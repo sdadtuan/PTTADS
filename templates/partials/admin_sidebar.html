@@ -100,6 +100,10 @@
         <span class="admin-nav-icon" aria-hidden="true">↻</span>
         Quy trình SOP
       </a>
+      <a href="{{ url_for('crm_service_delivery_page') }}" class="admin-nav-link{% if request.endpoint == 'crm_service_delivery_page' %} is-active{% endif %}" data-admin-nav="crm_service_delivery">
+        <span class="admin-nav-icon" aria-hidden="true">◈</span>
+        Service Delivery
+      </a>
     </div>
 
     <div class="admin-nav-group">
