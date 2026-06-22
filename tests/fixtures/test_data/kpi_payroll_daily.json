@@ -1,0 +1,40 @@
+{
+  "_comment": "Dữ liệu KPI, chấm công, báo cáo ngày",
+  "staff_kpi": {
+    "staff_id": 1,
+    "period_month": "2026-06",
+    "metrics": [
+      {"code": "LEADS_ASSIGNED", "target": 30, "actual": 12},
+      {"code": "CALLS_MADE", "target": 100, "actual": 45}
+    ]
+  },
+  "project_kpi": {
+    "project_code": "DA-A",
+    "period_month": "2026-06",
+    "metric_code": "RE_LEADS_NEW",
+    "target": 50,
+    "expected_actual_after_2_leads": 2,
+    "refresh_api": "POST /api/crm/re-projects/{id}/kpis/refresh-leads-new"
+  },
+  "attendance_row": {
+    "staff_id": 1,
+    "date": "2026-06-15",
+    "check_in": "08:02",
+    "check_out": "17:30",
+    "work_hours": 8.0
+  },
+  "payroll_period": {
+    "month": 6,
+    "year": 2026,
+    "staff_id": 1,
+    "expected_fields": ["base_salary", "attendance_days", "deductions", "net_pay"]
+  },
+  "daily_report": {
+    "staff_id": 1,
+    "report_date": "2026-06-15",
+    "work_done": "Gọi 8 lead, chốt 1 meeting khảo sát",
+    "hours": 8,
+    "plan_tomorrow": "Follow-up 5 lead Hot",
+    "blockers": "Chờ báo giá từ team thiết kế"
+  }
+}

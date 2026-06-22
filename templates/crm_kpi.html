@@ -1,0 +1,261 @@
+{% extends "admin_layout.html" %}
+{% set crm_staff_nav_active = 'kpi' if crm_staff_portal | default(false) else '' %}
+
+{% block title %}{% if crm_staff_portal | default(false) %}KPI của tôi{% else %}KPI nhân viên — CRM{% endif %}{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+{% block body_class_extra %}crm-body crm-kpi-page{% if kpi_readonly | default(false) %} crm-kpi-readonly{% endif %}{% if crm_staff_portal | default(false) %} crm-kpi-staff-portal{% endif %}{% endblock %}
+
+{% block admin_head %}
+  <meta name="description" content="{% if crm_staff_portal | default(false) %}Theo dõi KPI theo chức vụ và cập nhật tiến độ / ghi chú.{% else %}Danh mục chỉ tiêu KPI và theo dõi mục tiêu / thực tế theo nhân viên và tháng.{% endif %}" />
+  <script id="crm-kpi-meta" type="application/json">{{ {
+    "status_labels": kpi_status_labels,
+    "readonly": kpi_readonly,
+    "access_mode": kpi_access_mode,
+    "staff_portal": crm_staff_portal | default(false),
+    "staff_id": crm_staff_id,
+    "progress_only": kpi_progress_only | default(false)
+  } | tojson }}</script>
+  {% if not crm_staff_portal | default(false) %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+  {% endif %}
+{% endblock %}
+
+{% block admin_page_title %}{% if not crm_staff_portal | default(false) %}KPI nhân viên{% endif %}{% endblock %}
+{% block admin_page_desc %}
+  {% if not crm_staff_portal | default(false) %}
+  <p class="admin-page-desc">Cấu hình danh mục chỉ tiêu, ghi nhận mục tiêu / thực tế theo nhân viên và kỳ tháng.{% if kpi_readonly | default(false) %} <strong class="crm-kpi-mode-banner">Chế độ chỉ xem</strong> (server: <code>CRM_KPI_ACCESS=view</code>).{% endif %}</p>
+  {% endif %}
+{% endblock %}
+
+{% block admin_main %}
+<div class="crm-app{% if crm_staff_portal | default(false) %} crm-app--staff-portal{% endif %}">
+  <div class="crm-hero crm-staff-hero">
+    <div class="crm-hero-text">
+      <span class="crm-hero-badge" aria-hidden="true">Nhân sự</span>
+      <h1 class="crm-hero-title">{% if crm_staff_portal | default(false) %}KPI của tôi{% else %}KPI nhân viên{% endif %}</h1>
+      <p class="crm-hero-desc">
+        {% if crm_staff_portal | default(false) %}
+        Xem chỉ tiêu KPI theo <strong>chức vụ</strong> của bạn. Cập nhật <strong>thực tế</strong>, <strong>trạng thái</strong> và <strong>ghi chú</strong> — mục tiêu do quản trị đặt.
+        {% else %}
+        Cấu hình <strong>danh mục chỉ tiêu</strong>, rồi ghi nhận <strong>mục tiêu / thực tế</strong> theo từng nhân viên và <strong>kỳ tháng</strong>.
+        Một ô (nhân viên + chỉ tiêu + tháng) chỉ có một bản ghi — ghi đè khi thêm lại.
+        {% if kpi_readonly | default(false) %}
+        <strong class="crm-kpi-mode-banner">Chế độ chỉ xem</strong> (server: <code>CRM_KPI_ACCESS=view</code>) — không chỉnh sửa / xuất vẫn dùng được.
+        {% endif %}
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <section class="panel crm-staff-toolbar" aria-label="Chọn kỳ KPI">
+    <div class="crm-toolbar-row">
+      <label>Năm
+        <input type="number" id="crm-kpi-year" min="2000" max="2100" step="1" class="crm-pr-period-input" aria-label="Năm" />
+      </label>
+      <label>Tháng
+        <select id="crm-kpi-month" aria-label="Tháng">
+          {% for m in range(1, 13) %}
+          <option value="{{ m }}">{{ m }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="crm-kpi-admin-only" id="crm-kpi-filter-staff-wrap">Lọc nhân viên
+        <select id="crm-kpi-filter-staff" aria-label="Lọc theo nhân viên">
+          <option value="">Tất cả nhân viên</option>
+        </select>
+      </label>
+      <button type="button" class="btn-secondary" id="crm-kpi-refresh">Tải dữ liệu KPI</button>
+      <button type="button" class="btn-secondary crm-kpi-admin-only" id="crm-kpi-export-xlsx">Excel KPI</button>
+      <p class="crm-filter-hint muted" id="crm-kpi-period-hint" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section class="panel crm-kpi-alerts-panel crm-kpi-admin-only" id="crm-kpi-alerts-section" data-admin-section="crm_kpi_alerts" aria-label="Cảnh báo KPI" hidden>
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Giám sát</p>
+        <h2 class="crm-staff-section-title">Cảnh báo &amp; rủi ro trong kỳ</h2>
+        <p class="muted crm-dept-sub">Theo <strong>trạng thái</strong> và <strong>ngưỡng rủi ro</strong> đã cấu hình trên từng chỉ tiêu (% đạt tối thiểu hoặc trần vượt mức).</p>
+      </div>
+      <p class="crm-kpi-alert-summary muted" id="crm-kpi-alert-summary" aria-live="polite"></p>
+    </div>
+    <ul class="crm-kpi-alert-list" id="crm-kpi-alert-list"></ul>
+  </section>
+
+  <section class="panel crm-staff-section crm-kpi-admin-only" data-admin-section="crm_kpi_chart" aria-label="Biểu đồ KPI">
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Trực quan</p>
+        <h2 class="crm-staff-section-title">Biểu đồ % đạt theo nhân viên</h2>
+        <p class="muted crm-dept-sub">Chọn chỉ tiêu — cột so sánh <strong>% đạt</strong> trong kỳ (và bộ lọc nhân viên nếu có).</p>
+      </div>
+      <label class="crm-kpi-chart-metric-label">Chỉ tiêu
+        <select id="crm-kpi-chart-metric" aria-label="Chỉ tiêu biểu đồ">
+          <option value="">— Chọn chỉ tiêu —</option>
+        </select>
+      </label>
+    </div>
+    <div class="crm-kpi-chart-wrap">
+      <canvas id="crm-kpi-chart" height="120" aria-label="Biểu đồ KPI"></canvas>
+    </div>
+    <p class="crm-staff-msg is-error" id="crm-kpi-chart-err" hidden></p>
+  </section>
+
+  <section class="panel crm-staff-section crm-kpi-metrics-section crm-kpi-admin-only" data-admin-section="crm_kpi_metrics" aria-label="Danh mục chỉ tiêu">
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Cấu hình</p>
+        <h2 class="crm-staff-section-title">Chỉ tiêu KPI</h2>
+        <p class="muted crm-dept-sub">Chỉ tiêu <strong>ngưng hoạt động</strong> không dùng cho bản ghi mới; vẫn hiện ở các dòng KPI cũ.</p>
+      </div>
+      <button type="button" class="btn crm-kpi-edit-only" id="crm-kpi-open-metric-add">
+        <span class="crm-btn-icon" aria-hidden="true">+</span>
+        Thêm chỉ tiêu
+      </button>
+    </div>
+    <label class="crm-kpi-include-wrap">
+      <input type="checkbox" id="crm-kpi-metrics-include-inactive" />
+      Hiển thị cả chỉ tiêu đã ngưng
+    </label>
+    <div class="crm-staff-table-wrap crm-kpi-metric-table-wrap">
+      <table class="crm-staff-table crm-kpi-metric-table">
+        <thead>
+          <tr>
+            <th>Mã</th>
+            <th>Tên</th>
+            <th>Đơn vị</th>
+            <th>Thứ tự</th>
+            <th>Hoạt động</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="crm-kpi-metrics-tbody"></tbody>
+      </table>
+    </div>
+    <p class="crm-staff-msg is-error" id="crm-kpi-metrics-err" hidden></p>
+  </section>
+
+  <section class="panel crm-staff-section" data-admin-section="crm_kpi_records" aria-label="KPI theo nhân viên">
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Theo kỳ đã chọn</p>
+        <h2 class="crm-staff-section-title">{% if crm_staff_portal | default(false) %}Tiến độ KPI{% else %}Bản ghi KPI{% endif %}</h2>
+        <p class="muted crm-dept-sub">
+          {% if crm_staff_portal | default(false) %}
+          Nhập <strong>thực tế</strong>, chọn <strong>trạng thái</strong> và <strong>ghi chú</strong>, rồi bấm <strong>Lưu</strong> từng dòng.
+          {% else %}
+          Thêm dòng mới hoặc chỉnh trực tiếp trong bảng, rồi <strong>Lưu</strong> từng dòng.
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <form id="crm-kpi-add-form" class="crm-detail-form crm-kpi-add-form crm-kpi-edit-only crm-kpi-admin-only">
+      <div class="crm-staff-edit-grid crm-kpi-add-grid">
+        <label>Nhân viên *
+          <select name="staff_id" id="crm-kpi-add-staff" required>
+            <option value="">— Chọn —</option>
+          </select>
+        </label>
+        <label>Chỉ tiêu *
+          <select name="metric_id" id="crm-kpi-add-metric" required>
+            <option value="">— Chọn —</option>
+          </select>
+        </label>
+        <label>Mục tiêu
+          <input name="target_value" id="crm-kpi-add-target" type="text" inputmode="decimal" placeholder="VD: 95" autocomplete="off" />
+        </label>
+        <label>Thực tế
+          <input name="actual_value" id="crm-kpi-add-actual" type="text" inputmode="decimal" placeholder="VD: 92" autocomplete="off" />
+        </label>
+        <label>Trạng thái
+          <select name="status" id="crm-kpi-add-status"></select>
+        </label>
+        <label class="crm-kpi-add-note-label">Ghi chú
+          <input name="note" id="crm-kpi-add-note" type="text" maxlength="2000" placeholder="Tuỳ chọn" autocomplete="off" />
+        </label>
+      </div>
+      <div class="crm-kpi-add-actions">
+        <button type="submit" class="btn" id="crm-kpi-add-submit">Thêm / ghi đè</button>
+      </div>
+    </form>
+    <p class="crm-staff-msg is-error" id="crm-kpi-staff-err" hidden></p>
+
+    <div class="crm-staff-table-wrap crm-kpi-rows-wrap">
+      <table class="crm-staff-table crm-kpi-rows-table">
+        <thead>
+          <tr>
+            <th class="crm-kpi-col-staff">Nhân viên</th>
+            <th>Chỉ tiêu</th>
+            <th>Mục tiêu</th>
+            <th>Thực tế</th>
+            <th>Trạng thái</th>
+            <th>Ghi chú</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="crm-kpi-rows-tbody"></tbody>
+      </table>
+    </div>
+    <p class="crm-staff-empty muted" id="crm-kpi-rows-empty" hidden>Chưa có bản ghi KPI cho kỳ và bộ lọc này.</p>
+  </section>
+</div>
+
+<div class="crm-modal-root crm-kpi-admin-only" id="crm-kpi-metric-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-kpi-metric-close tabindex="-1"></div>
+  <div class="crm-modal-panel crm-modal-panel--staff-edit" role="dialog" aria-modal="true" aria-labelledby="crm-kpi-metric-title">
+    <header class="crm-modal-head">
+      <div>
+        <p class="crm-modal-kicker">Chỉ tiêu</p>
+        <h2 id="crm-kpi-metric-title">Thêm chỉ tiêu</h2>
+      </div>
+      <button type="button" class="crm-modal-close" data-kpi-metric-close aria-label="Đóng">×</button>
+    </header>
+    <form id="crm-kpi-metric-form" class="crm-detail-form">
+      <input type="hidden" name="id" id="crm-kpi-metric-id" value="" />
+      <div class="crm-staff-edit-grid">
+        <label>Mã
+          <input name="code" id="crm-kpi-metric-code" maxlength="64" placeholder="VD: SLA_PCT" autocomplete="off" />
+        </label>
+        <label>Tên *
+          <input name="name" id="crm-kpi-metric-name" required maxlength="240" placeholder="Tên hiển thị" />
+        </label>
+        <label>Đơn vị
+          <input name="unit" id="crm-kpi-metric-unit" maxlength="64" placeholder="%, điểm…" />
+        </label>
+        <label>Thứ tự
+          <input name="sort_order" id="crm-kpi-metric-sort" type="number" step="1" value="0" />
+        </label>
+        <label class="crm-kpi-metric-risk-label">Quản lý rủi ro
+          <span class="crm-kpi-risk-hint muted">Ngưỡng so với mục tiêu (0,9 = cảnh báo khi đạt dưới 90% mục tiêu nếu &quot;cao hơn tốt&quot;; để trống = chỉ dựa vào trạng thái).</span>
+          <input name="warn_ratio" id="crm-kpi-metric-warn" type="text" inputmode="decimal" placeholder="VD: 0.9" autocomplete="off" />
+        </label>
+        <label class="crm-kpi-metric-hi-label">
+          <input type="checkbox" name="higher_is_better" id="crm-kpi-metric-hi" checked />
+          Chỉ tiêu &quot;cao hơn tốt&quot; (bỏ chọn nếu thấp hơn tốt, VD: khiếu nại)
+        </label>
+        <label class="crm-kpi-metric-desc-label">Mô tả
+          <textarea name="description" id="crm-kpi-metric-desc" rows="3" maxlength="2000" placeholder="Gợi ý cách đo / nguồn dữ liệu"></textarea>
+        </label>
+        <label class="crm-kpi-metric-active-label" id="crm-kpi-metric-active-wrap" hidden>
+          <input type="checkbox" name="active" id="crm-kpi-metric-active" />
+          Đang sử dụng
+        </label>
+      </div>
+      <p class="crm-staff-msg is-error" id="crm-kpi-metric-err" hidden></p>
+      <div class="crm-modal-actions">
+        <button type="button" class="btn-secondary" data-kpi-metric-close>Hủy</button>
+        <button type="submit" class="btn" id="crm-kpi-metric-save">Lưu</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block admin_page_scripts %}
+{% if not crm_staff_portal | default(false) %}
+{% include 'partials/admin_grants_bootstrap.html' %}
+{% endif %}
+{% set _jk = static_js_file('crm_kpi.js') %}
+<script src="{{ url_for('static', filename=_jk) }}?v={{ static_v(_jk) }}"></script>
+{% endblock %}

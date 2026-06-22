@@ -1,0 +1,62 @@
+{
+  "_comment": "Dữ liệu thiết lập dự án BĐS cho test Lead theo dự án (Phase 1–5)",
+  "projects": [
+    {
+      "code": "DA-A",
+      "name": "Dự án Alpha Tower",
+      "type": "căn hộ",
+      "address": "Quận 7, TP.HCM",
+      "webhook_slug": "alpha-tower-fb",
+      "facebook_page_id": "page_alpha_001",
+      "facebook_forms": [
+        {
+          "form_id": "2814926042203269",
+          "form_name": "Form Alpha Lead",
+          "active": true
+        }
+      ],
+      "lead_config": {
+        "enabled": true,
+        "webhook_enabled": true,
+        "auto_assign": true
+      },
+      "staff": [
+        {"staff_id": 1, "role": "sales", "assign_enabled": true},
+        {"staff_id": 2, "role": "manager", "assign_enabled": true}
+      ]
+    },
+    {
+      "code": "DA-B",
+      "name": "Dự án Beta Residence",
+      "type": "nhà phố",
+      "address": "Quận 2, TP.HCM",
+      "webhook_slug": "beta-residence-fb",
+      "facebook_page_id": "page_beta_002",
+      "facebook_forms": [
+        {
+          "form_id": "form_beta_999888",
+          "form_name": "Form Beta Lead",
+          "active": true
+        }
+      ],
+      "lead_config": {
+        "enabled": true,
+        "webhook_enabled": true,
+        "auto_assign": true
+      },
+      "staff": [
+        {"staff_id": 2, "role": "sales", "assign_enabled": true}
+      ]
+    }
+  ],
+  "kpi_metric": {
+    "code": "RE_LEADS_NEW",
+    "name": "Lead mới trong tháng",
+    "unit": "lead",
+    "auto_count": true
+  },
+  "webhook_urls": {
+    "project_slug": "https://pttads.vn/api/crm/integration/webhooks/facebook/alpha-tower-fb",
+    "global": "https://pttads.vn/api/crm/integration/webhooks/facebook"
+  }
+}

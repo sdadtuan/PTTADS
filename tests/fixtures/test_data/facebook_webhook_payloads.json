@@ -1,0 +1,99 @@
+{
+  "_comment": "Payload webhook Facebook Lead Ads — dùng với ptt_fb_webhook_probe.py hoặc mock Graph API",
+  "verify_get": {
+    "method": "GET",
+    "query": {
+      "hub.mode": "subscribe",
+      "hub.verify_token": "<VERIFY_TOKEN_TU_CARD_DU_AN>",
+      "hub.challenge": "1234567890"
+    },
+    "expected": "HTTP 200, body = hub.challenge"
+  },
+  "leadgen_project_slug": {
+    "method": "POST",
+    "url_suffix": "/api/crm/integration/webhooks/facebook/alpha-tower-fb",
+    "headers": {
+      "X-Hub-Signature-256": "<HMAC_SHA256_APP_SECRET>"
+    },
+    "body": {
+      "object": "page",
+      "entry": [
+        {
+          "id": "page_alpha_001",
+          "time": 1718448000,
+          "changes": [
+            {
+              "field": "leadgen",
+              "value": {
+                "leadgen_id": "lg_test_alpha_001",
+                "form_id": "2814926042203269",
+                "page_id": "page_alpha_001",
+                "created_time": 1718448000
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "graph_api_mock_response": {
+      "full_name": "Khách Facebook Alpha",
+      "phone": "0907000001",
+      "email": "fb_alpha@test.com",
+      "meta": {
+        "facebook_form_id": "2814926042203269",
+        "facebook_page_id": "page_alpha_001",
+        "facebook_leadgen_id": "lg_test_alpha_001"
+      }
+    },
+    "expected": {
+      "http_status": 200,
+      "created_count": 1,
+      "re_project_code": "DA-A",
+      "owner_in_pool": [1, 2],
+      "kpi_RE_LEADS_NEW_increment": 1,
+      "notification_for_owner": true
+    }
+  },
+  "leadgen_unmapped_form": {
+    "method": "POST",
+    "body": {
+      "object": "page",
+      "entry": [
+        {
+          "id": "page_unknown",
+          "changes": [
+            {
+              "field": "leadgen",
+              "value": {
+                "leadgen_id": "lg_unmapped_001",
+                "form_id": "9999999999999999",
+                "page_id": "page_unknown"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "expected": {
+      "http_status": 200,
+      "created_count": 0,
+      "ai_search_hint": "form facebook chưa map"
+    }
+  },
+  "field_mapping_vn": {
+    "field_data": [
+      {"name": "ho_ten", "values": ["Nguyen Van FB"]},
+      {"name": "so_dien_thoai", "values": ["0901234567"]},
+      {"name": "email", "values": ["fbvn@test.com"]},
+      {"name": "khu_vuc", "values": ["Quận 7"]},
+      {"name": "san_pham", "values": ["căn hộ"]}
+    ],
+    "expected_normalized": {
+      "full_name": "Nguyen Van FB",
+      "phone": "0901234567",
+      "email": "fbvn@test.com",
+      "region": "Quận 7",
+      "product_interest": "căn hộ"
+    }
+  }
+}

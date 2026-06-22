@@ -1,0 +1,3 @@
+<script type="application/json" id="admin-grants-bootstrap">{{ admin_grants_json | default('{}') | safe }}</script>
+{% set _jag = static_js_file('admin_section_gating.js') %}
+<script src="{{ url_for('static', filename=_jag) }}?v={{ static_v(_jag) }}"></script>

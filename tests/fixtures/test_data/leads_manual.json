@@ -1,0 +1,84 @@
+{
+  "_comment": "Dữ liệu tạo/sửa lead thủ công và kiểm tra scoring, dedup, trạng thái",
+  "create_valid": {
+    "full_name": "Nguyễn Văn A",
+    "phone": "0901234567",
+    "email": "nguyenvana@test.com",
+    "source": "manual",
+    "need": "Tư vấn căn hộ 2PN, ngân sách 3 tỷ",
+    "product_interest": "Căn hộ",
+    "region": "Quận 7",
+    "re_project_code": "DA-A",
+    "expected": {
+      "status": "Mới",
+      "lead_score_min": 10,
+      "lead_level_in": ["vip", "hot", "warm_plus", "warm", "cold_plus", "cold"],
+      "activities_contain": ["Kiểm tra liên hệ", "Kiểm tra trùng", "Chấm điểm", "Phân hạng"]
+    }
+  },
+  "create_high_score": {
+    "full_name": "Nguyễn VIP Khách",
+    "phone": "0909999888",
+    "email": "vip@test.com",
+    "source": "referral",
+    "need": "Muốn mua ngay, ngân sách 3.5 tỷ",
+    "product_interest": "Căn hộ",
+    "region": "HCM",
+    "meta": {"budget_text": "3.5 tỷ", "site_time_minutes": 8},
+    "expected": {
+      "lead_score_min": 20,
+      "lead_level_likely": "hot"
+    }
+  },
+  "create_invalid_phone": {
+    "full_name": "SĐT sai",
+    "phone": "123",
+    "email": "",
+    "expected_error": "Số điện thoại không hợp lệ"
+  },
+  "create_invalid_email": {
+    "full_name": "Email sai",
+    "phone": "0911222333",
+    "email": "not-an-email",
+    "expected_error": "Email không hợp lệ"
+  },
+  "duplicate_phone": {
+    "first": {
+      "full_name": "Lead gốc",
+      "phone": "0911111111",
+      "email": "dup@test.com"
+    },
+    "second": {
+      "full_name": "Lead trùng SĐT",
+      "phone": "0911111111",
+      "email": "other@test.com",
+      "duplicate_policy": "flag"
+    },
+    "expected": {
+      "is_duplicate": 1,
+      "match_type": "phone"
+    }
+  },
+  "duplicate_scoped_project": {
+    "project_a": {
+      "code": "DA-A",
+      "lead": {"full_name": "Khách A", "phone": "0907000100", "email": ""}
+    },
+    "project_b": {
+      "code": "DA-B",
+      "lead": {"full_name": "Khách B", "phone": "0907000100", "email": ""}
+    },
+    "expected": "Cùng SĐT nhưng khác dự án → tạo 2 lead riêng, không coi trùng cross-project"
+  },
+  "status_transitions": [
+    {"from": "Mới", "to": "Đã liên hệ", "allowed": true},
+    {"from": "Mới", "to": "Chốt", "allowed": false},
+    {"from": "Qualified", "to": "Hot", "allowed": true},
+    {"from": "Chốt", "to": "Mất", "allowed": false}
+  ],
+  "assign_manual": {
+    "lead_phone": "0901234567",
+    "owner_staff_id": 2,
+    "expected": "owner_id = 2, log phân công ghi nhận"
+  }
+}

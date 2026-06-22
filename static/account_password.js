@@ -1,0 +1,66 @@
+(function () {
+  "use strict";
+
+  const form = document.getElementById("account-password-form");
+  const errEl = document.getElementById("account-password-err");
+  const okEl = document.getElementById("account-password-ok");
+
+  async function reqJson(url, opts = {}) {
+    const res = await fetch(url, {
+      credentials: "same-origin",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(opts.headers || {}),
+      },
+      ...opts,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = typeof data.error === "string" ? data.error : "Không thực hiện được.";
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  form?.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    if (errEl) errEl.hidden = true;
+    if (okEl) okEl.hidden = true;
+    const fd = new FormData(form);
+    const current = (fd.get("current_password") || "").toString();
+    const next = (fd.get("new_password") || "").toString();
+    const confirm = (fd.get("new_password_confirm") || "").toString();
+    if (next !== confirm) {
+      if (errEl) {
+        errEl.textContent = "Mật khẩu mới và xác nhận không khớp.";
+        errEl.hidden = false;
+      }
+      return;
+    }
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn instanceof HTMLButtonElement) btn.disabled = true;
+    try {
+      const data = await reqJson("/api/account/change-password", {
+        method: "POST",
+        body: JSON.stringify({
+          current_password: current,
+          new_password: next,
+          new_password_confirm: confirm,
+        }),
+      });
+      form.reset();
+      if (okEl) {
+        okEl.textContent = data.message || "Đã đổi mật khẩu thành công.";
+        okEl.hidden = false;
+      }
+    } catch (e) {
+      if (errEl) {
+        errEl.textContent = e instanceof Error ? e.message : "Lỗi";
+        errEl.hidden = false;
+      }
+    } finally {
+      if (btn instanceof HTMLButtonElement) btn.disabled = false;
+    }
+  });
+})();

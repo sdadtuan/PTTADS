@@ -1,0 +1,449 @@
+{% extends "admin_layout.html" %}
+{% set crm_staff_nav_active = 'customers' if crm_staff_portal else '' %}
+
+{% block title %}{% if crm_staff_portal %}Khách hàng của tôi{% else %}Khách hàng — CRM{% endif %}{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+{% block body_class_extra %}crm-body crm-customers-page{% if crm_staff_portal %} crm-customers-page--staff{% endif %}{% endblock %}
+
+{% block admin_head %}
+  <meta name="description" content="Trang quản lý khách hàng CRM — hồ sơ 360°, chăm sóc và pipeline." />
+  <script id="crm-cu-meta" type="application/json">{{ {
+    "pipeline_labels": crm_pipeline_labels,
+    "care_status_labels": crm_care_status_labels,
+    "care_contact_labels": crm_care_contact_labels,
+    "contract_status_labels": crm_contract_status_labels,
+    "lead_sources": crm_customer_lead_sources,
+    "genders": crm_customer_genders,
+    "relation_types": crm_relation_types,
+    "purchase_statuses": crm_purchase_statuses,
+    "issue_types": crm_issue_types,
+    "issue_statuses": crm_issue_statuses,
+    "issue_priorities": crm_issue_priorities,
+    "staff_portal": crm_staff_portal,
+    "admin_full_access": admin_full_access | default(false),
+    "staff_id": crm_staff_id,
+    "staff_name": crm_staff_name
+  } | tojson }}</script>
+{% endblock %}
+
+{% block admin_page_title %}{% if crm_staff_portal %}Khách hàng của tôi{% else %}Khách hàng{% endif %}{% endblock %}
+{% block admin_page_desc %}
+  <p class="admin-page-desc">{% if crm_staff_portal %}Theo dõi hồ sơ khách được gán — liên hệ, chăm sóc và xử lý phản ánh.{% else %}Quản lý hồ sơ 360° — nguồn lead, mua hàng, quan hệ và pipeline CSKH.{% endif %}</p>
+{% endblock %}
+{% block admin_page_actions %}
+  {% if not crm_staff_portal %}
+  <a class="btn-secondary" href="{{ url_for('crm_board') }}">Bảng CSKH</a>
+  <button type="button" class="btn" id="crm-cu-open-create" data-admin-btn="crm_board_customers__btn_create">
+    <span class="crm-cu-btn-icon" aria-hidden="true">+</span> Thêm khách hàng
+  </button>
+  {% endif %}
+{% endblock %}
+
+{% block admin_main %}
+<div class="crm-app crm-customers-app"{% if admin_full_access | default(false) or crm_staff_portal %} data-admin-section-allow{% else %} data-admin-section="crm_board_customers"{% endif %}>
+  <div class="crm-cu-shell">
+
+    <!-- Cột trái: tìm kiếm + danh sách -->
+    <aside class="crm-cu-list-pane panel" aria-label="Danh sách khách hàng">
+      <div class="crm-cu-stats-row" id="crm-cu-stats" aria-label="Tổng quan">
+        <div class="crm-cu-stat-card">
+          <span class="crm-cu-stat-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </span>
+          <span class="crm-cu-stat-pill-val" id="crm-cu-stat-total">0</span>
+          <span class="crm-cu-stat-pill-lbl">Tổng KH</span>
+        </div>
+        <div class="crm-cu-stat-card crm-cu-stat-card--active">
+          <span class="crm-cu-stat-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          </span>
+          <span class="crm-cu-stat-pill-val" id="crm-cu-stat-active">0</span>
+          <span class="crm-cu-stat-pill-lbl">Đang CS</span>
+        </div>
+        <div class="crm-cu-stat-card crm-cu-stat-card--warn">
+          <span class="crm-cu-stat-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          </span>
+          <span class="crm-cu-stat-pill-val" id="crm-cu-stat-issues">0</span>
+          <span class="crm-cu-stat-pill-lbl">Vấn đề</span>
+        </div>
+        <div class="crm-cu-stat-card">
+          <span class="crm-cu-stat-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </span>
+          <span class="crm-cu-stat-pill-val" id="crm-cu-stat-contracts">0</span>
+          <span class="crm-cu-stat-pill-lbl">Hợp đồng</span>
+        </div>
+      </div>
+
+      <div class="crm-cu-list-toolbar">
+        <label class="crm-search-wrap crm-cu-search-wrap">
+          <span class="visually-hidden">Tìm khách hàng</span>
+          <span class="crm-search-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </span>
+          <input type="search" id="crm-cu-search" placeholder="Tên, SĐT, email…" autocomplete="off" />
+        </label>
+        {% if not crm_staff_portal %}
+        <div class="crm-cu-filters" role="group" aria-label="Lọc danh sách">
+          <button type="button" class="crm-chip is-active" data-cu-filter="active">Đang CS</button>
+          <button type="button" class="crm-chip" data-cu-filter="all">Tất cả</button>
+        </div>
+        {% endif %}
+        <p class="crm-filter-hint muted" id="crm-cu-filter-summary" aria-live="polite"></p>
+      </div>
+
+      <div class="crm-cu-card-list" id="crm-cu-card-list" role="list"></div>
+      <p class="crm-staff-empty muted crm-cu-list-empty" id="crm-cu-empty" hidden>Chưa có khách hàng phù hợp bộ lọc.</p>
+    </aside>
+
+    <!-- Cột phải: chi tiết khách hàng -->
+    <div class="crm-cu-detail-pane" id="crm-cu-detail-pane">
+      <div class="crm-cu-detail-empty panel" id="crm-cu-detail-empty">
+        <div class="crm-cu-detail-empty-visual" aria-hidden="true">
+          <div class="crm-cu-empty-orbit"></div>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <h2>Hồ sơ khách hàng 360°</h2>
+        <p class="muted">Chọn khách ở danh sách bên trái để xem liên hệ, mua hàng, phản ánh và lịch sử CSKH.</p>
+        <ul class="crm-cu-empty-tips">
+          <li>Dùng ô tìm kiếm theo tên, SĐT hoặc email</li>
+          <li>Tab <strong>Phản ánh</strong> để ghi nhận khiếu nại</li>
+          <li>Tab <strong>Báo cáo CSKH</strong> để cập nhật chăm sóc</li>
+        </ul>
+      </div>
+
+      <div class="crm-cu-detail-panel panel" id="crm-cu-detail-panel" hidden>
+        <header class="crm-cu-hero">
+          <div class="crm-cu-hero-main">
+            <div class="crm-cu-avatar" id="crm-cu-avatar" aria-hidden="true">—</div>
+            <div class="crm-cu-hero-text">
+              <p class="crm-cu-hero-kicker">Khách hàng</p>
+              <h2 id="crm-cu-drawer-title">—</h2>
+              <p class="crm-cu-hero-meta" id="crm-cu-drawer-sub"></p>
+              <div class="crm-cu-hero-badges" id="crm-cu-hero-badges"></div>
+            </div>
+          </div>
+          <div class="crm-cu-hero-actions" id="crm-cu-hero-actions">
+            <a class="crm-cu-quick-btn" id="crm-cu-quick-call" href="#" hidden title="Gọi điện">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            </a>
+            <a class="crm-cu-quick-btn" id="crm-cu-quick-email" href="#" hidden title="Gửi email">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            </a>
+            <button type="button" class="crm-cu-detail-close" id="crm-cu-detail-close" aria-label="Đóng chi tiết">×</button>
+          </div>
+        </header>
+
+        <div class="crm-cu-metrics" id="crm-cu-quick-stats" aria-label="Chỉ số nhanh"></div>
+
+        <div class="crm-cu-detail-body">
+          <nav class="crm-cu-nav" role="tablist" aria-label="Mục hồ sơ">
+            <p class="crm-cu-nav-group">Hồ sơ</p>
+            <button type="button" class="crm-cu-nav-item is-active" role="tab" data-cu-tab="overview">
+              <span class="crm-cu-nav-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></span>
+              <span class="crm-cu-nav-label">Liên hệ</span>
+            </button>
+            <button type="button" class="crm-cu-nav-item" role="tab" data-cu-tab="profile">
+              <span class="crm-cu-nav-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+              <span class="crm-cu-nav-label">Cá nhân</span>
+            </button>
+            <p class="crm-cu-nav-group">Kinh doanh</p>
+            <button type="button" class="crm-cu-nav-item" role="tab" data-cu-tab="purchases">
+              <span class="crm-cu-nav-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
+              <span class="crm-cu-nav-label">Mua hàng</span>
+              <span class="crm-cu-nav-badge" id="crm-cu-badge-purchases" hidden>0</span>
+            </button>
+            {% if not crm_staff_portal %}
+            <button type="button" class="crm-cu-nav-item" role="tab" data-cu-tab="contracts">
+              <span class="crm-cu-nav-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+              <span class="crm-cu-nav-label">Hợp đồng</span>
+            </button>
+            {% endif %}
+            <p class="crm-cu-nav-group">CSKH</p>
+            <button type="button" class="crm-cu-nav-item" role="tab" data-cu-tab="cases">
+              <span class="crm-cu-nav-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
+              <span class="crm-cu-nav-label">Hồ sơ CSKH</span>
+            </button>
+            <button type="button" class="crm-cu-nav-item" role="tab" data-cu-tab="care">
+              <span class="crm-cu-nav-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+              <span class="crm-cu-nav-label">Báo cáo</span>
+            </button>
+            <button type="button" class="crm-cu-nav-item" role="tab" data-cu-tab="issues">
+              <span class="crm-cu-nav-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+              <span class="crm-cu-nav-label">Phản ánh</span>
+              <span class="crm-cu-nav-badge crm-cu-nav-badge--warn" id="crm-cu-badge-issues" hidden>0</span>
+            </button>
+          </nav>
+
+          <div class="crm-cu-content">
+            <div class="crm-cu-tab-panel is-active" id="crm-cu-panel-overview" data-cu-panel="overview" role="tabpanel">
+              <div class="crm-cu-contact-grid" id="crm-cu-contact-grid" aria-label="Liên hệ nhanh"></div>
+              <form id="crm-cu-profile-form" class="crm-detail-form crm-cu-form-section crm-cu-form-card panel">
+                <h3 class="crm-cu-form-title">Thông tin liên hệ</h3>
+                <div class="crm-staff-edit-grid">
+                  <label class="crm-field-span2">Họ và tên *
+                    <input name="name" required maxlength="240" />
+                  </label>
+                  <label>Số điện thoại
+                    <input name="phone" maxlength="64" autocomplete="tel" />
+                  </label>
+                  <label>Email
+                    <input name="email" type="email" maxlength="240" autocomplete="email" />
+                  </label>
+                  <label class="crm-field-span2">Địa chỉ
+                    <textarea name="address" rows="2" maxlength="500" placeholder="Số nhà, phường, quận…"></textarea>
+                  </label>
+                  <label class="crm-field-span2">Công ty / tổ chức
+                    <input name="company" maxlength="240" />
+                  </label>
+                </div>
+                <h3 class="crm-cu-form-title">Nguồn khách hàng</h3>
+                <div class="crm-staff-edit-grid">
+                  <label>Nguồn chính
+                    <select name="lead_source" id="crm-cu-lead-source"></select>
+                  </label>
+                  <label class="crm-field-span2">Ghi chú nguồn
+                    <input name="lead_source_note" maxlength="500" placeholder="VD: Giới thiệu tại sự kiện Q2" />
+                  </label>
+                </div>
+                <div class="crm-cu-source-tags" id="crm-cu-source-tags" hidden>
+                  <p class="crm-cu-form-title">Nguồn tổng hợp</p>
+                  <ul class="crm-cu-source-list" id="crm-cu-source-list"></ul>
+                </div>
+                <p class="muted crm-cu-created" id="crm-cu-created-at"></p>
+                <div class="crm-cu-form-footer crm-cu-sticky-bar" id="crm-cu-profile-actions">
+                  <button type="submit" class="btn">Lưu thay đổi</button>
+                </div>
+                <p class="crm-form-msg is-error" id="crm-cu-profile-err" hidden></p>
+              </form>
+            </div>
+
+            <div class="crm-cu-tab-panel" id="crm-cu-panel-profile" data-cu-panel="profile" role="tabpanel" hidden>
+              <form id="crm-cu-demographics-form" class="crm-detail-form crm-cu-form-section">
+                <h3 class="crm-cu-form-title">Nhân khẩu học</h3>
+                <div class="crm-staff-edit-grid">
+                  <label>Ngày sinh
+                    <input name="date_of_birth" type="date" />
+                  </label>
+                  <label>Giới tính
+                    <select name="gender" id="crm-cu-gender"></select>
+                  </label>
+                  <label>CMND / CCCD
+                    <input name="id_number" maxlength="32" autocomplete="off" />
+                  </label>
+                  <label>Nghề nghiệp
+                    <input name="occupation" maxlength="240" />
+                  </label>
+                  <label class="crm-field-span2">Sở thích / thói quen
+                    <textarea name="interests" rows="2" maxlength="4000" placeholder="Sản phẩm quan tâm, kênh liên hệ ưa thích…"></textarea>
+                  </label>
+                  <label class="crm-field-span2">Ghi chú hồ sơ
+                    <textarea name="profile_notes" rows="2" maxlength="4000"></textarea>
+                  </label>
+                </div>
+                <div class="crm-cu-form-footer" id="crm-cu-demo-actions">
+                  <button type="submit" class="btn">Lưu hồ sơ cá nhân</button>
+                </div>
+                <p class="crm-form-msg is-error" id="crm-cu-demo-err" hidden></p>
+              </form>
+              <section class="crm-cu-form-section">
+                <header class="crm-cu-section-head">
+                  <h3 class="crm-cu-form-title">Quan hệ gia đình</h3>
+                  {% if not crm_staff_portal %}
+                  <button type="button" class="btn-secondary btn-sm" id="crm-cu-relation-add">+ Thêm</button>
+                  {% endif %}
+                </header>
+                <div id="crm-cu-relations-list" class="crm-cu-relations-list"></div>
+                <form id="crm-cu-relation-form" class="crm-detail-form crm-cu-inline-form panel" hidden>
+                  <div class="crm-form-grid-2">
+                    <label>Quan hệ
+                      <select name="relation_type" id="crm-cu-relation-type"></select>
+                    </label>
+                    <label>Họ tên *
+                      <input name="full_name" required maxlength="240" />
+                    </label>
+                    <label>SĐT
+                      <input name="phone" maxlength="64" />
+                    </label>
+                    <label>Email
+                      <input name="email" type="email" maxlength="240" />
+                    </label>
+                    <label class="crm-field-span2">Ghi chú
+                      <input name="notes" maxlength="500" />
+                    </label>
+                  </div>
+                  <div class="crm-cu-inline-actions">
+                    <button type="button" class="btn-secondary" id="crm-cu-relation-cancel">Hủy</button>
+                    <button type="submit" class="btn">Lưu</button>
+                  </div>
+                  <input type="hidden" name="relation_id" value="" />
+                </form>
+              </section>
+            </div>
+
+            <div class="crm-cu-tab-panel" id="crm-cu-panel-purchases" data-cu-panel="purchases" role="tabpanel" hidden>
+              {% if not crm_staff_portal %}
+              <details class="crm-cu-collapsible panel">
+                <summary class="crm-cu-collapsible-summary">+ Thêm giao dịch mua hàng</summary>
+                <form id="crm-cu-purchase-form" class="crm-detail-form crm-cu-inline-form">
+                  <div class="crm-form-grid-2">
+                    <label>Ngày *
+                      <input name="order_date" type="date" required />
+                    </label>
+                    <label>Trạng thái
+                      <select name="status" id="crm-cu-purchase-status"></select>
+                    </label>
+                    <label class="crm-field-span2">Sản phẩm / dịch vụ *
+                      <input name="product_name" required maxlength="400" />
+                    </label>
+                    <label>Số lượng
+                      <input name="quantity" type="number" min="1" value="1" />
+                    </label>
+                    <label>Giá trị (₫)
+                      <input name="amount_vnd" type="number" min="0" step="1000" />
+                    </label>
+                    <label>Mã đơn
+                      <input name="reference_code" maxlength="120" />
+                    </label>
+                    <label class="crm-field-span2">Ghi chú
+                      <input name="notes" maxlength="500" />
+                    </label>
+                  </div>
+                  <button type="submit" class="btn">Thêm giao dịch</button>
+                  <p class="crm-form-msg is-error" id="crm-cu-purchase-err" hidden></p>
+                </form>
+              </details>
+              {% endif %}
+              <div id="crm-cu-purchases-list" class="crm-cu-purchases-list"></div>
+            </div>
+
+            <div class="crm-cu-tab-panel" id="crm-cu-panel-issues" data-cu-panel="issues" role="tabpanel" hidden>
+              <details class="crm-cu-collapsible panel" open>
+                <summary class="crm-cu-collapsible-summary">Ghi nhận phản ánh mới</summary>
+                <form id="crm-cu-issue-form" class="crm-detail-form crm-cu-inline-form">
+                  <div class="crm-form-grid-2">
+                    <label>Loại *
+                      <select name="issue_type" id="crm-cu-issue-type" required></select>
+                    </label>
+                    <label>Ưu tiên
+                      <select name="priority" id="crm-cu-issue-priority"></select>
+                    </label>
+                    <label class="crm-field-span2">Tiêu đề *
+                      <input name="title" required maxlength="400" placeholder="Tóm tắt vấn đề" />
+                    </label>
+                    <label class="crm-field-span2">Mô tả *
+                      <textarea name="description" rows="3" required maxlength="8000"></textarea>
+                    </label>
+                  </div>
+                  <button type="submit" class="btn">Tạo vấn đề</button>
+                  <p class="crm-form-msg is-error" id="crm-cu-issue-err" hidden></p>
+                </form>
+              </details>
+              <div id="crm-cu-issues-list" class="crm-cu-issues-list"></div>
+            </div>
+
+            <div class="crm-cu-tab-panel" id="crm-cu-panel-cases" data-cu-panel="cases" role="tabpanel" hidden>
+              <div class="crm-cu-cases-list" id="crm-cu-cases-list"></div>
+            </div>
+
+            <div class="crm-cu-tab-panel" id="crm-cu-panel-care" data-cu-panel="care" role="tabpanel" hidden>
+              <form id="crm-cu-care-form" class="crm-detail-form crm-cu-form-section panel">
+                <h3 class="crm-cu-form-title">Gửi báo cáo chăm sóc</h3>
+                <label>Hồ sơ CSKH
+                  <select name="case_id" id="crm-cu-care-case" required></select>
+                </label>
+                <div class="crm-form-grid-2">
+                  <label>Hình thức
+                    <select name="contact_type" id="crm-cu-care-contact"></select>
+                  </label>
+                  <label>Tình trạng
+                    <select name="care_status" id="crm-cu-care-status"></select>
+                  </label>
+                </div>
+                <label>Nội dung *
+                  <textarea name="summary" rows="3" required maxlength="4000" placeholder="Kết quả liên hệ…"></textarea>
+                </label>
+                <label>Bước tiếp theo
+                  <input name="next_action" maxlength="800" placeholder="VD: Gọi lại thứ Sáu" />
+                </label>
+                <button type="submit" class="btn">Gửi báo cáo</button>
+                <p class="crm-form-msg is-error" id="crm-cu-care-err" hidden></p>
+              </form>
+              <h3 class="crm-cu-form-title">Lịch sử báo cáo</h3>
+              <ol class="crm-timeline crm-cu-care-timeline" id="crm-cu-care-timeline"></ol>
+            </div>
+
+            <div class="crm-cu-tab-panel" id="crm-cu-panel-contracts" data-cu-panel="contracts" role="tabpanel" hidden>
+              <div id="crm-cu-contracts-list" class="crm-cu-contracts-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Mobile drawer overlay -->
+<div class="crm-cu-mobile-drawer" id="crm-cu-mobile-drawer" hidden>
+  <div class="crm-cu-mobile-backdrop" id="crm-cu-mobile-backdrop"></div>
+</div>
+
+<!-- Modal thêm khách -->
+<div class="crm-modal-root" id="crm-cu-modal-create" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-cu-close tabindex="-1"></div>
+  <div class="crm-modal-panel crm-cu-create-modal" role="dialog" aria-modal="true" aria-labelledby="crm-cu-create-title">
+    <header class="crm-modal-head">
+      <div>
+        <p class="crm-modal-kicker">Khách hàng mới</p>
+        <h2 id="crm-cu-create-title">Thêm khách hàng</h2>
+      </div>
+      <button type="button" class="crm-modal-close" data-cu-close aria-label="Đóng">×</button>
+    </header>
+    <form id="crm-cu-create-form" class="crm-detail-form">
+      <div class="crm-cu-create-steps">
+        <section class="crm-cu-form-section">
+          <h3 class="crm-cu-form-title">Liên hệ</h3>
+          <div class="crm-staff-edit-grid">
+            <label class="crm-field-span2">Họ và tên *
+              <input name="name" required maxlength="240" autofocus />
+            </label>
+            <label>Số điện thoại
+              <input name="phone" maxlength="64" placeholder="090…" />
+            </label>
+            <label>Email
+              <input name="email" type="email" maxlength="240" />
+            </label>
+            <label class="crm-field-span2">Địa chỉ
+              <textarea name="address" rows="2" maxlength="500"></textarea>
+            </label>
+            <label class="crm-field-span2">Công ty
+              <input name="company" maxlength="240" />
+            </label>
+          </div>
+        </section>
+        <section class="crm-cu-form-section">
+          <h3 class="crm-cu-form-title">Nguồn</h3>
+          <label>Nguồn khách
+            <select name="lead_source" id="crm-cu-create-lead-source"></select>
+          </label>
+        </section>
+      </div>
+      <p class="muted crm-cu-create-hint">Cần ít nhất số điện thoại hoặc email.</p>
+      <div class="crm-modal-actions">
+        <button type="button" class="btn-secondary" data-cu-close>Hủy</button>
+        <button type="submit" class="btn">Tạo khách hàng</button>
+      </div>
+      <p class="crm-form-msg is-error" id="crm-cu-create-err" hidden></p>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block admin_page_scripts %}
+{% if not crm_staff_portal %}
+{% include 'partials/admin_grants_bootstrap.html' %}
+{% endif %}
+{% set _jcu = static_js_file('crm_customers.js') %}
+<script src="{{ url_for('static', filename=_jcu) }}?v={{ static_v(_jcu) }}"></script>
+{% endblock %}

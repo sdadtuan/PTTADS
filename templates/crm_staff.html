@@ -1,0 +1,782 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}Quản lý nhân viên — CRM{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+{% block body_class_extra %}crm-body crm-staff-page{% endblock %}
+
+{% block admin_head %}
+  <meta name="description" content="Danh sách nhân viên phụ trách CRM — hồ sơ, bộ phận, tìm kiếm và trạng thái hoạt động." />
+{% endblock %}
+
+{% block admin_page_title %}Quản lý nhân viên{% endblock %}
+{% block admin_page_desc %}
+  <p class="admin-page-desc">Cấu hình phòng ban / chức vụ và hồ sơ nhân viên. Quy trình 6 bước CRM nằm trên <a href="{{ url_for('crm_board') }}#crm-workflow-playbook">Bảng CSKH</a>.</p>
+{% endblock %}
+
+{% block admin_main %}
+<div class="crm-app">
+  <div class="crm-hero crm-staff-hero">
+    <div class="crm-hero-text">
+      <span class="crm-hero-badge" aria-hidden="true">Nhân sự CRM</span>
+      <p class="crm-hero-desc">
+        Cấu hình <strong>phòng ban / chức vụ</strong> và <strong>hồ sơ nhân viên</strong>.
+        Ngưng nhân viên sẽ gỡ phân công khỏi hồ sơ đang mở.
+      </p>
+    </div>
+  </div>
+
+  <div class="crm-staff-workspace">
+  <section class="crm-stats crm-staff-stats" id="crm-staff-stats" aria-label="Tổng quan nhân viên" hidden>
+    <div class="crm-stat-card">
+      <span class="crm-stat-label">Tổng nhân viên</span>
+      <strong class="crm-stat-value" id="crm-stat-staff-total">0</strong>
+    </div>
+    <div class="crm-stat-card crm-stat-card--active">
+      <span class="crm-stat-label">Đang hoạt động</span>
+      <strong class="crm-stat-value" id="crm-stat-staff-active">0</strong>
+    </div>
+    <div class="crm-stat-card">
+      <span class="crm-stat-label">Ngưng hoạt động</span>
+      <strong class="crm-stat-value" id="crm-stat-staff-inactive">0</strong>
+    </div>
+    <div class="crm-stat-card crm-stat-card--warn">
+      <span class="crm-stat-label">Hồ sơ đang gán (chưa đóng)</span>
+      <strong class="crm-stat-value" id="crm-stat-open-cases">0</strong>
+    </div>
+  </section>
+
+  <section class="crm-staff-zone crm-staff-zone--reference" aria-labelledby="crm-staff-zone-ref-title">
+    <header class="crm-staff-zone-head">
+      <span class="crm-staff-zone-badge" aria-hidden="true">1</span>
+      <div class="crm-staff-zone-head-text">
+        <h2 id="crm-staff-zone-ref-title" class="crm-staff-zone-title">Danh mục tổ chức</h2>
+        <p class="crm-staff-zone-desc muted">Tham chiếu dùng khi gán nhân viên, lọc danh sách và báo cáo. Mục ngưng sẽ gỡ khỏi người đang gán.</p>
+      </div>
+    </header>
+
+  <div class="crm-staff-catalog-grid" aria-label="Danh mục tổ chức">
+  <section class="panel crm-staff-section crm-dept-panel" id="crm-dept-panel" data-admin-section="crm_staff_departments" aria-label="Phòng ban">
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Phòng ban</p>
+        <h3 class="crm-staff-section-title">Danh sách phòng ban</h3>
+        <p class="muted crm-dept-sub">Mã ngắn gọn, thứ tự hiển thị trong bộ lọc.</p>
+      </div>
+      <button type="button" class="btn btn-secondary crm-staff-outline-btn" id="crm-open-dept-add" aria-label="Thêm phòng ban">＋ Thêm</button>
+    </div>
+    <div class="crm-staff-table-wrap crm-staff-table-shell">
+      <table class="crm-staff-table crm-dept-table crm-staff-table--compact">
+        <thead>
+          <tr>
+            <th>Mã</th>
+            <th class="crm-staff-col-title-head">Tên</th>
+            <th>Thứ tự</th>
+            <th>TT</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="crm-dept-tbody"></tbody>
+      </table>
+    </div>
+    <p class="crm-staff-msg is-error" id="crm-dept-err" hidden></p>
+  </section>
+
+  <section class="panel crm-staff-section crm-position-panel" id="crm-position-panel" data-admin-section="crm_staff_positions" aria-label="Chức vụ">
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Chức vụ</p>
+        <h3 class="crm-staff-section-title">Danh mục chức vụ</h3>
+        <p class="muted crm-dept-sub">Khớp với chức danh (danh mục) trên hồ sơ nhân viên.</p>
+      </div>
+      <button type="button" class="btn btn-secondary crm-staff-outline-btn" id="crm-open-position-add" aria-label="Thêm chức vụ">＋ Thêm</button>
+    </div>
+    <div class="crm-staff-table-wrap crm-staff-table-shell">
+      <table class="crm-staff-table crm-position-table crm-staff-table--compact">
+        <thead>
+          <tr>
+            <th>Mã</th>
+            <th class="crm-staff-col-title-head">Tên</th>
+            <th>Thứ tự</th>
+            <th>TT</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="crm-position-tbody"></tbody>
+      </table>
+    </div>
+    <p class="crm-staff-msg is-error" id="crm-position-err" hidden></p>
+  </section>
+  </div>
+  </section>
+
+  <section class="crm-staff-zone crm-staff-zone--levels" aria-labelledby="crm-staff-zone-levels-title" data-admin-section="crm_staff_roster">
+    <header class="crm-staff-zone-head">
+      <span class="crm-staff-zone-badge crm-staff-zone-badge--levels" aria-hidden="true">HT</span>
+      <div class="crm-staff-zone-head-text">
+        <h2 id="crm-staff-zone-levels-title" class="crm-staff-zone-title">Hệ thống phân cấp nhân viên</h2>
+        <p class="crm-staff-zone-desc muted">Tiêu chí định lượng, kỹ năng và loại lead phù hợp theo cấp S / A / B / C — dùng khi gán cấp bậc trên hồ sơ nhân viên.</p>
+      </div>
+      <button type="button" class="btn btn-secondary crm-staff-outline-btn" id="crm-staff-levels-reset" hidden title="Khôi phục mặc định">Khôi phục mặc định</button>
+      <button type="button" class="btn btn-secondary crm-staff-outline-btn" id="crm-open-competency-modal">Chấm điểm năng lực</button>
+    </header>
+    <div class="crm-staff-levels-grid" id="crm-staff-levels-grid" aria-live="polite"></div>
+    <p class="crm-staff-msg is-error" id="crm-staff-levels-err" hidden></p>
+    <div class="crm-staff-competency-preview panel" id="crm-staff-competency-preview" hidden aria-live="polite"></div>
+  </section>
+
+  <section class="crm-staff-zone crm-staff-zone--roster" aria-labelledby="crm-staff-zone-roster-title">
+    <header class="crm-staff-zone-head">
+      <span class="crm-staff-zone-badge" aria-hidden="true">2</span>
+      <div class="crm-staff-zone-head-text">
+        <h2 id="crm-staff-zone-roster-title" class="crm-staff-zone-title">Hồ sơ nhân viên</h2>
+        <p class="crm-staff-zone-desc muted">Tìm, lọc, xuất / nhập và chỉnh sửa hồ sơ. Trạng thái và hồ sơ mở cập nhật theo CRM.</p>
+      </div>
+    </header>
+
+  <div class="crm-toolbar panel crm-staff-toolbar">
+    <p class="crm-staff-toolbar-legend" id="crm-toolbar-legend">Thao tác &amp; lọc</p>
+    <div class="crm-toolbar-row crm-toolbar-row--staff-primary">
+      <button type="button" class="btn crm-staff-btn-cta" id="crm-open-staff-add">
+        <svg class="crm-staff-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Thêm nhân viên
+      </button>
+      <label class="crm-search-wrap crm-search-wrap--flex">
+        <span class="visually-hidden">Tìm nhân viên</span>
+        <span class="crm-search-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <input type="search" id="crm-staff-search" placeholder="Tìm theo tên, email, SĐT, mã, phòng ban, chức danh, chức vụ (DM)…" autocomplete="off" />
+      </label>
+      <label class="crm-staff-filter-dept-wrap">
+        <span class="visually-hidden">Lọc theo phòng ban</span>
+        <select id="crm-staff-filter-dept" class="crm-staff-dept-filter" aria-label="Lọc theo phòng ban">
+          <option value="">Tất cả phòng ban</option>
+        </select>
+      </label>
+      <p class="crm-filter-hint muted" id="crm-staff-result-hint" aria-live="polite"></p>
+    </div>
+    <div class="crm-toolbar-row crm-toolbar-row--export" role="group" aria-label="Xuất báo cáo">
+      <span class="crm-staff-toolbar-divider" aria-hidden="true"></span>
+      <span class="crm-filter-label">Dữ liệu:</span>
+      <button type="button" class="btn-secondary" id="crm-staff-export-xlsx">Excel (.xlsx)</button>
+      <button type="button" class="btn-secondary" id="crm-staff-export-csv">CSV</button>
+      <button type="button" class="btn-secondary" id="crm-staff-daily-report-template" title="Mẫu báo cáo công việc hàng ngày">Mẫu BC công việc ngày</button>
+      <a class="btn-secondary" href="{{ url_for('crm_daily_reports_page') }}">Quản lý BC ngày</a>
+      <label class="crm-staff-import-wrap">
+        <span class="visually-hidden">Chọn file CSV để nhập</span>
+        <input type="file" id="crm-staff-import-file" accept=".csv,text/csv" />
+      </label>
+      <button type="button" class="btn-secondary" id="crm-staff-import-btn">Nhập CSV</button>
+      <p class="crm-export-hint muted">
+        Xuất theo bộ lọc hiện tại. CSV nhập: cùng cột như file xuất (UTF-8); trùng Mã NV hoặc Email sẽ cập nhật.
+        Mẫu <strong>BC công việc ngày</strong>: Excel 3 sheet (báo cáo ngày, theo tháng, hướng dẫn).
+      </p>
+    </div>
+    <div class="crm-filter-chips" role="group" aria-label="Lọc trạng thái">
+      <span class="crm-staff-toolbar-divider crm-staff-toolbar-divider--full" aria-hidden="true"></span>
+      <span class="crm-filter-label">Hiển thị:</span>
+      <button type="button" class="crm-chip is-active" data-staff-filter="all">Tất cả</button>
+      <button type="button" class="crm-chip" data-staff-filter="active">Hoạt động</button>
+      <button type="button" class="crm-chip" data-staff-filter="inactive">Ngưng</button>
+    </div>
+  </div>
+
+  <section class="panel crm-staff-list-panel" data-admin-section="crm_staff_roster" aria-label="Bảng nhân viên">
+    <div class="crm-staff-list-head crm-staff-list-head--main">
+      <div>
+        <p class="crm-staff-eyebrow">Bảng dữ liệu</p>
+        <h3 class="crm-staff-section-title">Chi tiết nhân viên</h3>
+        <p class="muted crm-staff-list-micro">Cột <strong>TT</strong>: hoạt động; <strong>Hồ sơ mở</strong>: yêu cầu CRM chưa đóng đang gán.</p>
+      </div>
+    </div>
+    <div class="crm-staff-table-wrap crm-staff-table-shell crm-staff-table-shell--main">
+      <table class="crm-staff-table crm-staff-table--main">
+        <thead>
+          <tr>
+            <th>Mã</th>
+            <th class="crm-staff-col-name-head">Họ tên</th>
+            <th>Chức danh</th>
+            <th>Cấp KD</th>
+            <th>Chức vụ (DM)</th>
+            <th>Loại HĐ</th>
+            <th>Bộ phận</th>
+            <th>Liên hệ</th>
+            <th>Tạo</th>
+            <th>Hồ sơ mở</th>
+            <th>TT</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="crm-staff-tbody"></tbody>
+      </table>
+    </div>
+    <p class="crm-staff-empty muted" id="crm-staff-empty" hidden>Không có nhân viên khớp bộ lọc.</p>
+    <nav class="crm-staff-pagination" id="crm-staff-pagination" aria-label="Phân trang" hidden>
+      <button type="button" class="btn-secondary" id="crm-staff-page-prev">Trước</button>
+      <span class="crm-staff-page-label muted" id="crm-staff-page-label"></span>
+      <button type="button" class="btn-secondary" id="crm-staff-page-next">Sau</button>
+      <label class="crm-staff-per-page">
+        <span class="visually-hidden">Số dòng trên một trang</span>
+        <select id="crm-staff-per-page" aria-label="Số dòng trên một trang">
+          <option value="25">25 / trang</option>
+          <option value="50">50 / trang</option>
+          <option value="100">100 / trang</option>
+        </select>
+      </label>
+    </nav>
+    <p class="crm-staff-msg" id="crm-staff-import-msg" hidden></p>
+    <p class="crm-staff-msg is-error" id="crm-staff-list-err" hidden></p>
+  </section>
+  </section>
+  </div>
+</div>
+
+<div class="crm-modal-root" id="crm-dept-add-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-dept-add-close tabindex="-1"></div>
+  <div class="crm-modal-panel crm-modal-panel--staff-edit" role="dialog" aria-modal="true" aria-labelledby="crm-dept-add-title">
+    <header class="crm-modal-head">
+      <div>
+        <p class="crm-modal-kicker">Phòng ban</p>
+        <h2 id="crm-dept-add-title">Thêm phòng ban</h2>
+      </div>
+      <button type="button" class="crm-modal-close" data-dept-add-close aria-label="Đóng">×</button>
+    </header>
+    <form id="crm-dept-add-form" class="crm-detail-form">
+      <div class="crm-staff-edit-grid">
+        <label>Tên phòng ban *
+          <input name="name" required maxlength="240" placeholder="VD: Chăm sóc khách hàng" />
+        </label>
+        <label>Mã
+          <input name="code" maxlength="32" placeholder="CSKH" autocomplete="off" />
+        </label>
+        <label>Thứ tự
+          <input name="sort_order" type="number" value="0" step="1" />
+        </label>
+      </div>
+      <label class="crm-staff-notes-label">Mô tả (tuỳ chọn)
+        <textarea name="description" maxlength="2000" rows="2" placeholder="Phạm vi nội bộ, không hiển thị cho khách."></textarea>
+      </label>
+      <div class="crm-modal-actions">
+        <button type="button" class="crm-btn-cancel" data-dept-add-close>Hủy</button>
+        <button type="submit" class="btn">Thêm</button>
+      </div>
+      <p class="crm-form-msg is-error" id="crm-dept-add-err" hidden></p>
+    </form>
+  </div>
+</div>
+
+<div class="crm-modal-root" id="crm-position-add-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-position-add-close tabindex="-1"></div>
+  <div class="crm-modal-panel crm-modal-panel--staff-edit" role="dialog" aria-modal="true" aria-labelledby="crm-position-add-title">
+    <header class="crm-modal-head">
+      <div>
+        <p class="crm-modal-kicker">Chức vụ</p>
+        <h2 id="crm-position-add-title">Thêm chức vụ</h2>
+      </div>
+      <button type="button" class="crm-modal-close" data-position-add-close aria-label="Đóng">×</button>
+    </header>
+    <form id="crm-position-add-form" class="crm-detail-form">
+      <div class="crm-staff-edit-grid">
+        <label>Tên chức vụ *
+          <input name="name" required maxlength="240" placeholder="VD: Chuyên viên CSKH" />
+        </label>
+        <label>Mã
+          <input name="code" maxlength="32" placeholder="CSKH-01" autocomplete="off" />
+        </label>
+        <label>Thứ tự
+          <input name="sort_order" type="number" value="0" step="1" />
+        </label>
+      </div>
+      <label class="crm-staff-notes-label">Mô tả (tuỳ chọn)
+        <textarea name="description" maxlength="2000" rows="2" placeholder="Phạm vi nội bộ."></textarea>
+      </label>
+      <div class="crm-modal-actions">
+        <button type="button" class="crm-btn-cancel" data-position-add-close>Hủy</button>
+        <button type="submit" class="btn">Thêm</button>
+      </div>
+      <p class="crm-form-msg is-error" id="crm-position-add-err" hidden></p>
+    </form>
+  </div>
+</div>
+
+<div class="crm-modal-root" id="crm-position-edit-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-position-close tabindex="-1"></div>
+  <div class="crm-modal-panel crm-modal-panel--staff-edit" role="dialog" aria-modal="true" aria-labelledby="crm-position-edit-title">
+    <header class="crm-modal-head">
+      <div>
+        <p class="crm-modal-kicker">Chức vụ</p>
+        <h2 id="crm-position-edit-title">Chỉnh sửa</h2>
+      </div>
+      <button type="button" class="crm-modal-close" data-position-close aria-label="Đóng">×</button>
+    </header>
+    <form id="crm-position-edit-form" class="crm-detail-form">
+      <input type="hidden" id="crm-position-edit-id" />
+      <div class="crm-staff-edit-grid">
+        <label>Mã
+          <input name="code" id="crm-position-edit-code" maxlength="32" />
+        </label>
+        <label>Tên *
+          <input name="name" id="crm-position-edit-name" required maxlength="240" />
+        </label>
+        <label>Thứ tự
+          <input name="sort_order" id="crm-position-edit-sort" type="number" step="1" />
+        </label>
+        <label class="crm-staff-checkbox">
+          <input type="checkbox" name="active" id="crm-position-edit-active" />
+          Đang hoạt động
+        </label>
+      </div>
+      <label class="crm-staff-notes-label">Mô tả
+        <textarea name="description" id="crm-position-edit-desc" rows="3" maxlength="2000"></textarea>
+      </label>
+      <div class="crm-modal-actions">
+        <button type="button" class="crm-btn-cancel" data-position-close>Hủy</button>
+        <button type="submit" class="btn">Lưu</button>
+      </div>
+      <p class="crm-form-msg is-error" id="crm-position-edit-err" hidden></p>
+    </form>
+  </div>
+</div>
+
+<div class="crm-modal-root" id="crm-staff-add-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-staff-add-close tabindex="-1"></div>
+  <div class="crm-modal-panel crm-modal-panel--staff-edit" role="dialog" aria-modal="true" aria-labelledby="crm-staff-add-title">
+    <header class="crm-modal-head">
+      <div>
+        <p class="crm-modal-kicker">Nhân viên</p>
+        <h2 id="crm-staff-add-title">Thêm nhân viên</h2>
+      </div>
+      <button type="button" class="crm-modal-close" data-staff-add-close aria-label="Đóng">×</button>
+    </header>
+    <form id="crm-staff-add-form" class="crm-detail-form">
+      <p class="crm-staff-hint muted crm-staff-hint--flush">Các trường tùy chọn có thể bổ sung sau — email và mã nội bộ là duy nhất (khi nhập).</p>
+      <div class="crm-staff-form-grid crm-staff-form-grid--wide">
+        <label>Họ và tên *
+          <input name="name" required maxlength="240" placeholder="Nguyễn Văn A" autocomplete="name" />
+        </label>
+        <label>Mã nhân viên
+          <input name="internal_code" maxlength="80" placeholder="VD: CSKH-01" autocomplete="off" />
+        </label>
+        <label>Mã trên máy chấm công (PIN)
+          <input name="attendance_pin" maxlength="64" placeholder="Trùng mã máy gửi qua API thiết bị" autocomplete="off" title="Dùng khi tích hợp máy vân tay / nhận diện khuôn mặt (HTTP). Không trùng giữa các nhân viên." />
+        </label>
+        <label>Chức danh
+          <input name="job_title" maxlength="200" placeholder="VD: Chuyên viên CSKH" />
+        </label>
+        <label>Cấp bậc kinh doanh
+          <select name="sales_level" id="crm-staff-add-sales-level" class="crm-staff-sales-level-select">
+            <option value="">— Chưa phân cấp —</option>
+          </select>
+        </label>
+        <label>Chức vụ (danh mục)
+          <select name="position_id" id="crm-staff-add-position" class="crm-staff-position-select">
+            <option value="">— Chưa chọn —</option>
+          </select>
+        </label>
+        <label>Phòng ban (danh mục)
+          <select name="department_id" id="crm-staff-add-dept" class="crm-staff-dept-select">
+            <option value="">— Chưa gán phòng ban —</option>
+          </select>
+        </label>
+        <label>Nhãn nhóm (tùy chọn)
+          <input name="department" maxlength="200" placeholder="Ghi chú nhóm cũ / tên hiển thị thêm" />
+        </label>
+        <label>Người quản lý trực tiếp
+          <select name="reports_to_id" id="crm-staff-add-reportsto">
+            <option value="">— Không chọn —</option>
+          </select>
+        </label>
+        <label>Loại hợp đồng
+          <select name="employment_type" id="crm-staff-add-emp">
+            <option value="full_time">Chính thức</option>
+            <option value="contractor">Cộng tác / Hợp đồng</option>
+            <option value="intern">Thực tập</option>
+            <option value="collaborator">Cộng tác viên</option>
+          </select>
+        </label>
+        <label>Ngày bắt đầu
+          <input name="started_on" type="date" />
+        </label>
+        <label>Ngày kết thúc
+          <input name="ended_on" type="date" />
+        </label>
+        <label>Số điện thoại
+          <input name="phone" type="tel" maxlength="80" placeholder="Tuỳ chọn" autocomplete="tel" />
+        </label>
+        <label>Email
+          <input name="email" type="email" maxlength="240" placeholder="Tuỳ chọn" autocomplete="email" />
+        </label>
+        <label>Thứ tự hiển thị
+          <input name="sort_order" type="number" value="0" step="1" title="Số nhỏ hơn xuất hiện trước trong danh sách Phụ trách" />
+        </label>
+        <label>Lương cơ bản (VNĐ / tháng)
+          <input name="base_salary_vnd" type="number" min="0" max="9999999999" step="1" value="0" placeholder="0" title="Dùng làm mốc khi tính lương theo công" />
+        </label>
+      </div>
+      <label class="crm-staff-notes-label">Ghi chú nội bộ
+        <textarea name="notes" rows="2" maxlength="4000" placeholder="Ghi chú không hiển thị cho khách — chỉ nội bộ quản lý."></textarea>
+      </label>
+      <fieldset class="crm-fieldset">
+        <legend>Tài khoản đăng nhập CSKH</legend>
+        <p class="muted">Nhân viên dùng tên đăng nhập + mật khẩu này để vào mục Chăm sóc khách hàng (chỉ thấy khách được gán).</p>
+        <div class="crm-staff-form-grid crm-staff-form-grid--wide">
+          <label>Tên đăng nhập
+            <input name="login_username" maxlength="64" placeholder="vd: cskh.an" autocomplete="off" />
+          </label>
+          <label>Mật khẩu
+            <input type="password" name="login_password" minlength="6" placeholder="Tối thiểu 6 ký tự" autocomplete="new-password" />
+          </label>
+        </div>
+        <label class="crm-checkbox-field">
+          <input type="checkbox" name="login_enabled" value="1" checked />
+          Cho phép đăng nhập
+        </label>
+      </fieldset>
+      <div class="crm-modal-actions">
+        <button type="button" class="crm-btn-cancel" data-staff-add-close>Hủy</button>
+        <button type="submit" class="btn">Thêm nhân viên</button>
+      </div>
+      <p class="crm-form-msg is-error" id="crm-staff-add-err" hidden></p>
+    </form>
+  </div>
+</div>
+
+<div class="crm-modal-root" id="crm-staff-edit-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-staff-close tabindex="-1"></div>
+  <div class="crm-modal-panel crm-modal-panel--staff-edit" role="dialog" aria-modal="true" aria-labelledby="crm-staff-edit-title">
+    <header class="crm-modal-head">
+      <div>
+        <p class="crm-modal-kicker">Chi tiết nhân viên</p>
+        <h2 id="crm-staff-edit-title">Nhân viên</h2>
+        <p class="crm-modal-sub" id="crm-staff-edit-meta"></p>
+      </div>
+      <button type="button" class="crm-modal-close" data-staff-close aria-label="Đóng">×</button>
+    </header>
+    <form id="crm-staff-edit-form" class="crm-detail-form">
+      <input type="hidden" name="id" id="crm-staff-edit-id" />
+      <input type="hidden" id="crm-staff-edit-pipeline" value="0" />
+      <div class="crm-staff-edit-grid">
+        <label>Họ và tên *
+          <input name="name" id="crm-staff-edit-name" required maxlength="240" />
+        </label>
+        <label>Mã nhân viên
+          <input name="internal_code" id="crm-staff-edit-code" maxlength="80" />
+        </label>
+        <label>Mã trên máy chấm công (PIN)
+          <input name="attendance_pin" id="crm-staff-edit-attendance-pin" maxlength="64" placeholder="Tuỳ chọn" autocomplete="off" />
+        </label>
+        <label>Chức danh
+          <input name="job_title" id="crm-staff-edit-job" maxlength="200" />
+        </label>
+        <label>Cấp bậc kinh doanh
+          <select name="sales_level" id="crm-staff-edit-sales-level" class="crm-staff-sales-level-select">
+            <option value="">— Chưa phân cấp —</option>
+          </select>
+        </label>
+        <label>Chức vụ (danh mục)
+          <select name="position_id" id="crm-staff-edit-position" class="crm-staff-position-select">
+            <option value="">— Chưa chọn —</option>
+          </select>
+        </label>
+        <label>Phòng ban (danh mục)
+          <select name="department_id" id="crm-staff-edit-dept-id" class="crm-staff-dept-select">
+            <option value="">— Chưa gán phòng ban —</option>
+          </select>
+        </label>
+        <label>Nhãn nhóm (tùy chọn)
+          <input name="department" id="crm-staff-edit-dept" maxlength="200" placeholder="Ghi chú nhóm" />
+        </label>
+        <label>Quản lý trực tiếp
+          <select name="reports_to_id" id="crm-staff-edit-reportsto">
+            <option value="">— Không chọn —</option>
+          </select>
+        </label>
+        <label>Loại hợp đồng
+          <select name="employment_type" id="crm-staff-edit-emp">
+            <option value="full_time">Chính thức</option>
+            <option value="contractor">Cộng tác / Hợp đồng</option>
+            <option value="intern">Thực tập</option>
+            <option value="collaborator">Cộng tác viên</option>
+          </select>
+        </label>
+        <label>Ngày bắt đầu
+          <input name="started_on" id="crm-staff-edit-started" type="date" />
+        </label>
+        <label>Ngày kết thúc
+          <input name="ended_on" id="crm-staff-edit-ended" type="date" />
+        </label>
+        <label>Số điện thoại
+          <input name="phone" id="crm-staff-edit-phone" maxlength="80" />
+        </label>
+        <label>Email
+          <input name="email" type="email" id="crm-staff-edit-email" maxlength="240" />
+        </label>
+        <label>Thứ tự hiển thị
+          <input name="sort_order" type="number" id="crm-staff-edit-sort" step="1" />
+        </label>
+        <label>Lương cơ bản (VNĐ / tháng)
+          <input name="base_salary_vnd" type="number" id="crm-staff-edit-base-salary" min="0" max="9999999999" step="1" placeholder="0" />
+        </label>
+      </div>
+      <label class="crm-staff-notes-label">Ghi chú nội bộ
+        <textarea name="notes" id="crm-staff-edit-notes" rows="3" maxlength="4000"></textarea>
+      </label>
+      <fieldset class="crm-fieldset">
+        <legend>Tài khoản đăng nhập CSKH</legend>
+        <p class="muted" id="crm-staff-edit-login-hint"></p>
+        <div class="crm-staff-edit-grid">
+          <label>Tên đăng nhập
+            <input name="login_username" id="crm-staff-edit-login-user" maxlength="64" autocomplete="off" />
+          </label>
+          <label>Mật khẩu mới (để trống nếu giữ)
+            <input type="password" name="login_password" id="crm-staff-edit-login-pass" minlength="6" autocomplete="new-password" />
+          </label>
+        </div>
+        <label class="crm-staff-checkbox">
+          <input type="checkbox" name="login_enabled" id="crm-staff-edit-login-enabled" />
+          Cho phép đăng nhập CSKH
+        </label>
+      </fieldset>
+      <label class="crm-staff-checkbox">
+        <input type="checkbox" name="active" id="crm-staff-edit-active" />
+        Đang hoạt động (hiện trong danh sách Phụ trách khi tạo yêu cầu)
+      </label>
+      <div class="crm-modal-actions">
+        <button type="button" class="crm-btn-cancel" data-staff-close>Hủy</button>
+        <button type="submit" class="btn">Lưu thay đổi</button>
+      </div>
+      <p class="crm-form-msg is-error" id="crm-staff-edit-err" hidden></p>
+    </form>
+  </div>
+</div>
+
+<div class="crm-modal-root" id="crm-staff-competency-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-competency-close tabindex="-1"></div>
+  <div class="crm-modal-panel crm-modal-panel--competency" role="dialog" aria-modal="true" aria-labelledby="crm-staff-competency-title">
+    <header class="crm-modal-head">
+      <div>
+        <p class="crm-modal-kicker">Phân bổ lead</p>
+        <h2 id="crm-staff-competency-title">Chấm điểm năng lực nhân viên</h2>
+        <p class="crm-modal-sub muted">Tổng 100 điểm — nhóm A (50) + B (30) + C (20). Kết quả xếp Level S/A/B/C.</p>
+      </div>
+      <button type="button" class="crm-modal-close" data-competency-close aria-label="Đóng">×</button>
+    </header>
+    <div class="crm-staff-competency-tabs" role="tablist">
+      <button type="button" class="crm-staff-competency-tab is-active" data-competency-tab="rubric">Bảng tiêu chí</button>
+      <button type="button" class="crm-staff-competency-tab" data-competency-tab="classification">Phân loại kết quả</button>
+    </div>
+    <div class="crm-staff-competency-pane is-active" id="crm-competency-pane-rubric" data-competency-pane="rubric">
+      <div class="crm-staff-competency-toolbar">
+        <button type="button" class="btn-secondary btn-sm" id="crm-competency-add-group">＋ Thêm nhóm</button>
+        <button type="button" class="btn-secondary btn-sm" id="crm-competency-reset" hidden>Khôi phục mặc định</button>
+      </div>
+      <div id="crm-competency-groups" class="crm-competency-groups"></div>
+      <section class="crm-staff-competency-editor panel-inset" id="crm-competency-criterion-editor" hidden>
+        <header class="crm-staff-competency-editor-head">
+          <h3 id="crm-competency-criterion-editor-title">Tiêu chí</h3>
+          <button type="button" class="crm-modal-close crm-leads-editor-close" id="crm-competency-criterion-cancel" aria-label="Đóng">×</button>
+        </header>
+        <div class="crm-staff-edit-grid">
+          <label>Mã tiêu chí
+            <input id="crm-competency-crit-code" maxlength="16" placeholder="A1" />
+          </label>
+          <label>Tên tiêu chí *
+            <input id="crm-competency-crit-label" required maxlength="200" />
+          </label>
+          <label>Chỉ số đo
+            <select id="crm-competency-crit-metric"></select>
+          </label>
+          <label>Điểm tối đa
+            <input type="number" id="crm-competency-crit-max" min="0" max="100" step="1" />
+          </label>
+        </div>
+        <div class="crm-staff-competency-bands-head">
+          <h4>Mức điểm theo ngưỡng</h4>
+          <button type="button" class="btn-secondary btn-sm" id="crm-competency-add-band">＋ Thêm mức</button>
+        </div>
+        <div class="crm-staff-table-wrap">
+          <table class="crm-staff-table crm-staff-table--compact">
+            <thead>
+              <tr>
+                <th>Nhãn</th>
+                <th>Từ</th>
+                <th>Đến</th>
+                <th>Điểm</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="crm-competency-bands-body"></tbody>
+          </table>
+        </div>
+        <label class="crm-staff-checkbox">
+          <input type="checkbox" id="crm-competency-crit-enabled" checked />
+          Đang áp dụng
+        </label>
+        <div class="crm-modal-actions">
+          <button type="button" class="crm-btn-cancel" id="crm-competency-criterion-cancel2">Hủy</button>
+          <button type="button" class="btn" id="crm-competency-criterion-save">Lưu tiêu chí</button>
+        </div>
+        <p class="crm-form-msg is-error" id="crm-competency-criterion-err" hidden></p>
+      </section>
+    </div>
+    <div class="crm-staff-competency-pane" id="crm-competency-pane-classification" data-competency-pane="classification" hidden>
+      <div class="crm-staff-competency-toolbar">
+        <button type="button" class="btn-secondary btn-sm" id="crm-competency-add-class">＋ Thêm mức phân loại</button>
+      </div>
+      <div class="crm-staff-table-wrap">
+        <table class="crm-staff-table crm-staff-table--compact">
+          <thead>
+            <tr>
+              <th>Điểm từ</th>
+              <th>Điểm đến</th>
+              <th>Level</th>
+              <th>Nhãn</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="crm-competency-class-body"></tbody>
+        </table>
+      </div>
+      <section class="crm-staff-competency-editor panel-inset" id="crm-competency-class-editor" hidden>
+        <header class="crm-staff-competency-editor-head">
+          <h3 id="crm-competency-class-editor-title">Phân loại</h3>
+        </header>
+        <div class="crm-staff-edit-grid">
+          <label>Điểm từ
+            <input type="number" id="crm-competency-class-min" min="0" max="100" step="1" />
+          </label>
+          <label>Điểm đến
+            <input type="number" id="crm-competency-class-max" min="0" max="100" step="1" />
+          </label>
+          <label>Level gán
+            <select id="crm-competency-class-level">
+              <option value="s">S — Chuyên gia</option>
+              <option value="a">A — Senior</option>
+              <option value="b">B — Middle</option>
+              <option value="c">C — Junior</option>
+            </select>
+          </label>
+          <label>Biểu tượng
+            <input id="crm-competency-class-emoji" maxlength="8" placeholder="💎" />
+          </label>
+          <label class="crm-staff-notes-label">Nhãn hiển thị
+            <input id="crm-competency-class-label" maxlength="80" />
+          </label>
+        </div>
+        <div class="crm-modal-actions">
+          <button type="button" class="crm-btn-cancel" id="crm-competency-class-cancel">Hủy</button>
+          <button type="button" class="btn" id="crm-competency-class-save">Lưu</button>
+        </div>
+        <p class="crm-form-msg is-error" id="crm-competency-class-err" hidden></p>
+      </section>
+    </div>
+    <footer class="crm-modal-actions crm-staff-competency-footer">
+      <button type="button" class="crm-btn-cancel" data-competency-close>Đóng</button>
+      <button type="button" class="btn" id="crm-competency-save-all">Lưu cấu hình</button>
+    </footer>
+    <p class="crm-form-msg is-error" id="crm-competency-err" hidden></p>
+  </div>
+</div>
+
+<div class="crm-modal-root" id="crm-staff-level-edit-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-staff-level-close tabindex="-1"></div>
+  <div class="crm-modal-panel crm-modal-panel--staff-level" role="dialog" aria-modal="true" aria-labelledby="crm-staff-level-edit-title">
+    <header class="crm-modal-head">
+      <div>
+        <p class="crm-modal-kicker">Phân cấp nhân viên</p>
+        <h2 id="crm-staff-level-edit-title">Chỉnh sửa cấp bậc</h2>
+      </div>
+      <button type="button" class="crm-modal-close" data-staff-level-close aria-label="Đóng">×</button>
+    </header>
+    <form id="crm-staff-level-edit-form" class="crm-detail-form">
+      <input type="hidden" id="crm-staff-level-edit-id" />
+      <div class="crm-staff-edit-grid">
+        <label>Mã cấp
+          <input id="crm-staff-level-edit-code" readonly />
+        </label>
+        <label>Tên hiển thị *
+          <input id="crm-staff-level-edit-label" required maxlength="80" />
+        </label>
+        <label>Biểu tượng
+          <input id="crm-staff-level-edit-emoji" maxlength="8" placeholder="💎" />
+        </label>
+        <label>Kinh nghiệm
+          <input id="crm-staff-level-edit-experience" maxlength="200" />
+        </label>
+        <label>Lead tối thiểu / ngày
+          <input type="number" id="crm-staff-level-edit-min-leads" min="0" max="100" step="1" />
+        </label>
+        <label>Lead tối đa / ngày
+          <input type="number" id="crm-staff-level-edit-max-leads" min="0" max="100" step="1" />
+        </label>
+      </div>
+      <label class="crm-staff-notes-label">Ghi chú ưu tiên (tuỳ chọn)
+        <input id="crm-staff-level-edit-priority" maxlength="500" placeholder="VD: Ưu tiên nhận HOT + VIP trước tiên" />
+      </label>
+      <label class="crm-staff-notes-label">Tiêu chí định lượng <span class="muted">(mỗi dòng một tiêu chí)</span>
+        <textarea id="crm-staff-level-edit-quantitative" rows="5" maxlength="8000"></textarea>
+      </label>
+      <label class="crm-staff-notes-label">Kỹ năng <span class="muted">(mỗi dòng một kỹ năng)</span>
+        <textarea id="crm-staff-level-edit-skills" rows="4" maxlength="8000"></textarea>
+      </label>
+      <label class="crm-staff-notes-label">Phù hợp với loại lead <span class="muted">(mỗi dòng một loại)</span>
+        <textarea id="crm-staff-level-edit-leads" rows="4" maxlength="8000"></textarea>
+      </label>
+      <label class="crm-staff-checkbox">
+        <input type="checkbox" id="crm-staff-level-edit-enabled" checked />
+        Đang áp dụng
+      </label>
+      <div class="crm-modal-actions">
+        <button type="button" class="crm-btn-cancel" data-staff-level-close>Hủy</button>
+        <button type="submit" class="btn">Lưu cấp bậc</button>
+      </div>
+      <p class="crm-form-msg is-error" id="crm-staff-level-edit-err" hidden></p>
+    </form>
+  </div>
+</div>
+
+<div class="crm-modal-root" id="crm-dept-edit-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-dept-close tabindex="-1"></div>
+  <div class="crm-modal-panel crm-modal-panel--staff-edit" role="dialog" aria-modal="true" aria-labelledby="crm-dept-edit-title">
+    <header class="crm-modal-head">
+      <div>
+        <p class="crm-modal-kicker">Phòng ban</p>
+        <h2 id="crm-dept-edit-title">Chỉnh sửa</h2>
+      </div>
+      <button type="button" class="crm-modal-close" data-dept-close aria-label="Đóng">×</button>
+    </header>
+    <form id="crm-dept-edit-form" class="crm-detail-form">
+      <input type="hidden" id="crm-dept-edit-id" />
+      <div class="crm-staff-edit-grid">
+        <label>Mã
+          <input name="code" id="crm-dept-edit-code" maxlength="32" />
+        </label>
+        <label>Tên *
+          <input name="name" id="crm-dept-edit-name" required maxlength="240" />
+        </label>
+        <label>Thứ tự
+          <input name="sort_order" id="crm-dept-edit-sort" type="number" step="1" />
+        </label>
+        <label class="crm-staff-checkbox">
+          <input type="checkbox" name="active" id="crm-dept-edit-active" />
+          Đang hoạt động
+        </label>
+      </div>
+      <label class="crm-staff-notes-label">Mô tả
+        <textarea name="description" id="crm-dept-edit-desc" rows="3" maxlength="2000"></textarea>
+      </label>
+      <div class="crm-modal-actions">
+        <button type="button" class="crm-btn-cancel" data-dept-close>Hủy</button>
+        <button type="submit" class="btn">Lưu</button>
+      </div>
+      <p class="crm-form-msg is-error" id="crm-dept-edit-err" hidden></p>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block admin_page_scripts %}
+{% include 'partials/admin_grants_bootstrap.html' %}
+{% set _jsp = static_js_file('crm_staff.js') %}
+<script src="{{ url_for('static', filename=_jsp) }}?v={{ static_v(_jsp) }}"></script>
+{% endblock %}

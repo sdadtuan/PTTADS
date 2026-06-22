@@ -1,0 +1,635 @@
+(function () {
+  const ACTIONS = ["view", "edit", "create", "delete", "export", "configure"];
+  const ACTION_LABELS = {
+    view: "Xem",
+    edit: "Sửa",
+    create: "Tạo",
+    delete: "Xóa",
+    export: "Xuất",
+    configure: "Cấu hình",
+  };
+
+  let grants = {};
+  let matrixData = null;
+  let canConfigure = false;
+
+  function readBootstrap() {
+    const el = document.getElementById("cms-perms-bootstrap");
+    if (!el) return {};
+    try {
+      return JSON.parse(el.textContent || "{}");
+    } catch (_e) {
+      return {};
+    }
+  }
+
+  function can(moduleId, action) {
+    const list = grants[moduleId] || [];
+    return list.includes(action);
+  }
+
+  window.PTT_CMS_CAN = can;
+  window.PTT_CMS_GRANTS = grants;
+
+  async function requestJson(url, options = {}) {
+    const response = await fetch(url, {
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    if (response.status === 401) {
+      const body = await response.json().catch(() => ({}));
+      if (typeof body.login === "string") window.location.href = body.login;
+      throw new Error(body.error || "Unauthorized");
+    }
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || "Request failed");
+    }
+    return response.json();
+  }
+
+  function showPermToast(message, kind) {
+    if (!message) return;
+    let host = document.getElementById("cms-perms-toast-host");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "cms-perms-toast-host";
+      host.className = "cms-perms-toast-host";
+      host.setAttribute("role", "status");
+      host.setAttribute("aria-live", "polite");
+      document.body.appendChild(host);
+    }
+    const toast = document.createElement("div");
+    toast.className = `cms-perms-toast cms-perms-toast--${kind || "info"}`;
+    toast.textContent = message;
+    host.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add("is-visible"));
+    const hideMs = kind === "err" ? 8000 : 4500;
+    window.setTimeout(() => {
+      toast.classList.remove("is-visible");
+      window.setTimeout(() => toast.remove(), 320);
+    }, hideMs);
+  }
+
+  function applySectionGating() {
+    document.querySelectorAll("[data-cms-module]").forEach((panel) => {
+      const mid = panel.getAttribute("data-cms-module");
+      if (!mid) return;
+      if (!can(mid, "view")) {
+        panel.classList.add("cms-no-access");
+        return;
+      }
+      panel.classList.remove("cms-no-access");
+      if (mid === "permissions_matrix") {
+        panel.classList.remove("cms-readonly");
+        return;
+      }
+      const editable =
+        can(mid, "edit") || can(mid, "create") || can(mid, "configure");
+      panel.classList.toggle("cms-readonly", !editable);
+    });
+
+    document.querySelectorAll("[data-cms-nav]").forEach((link) => {
+      const mid = link.getAttribute("data-cms-nav");
+      link.classList.toggle("cms-nav-hidden", !can(mid, "view"));
+    });
+
+    const settingsForm = document.getElementById("settings-form");
+    if (settingsForm && !can("landing_settings", "edit")) {
+      settingsForm.querySelector('button[type="submit"]')?.setAttribute("disabled", "disabled");
+    }
+
+    const servicesForm = document.getElementById("services-form");
+    if (servicesForm && !can("services_builder", "edit")) {
+      servicesForm.querySelector('button[type="submit"]')?.setAttribute("disabled", "disabled");
+      document.getElementById("add-category-btn")?.setAttribute("disabled", "disabled");
+    }
+
+    const mkForm = document.getElementById("mk-chat-settings-form");
+    if (mkForm && !can("mk_chat_config", "edit")) {
+      mkForm.querySelector('button[type="submit"]')?.setAttribute("disabled", "disabled");
+    }
+
+    const launcher = document.getElementById("pttMkChatLauncher");
+    const panel = document.getElementById("pttMkChatPanel");
+    const showChat =
+      can("mk_chat_conversation", "view") || can("mk_chat_config", "view");
+    if (launcher) launcher.hidden = !showChat;
+    if (panel && !showChat) panel.hidden = true;
+
+    const sendBtn = document.getElementById("pttMkChatSend");
+    const input = document.getElementById("pttMkChatInput");
+    if (sendBtn) sendBtn.disabled = !can("mk_chat_conversation", "create");
+    if (input) input.readOnly = !can("mk_chat_conversation", "create");
+
+    [
+      "pttMkChatExportMd",
+      "pttMkChatExportHtml",
+      "pttMkChatExportJson",
+    ].forEach((id) => {
+      const btn = document.getElementById(id);
+      if (btn) btn.disabled = !can("mk_chat_export", "export");
+    });
+
+    ["pttMkChatWeeklyXlsx", "pttMkChatMultichannelXlsx", "pttMkChatKpiXlsx"].forEach(
+      (id) => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = !can("mk_chat_excel", "export");
+      }
+    );
+  }
+
+  function grantsFromRole(role) {
+    const out = {};
+    (role.grants || []).forEach((row) => {
+      out[row.module_id] = (row.allowed_list || []).slice();
+    });
+    return out;
+  }
+
+  function renderMatrixTable(role, editable) {
+    const rows = [];
+    let lastGroup = "";
+    (role.grants || []).forEach((row) => {
+      if (row.group !== lastGroup) {
+        lastGroup = row.group;
+        rows.push(
+          `<tr class="cms-perms-group"><td colspan="${ACTIONS.length + 1}">${escapeHtml(lastGroup)}</td></tr>`
+        );
+      }
+      const cells = ACTIONS.map((act) => {
+        const checked = row.actions && row.actions[act];
+        const dis =
+          !editable ||
+          (act === "configure" &&
+            row.module_id === "permissions_matrix" &&
+            role.code !== "super_admin");
+        return `<td class="cms-perm-cell"><input type="checkbox" data-module="${escapeAttr(row.module_id)}" data-action="${act}" ${checked ? "checked" : ""} ${dis ? "disabled" : ""} aria-label="${escapeAttr(row.module_label)} — ${ACTION_LABELS[act]}" /></td>`;
+      }).join("");
+      rows.push(
+        `<tr><th scope="row">${escapeHtml(row.module_label)}<span class="cms-perms-desc">${escapeHtml(row.description || "")}</span></th>${cells}</tr>`
+      );
+    });
+    const head = ACTIONS.map(
+      (a) => `<th scope="col" title="${escapeAttr(ACTION_LABELS[a])}">${escapeHtml(ACTION_LABELS[a])}</th>`
+    ).join("");
+    return `<table class="cms-perms-matrix"><thead><tr><th scope="col">Hạng mục</th>${head}</tr></thead><tbody>${rows.join("")}</tbody></table>`;
+  }
+
+  function escapeHtml(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function escapeAttr(s) {
+    return escapeHtml(s);
+  }
+
+  function collectGrantsFromTable(container) {
+    const out = {};
+    container.querySelectorAll('input[type="checkbox"][data-module]').forEach((cb) => {
+      const mid = cb.getAttribute("data-module");
+      const act = cb.getAttribute("data-action");
+      if (!mid || !act || mid.endsWith("__buttons")) return;
+      if (!out[mid]) out[mid] = [];
+      if (cb.checked) out[mid].push(act);
+    });
+    Object.keys(out).forEach((mid) => {
+      out[mid] = [...new Set(out[mid])].sort();
+    });
+    return out;
+  }
+
+  function setPermStatus(el, message, kind) {
+    if (!el) return;
+    el.textContent = message || "";
+    el.classList.remove("cms-perms-status--ok", "cms-perms-status--err", "cms-perms-status--busy");
+    if (kind === "ok") el.classList.add("cms-perms-status--ok");
+    else if (kind === "err") el.classList.add("cms-perms-status--err");
+    else if (kind === "busy") el.classList.add("cms-perms-status--busy");
+    if (message) {
+      el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }
+
+  async function runPermSave(btn, statusEl, saveFn) {
+    if (btn && btn.disabled) {
+      const msg = "Không thể lưu — nút đang bị khóa.";
+      setPermStatus(statusEl, msg, "err");
+      showPermToast(msg, "err");
+      return;
+    }
+    if (!btn) {
+      const msg = "Bạn không có quyền cấu hình ma trận phân quyền.";
+      setPermStatus(statusEl, msg, "err");
+      showPermToast(msg, "err");
+      return;
+    }
+    const prevLabel = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Đang lưu…";
+    setPermStatus(statusEl, "Đang lưu…", "busy");
+    showPermToast("Đang lưu ma trận phân quyền…", "busy");
+    try {
+      await saveFn();
+      const okMsg = "Đã lưu ma trận phân quyền thành công.";
+      setPermStatus(statusEl, okMsg, "ok");
+      showPermToast(okMsg, "ok");
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : "Không lưu được.";
+      setPermStatus(statusEl, errMsg, "err");
+      showPermToast(errMsg, "err");
+      throw e;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = prevLabel;
+    }
+  }
+
+  async function renderUsersSection(container) {
+    if (!canConfigure) return;
+    let data;
+    try {
+      data = await requestJson("/api/cms/admin-users");
+    } catch (e) {
+      container.insertAdjacentHTML(
+        "beforeend",
+        `<p class="muted cms-perms-users">Không tải được danh sách user: ${escapeHtml(e.message)}</p>`
+      );
+      return;
+    }
+    const roles = data.roles || [];
+    const positions = data.positions || [];
+    const users = data.users || [];
+    const roleOpts = roles
+      .map((r) => `<option value="${escapeAttr(r.code)}">${escapeHtml(r.name)}</option>`)
+      .join("");
+    function positionOptionsForUser(u) {
+      const cur = u.position_id != null ? String(u.position_id) : "";
+      return (
+        `<option value="" ${cur === "" ? "selected" : ""}>— Không gán —</option>` +
+        positions
+          .map(
+            (p) =>
+              `<option value="${escapeAttr(String(p.id))}" ${String(p.id) === cur ? "selected" : ""}>${escapeHtml(p.name)}</option>`
+          )
+          .join("")
+      );
+    }
+    const userRows = users
+      .map(
+        (u) => `<tr data-user-id="${u.id}">
+          <td>${escapeHtml(u.username)}</td>
+          <td>${escapeHtml(u.display_name || "")}</td>
+          <td><select class="cms-user-role" data-user-id="${u.id}">${roles
+            .map(
+              (r) =>
+                `<option value="${escapeAttr(r.code)}" ${r.code === u.role_code ? "selected" : ""}>${escapeHtml(r.name)}</option>`
+            )
+            .join("")}</select></td>
+          <td><select class="cms-user-position" data-user-id="${u.id}">${positionOptionsForUser(u)}</select></td>
+          <td>${u.active ? "Hoạt động" : "Tắt"}</td>
+        </tr>`
+      )
+      .join("");
+    container.insertAdjacentHTML(
+      "beforeend",
+      `<div class="cms-perms-users">
+        <h3>Gán vai trò &amp; chức vụ cho tài khoản CMS</h3>
+        <p class="muted">User đăng nhập bằng mật khẩu trong <code>.env</code> (ADMIN_USERNAME). Gán <strong>chức vụ</strong> để áp dụng ma trận section CRM.</p>
+        <table class="cms-perms-users-table"><thead><tr><th>Username</th><th>Tên hiển thị</th><th>Vai trò</th><th>Chức vụ CRM</th><th>Trạng thái</th></tr></thead><tbody>${userRows}</tbody></table>
+        <div class="cms-perms-add-user">
+          <input type="text" id="cms-new-user-name" placeholder="Username" />
+          <input type="text" id="cms-new-user-display" placeholder="Tên hiển thị (tuỳ chọn)" />
+          <select id="cms-new-user-role">${roleOpts}</select>
+          <button type="button" class="btn" id="cms-add-user-btn">Thêm user</button>
+        </div>
+        <p id="cms-users-status" class="muted cms-perms-status"></p>
+      </div>`
+    );
+    container.querySelectorAll(".cms-user-role").forEach((sel) => {
+      sel.addEventListener("change", async () => {
+        const uid = sel.getAttribute("data-user-id");
+        const status = document.getElementById("cms-users-status");
+        try {
+          await requestJson(`/api/cms/admin-users/${uid}`, {
+            method: "PATCH",
+            body: JSON.stringify({ role_code: sel.value }),
+          });
+          if (status) status.textContent = "Đã cập nhật vai trò.";
+        } catch (e) {
+          if (status) status.textContent = e.message;
+        }
+      });
+    });
+    container.querySelectorAll(".cms-user-position").forEach((sel) => {
+      sel.addEventListener("change", async () => {
+        const uid = sel.getAttribute("data-user-id");
+        const status = document.getElementById("cms-users-status");
+        const raw = sel.value;
+        try {
+          await requestJson(`/api/cms/admin-users/${uid}`, {
+            method: "PATCH",
+            body: JSON.stringify({ position_id: raw ? Number(raw) : null }),
+          });
+          if (status) status.textContent = "Đã cập nhật chức vụ.";
+        } catch (e) {
+          if (status) status.textContent = e.message;
+        }
+      });
+    });
+    document.getElementById("cms-add-user-btn")?.addEventListener("click", async () => {
+      const username = document.getElementById("cms-new-user-name")?.value?.trim();
+      const display_name = document.getElementById("cms-new-user-display")?.value?.trim();
+      const role_code = document.getElementById("cms-new-user-role")?.value;
+      const status = document.getElementById("cms-users-status");
+      if (!username) {
+        if (status) status.textContent = "Nhập username.";
+        return;
+      }
+      try {
+        await requestJson("/api/cms/admin-users", {
+          method: "POST",
+          body: JSON.stringify({ username, display_name, role_code }),
+        });
+        if (status) status.textContent = "Đã thêm user.";
+        location.reload();
+      } catch (e) {
+        if (status) status.textContent = e.message;
+      }
+    });
+  }
+
+  function renderPositionMatrixTable(position, editable) {
+    const rows = [];
+    let lastGroup = "";
+    (position.grants || []).forEach((row) => {
+      if (row.group !== lastGroup) {
+        lastGroup = row.group;
+        rows.push(
+          `<tr class="cms-perms-group"><td colspan="${ACTIONS.length + 1}">${escapeHtml(lastGroup)}</td></tr>`
+        );
+      }
+      if (row.row_kind === "button_group") {
+        rows.push(
+          `<tr class="cms-perms-button-group"><td colspan="${ACTIONS.length + 1}">${escapeHtml(row.section_label)}</td></tr>`
+        );
+        return;
+      }
+      const isButton = row.row_kind === "ui_button";
+      const reqAct = row.requires_action || "";
+      const cells = ACTIONS.map((act) => {
+        if (isButton && act !== reqAct) {
+          return `<td class="cms-perm-cell cms-perm-cell--na" aria-hidden="true">—</td>`;
+        }
+        const checked = row.actions && row.actions[act];
+        const dis = !editable || (isButton && act !== reqAct);
+        return `<td class="cms-perm-cell"><input type="checkbox" data-module="${escapeAttr(row.section_id)}" data-action="${act}" ${checked ? "checked" : ""} ${dis ? "disabled" : ""} aria-label="${escapeAttr(row.section_label)} — ${ACTION_LABELS[act]}" /></td>`;
+      }).join("");
+      const label = isButton
+        ? `↳ ${row.section_label}`
+        : row.section_label;
+      const rowClass = isButton ? " cms-perms-button-row" : "";
+      rows.push(
+        `<tr class="${rowClass.trim()}"><th scope="row">${escapeHtml(label)}<span class="cms-perms-desc">${escapeHtml(row.description || "")}</span></th>${cells}</tr>`
+      );
+    });
+    const head = ACTIONS.map(
+      (a) => `<th scope="col" title="${escapeAttr(ACTION_LABELS[a])}">${escapeHtml(ACTION_LABELS[a])}</th>`
+    ).join("");
+    return `<table class="cms-perms-matrix"><thead><tr><th scope="col">Section / hạng mục</th>${head}</tr></thead><tbody>${rows.join("")}</tbody></table>`;
+  }
+
+  async function initPositionPermissionsPanel(container) {
+    if (!can("permissions_matrix", "view")) return;
+    let posMatrix;
+    try {
+      posMatrix = await requestJson("/api/cms/permissions/positions/matrix");
+    } catch (e) {
+      container.insertAdjacentHTML(
+        "beforeend",
+        `<p class="muted">Lỗi tải ma trận chức vụ: ${escapeHtml(e.message)}</p>`
+      );
+      return;
+    }
+    const positions = posMatrix.positions || [];
+    if (!positions.length) {
+      container.insertAdjacentHTML(
+        "beforeend",
+        `<p class="muted">Chưa có chức vụ CRM — thêm tại Nhân viên CRM → Chức vụ.</p>`
+      );
+      return;
+    }
+    let selectedId = String(positions[0].id);
+    const posOpts = positions
+      .map(
+        (p) =>
+          `<option value="${escapeAttr(String(p.id))}" ${String(p.id) === selectedId ? "selected" : ""}>${escapeHtml(p.name)} (${escapeHtml(p.code || "")})</option>`
+      )
+      .join("");
+    const posCanConfigure = Boolean(posMatrix.can_configure);
+    const posReadOnlyBanner = posCanConfigure
+      ? ""
+      : `<p class="cms-perms-readonly-banner" role="status">Chế độ chỉ xem — không thể lưu ma trận chức vụ.</p>`;
+    const posWrap = document.createElement("div");
+    posWrap.id = "cms-perms-position-pane";
+    posWrap.hidden = true;
+    posWrap.innerHTML = `
+      ${posReadOnlyBanner}
+      <div class="cms-perms-toolbar">
+        <label>Chức vụ
+          <select id="cms-perms-position-select">${posOpts}</select>
+        </label>
+        ${posCanConfigure ? '<button type="button" class="btn" id="cms-perms-position-save">Lưu chức vụ</button>' : ""}
+      </div>
+      <div id="cms-perms-position-table-wrap"></div>
+      <p id="cms-perms-position-status" class="muted cms-perms-status"></p>
+    `;
+    container.appendChild(posWrap);
+
+    function showPosition(id) {
+      selectedId = String(id);
+      const pos = positions.find((p) => String(p.id) === selectedId) || positions[0];
+      const wrap = document.getElementById("cms-perms-position-table-wrap");
+      if (!wrap || !pos) return;
+      wrap.innerHTML = renderPositionMatrixTable(pos, posCanConfigure);
+    }
+    showPosition(selectedId);
+
+    document.getElementById("cms-perms-position-select")?.addEventListener("change", (ev) => {
+      showPosition(ev.target.value);
+    });
+
+    document.getElementById("cms-perms-position-save")?.addEventListener("click", async () => {
+      const status = document.getElementById("cms-perms-position-status");
+      const wrap = document.getElementById("cms-perms-position-table-wrap");
+      const btn = document.getElementById("cms-perms-position-save");
+      if (!wrap) return;
+      const payload = collectGrantsFromTable(wrap);
+      await runPermSave(btn, status, async () => {
+        const resp = await requestJson(`/api/cms/permissions/positions/${encodeURIComponent(selectedId)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ grants: payload }),
+        });
+        const idx = positions.findIndex((p) => String(p.id) === selectedId);
+        if (idx >= 0) {
+          if (Array.isArray(resp.grants_rows)) {
+            positions[idx].grants = resp.grants_rows;
+          }
+          if (resp.grants && typeof resp.grants === "object") {
+            positions[idx].grants_dict = resp.grants;
+          }
+        }
+        showPosition(selectedId);
+      }).catch(() => {});
+    });
+  }
+
+  async function initPermissionsPanel() {
+    const panel = document.getElementById("cms-perms-panel");
+    const section = document.getElementById("cms-permissions");
+    if (!panel || !section) return;
+    if (!can("permissions_matrix", "view")) {
+      section.classList.add("cms-no-access");
+      return;
+    }
+
+    try {
+      matrixData = await requestJson("/api/cms/permissions/matrix");
+    } catch (e) {
+      panel.innerHTML = `<p class="muted">Lỗi tải ma trận: ${escapeHtml(e.message)}</p>`;
+      return;
+    }
+
+    canConfigure = Boolean(matrixData.can_configure);
+    const roles = matrixData.roles || [];
+    if (!roles.length) {
+      panel.innerHTML = `<p class="muted">Không có vai trò.</p>`;
+      return;
+    }
+
+    const readOnlyBanner = canConfigure
+      ? ""
+      : `<p class="cms-perms-readonly-banner" role="status">Chế độ chỉ xem — bạn không có quyền «Cấu hình» trên Bảng phân quyền. Liên hệ Quản trị hệ thống để chỉnh ma trận.</p>`;
+
+    let selectedCode = matrixData.current_role || roles[0].code;
+    const roleOptions = roles
+      .map(
+        (r) =>
+          `<option value="${escapeAttr(r.code)}" ${r.code === selectedCode ? "selected" : ""}>${escapeHtml(r.name)}</option>`
+      )
+      .join("");
+
+    panel.innerHTML = `
+      ${readOnlyBanner}
+      <div class="cms-perms-tabs" role="tablist">
+        <button type="button" class="cms-perms-tab is-active" data-perm-tab="roles" role="tab">Theo vai trò CMS</button>
+        <button type="button" class="cms-perms-tab" data-perm-tab="positions" role="tab">Theo chức vụ CRM</button>
+      </div>
+      <div id="cms-perms-role-pane">
+      <div class="cms-perms-toolbar">
+        <label>Vai trò
+          <select id="cms-perms-role-select">${roleOptions}</select>
+        </label>
+        ${canConfigure ? '<button type="button" class="btn" id="cms-perms-save">Lưu vai trò</button>' : ""}
+        ${canConfigure ? '<button type="button" class="btn btn-secondary" id="cms-perms-reset">Khôi phục mặc định (tải lại)</button>' : ""}
+      </div>
+      <div id="cms-perms-table-wrap"></div>
+      <p id="cms-perms-status" class="muted cms-perms-status"></p>
+      </div>
+    `;
+
+    panel.querySelectorAll("[data-perm-tab]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tab = btn.getAttribute("data-perm-tab");
+        panel.querySelectorAll(".cms-perms-tab").forEach((b) => b.classList.toggle("is-active", b === btn));
+        const rolePane = document.getElementById("cms-perms-role-pane");
+        const posPane = document.getElementById("cms-perms-position-pane");
+        if (rolePane) rolePane.hidden = tab !== "roles";
+        if (posPane) posPane.hidden = tab !== "positions";
+      });
+    });
+
+    await initPositionPermissionsPanel(panel);
+
+    function showRole(code) {
+      selectedCode = code;
+      const role = roles.find((r) => r.code === code) || roles[0];
+      const wrap = document.getElementById("cms-perms-table-wrap");
+      if (!wrap || !role) return;
+      wrap.innerHTML = renderMatrixTable(role, canConfigure);
+      const desc = role.description ? `<p class="muted">${escapeHtml(role.description)}</p>` : "";
+      wrap.insertAdjacentHTML("afterbegin", desc);
+    }
+
+    showRole(selectedCode);
+
+    document.getElementById("cms-perms-role-select")?.addEventListener("change", (ev) => {
+      showRole(ev.target.value);
+    });
+
+    document.getElementById("cms-perms-reset")?.addEventListener("click", () => {
+      location.reload();
+    });
+
+    document.getElementById("cms-perms-save")?.addEventListener("click", async () => {
+      const status = document.getElementById("cms-perms-status");
+      const wrap = document.getElementById("cms-perms-table-wrap");
+      const btn = document.getElementById("cms-perms-save");
+      if (!wrap) return;
+      const payload = collectGrantsFromTable(wrap);
+      await runPermSave(btn, status, async () => {
+        await requestJson(`/api/cms/permissions/roles/${encodeURIComponent(selectedCode)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ grants: payload }),
+        });
+        const idx = roles.findIndex((r) => r.code === selectedCode);
+        if (idx >= 0) {
+          roles[idx].grants = (matrixData.modules || []).map((mod) => {
+            const allowed = payload[mod.id] || [];
+            const actions = {};
+            ACTIONS.forEach((a) => {
+              actions[a] = allowed.includes(a);
+            });
+            return {
+              module_id: mod.id,
+              module_label: mod.label,
+              group: mod.group,
+              description: mod.description,
+              actions,
+              allowed_list: allowed,
+            };
+          });
+        }
+        showRole(selectedCode);
+      }).catch(() => {});
+    });
+
+    await renderUsersSection(panel);
+  }
+
+  function boot() {
+    grants = readBootstrap();
+    window.PTT_CMS_GRANTS = grants;
+    applySectionGating();
+    initPermissionsPanel().catch((e) => {
+      const panel = document.getElementById("cms-perms-panel");
+      const msg = e instanceof Error ? e.message : "Không tải được bảng phân quyền.";
+      if (panel) {
+        panel.innerHTML = `<p class="muted cms-perms-status--err">${escapeHtml(msg)}</p>`;
+      }
+      showPermToast(msg, "err");
+    });
+    document.dispatchEvent(new CustomEvent("ptt-cms-perms-ready"));
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();

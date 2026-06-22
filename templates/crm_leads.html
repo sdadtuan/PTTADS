@@ -1,0 +1,802 @@
+{% extends "admin_layout.html" %}
+{% set _leads_only = crm_leads_only_ui | default(false) %}
+{% set crm_staff_nav_active = 'leads' if crm_staff_portal | default(false) else '' %}
+
+{% block title %}{% if crm_staff_portal | default(false) %}Lead của tôi{% elif _leads_only %}Danh sách lead{% else %}Quản lý Lead — CRM{% endif %}{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+{% block body_class_extra %}crm-body crm-leads-page{% if crm_staff_portal | default(false) %} crm-app--staff-portal{% endif %}{% if _leads_only %} crm-leads-page--sales-only{% endif %}{% endblock %}
+
+{% block admin_head %}
+  {% set _css = 'crm_leads.css' %}
+  <link rel="stylesheet" href="{{ url_for('static', filename=_css) }}?v={{ static_v(_css) }}" />
+  <script id="crm-leads-meta" type="application/json">{{ {
+    "staff_portal": crm_staff_portal | default(false),
+    "leads_only_ui": _leads_only,
+    "staff_id": crm_staff_id,
+    "statuses": crm_lead_statuses,
+    "status_labels": crm_lead_status_labels,
+    "levels": crm_lead_levels,
+    "level_labels": crm_lead_level_labels,
+    "sources": crm_lead_sources,
+    "source_labels": crm_lead_source_labels,
+    "activity_types": crm_lead_activity_types,
+    "activity_labels": crm_lead_activity_labels,
+    "scoring_rule_defaults": crm_scoring_rule_defaults | default([]),
+    "scoring_rubric_defaults": crm_scoring_rubric_defaults | default({}),
+    "scoring_evaluators": crm_scoring_evaluators | default([]),
+    "level_tier_defaults": crm_level_tier_defaults | default([]),
+    "scoring_conditions": crm_scoring_conditions | default([]),
+    "scoring_field_options": crm_scoring_field_options | default([]),
+    "assign_strategy_defaults": crm_assign_strategy_defaults | default([]),
+    "assign_tier_level_map_defaults": crm_assign_tier_level_map_defaults | default({}),
+    "can_configure_leads": crm_leads_can_configure | default(false),
+    "can_delete_leads": crm_leads_can_delete | default(false),
+    "product_line_labels": crm_product_line_labels | default({}),
+    "care_contact_types": crm_care_contact_types | default([]),
+    "care_contact_labels": crm_care_contact_labels | default({}),
+    "care_status_types": crm_care_status_types | default([]),
+    "care_status_labels": crm_care_status_labels | default({}),
+    "care_pipeline_stages": crm_care_pipeline_stages | default([])
+  } | tojson }}</script>
+{% endblock %}
+
+{% block admin_page_title %}{% if _leads_only %}Danh sách lead{% else %}Quản lý Lead{% endif %}{% endblock %}
+{% block admin_page_desc %}
+  {% if _leads_only %}
+  <p class="admin-page-desc">Lead được phân cho bạn — tìm kiếm, cập nhật trạng thái và ghi hoạt động chăm sóc.</p>
+  {% else %}
+  <p class="admin-page-desc">Thu thập đa nguồn, chấm điểm, phân loại Hot/Warm/Cold, gán owner, SLA và truy xuất AI.</p>
+  {% endif %}
+{% endblock %}
+{% block admin_page_actions %}
+  <button type="button" class="btn-secondary" id="crm-leads-rules-btn" hidden data-admin-section-allow data-admin-btn="crm_leads__btn_rules">Quy tắc điểm & hạng</button>
+  <button type="button" class="btn-secondary" id="crm-leads-config-btn" hidden data-admin-section-allow data-admin-btn="crm_leads__btn_config">Cấu hình phân lead</button>
+  <button type="button" class="btn-secondary" id="crm-leads-export-xlsx" data-admin-btn="crm_leads__btn_export_xlsx">Excel</button>
+  <button type="button" class="btn-secondary" id="crm-leads-export-pdf" data-admin-btn="crm_leads__btn_export_pdf">PDF</button>
+  <button type="button" class="btn-secondary" id="crm-leads-import-btn" data-admin-btn="crm_leads__btn_import">Import CSV</button>
+  <button type="button" class="btn-secondary" id="crm-leads-fb-btn" data-admin-btn="crm_leads__btn_fb_sync">Facebook Lead</button>
+  <button type="button" class="btn" id="crm-leads-create-btn" data-admin-btn="crm_leads__btn_create">＋ Tạo lead</button>
+{% endblock %}
+
+{% block admin_main %}
+<div class="crm-app crm-leads-app" data-admin-section="crm_leads">
+  <div class="crm-leads-notify-stack" id="crm-leads-notify-stack" aria-live="polite" aria-atomic="false"></div>
+  {% if crm_staff_portal | default(false) or not _leads_only %}
+  <div class="crm-leads-stats" id="crm-leads-stats" aria-label="Thống kê"></div>
+  {% endif %}
+  <section class="panel crm-leads-owner-panel" id="crm-leads-owner-panel" hidden aria-label="Hiệu suất theo owner">
+    <h3 class="crm-leads-subtitle">{% if crm_staff_portal | default(false) or _leads_only %}Hiệu suất của tôi{% else %}Hiệu suất theo Owner{% endif %}</h3>
+    <p class="muted crm-leads-owner-desc">Tổng hợp lead được phân công trên <strong>mọi dự án</strong> nhân viên tham gia (dùng bộ lọc «Dự án BĐS» để xem từng dự án). Cột B1–B8: số lead theo bước chăm sóc.</p>
+    <div class="crm-staff-table-wrap crm-leads-owner-scroll">
+      <table class="crm-staff-table crm-leads-owner-table">
+        <thead>
+          <tr>
+            <th>Owner</th>
+            <th>Tổng</th>
+            <th>Theo dự án</th>
+            {% for st in crm_care_pipeline_stages %}
+            <th class="crm-leads-owner-stage-col" title="{{ st.label }}">B{{ loop.index }}</th>
+            {% endfor %}
+            <th>Đang mở</th>
+            <th>Mất</th>
+            <th>Chốt</th>
+            <th>%</th>
+            <th>Quá SLA</th>
+            <th>Điểm TB</th>
+          </tr>
+        </thead>
+        <tbody id="crm-leads-owner-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="crm-leads-layout crm-leads-layout--wide">
+    <section class="panel crm-leads-list-pane">
+      <div class="crm-leads-pane-head">
+        <h3 class="crm-leads-pane-title">Danh sách lead</h3>
+        <span class="crm-leads-pane-count" id="crm-leads-list-count">—</span>
+      </div>
+      <div class="crm-leads-toolbar crm-leads-toolbar--wide">
+        <input type="search" id="crm-leads-search" placeholder="Tìm tên, SĐT, email…" />
+        <select id="crm-leads-filter-status"><option value="">Trạng thái</option></select>
+        <select id="crm-leads-filter-level"><option value="">Phân loại</option></select>
+        <select id="crm-leads-filter-source"><option value="">Nguồn</option></select>
+        <select id="crm-leads-filter-project"><option value="">Dự án BĐS (tất cả)</option></select>
+        <select id="crm-leads-filter-line"><option value="">Dòng SP</option></select>
+        <select id="crm-leads-filter-zone"><option value="">Phân khu</option></select>
+        <label class="crm-leads-sla-check"><input type="checkbox" id="crm-leads-sla-only" /> Quá hạn SLA</label>
+        {% if not _leads_only %}
+        <button type="button" class="btn-secondary" id="crm-leads-filter-fb-only">Facebook</button>
+        {% endif %}
+        <button type="button" class="btn-secondary" id="crm-leads-filter-reset">Xóa lọc</button>
+        {% if not crm_staff_portal | default(false) and not _leads_only %}
+        <select id="crm-leads-filter-owner"><option value="">Owner</option></select>
+        {% endif %}
+      </div>
+      <div class="crm-leads-list" id="crm-leads-list"><div class="crm-leads-loading">Đang tải…</div></div>
+    </section>
+
+    {% if not _leads_only %}
+    <section class="panel crm-leads-ai-pane crm-leads-ai-pane--below">
+      <h3 class="crm-leads-ai-title">AI Truy xuất</h3>
+      <p class="muted">Hỏi bằng tiếng Việt: «Lead nào quá hạn?», «Lead hot ưu tiên» — lọc theo dự án BĐS nếu đã chọn.</p>
+      <textarea id="crm-leads-ai-query" rows="3" placeholder="Nhập câu hỏi…"></textarea>
+      <button type="button" class="btn" id="crm-leads-ai-search" data-admin-btn="crm_leads__btn_ai_search">Tìm kiếm AI</button>
+      <div id="crm-leads-ai-search-result" class="crm-leads-ai-box"></div>
+    </section>
+    {% endif %}
+  </div>
+</div>
+
+<div class="crm-modal-root" id="crm-leads-view-modal" hidden>
+  <div class="crm-modal-backdrop" data-close-view-modal></div>
+  <div class="crm-modal-panel crm-modal-panel--wide crm-leads-view-modal" role="dialog" aria-modal="true" aria-labelledby="crm-leads-detail-name">
+    <header class="crm-modal-head crm-leads-detail-head">
+      <div>
+        <p class="crm-modal-kicker">Chi tiết lead</p>
+        <h2 id="crm-leads-detail-name">—</h2>
+        <div class="crm-leads-badges" id="crm-leads-detail-badges"></div>
+      </div>
+      <div class="crm-leads-detail-actions">
+        {% if not _leads_only %}
+        <button type="button" class="btn-secondary" id="crm-leads-convert-btn" title="Tạo Khách hàng + Case CSKH" data-admin-btn="crm_leads__btn_convert">→ Case/KH</button>
+        {% if not crm_staff_portal | default(false) %}
+        <button type="button" class="btn-secondary" id="crm-leads-assign-btn" title="Phân lại owner" data-admin-btn="crm_leads__btn_assign">Phân lại</button>
+        <button type="button" class="btn-secondary" id="crm-leads-merge-btn" title="Gộp lead trùng" hidden data-admin-btn="crm_leads__btn_merge">Gộp trùng</button>
+        {% endif %}
+        <button type="button" class="btn-secondary" id="crm-leads-ai-summary" data-admin-btn="crm_leads__btn_ai_summary">AI Tóm tắt</button>
+        <button type="button" class="btn-secondary" id="crm-leads-ai-classify" data-admin-btn="crm_leads__btn_ai_classify">AI Phân loại</button>
+        <button type="button" class="btn-secondary" id="crm-leads-ai-recommend" data-admin-btn="crm_leads__btn_ai_recommend">Gợi ý</button>
+        <button type="button" class="btn-secondary" id="crm-leads-hold-product" hidden>Giữ chỗ SP</button>
+        <button type="button" class="btn-secondary" id="crm-leads-release-product" hidden>Hủy giữ chỗ</button>
+        {% endif %}
+        <button type="button" class="btn-secondary" id="crm-leads-edit-btn" data-admin-btn="crm_leads__btn_edit">Sửa</button>
+        {% if not _leads_only %}
+        <button type="button" class="btn-secondary crm-leads-btn-danger" id="crm-leads-delete-btn" hidden title="Xóa lead vĩnh viễn" data-admin-btn="crm_leads__btn_delete">Xóa</button>
+        {% endif %}
+        <button type="button" class="crm-modal-close" data-close-view-modal aria-label="Đóng">×</button>
+      </div>
+    </header>
+    <div class="crm-modal-body crm-leads-view-body">
+      <div class="crm-leads-detail-grid" id="crm-leads-detail-info"></div>
+      <div class="crm-leads-score-panel panel-inset" id="crm-leads-score-panel">
+        <div class="crm-leads-score-head">
+          <h3 class="crm-leads-subtitle">Chi tiết chấm điểm</h3>
+          {% if not _leads_only %}
+          <button type="button" class="btn-secondary btn-sm" id="crm-leads-rescore-btn" data-admin-btn="crm_leads__btn_rescore">Chấm lại</button>
+          {% endif %}
+        </div>
+        <div id="crm-leads-score-breakdown" class="crm-leads-score-breakdown muted">—</div>
+      </div>
+      <div class="crm-leads-dup-panel panel-inset" id="crm-leads-dup-panel" hidden>
+        <h3 class="crm-leads-subtitle">Lead trùng lặp</h3>
+        <div id="crm-leads-dup-list" class="muted">—</div>
+      </div>
+      <div class="crm-leads-ai-box" id="crm-leads-ai-result" hidden></div>
+
+      <div class="crm-leads-care panel-inset crm-timeline-wrap" id="crm-leads-care-panel">
+        <div class="crm-leads-care-pipeline-head">
+          <h3 class="crm-panel-title">Quy trình chăm sóc (8 bước)</h3>
+          <p class="muted crm-leads-care-pipeline-desc">Chọn bước trên thanh pipeline — ghi <strong>báo cáo theo từng bước</strong>, sau đó hoàn thành để chuyển tiếp (bước xong được tô xanh).</p>
+        </div>
+        <div class="crm-leads-care-pipeline" id="crm-leads-care-pipeline" aria-label="Quy trình chăm sóc 8 bước"></div>
+        <div class="crm-leads-care-stage-panel" id="crm-leads-care-stage-panel" hidden>
+          <div class="crm-leads-care-stage-panel-head">
+            <span class="crm-leads-care-stage-badge" id="crm-leads-care-stage-num">1</span>
+            <div>
+              <p class="crm-leads-care-stage-panel-kicker">Bước đang thực hiện</p>
+              <h4 class="crm-leads-care-stage-panel-title" id="crm-leads-care-stage-name">—</h4>
+            </div>
+          </div>
+          <p class="crm-leads-care-stage-panel-hint" id="crm-leads-care-stage-hint">—</p>
+          <div class="crm-leads-care-stage-reports" id="crm-leads-care-stage-reports" aria-live="polite"></div>
+          <div class="crm-leads-care-stage-report-wrap" id="crm-leads-care-stage-report-wrap">
+            <h5 class="crm-leads-care-report-title" id="crm-leads-care-report-title">Báo cáo bước</h5>
+            <form id="crm-leads-care-form" class="crm-care-report-form crm-leads-care-stage-form">
+              <input type="hidden" id="crm-leads-care-stage-key" name="care_stage_key" value="" />
+              <div class="crm-form-grid-2">
+                <label for="crm-leads-care-contact">Hình thức liên hệ
+                  <select name="contact_type" id="crm-leads-care-contact" required></select>
+                </label>
+                <label for="crm-leads-care-status">Tình trạng chăm sóc
+                  <select name="care_status" id="crm-leads-care-status" required></select>
+                </label>
+              </div>
+              <label for="crm-leads-care-summary">Nội dung báo cáo bước này *
+                <textarea id="crm-leads-care-summary" name="summary" rows="3" required placeholder="Ghi theo hướng dẫn bước ở trên…"></textarea>
+              </label>
+              <label for="crm-leads-care-next">Việc tiếp theo (trong bước / trước khi chốt bước)
+                <input type="text" id="crm-leads-care-next" name="next_action" placeholder="Ví dụ: Gửi báo giá + follow-up Zalo ngày 28/05" />
+              </label>
+              <label for="crm-leads-care-next-at">Nhắc lúc
+                <input type="datetime-local" id="crm-leads-care-next-at" name="next_action_at" />
+              </label>
+              <button type="submit" class="btn" data-admin-btn="crm_leads__btn_activity">Gửi báo cáo bước này</button>
+              <p class="crm-form-msg is-error" id="crm-leads-care-err" hidden></p>
+              <p class="crm-form-msg is-success" id="crm-leads-care-ok" hidden>Đã lưu báo cáo cho bước.</p>
+            </form>
+            <p class="muted crm-leads-care-report-readonly" id="crm-leads-care-report-readonly" hidden>
+              Báo cáo chỉ ghi ở <strong>bước đang thực hiện</strong>. Chọn bước hiện tại trên thanh pipeline để ghi mới.
+            </p>
+          </div>
+          <div class="crm-leads-care-stage-complete-wrap">
+            <label class="crm-leads-care-stage-note-label" for="crm-leads-care-stage-note">Ghi chú khi hoàn thành bước (tuỳ chọn)</label>
+            <input type="text" id="crm-leads-care-stage-note" class="crm-leads-care-stage-note" placeholder="Tóm tắt kết quả bước trước khi chuyển tiếp…" />
+            <div class="crm-leads-care-stage-actions">
+              <button type="button" class="btn btn-secondary" id="crm-leads-care-stage-complete" data-admin-btn="crm_leads__btn_care_stage">✓ Hoàn thành &amp; chuyển bước tiếp</button>
+              <p class="crm-form-msg is-error" id="crm-leads-care-stage-err" hidden></p>
+              <p class="crm-form-msg is-success" id="crm-leads-care-stage-ok" hidden>Đã chuyển sang bước tiếp theo.</p>
+            </div>
+          </div>
+        </div>
+        <h3 class="crm-panel-title crm-panel-title--spaced">Lịch sử tổng hợp</h3>
+        <p class="crm-timeline-intro muted">Báo cáo theo từng bước, chuyển trạng thái pipeline và ghi chú nội bộ.</p>
+        <ol class="crm-timeline" id="crm-leads-care-timeline">
+          <li class="crm-ev-muted crm-ev-empty">Chọn lead để xem lịch sử.</li>
+        </ol>
+        <form id="crm-leads-note-form" class="crm-note-form">
+          <label for="crm-leads-note-body" class="crm-note-label">Thêm ghi chú</label>
+          <textarea id="crm-leads-note-body" name="body" rows="3" placeholder="Ví dụ: Đã gọi xác nhận — khách hẹn phản hồi email trước thứ Sáu."></textarea>
+          <button type="submit" class="btn btn-secondary">Thêm ghi chú</button>
+        </form>
+      </div>
+
+      {% if not _leads_only %}
+      <div class="crm-leads-audit panel-inset">
+        <h3 class="crm-leads-subtitle">Truy xuất thay đổi</h3>
+        <div class="crm-leads-audit-grid">
+          <div>
+            <h4 class="crm-leads-audit-head">Lịch sử trạng thái</h4>
+            <div id="crm-leads-status-logs" class="crm-leads-audit-list muted">—</div>
+          </div>
+          <div>
+            <h4 class="crm-leads-audit-head">Lịch sử phân công</h4>
+            <div id="crm-leads-assignment-logs" class="crm-leads-audit-list muted">—</div>
+          </div>
+        </div>
+      </div>
+      {% else %}
+      <div id="crm-leads-status-logs" hidden></div>
+      <div id="crm-leads-assignment-logs" hidden></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="crm-modal-root" id="crm-leads-modal" hidden>
+  <div class="crm-modal-backdrop" data-close-leads-modal></div>
+  <div class="crm-modal-panel crm-leads-form-modal" role="dialog" aria-modal="true" aria-labelledby="crm-leads-modal-title">
+    <header class="crm-modal-head">
+      <div>
+        <p class="crm-modal-kicker">Lead CRM</p>
+        <h2 id="crm-leads-modal-title">Lead</h2>
+      </div>
+      <button type="button" class="crm-modal-close" data-close-leads-modal aria-label="Đóng">×</button>
+    </header>
+    <form id="crm-leads-form" class="crm-modal-body crm-leads-lead-form">
+      <input type="hidden" id="crm-leads-form-id" />
+
+      <section class="crm-leads-form-section">
+        <h3 class="crm-leads-form-section-title">Thông tin liên hệ</h3>
+        <div class="crm-leads-form-grid">
+          <div class="crm-leads-form-field">
+            <label for="crm-leads-f-name">Họ tên <span class="crm-leads-req">*</span></label>
+            <input type="text" id="crm-leads-f-name" required autocomplete="name" placeholder="Nguyễn Văn A" />
+          </div>
+          <div class="crm-leads-form-field">
+            <label for="crm-leads-f-phone">Số điện thoại</label>
+            <input type="tel" id="crm-leads-f-phone" autocomplete="tel" placeholder="0901234567" />
+          </div>
+          <div class="crm-leads-form-field">
+            <label for="crm-leads-f-email">Email</label>
+            <input type="email" id="crm-leads-f-email" autocomplete="email" placeholder="email@congty.com" />
+          </div>
+          <div class="crm-leads-form-field">
+            <label for="crm-leads-f-region">Khu vực</label>
+            <input type="text" id="crm-leads-f-region" placeholder="HCM, Hà Nội…" />
+          </div>
+        </div>
+      </section>
+
+      <section class="crm-leads-form-section">
+        <h3 class="crm-leads-form-section-title">Nguồn & quan tâm</h3>
+        <div class="crm-leads-form-grid">
+          <div class="crm-leads-form-field">
+            <label for="crm-leads-f-source">Nguồn lead <span class="crm-leads-req">*</span></label>
+            <select id="crm-leads-f-source" required></select>
+          </div>
+          <div class="crm-leads-form-field">
+            <label for="crm-leads-f-project">Dự án BĐS</label>
+            <select id="crm-leads-f-project"><option value="">— Chưa gán dự án —</option></select>
+          </div>
+          <div class="crm-leads-form-field">
+            <label for="crm-leads-f-line">Dòng sản phẩm</label>
+            <select id="crm-leads-f-line"><option value="">— Chọn dòng SP —</option></select>
+          </div>
+          <div class="crm-leads-form-field">
+            <label for="crm-leads-f-zone">Phân khu</label>
+            <select id="crm-leads-f-zone"><option value="">— Chọn phân khu —</option></select>
+          </div>
+          <div class="crm-leads-form-field crm-leads-form-field--full">
+            <label for="crm-leads-f-product-pick">Mã căn / sản phẩm</label>
+            <div class="crm-leads-product-pick-row">
+              <select id="crm-leads-f-product-pick"><option value="">— Tìm căn trống —</option></select>
+              <input type="search" id="crm-leads-f-product-q" placeholder="Tìm mã căn…" autocomplete="off" />
+            </div>
+          </div>
+          <div class="crm-leads-form-field">
+            <label for="crm-leads-f-product">Sản phẩm quan tâm (text)</label>
+            <input type="text" id="crm-leads-f-product" placeholder="Shophouse block B, căn 2PN…" />
+          </div>
+        </div>
+        <div class="crm-leads-form-field crm-leads-form-field--full">
+          <label for="crm-leads-f-need">Nhu cầu / mô tả</label>
+          <textarea id="crm-leads-f-need" rows="3" placeholder="Khách cần tư vấn gì, thời gian, ngân sách…"></textarea>
+        </div>
+      </section>
+
+      <section class="crm-leads-form-section" id="crm-leads-edit-section" hidden>
+        <h3 class="crm-leads-form-section-title">Pipeline & phân công</h3>
+        <div class="crm-leads-form-grid">
+          <div class="crm-leads-form-field">
+            <label for="crm-leads-f-status">Trạng thái</label>
+            <select id="crm-leads-f-status"></select>
+          </div>
+          <div class="crm-leads-form-field">
+            <label for="crm-leads-f-level">Phân loại</label>
+            <select id="crm-leads-f-level"><option value="">Tự động theo điểm</option></select>
+          </div>
+          {% if not crm_staff_portal | default(false) %}
+          <div class="crm-leads-form-field">
+            <label for="crm-leads-f-owner">Owner</label>
+            <select id="crm-leads-f-owner"><option value="">Tự động gán</option></select>
+          </div>
+          {% endif %}
+          <div class="crm-leads-form-field crm-leads-form-field--full">
+            <label for="crm-leads-f-status-note">Ghi chú chuyển trạng thái</label>
+            <input type="text" id="crm-leads-f-status-note" placeholder="Lý do thay đổi trạng thái…" />
+          </div>
+        </div>
+        <div class="crm-leads-config-check crm-leads-override-check" id="crm-leads-override-wrap" hidden>
+          <input type="checkbox" id="crm-leads-f-status-override" />
+          <label for="crm-leads-f-status-override">Override — cho phép đổi trạng thái khi thiếu dữ liệu bắt buộc</label>
+        </div>
+      </section>
+
+      <p class="crm-form-msg is-warning" id="crm-leads-form-dup-hint" hidden></p>
+      <p class="crm-form-msg is-error" id="crm-leads-form-err" hidden></p>
+    </form>
+    <footer class="crm-modal-foot">
+      <button type="button" class="btn-secondary" data-close-leads-modal>Hủy</button>
+      <button type="submit" form="crm-leads-form" class="btn" id="crm-leads-form-submit" data-admin-btn="crm_leads__btn_save">Lưu lead</button>
+    </footer>
+  </div>
+</div>
+
+<input type="file" id="crm-leads-import-file" accept=".csv,text/csv" hidden />
+
+<div class="crm-modal-root" id="crm-leads-fb-modal" hidden>
+  <div class="crm-modal-backdrop" data-close-fb-modal></div>
+  <div class="crm-modal-panel crm-leads-form-modal" role="dialog" aria-modal="true">
+    <header class="crm-modal-head">
+      <div>
+        <h2>Nhập lead Facebook</h2>
+        <p class="muted">Chấm điểm → phân hạng → phân công NV tự động</p>
+      </div>
+      <button type="button" class="crm-modal-close" data-close-fb-modal>×</button>
+    </header>
+    <form id="crm-leads-fb-form" class="crm-modal-body">
+      <p class="muted" id="crm-leads-fb-status">Webhook: <code>/api/crm/integration/webhooks/facebook</code></p>
+      <label>Leadgen ID (Facebook Graph)
+        <input type="text" id="crm-leads-fb-leadgen-id" placeholder="Tùy chọn — đồng bộ từ Graph API" />
+      </label>
+      <label>Họ tên *
+        <input type="text" id="crm-leads-fb-name" required />
+      </label>
+      <label>SĐT *
+        <input type="tel" id="crm-leads-fb-phone" required />
+      </label>
+      <label>Email
+        <input type="email" id="crm-leads-fb-email" />
+      </label>
+      <label>Khu vực
+        <input type="text" id="crm-leads-fb-region" placeholder="q.7, q.2…" />
+      </label>
+      <label>Sản phẩm quan tâm
+        <input type="text" id="crm-leads-fb-product" placeholder="căn hộ, nhà phố…" />
+      </label>
+      <label>Nhu cầu
+        <textarea id="crm-leads-fb-need" rows="3"></textarea>
+      </label>
+      <p class="crm-form-msg is-error" id="crm-leads-fb-err" hidden></p>
+      <p class="crm-form-msg is-success" id="crm-leads-fb-ok" hidden></p>
+    </form>
+    <footer class="crm-modal-foot">
+      <button type="button" class="btn-secondary" data-close-fb-modal>Hủy</button>
+      <button type="submit" form="crm-leads-fb-form" class="btn">Nhập &amp; phân lead</button>
+    </footer>
+  </div>
+</div>
+
+<div class="crm-modal-root" id="crm-leads-assign-modal" hidden>
+  <div class="crm-modal-backdrop" data-close-assign-modal></div>
+  <div class="crm-modal-panel" role="dialog" aria-modal="true">
+    <header class="crm-modal-head">
+      <h2>Phân lại lead</h2>
+      <button type="button" class="crm-modal-close" data-close-assign-modal>×</button>
+    </header>
+    <form id="crm-leads-assign-form" class="crm-modal-body">
+      <label>Owner mới
+        <select id="crm-leads-assign-owner" required></select>
+      </label>
+      <label>Lý do phân lại *
+        <textarea id="crm-leads-assign-reason" rows="3" required placeholder="VD: Chuyển cho sales khu vực miền Bắc…"></textarea>
+      </label>
+      <p class="crm-form-msg is-error" id="crm-leads-assign-err" hidden></p>
+    </form>
+    <footer class="crm-modal-foot">
+      <button type="button" class="btn-secondary" data-close-assign-modal>Hủy</button>
+      <button type="submit" form="crm-leads-assign-form" class="btn">Xác nhận</button>
+    </footer>
+  </div>
+</div>
+
+<div class="crm-modal-root" id="crm-leads-config-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-close-config-modal></div>
+  <div class="crm-modal-panel crm-modal-panel--wide crm-leads-config-modal-panel" role="dialog" aria-modal="true" data-admin-section-allow>
+    <header class="crm-modal-head">
+      <div>
+        <p class="crm-modal-kicker">Lead CRM</p>
+        <h2>Cấu hình phân lead</h2>
+        <p class="muted crm-leads-config-sub">Chính sách trùng lặp, tự động gán owner và phương pháp phân lead theo nghiệp vụ.</p>
+      </div>
+      <button type="button" class="crm-modal-close" data-close-config-modal aria-label="Đóng">×</button>
+    </header>
+
+    <nav class="crm-leads-config-tabs" aria-label="Tab cấu hình phân lead">
+      <button type="button" class="crm-leads-config-tab is-active" data-config-tab="general" id="crm-leads-cfg-tab-general">Chính sách chung</button>
+      <button type="button" class="crm-leads-config-tab" data-config-tab="strategies" id="crm-leads-cfg-tab-strategies">Phương pháp phân lead</button>
+      <button type="button" class="crm-leads-config-tab" data-config-tab="mapping" id="crm-leads-cfg-tab-mapping">Bảng cấp NV</button>
+      <button type="button" class="crm-leads-config-tab" data-config-tab="facebook" id="crm-leads-cfg-tab-facebook">Facebook Lead</button>
+    </nav>
+
+    <form id="crm-leads-config-form" class="crm-modal-body crm-leads-config-form">
+      <!-- Tab chính sách chung -->
+      <div class="crm-leads-config-pane" id="crm-leads-config-pane-general" data-config-pane="general">
+        <section class="crm-leads-form-section">
+          <h3 class="crm-leads-form-section-title">Lead trùng lặp</h3>
+          <p class="muted crm-leads-rules-hint">Khi tạo lead mới trùng số điện thoại hoặc email với lead đã có.</p>
+          <div class="crm-leads-config-field">
+            <label for="crm-leads-cfg-dup">Xử lý trùng</label>
+            <select id="crm-leads-cfg-dup">
+              <option value="flag">Đánh dấu trùng — vẫn tạo, gắn cờ duplicate</option>
+              <option value="reject">Từ chối tạo — báo lỗi, không lưu</option>
+              <option value="merge">Tự gộp — nhập dữ liệu vào lead cũ</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="crm-leads-form-section">
+          <h3 class="crm-leads-form-section-title">Owner không còn hoạt động</h3>
+          <p class="muted crm-leads-rules-hint">Khi NV nghỉ / bị vô hiệu hóa, lead đang phụ trách sẽ được phân lại.</p>
+          <div class="crm-leads-config-field">
+            <label for="crm-leads-cfg-fallback">Cách phân lại</label>
+            <select id="crm-leads-cfg-fallback">
+              <option value="round_robin">Round-robin — luân phiên trong team</option>
+              <option value="min_workload">Ít tải nhất — NV đang xử lý ít lead mở</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="crm-leads-form-section">
+          <h3 class="crm-leads-form-section-title">Theo dõi SLA</h3>
+          <label class="crm-leads-config-check">
+            <input type="checkbox" id="crm-leads-cfg-act-sla" />
+            <span>Cảnh báo khi lead không có activity trong thời hạn SLA trạng thái</span>
+          </label>
+        </section>
+      </div>
+
+      <!-- Tab phương pháp -->
+      <div class="crm-leads-config-pane" id="crm-leads-config-pane-strategies" data-config-pane="strategies" hidden>
+        <section class="crm-leads-form-section">
+          <label class="crm-leads-config-check crm-leads-config-check--master">
+            <input type="checkbox" id="crm-leads-cfg-auto-assign" checked />
+            <span>
+              <strong>Tự động phân lead khi tạo mới</strong>
+              <small class="crm-leads-config-check-sub">Gán owner ngay sau khi chấm điểm và phân hạng lead</small>
+            </span>
+          </label>
+        </section>
+
+        <section class="crm-leads-form-section" id="crm-leads-assign-section">
+          <div class="crm-leads-rules-section-head">
+            <div>
+              <h3 class="crm-leads-form-section-title">Phương pháp áp dụng</h3>
+              <p class="muted crm-leads-rules-hint">
+                Bật/tắt từng phương pháp. Hệ thống lọc NV theo thứ tự ưu tiên (#) rồi chọn người phù hợp.
+                <span id="crm-leads-assign-count" class="crm-leads-assign-count"></span>
+              </p>
+            </div>
+            <button type="button" class="btn-secondary btn-sm" id="crm-leads-assign-reset">Khôi phục mặc định</button>
+          </div>
+          <div id="crm-leads-assign-strategies" class="crm-leads-assign-strategies"></div>
+          <p class="muted crm-leads-config-footnote">
+            💡 Ghi chú NV tại <a href="/crm/staff" target="_blank" rel="noopener">Quản lý nhân viên</a> nên có khu vực, sản phẩm, thế mạnh (vd: «q.7, căn hộ, việt kiều») để phân theo khu vực / đặc điểm KH.
+          </p>
+        </section>
+      </div>
+
+      <!-- Tab bảng cấp NV -->
+      <div class="crm-leads-config-pane" id="crm-leads-config-pane-mapping" data-config-pane="mapping" hidden>
+        <section class="crm-leads-form-section">
+          <h3 class="crm-leads-form-section-title">Phân hạng lead → Cấp nhân viên</h3>
+          <p class="muted crm-leads-rules-hint">Tham chiếu khi bật «Phân theo năng lực» hoặc «Hybrid». Chỉnh cấp NV tại trang Quản lý nhân viên.</p>
+          <div class="crm-leads-scoring-table-wrap">
+            <table class="crm-leads-scoring-table crm-leads-tier-map-table">
+              <thead>
+                <tr>
+                  <th>Phân hạng lead</th>
+                  <th>Cấp NV nhận</th>
+                </tr>
+              </thead>
+              <tbody id="crm-leads-tier-map-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+
+      <!-- Tab Facebook Lead -->
+      <div class="crm-leads-config-pane" id="crm-leads-config-pane-facebook" data-config-pane="facebook" hidden>
+        <section class="crm-leads-form-section">
+          <label class="crm-leads-config-check crm-leads-config-check--master">
+            <input type="checkbox" id="crm-leads-fb-cfg-enabled" />
+            <span>
+              <strong>Bật lấy lead tự động từ Facebook</strong>
+              <small class="crm-leads-config-check-sub">Chỉ xử lý lead từ Page/Form chỉ định bên dưới</small>
+            </span>
+          </label>
+        </section>
+
+        <section class="crm-leads-form-section">
+          <h3 class="crm-leads-form-section-title">Page &amp; Form chỉ định</h3>
+          <div class="crm-leads-config-field">
+            <label for="crm-leads-fb-cfg-page-id">Facebook Page ID</label>
+            <input type="text" id="crm-leads-fb-cfg-page-id" placeholder="VD: 123456789012345" />
+          </div>
+          <div class="crm-leads-config-field">
+            <label for="crm-leads-fb-cfg-page-name">Tên Page (ghi chú)</label>
+            <input type="text" id="crm-leads-fb-cfg-page-name" placeholder="VD: PTT BDS Official" />
+          </div>
+          <div class="crm-leads-config-field">
+            <label for="crm-leads-fb-cfg-form-ids">Form ID (phân cách bằng dấu phẩy)</label>
+            <input type="text" id="crm-leads-fb-cfg-form-ids" placeholder="form_id_1, form_id_2" />
+            <p class="muted crm-leads-rules-hint">Để trống = lấy tất cả form trên Page (khi đồng bộ thủ công).</p>
+          </div>
+        </section>
+
+        <section class="crm-leads-form-section">
+          <h3 class="crm-leads-form-section-title">Pipeline tự động</h3>
+          <label class="crm-leads-config-check">
+            <input type="checkbox" id="crm-leads-fb-cfg-webhook" checked />
+            <span>Nhận qua Webhook (realtime — vài giây)</span>
+          </label>
+          <label class="crm-leads-config-check">
+            <input type="checkbox" id="crm-leads-fb-cfg-auto-sync" checked />
+            <span>Tự động đồng bộ nền (mặc định 5 phút/lần — tránh giới hạn API Facebook)</span>
+          </label>
+          <div class="crm-leads-config-field">
+            <label for="crm-leads-fb-cfg-sync-interval">Chu kỳ đồng bộ (phút)</label>
+            <input type="number" id="crm-leads-fb-cfg-sync-interval" min="5" max="60" value="5" />
+          </div>
+          <label class="crm-leads-config-check">
+            <input type="checkbox" id="crm-leads-fb-cfg-optimize" checked />
+            <span>Tối ưu dữ liệu (chuẩn hóa SĐT, khu vực, nhu cầu)</span>
+          </label>
+          <label class="crm-leads-config-check">
+            <input type="checkbox" id="crm-leads-fb-cfg-auto-assign" checked />
+            <span>Chấm điểm → phân hạng → phân công NV</span>
+          </label>
+          <p class="muted crm-leads-config-footnote">
+            Webhook URL: <code>/api/crm/integration/webhooks/facebook</code>
+          </p>
+          <p class="muted" id="crm-leads-fb-cfg-sync-status">—</p>
+          <button type="button" class="btn-secondary btn-sm" id="crm-leads-fb-cfg-sync-btn">Đồng bộ ngay từ Facebook</button>
+        </section>
+      </div>
+
+      <p class="crm-form-msg is-error" id="crm-leads-config-err" hidden></p>
+    </form>
+    <footer class="crm-modal-foot">
+      <button type="button" class="btn-secondary" data-close-config-modal>Hủy</button>
+      <button type="submit" form="crm-leads-config-form" class="btn">Lưu cấu hình</button>
+    </footer>
+  </div>
+</div>
+
+<div class="crm-modal-root" id="crm-leads-rules-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-close-rules-modal></div>
+  <div class="crm-modal-panel crm-leads-rules-modal" role="dialog" aria-modal="true" data-admin-section-allow>
+    <header class="crm-modal-head">
+      <div>
+        <p class="crm-modal-kicker">Cấu hình Lead</p>
+        <h2>Quy tắc điểm & phân hạng</h2>
+      </div>
+      <button type="button" class="crm-modal-close" data-close-rules-modal aria-label="Đóng">×</button>
+    </header>
+
+    <nav class="crm-leads-rules-tabs" aria-label="Tab cấu hình">
+      <button type="button" class="crm-leads-rules-tab is-active" data-rules-tab="scoring" id="crm-leads-tab-scoring">Bảng chấm điểm D1–D6</button>
+      <button type="button" class="crm-leads-rules-tab" data-rules-tab="tiers" id="crm-leads-tab-tiers">Phân hạng lead</button>
+    </nav>
+
+    <div class="crm-modal-body crm-leads-rules-body">
+      <!-- Tab chấm điểm rubric D1–D6 -->
+      <div class="crm-leads-rules-pane" id="crm-leads-rules-pane-scoring" data-rules-pane="scoring">
+        <div class="crm-leads-rubric-toolbar">
+          <button type="button" class="btn-secondary btn-sm" id="crm-leads-rubric-add-group">＋ Thêm nhóm</button>
+          <button type="button" class="btn-secondary btn-sm" id="crm-leads-rubric-reset">Khôi phục mặc định</button>
+        </div>
+        <p class="muted crm-leads-rules-hint">Tổng 100 điểm — D1 (25) + D2 (20) + D3 (20) + D4 (15) + D5 (12) + D6 (8). Mỗi tiêu chí chỉ nhận một mức điểm.</p>
+        <div id="crm-leads-rubric-groups" class="crm-leads-rubric-groups"></div>
+        <section class="crm-leads-rules-editor panel-inset" id="crm-leads-rubric-crit-editor" hidden>
+          <header class="crm-leads-rules-editor-head">
+            <h3 class="crm-leads-form-section-title" id="crm-leads-rubric-crit-title">Tiêu chí</h3>
+            <button type="button" class="crm-modal-close crm-leads-editor-close" id="crm-leads-rubric-crit-cancel" aria-label="Đóng">×</button>
+          </header>
+          <div class="crm-leads-form-grid">
+            <div class="crm-leads-form-field">
+              <label for="crm-leads-rubric-crit-code">Mã</label>
+              <input type="text" id="crm-leads-rubric-crit-code" maxlength="16" />
+            </div>
+            <div class="crm-leads-form-field">
+              <label for="crm-leads-rubric-crit-label">Tên tiêu chí <span class="crm-leads-req">*</span></label>
+              <input type="text" id="crm-leads-rubric-crit-label" maxlength="200" />
+            </div>
+            <div class="crm-leads-form-field">
+              <label for="crm-leads-rubric-crit-evaluator">Chỉ số đo</label>
+              <select id="crm-leads-rubric-crit-evaluator"></select>
+            </div>
+            <div class="crm-leads-form-field">
+              <label for="crm-leads-rubric-crit-max">Điểm tối đa</label>
+              <input type="number" id="crm-leads-rubric-crit-max" min="0" max="100" step="1" />
+            </div>
+          </div>
+          <div class="crm-leads-rubric-bands-head">
+            <h4>Mức điểm</h4>
+            <button type="button" class="btn-secondary btn-sm" id="crm-leads-rubric-add-band">＋ Thêm mức</button>
+          </div>
+          <div class="crm-leads-scoring-table-wrap">
+            <table class="crm-leads-scoring-table">
+              <thead><tr><th>Nhãn</th><th>Từ</th><th>Đến</th><th>Điểm</th><th>Nguồn/Tier</th><th></th></tr></thead>
+              <tbody id="crm-leads-rubric-bands-body"></tbody>
+            </table>
+          </div>
+          <label class="crm-leads-config-check">
+            <input type="checkbox" id="crm-leads-rubric-crit-enabled" checked />
+            <span>Đang áp dụng</span>
+          </label>
+          <footer class="crm-leads-rules-editor-foot">
+            <button type="button" class="crm-btn-cancel" id="crm-leads-rubric-crit-cancel2">Hủy</button>
+            <button type="button" class="btn" id="crm-leads-rubric-crit-save">Lưu tiêu chí</button>
+          </footer>
+          <p class="crm-form-msg is-error" id="crm-leads-rubric-crit-err" hidden></p>
+        </section>
+        <p class="crm-form-msg is-error" id="crm-leads-scoring-err" hidden></p>
+      </div>
+
+      <!-- Tab phân hạng -->
+      <div class="crm-leads-rules-pane" id="crm-leads-rules-pane-tiers" data-rules-pane="tiers" hidden>
+        <section class="crm-leads-rules-editor panel-inset" id="crm-leads-tiers-editor" hidden>
+          <header class="crm-leads-rules-editor-head">
+            <h3 class="crm-leads-form-section-title" id="crm-leads-tiers-editor-title">Thêm phân hạng</h3>
+            <button type="button" class="crm-modal-close crm-leads-editor-close" id="crm-leads-tiers-ed-cancel" aria-label="Đóng form">×</button>
+          </header>
+          <div class="crm-leads-form-grid">
+            <div class="crm-leads-form-field">
+              <label for="crm-leads-tiers-ed-emoji">Biểu tượng</label>
+              <input type="text" id="crm-leads-tiers-ed-emoji" maxlength="8" placeholder="🔴" />
+            </div>
+            <div class="crm-leads-form-field">
+              <label for="crm-leads-tiers-ed-label">Loại / tên hạng <span class="crm-leads-req">*</span></label>
+              <input type="text" id="crm-leads-tiers-ed-label" maxlength="80" placeholder="VIP, HOT, WARM+…" />
+            </div>
+            <div class="crm-leads-form-field">
+              <label for="crm-leads-tiers-ed-id">Mã (slug) <span class="crm-leads-req">*</span></label>
+              <input type="text" id="crm-leads-tiers-ed-id" maxlength="32" placeholder="vip, hot" />
+            </div>
+            <div class="crm-leads-form-field">
+              <label for="crm-leads-tiers-ed-min">Điểm từ <span class="crm-leads-req">*</span></label>
+              <input type="number" id="crm-leads-tiers-ed-min" value="0" min="0" max="100" />
+            </div>
+            <div class="crm-leads-form-field">
+              <label for="crm-leads-tiers-ed-max">Điểm đến <span class="crm-leads-req">*</span></label>
+              <input type="number" id="crm-leads-tiers-ed-max" value="100" min="0" max="100" />
+            </div>
+            <div class="crm-leads-form-field crm-leads-form-field--wide">
+              <label for="crm-leads-tiers-ed-desc">Mô tả</label>
+              <input type="text" id="crm-leads-tiers-ed-desc" maxlength="500" placeholder="Siêu nóng, ưu tiên tuyệt đối" />
+            </div>
+            <div class="crm-leads-form-field">
+              <label for="crm-leads-tiers-ed-sla">Thời gian xử lý</label>
+              <input type="text" id="crm-leads-tiers-ed-sla" maxlength="120" placeholder="< 2 phút, Trong ngày…" />
+            </div>
+            <div class="crm-leads-form-field crm-leads-form-field--check">
+              <label class="crm-leads-config-check">
+                <input type="checkbox" id="crm-leads-tiers-ed-enabled" checked />
+                <span>Bật phân hạng này</span>
+              </label>
+            </div>
+          </div>
+          <footer class="crm-leads-rules-editor-foot">
+            <button type="button" class="btn" id="crm-leads-tiers-ed-save">Lưu hạng</button>
+          </footer>
+          <p class="crm-form-msg is-error" id="crm-leads-tiers-ed-err" hidden></p>
+        </section>
+
+        <section class="crm-leads-form-section">
+          <div class="crm-leads-rules-section-head">
+            <div>
+              <h3 class="crm-leads-form-section-title">Bảng phân loại lead</h3>
+              <p class="muted crm-leads-rules-hint">Phân hạng theo điểm chấm (0–100). Có thể thêm, sửa, xóa từng mức.</p>
+            </div>
+            <div class="crm-leads-rubric-toolbar">
+              <button type="button" class="btn-secondary btn-sm" id="crm-leads-tiers-add-btn">＋ Thêm hạng</button>
+              <button type="button" class="btn-secondary btn-sm" id="crm-leads-tiers-reset">Khôi phục mặc định</button>
+            </div>
+          </div>
+          <div class="crm-leads-scoring-table-wrap">
+            <table class="crm-leads-scoring-table crm-leads-tiers-table">
+              <thead>
+                <tr>
+                  <th class="col-check">Bật</th>
+                  <th>Điểm</th>
+                  <th>Loại</th>
+                  <th>Mô tả</th>
+                  <th>Thời gian XL</th>
+                  <th class="col-actions"></th>
+                </tr>
+              </thead>
+              <tbody id="crm-leads-tiers-body"></tbody>
+            </table>
+          </div>
+          <p class="crm-form-msg is-error" id="crm-leads-tiers-err" hidden></p>
+        </section>
+      </div>
+    </div>
+
+    <footer class="crm-modal-foot">
+      <button type="button" class="btn-secondary" data-close-rules-modal>Hủy</button>
+      <button type="button" class="btn" id="crm-leads-rules-save-btn">Lưu thay đổi</button>
+    </footer>
+  </div>
+</div>
+
+<div class="crm-modal-root" id="crm-leads-merge-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-close-merge-modal></div>
+  <div class="crm-modal-panel" role="dialog" aria-modal="true">
+    <header class="crm-modal-head">
+      <h2>Gộp lead trùng</h2>
+      <button type="button" class="crm-modal-close" data-close-merge-modal>×</button>
+    </header>
+    <form id="crm-leads-merge-form" class="crm-modal-body">
+      <p class="muted">Lead hiện tại là bản ghi chính. Chọn lead trùng để gộp (activity sẽ chuyển sang lead chính).</p>
+      <div id="crm-leads-merge-checkboxes"></div>
+      <label>Lý do gộp<textarea id="crm-leads-merge-reason" rows="2"></textarea></label>
+      <p class="crm-form-msg is-error" id="crm-leads-merge-err" hidden></p>
+    </form>
+    <footer class="crm-modal-foot">
+      <button type="button" class="btn-secondary" data-close-merge-modal>Hủy</button>
+      <button type="submit" form="crm-leads-merge-form" class="btn">Gộp</button>
+    </footer>
+  </div>
+</div>
+{% endblock %}
+
+{% block admin_page_scripts %}
+{% if not crm_staff_portal | default(false) %}
+{% include 'partials/admin_grants_bootstrap.html' %}
+{% endif %}
+{% set _js = static_js_file('crm_leads.js') %}
+<script src="{{ url_for('static', filename=_js) }}?v={{ static_v(_js) }}" defer></script>
+{% endblock %}

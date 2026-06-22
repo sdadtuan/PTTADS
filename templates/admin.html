@@ -1,0 +1,104 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}Bảng điều khiển — PTT{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+
+{% block admin_head %}
+  <meta name="description" content="Trang quản trị nội bộ — không lập chỉ mục." />
+{% endblock %}
+
+{% block admin_page_title %}Bảng điều khiển{% endblock %}
+{% block admin_page_desc %}
+  <p class="admin-page-desc">Quản trị dự án portfolio, tin tức và kênh CRM (dropdown Yêu cầu mới trên Bảng CSKH).</p>
+{% endblock %}
+
+{% block admin_main %}
+  <nav class="admin-dashboard-cards" aria-label="Truy cập nhanh">
+    <a href="{{ url_for('cms_landing') }}" class="admin-dash-card">
+      <span class="admin-dash-card-kicker">Landing Page</span>
+      <span class="admin-dash-card-title">CMS Landing</span>
+      <span class="admin-dash-card-desc">Hero slider, hình ảnh, dự án, blog và nội dung trang chủ.</span>
+    </a>
+    <a href="#admin-channels" class="admin-dash-card">
+      <span class="admin-dash-card-kicker">CRM</span>
+      <span class="admin-dash-card-title">Kênh yêu cầu mới</span>
+      <span class="admin-dash-card-desc">Cấu hình nguồn lead trên Bảng CSKH.</span>
+    </a>
+    <a href="{{ url_for('cms') }}" class="admin-dash-card">
+      <span class="admin-dash-card-kicker">Website</span>
+      <span class="admin-dash-card-title">CMS nâng cao</span>
+      <span class="admin-dash-card-desc">Dịch vụ, mega menu, chat marketing và phân quyền.</span>
+    </a>
+    <a href="{{ url_for('crm_board') }}" class="admin-dash-card">
+      <span class="admin-dash-card-kicker">CRM</span>
+      <span class="admin-dash-card-title">Bảng CSKH</span>
+      <span class="admin-dash-card-desc">Kanban chăm sóc khách hàng và pipeline.</span>
+    </a>
+  </nav>
+
+  <section class="panel" id="admin-channels" data-cms-module="crm_lead_channels">
+    <h2>Kênh CRM — Yêu cầu mới</h2>
+    <p class="muted">Tạo kênh tại đây; danh sách sẽ hiển thị trong form <a href="{{ url_for('crm_board') }}">Bảng CSKH → Yêu cầu mới</a>.</p>
+    <form id="crm-channel-form" class="form-grid">
+      <input name="name" placeholder="Tên kênh (VD: Form landing)" required />
+      <input name="code" placeholder="Mã (tuỳ chọn, VD: form_landing)" />
+      <input name="description" placeholder="Mô tả ngắn" />
+      <input name="sort_order" type="number" placeholder="Thứ tự (0)" value="0" />
+      <button class="btn" type="submit">Thêm kênh</button>
+    </form>
+    <p class="form-msg is-error" id="crm-channel-msg-error" hidden></p>
+    <table class="admin-table-spaced">
+      <thead>
+        <tr><th>Mã</th><th>Tên</th><th>Mô tả</th><th>TT</th><th>Trạng thái</th><th></th></tr>
+      </thead>
+      <tbody id="crm-channels-table"></tbody>
+    </table>
+  </section>
+
+  <section class="panel" id="admin-projects" data-cms-module="projects">
+    <h2>Tạo dự án mới</h2>
+    <form id="project-form" class="form-grid">
+      <input name="title" placeholder="Tên dự án" required />
+      <input name="category" placeholder="Danh mục" required />
+      <input name="image_url" placeholder="URL ảnh" required />
+      <input name="description" placeholder="Mô tả ngắn" required />
+      <button class="btn" type="submit">Thêm dự án</button>
+    </form>
+  </section>
+
+  <section class="panel" data-cms-module="projects">
+    <h2>Danh sách dự án</h2>
+    <table>
+      <thead>
+        <tr><th>Tên</th><th>Danh mục</th><th>Mô tả</th><th></th></tr>
+      </thead>
+      <tbody id="projects-table"></tbody>
+    </table>
+  </section>
+
+  <section class="panel" id="admin-news" data-cms-module="news">
+    <h2>Tạo tin tức</h2>
+    <form id="news-form" class="form-grid">
+      <input name="title" placeholder="Tiêu đề tin" required />
+      <input name="summary" placeholder="Tóm tắt" required />
+      <input name="url" placeholder="Link bài viết" required />
+      <button class="btn" type="submit">Thêm tin tức</button>
+    </form>
+  </section>
+
+  <section class="panel" data-cms-module="news">
+    <h2>Danh sách tin tức</h2>
+    <table>
+      <thead>
+        <tr><th>Tiêu đề</th><th>Tóm tắt</th><th>Link</th><th></th></tr>
+      </thead>
+      <tbody id="news-table"></tbody>
+    </table>
+  </section>
+{% endblock %}
+
+{% block admin_page_scripts %}
+{% include 'partials/admin_grants_bootstrap.html' %}
+{% set _jad = static_js_file('admin.js') %}
+<script src="{{ url_for('static', filename=_jad) }}?v={{ static_v(_jad) }}"></script>
+{% endblock %}

@@ -1,0 +1,57 @@
+/** Tab / chế độ playbook CRM — dùng trên Bảng CSKH */
+(function initCrmWorkflowPlaybook() {
+  const root = document.getElementById("crm-workflow-playbook");
+  if (!root) return;
+
+  const nav = root.querySelector(".crm-wf-nav");
+  if (nav) {
+    const btns = nav.querySelectorAll("[data-wf-tab]");
+    const panels = root.querySelectorAll("[data-wf-panel]");
+    btns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-wf-tab");
+        if (!id) return;
+        btns.forEach((b) => {
+          const on = b === btn;
+          b.classList.toggle("is-active", on);
+          b.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        panels.forEach((p) => {
+          const show = p.getAttribute("data-wf-panel") === id;
+          p.hidden = !show;
+          p.classList.toggle("is-active", show);
+        });
+      });
+    });
+  }
+
+  root.querySelectorAll("[data-wf-mode]").forEach((modeBtn) => {
+    modeBtn.addEventListener("click", () => {
+      const mode = modeBtn.getAttribute("data-wf-mode");
+      if (!mode) return;
+      root.querySelectorAll("[data-wf-mode]").forEach((b) => {
+        b.classList.toggle("is-active", b === modeBtn);
+      });
+      root.querySelectorAll("[data-wf-mode-pane]").forEach((pane) => {
+        const show = pane.getAttribute("data-wf-mode-pane") === mode;
+        pane.hidden = !show;
+        pane.classList.toggle("is-active", show);
+      });
+    });
+  });
+
+  root.querySelectorAll("[data-wf-channel]").forEach((chBtn) => {
+    chBtn.addEventListener("click", () => {
+      const id = chBtn.getAttribute("data-wf-channel");
+      if (!id) return;
+      root.querySelectorAll("[data-wf-channel]").forEach((b) => {
+        b.classList.toggle("is-active", b === chBtn);
+      });
+      root.querySelectorAll("[data-wf-channel-panel]").forEach((p) => {
+        const show = p.getAttribute("data-wf-channel-panel") === id;
+        p.hidden = !show;
+        p.classList.toggle("is-active", show);
+      });
+    });
+  });
+})();

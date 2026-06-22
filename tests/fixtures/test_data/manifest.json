@@ -1,0 +1,63 @@
+{
+  "version": "2026-05",
+  "description": "Manifest dữ liệu test PTT — liên kết TC-ID với fixture files",
+  "documentation": "docs/TEST_CASES_PTT.md",
+  "excel_workbook": "docs/TEST_CASES_PTT.xlsx",
+  "excel_build_script": "scripts/build_test_cases_xlsx.py",
+  "registry_csv": "test_cases_registry.csv",
+  "fixtures": {
+    "accounts.json": {
+      "description": "Tài khoản admin và portal NV",
+      "used_by_tc": ["TC-AUTH-*", "TC-PERM-*", "TC-PORTAL-*", "TC-PROJ-11", "TC-PROJ-12", "TC-PROJ-13"]
+    },
+    "re_projects_setup.json": {
+      "description": "Dự án BĐS, webhook slug, form map, pool NV",
+      "used_by_tc": ["TC-PROJ-*", "TC-RE-*"]
+    },
+    "leads_manual.json": {
+      "description": "Tạo lead, scoring, dedup, status, assign",
+      "used_by_tc": ["TC-LEAD-*", "TC-PROJ-01", "TC-PROJ-03", "TC-SCORE-*"]
+    },
+    "leads_import_sample.csv": {
+      "description": "4 dòng CSV import lead (1 trùng SĐT)",
+      "used_by_tc": ["TC-IO-01"]
+    },
+    "facebook_webhook_payloads.json": {
+      "description": "Webhook verify GET, leadgen POST, field mapping VN",
+      "used_by_tc": ["TC-PROJ-07", "TC-PROJ-08", "TC-PROJ-09", "TC-PROJ-10", "TC-PROJ-18", "TC-PORTAL-05"]
+    },
+    "cskh_cases.json": {
+      "description": "Kanban CSKH, khách hàng, portal scope case",
+      "used_by_tc": ["TC-CSKH-*"]
+    },
+    "kpi_payroll_daily.json": {
+      "description": "KPI NV/dự án, chấm công, báo cáo ngày",
+      "used_by_tc": ["TC-KPI-*", "TC-ATT-*", "TC-RPT-*", "TC-PROJ-14", "TC-PROJ-15"]
+    },
+    "permissions_scenarios.json": {
+      "description": "Ma trận CMS role + CRM position + API deny",
+      "used_by_tc": ["TC-PERM-*"]
+    }
+  },
+  "automated_test_suite": {
+    "command": "python3 -m unittest discover -s tests -v",
+    "expected_pass": 117,
+    "files": [
+      "tests/test_crm_leads.py",
+      "tests/test_crm_project_leads.py",
+      "tests/test_crm_facebook_leads.py",
+      "tests/test_crm_lead_auto_assign.py",
+      "tests/test_crm_re_projects.py",
+      "tests/test_crm_lead_scoring_rubric.py",
+      "tests/test_crm_staff_competency.py",
+      "tests/test_crm_staff_levels.py"
+    ]
+  },
+  "smoke_p0_checklist": [
+    "TC-AUTH-01", "TC-AUTH-02",
+    "TC-LEAD-01", "TC-LEAD-03",
+    "TC-PROJ-01", "TC-PROJ-05", "TC-PROJ-08",
+    "TC-PROJ-11", "TC-PROJ-13", "TC-PROJ-14", "TC-PROJ-18",
+    "TC-PORTAL-01", "TC-PORTAL-02"
+  ]
+}

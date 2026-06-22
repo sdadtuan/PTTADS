@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block body_class %}admin-app {% block body_class_extra %}{% endblock %}{% endblock %}
+
+{% block head %}
+  {{ super() }}
+  <link rel="stylesheet" href="{{ url_for('static', filename='admin_shell.css') }}?v={{ static_v('admin_shell.css') }}" />
+  {% block admin_head %}{% endblock %}
+{% endblock %}
+
+{% block header %}
+{% set _staff_portal = admin_staff_portal | default(crm_staff_portal | default(false)) %}
+{% if _staff_portal %}
+{% set crm_staff_nav_active = crm_staff_nav_active | default('') %}
+{% include 'partials/crm_staff_portal_nav.html' %}
+{% else %}
+{% include 'partials/admin_topbar.html' %}
+{% endif %}
+{% endblock %}
+
+{% block footer %}{% endblock %}
+{% block floating_contact %}{% endblock %}
+
+{% block content %}
+{% set _staff_portal = admin_staff_portal | default(crm_staff_portal | default(false)) %}
+{% if _staff_portal %}
+<main id="main" class="admin-app-main admin-app-main--staff" role="main">
+{% else %}
+<div class="admin-app-layout{% if admin_full_access | default(false) %} admin-app-layout--full-access{% endif %}{% if crm_leads_only_ui | default(false) %} admin-app-layout--leads-only{% endif %}">
+  {% include 'partials/admin_sidebar.html' %}
+  <div class="admin-app-main" id="main">
+    <header class="admin-page-head">
+      <div class="admin-page-head-text">
+        {% block admin_breadcrumb %}{% endblock %}
+        <h1 class="admin-page-title">{% block admin_page_title %}Quản trị{% endblock %}</h1>
+        {% block admin_page_desc %}{% endblock %}
+      </div>
+      <div class="admin-page-actions">{% block admin_page_actions %}{% endblock %}</div>
+    </header>
+    <div class="admin-page-body">
+{% endif %}
+      {% block admin_main %}{% endblock %}
+{% if _staff_portal %}
+</main>
+{% else %}
+    </div>
+  </div>
+</div>
+{% endif %}
+{% if request.path.startswith('/crm') and not (crm_leads_only_ui | default(false)) %}
+{% include 'partials/crm_assistant_widget.html' %}
+{% endif %}
+{% block admin_page_scripts %}{% endblock %}
+<script src="{{ url_for('static', filename='admin_shell.js') }}?v={{ static_v('admin_shell.js') }}"></script>
+{% endblock %}

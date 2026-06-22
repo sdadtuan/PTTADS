@@ -1,0 +1,5 @@
+full_name,phone,email,source,need,product_interest,region,re_project_code
+Nguyễn Import 01,0908000001,import01@test.com,import_csv,Tư vấn căn hộ,Căn hộ,Quận 7,DA-A
+Trần Import 02,0908000002,import02@test.com,import_csv,Quan tâm nhà phố,Nhà phố,Quận 2,DA-B
+Lê Import 03,0908000003,,import_csv,Chưa có email,,,
+Phạm Import Trùng,0908000001,dup_import@test.com,import_csv,Trùng SĐT dòng 1,,,

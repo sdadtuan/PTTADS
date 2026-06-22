@@ -1,0 +1,1081 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}{{ page.abbr }} — {{ page.title }} | Kế hoạch marketing — CRM{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+{% block body_class_extra %}crm-body crm-mp-page crm-mp-segment-page{% endblock %}
+
+{% block admin_head %}
+  <meta name="description" content="{{ page.lead | e }}" />
+{% endblock %}
+
+{% block admin_breadcrumb %}
+  <ol class="admin-breadcrumb">
+    <li><a href="{{ url_for('crm_marketing_plan_page') }}">Kế hoạch marketing</a></li>
+    <li>{{ page.abbr | e }} — {{ page.title | e }}</li>
+  </ol>
+{% endblock %}
+{% block admin_page_title %}{{ page.title | e }}{% endblock %}
+{% block admin_page_desc %}
+  <p class="admin-page-desc">{{ page.lead | e }}</p>
+{% endblock %}
+
+{% block admin_main %}
+<div class="crm-app">
+
+  {% if khtn_pipeline_steps %}
+  <section class="panel crm-khtn-plan-strip" aria-label="Gắn dữ liệu với kế hoạch marketing">
+    <h2 class="crm-mp-segment-h2" id="crm-khtn-plan-strip-h">Theo kế hoạch marketing</h2>
+    <p class="muted crm-khtn-plan-strip-lead">
+      Chọn kế hoạch trước khi nhập / lưu dữ liệu popup cho <strong>bước 1</strong> đến <strong>bước 5</strong> của quy trình KHTN — một file JSON kèm kế hoạch trên máy chủ.
+      URL có <code>?plan_id=…</code> sẽ tự chọn kế hoạch tương ứng nếu tồn tại.
+    </p>
+    <div class="crm-khtn-plan-strip-controls">
+      <label class="crm-khtn-plan-fy-label">FY
+        <input type="number" id="crm-khtn-plan-fy" min="1990" max="2120" step="1" />
+      </label>
+      <button type="button" class="btn-secondary" id="crm-khtn-plan-reload">Tải danh sách</button>
+    </div>
+    <label class="crm-khtn-plan-select-label">Kế hoạch marketing
+      <select id="crm-khtn-plan-select" aria-describedby="crm-khtn-plan-msg">
+        <option value="">— Chọn kế hoạch —</option>
+      </select>
+    </label>
+    <p class="muted crm-khtn-plan-msg" id="crm-khtn-plan-msg" hidden></p>
+  </section>
+
+  <section class="panel crm-khtn-pipeline" aria-labelledby="crm-khtn-pipeline-h">
+    <h2 class="crm-mp-segment-h2" id="crm-khtn-pipeline-h">Quy trình 5 bước (KHTN)</h2>
+    <p class="muted crm-khtn-pipeline-lead">
+      Nhấn từng bước để mở popup hướng dẫn chi tiết — áp dụng khi xây pool khách hàng tiềm năng.
+    </p>
+    <ol class="crm-khtn-steps-list" role="list">
+      {% for step in khtn_pipeline_steps %}
+      <li>
+        <button
+          type="button"
+          class="crm-khtn-step-btn"
+          data-step-id="{{ step.id }}"
+        >
+          <span class="crm-khtn-step-index" aria-hidden="true">{{ step.id }}</span>
+          <span class="crm-khtn-step-label">{{ step.label | e }}</span>
+          <span class="crm-khtn-step-hint muted">Chi tiết…</span>
+        </button>
+      </li>
+      {% endfor %}
+    </ol>
+  </section>
+
+  <div class="crm-modal-root" id="crm-khtn-step-modal" hidden data-admin-section-allow>
+    <div class="crm-modal-backdrop" data-khtn-step-close tabindex="-1" aria-hidden="true"></div>
+    <div
+      class="crm-modal-panel crm-modal-wide crm-modal-panel--detail"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="crm-khtn-step-modal-title"
+    >
+      <header class="crm-modal-head crm-modal-head--detail">
+        <div>
+          <p class="crm-modal-kicker">Khách hàng tiềm năng</p>
+          <h2 id="crm-khtn-step-modal-title"></h2>
+        </div>
+        <button type="button" class="crm-modal-close" data-khtn-step-close aria-label="Đóng">×</button>
+      </header>
+      <div class="crm-khtn-step-modal-inner">
+        <p id="crm-khtn-step-modal-lead" class="crm-khtn-step-lead muted"></p>
+        <ul id="crm-khtn-step-modal-points" class="crm-khtn-step-points"></ul>
+
+        <div id="crm-khtn-step1-extra" class="crm-khtn-step1-extra" hidden>
+          <hr class="crm-khtn-step1-hr" />
+          <h3 class="crm-khtn-step1-form-title">Dữ liệu nghiên cứu thị trường</h3>
+          <p class="muted crm-khtn-step1-form-lead">
+            Điền theo kế hoạch đã chọn phía trên. Nút <strong>Lưu dữ liệu</strong> ghi vào máy chủ với PATCH kế hoạch (cần chọn FY + kế hoạch).
+          </p>
+          <div class="crm-khtn-step1-fields">
+            <label class="crm-khtn-step1-label">
+              1. Dung lượng thị trường
+              <span class="crm-khtn-field-hint muted">
+                Nắm <strong>số lượng khách hàng tiềm năng</strong> thuộc phạm vi thị trường bạn nhắm tới, và <strong>ước tính doanh thu của thị trường</strong> (hoặc phân khúc). Nên ghi kèm: đơn vị đo,
+                cách tính, giả định, nguồn / năm tham chiếu để sau này đối chiếu và cập nhật.
+              </span>
+              <textarea
+                id="crm-khtn-s1-market_size"
+                rows="4"
+                maxlength="12000"
+                placeholder="VD: số KHTN ước tính (người / hộ / DN…); doanh thu thị trường hoặc phân khúc ước lượng (VND/năm); phạm vi địa lý &amp; điều kiện lọc; nguồn: báo cáo, điều tra, mô hình nội bộ…"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              2. Xu hướng thị trường
+              <span class="crm-khtn-field-hint muted">
+                Ghi nhận <strong>xu hướng mới hoặc sự chuyển dịch trong hành vi tiêu dùng</strong>, và <strong>những thay đổi trong nhu cầu của khách hàng</strong> (ưu tiên, tiêu chí chọn, tần suất, kênh,
+                giá trị cảm nhận…). Nên nêu thời điểm / giai đoạn và nguồn tham chiếu nếu có.
+              </span>
+              <textarea
+                id="crm-khtn-s1-trends"
+                rows="4"
+                maxlength="12000"
+                placeholder="VD: chuyển dịch kênh mua (online / offline); quan tâm bền vững, giá rẻ, tiện lợi; thay đổi nhu cầu theo mùa / theo nhóm KH; insight từ khảo sát, báo chí, dữ liệu nội bộ…"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              3. Đối thủ cạnh tranh
+              <span class="crm-khtn-field-hint muted">
+                Phân tích từng đối thủ (hoặc nhóm): <strong>điểm mạnh, điểm yếu</strong>; <strong>chiến lược marketing</strong> (kênh, ngân sách ước biết, chương trình, thông điệp, nội dung…); và <strong>vị trí thương hiệu</strong> trên thị trường (giá trị nhận diện, phân khúc họ nhắm tới, khác biệt hóa).
+              </span>
+              <textarea
+                id="crm-khtn-s1-competitors"
+                rows="4"
+                maxlength="12000"
+                placeholder="VD: Tên A — mạnh về …, yếu …; marketing: quảng cáo …, kênh …; vị trí: cao cấp / giá trị /… Tên B — …"
+              ></textarea>
+            </label>
+          </div>
+          <div class="crm-khtn-step1-actions">
+            <button type="button" class="btn" id="crm-khtn-s1-save">Lưu dữ liệu</button>
+            <span class="muted crm-khtn-s1-save-msg" id="crm-khtn-s1-save-msg" role="status" aria-live="polite" hidden></span>
+          </div>
+        </div>
+
+        <div id="crm-khtn-step2-extra" class="crm-khtn-step2-extra" hidden>
+          <hr class="crm-khtn-step1-hr" />
+          <h3 class="crm-khtn-step1-form-title">Dữ liệu phân khúc thị trường</h3>
+          <p class="muted crm-khtn-step1-form-lead">
+            Điền theo kế hoạch đã chọn phía trên. Nút <strong>Lưu dữ liệu</strong> ghi vào máy chủ với PATCH kế hoạch (cần chọn FY + kế hoạch).
+          </p>
+          <div class="crm-khtn-step1-fields">
+            <label class="crm-khtn-step1-label crm-khtn-demo-block">
+              <span>1. Nhân khẩu học</span>
+              <span class="crm-khtn-field-hint muted">Phân khúc theo đặc điểm dân số; có thể bổ sung thêm ở ô ghi chú phía dưới.</span>
+              <div class="crm-khtn-demo-fields" role="group" aria-label="Nhân khẩu học">
+                <label class="crm-khtn-demo-field">
+                  <span>Độ tuổi</span>
+                  <input type="text" id="crm-khtn-s2-demo-age" maxlength="4000" autocomplete="off" placeholder="VD: 25–34; hưu trí…" />
+                </label>
+                <label class="crm-khtn-demo-field">
+                  <span>Giới tính</span>
+                  <input type="text" id="crm-khtn-s2-demo-gender" maxlength="4000" autocomplete="off" placeholder="VD: nam / nữ / tất cả / không áp dụng…" />
+                </label>
+                <label class="crm-khtn-demo-field">
+                  <span>Thu nhập</span>
+                  <input type="text" id="crm-khtn-s2-demo-income" maxlength="4000" autocomplete="off" placeholder="VD: nhóm thu nhập; VND/tháng; quy mô hộ…" />
+                </label>
+                <label class="crm-khtn-demo-field">
+                  <span>Trình độ học vấn</span>
+                  <input type="text" id="crm-khtn-s2-demo-education" maxlength="4000" autocomplete="off" placeholder="VD: ĐH trở lên; phổ thông…" />
+                </label>
+                <label class="crm-khtn-demo-field">
+                  <span>Nghề nghiệp</span>
+                  <input type="text" id="crm-khtn-s2-demo-occupation" maxlength="4000" autocomplete="off" placeholder="VD: văn phòng; tự doanh; nội trợ…" />
+                </label>
+              </div>
+              <label class="crm-khtn-demo-field crm-khtn-demo-notes">
+                <span>Ghi chú bổ sung (tuỳ chọn)</span>
+                <textarea
+                  id="crm-khtn-s2-demographics-notes"
+                  rows="2"
+                  maxlength="12000"
+                  placeholder="Tiêu chí nhân khẩu khác hoặc nội dung đã nhập trước khi tách trường."
+                ></textarea>
+              </label>
+            </label>
+            <label class="crm-khtn-step1-label crm-khtn-geo-block">
+              <span>2. Địa lý</span>
+              <span class="crm-khtn-field-hint muted">Vị trí, điều kiện khí hậu / môi trường, mật độ dân cư — có thể bổ sung ở ô ghi chú phía dưới.</span>
+              <div class="crm-khtn-demo-fields" role="group" aria-label="Địa lý">
+                <label class="crm-khtn-demo-field">
+                  <span>Vị trí địa lý</span>
+                  <input type="text" id="crm-khtn-s2-geo-location" maxlength="4000" autocomplete="off" placeholder="VD: TP, tỉnh, vùng, bán kính; đô thị / nông thôn…" />
+                </label>
+                <label class="crm-khtn-demo-field">
+                  <span>Khí hậu và môi trường</span>
+                  <input type="text" id="crm-khtn-s2-geo-climate" maxlength="4000" autocomplete="off" placeholder="VD: nhiệt đới; mùa / thời tiết; yếu tố môi trường liên quan nhu cầu…" />
+                </label>
+                <label class="crm-khtn-demo-field">
+                  <span>Mật độ dân cư</span>
+                  <input type="text" id="crm-khtn-s2-geo-density" maxlength="4000" autocomplete="off" placeholder="VD: đô thị đông đúc; vùng ven; nông thôn thưa…" />
+                </label>
+              </div>
+              <label class="crm-khtn-demo-field crm-khtn-demo-notes">
+                <span>Ghi chú bổ sung (tuỳ chọn)</span>
+                <textarea
+                  id="crm-khtn-s2-geography-notes"
+                  rows="2"
+                  maxlength="12000"
+                  placeholder="Thành phố, tỉnh, vùng khác hoặc nội dung đã nhập trước khi tách trường."
+                ></textarea>
+              </label>
+            </label>
+            <label class="crm-khtn-step1-label crm-khtn-psy-block">
+              <span>3. Tâm lý học</span>
+              <span class="crm-khtn-field-hint muted">Động cơ, cách tự hình dung và các yếu tố tâm lý ảnh hưởng hành vi — có thể bổ sung ở ô ghi chú phía dưới.</span>
+              <div class="crm-khtn-demo-fields" role="group" aria-label="Tâm lý học">
+                <label class="crm-khtn-demo-field">
+                  <span>Phong cách sống</span>
+                  <input type="text" id="crm-khtn-s2-psy-lifestyle" maxlength="4000" autocomplete="off" placeholder="VD: năng động / tối giản / gia đình; nhịp sống đô thị…" />
+                </label>
+                <label class="crm-khtn-demo-field">
+                  <span>Sở thích</span>
+                  <input type="text" id="crm-khtn-s2-psy-interests" maxlength="4000" autocomplete="off" placeholder="VD: du lịch, công nghệ, ẩm thực…" />
+                </label>
+                <label class="crm-khtn-demo-field">
+                  <span>Mối quan tâm</span>
+                  <input type="text" id="crm-khtn-s2-psy-concerns" maxlength="4000" autocomplete="off" placeholder="VD: sức khỏe, giáo dục con, tài chính…" />
+                </label>
+                <label class="crm-khtn-demo-field">
+                  <span>Giá trị cốt lõi và niềm tin</span>
+                  <input type="text" id="crm-khtn-s2-psy-values" maxlength="4000" autocomplete="off" placeholder="VD: trung thực, bền vững, cộng đồng…" />
+                </label>
+                <label class="crm-khtn-demo-field">
+                  <span>Quan điểm</span>
+                  <input type="text" id="crm-khtn-s2-psy-opinions" maxlength="4000" autocomplete="off" placeholder="VD: thương hiệu, chính sách, xu hướng xã hội…" />
+                </label>
+              </div>
+              <label class="crm-khtn-demo-field crm-khtn-demo-notes">
+                <span>Ghi chú bổ sung (tuỳ chọn)</span>
+                <textarea
+                  id="crm-khtn-s2-psychographics-notes"
+                  rows="2"
+                  maxlength="12000"
+                  placeholder="Nội dung tâm lý học khác hoặc bản nhập trước khi tách trường."
+                ></textarea>
+              </label>
+            </label>
+            <label class="crm-khtn-step1-label crm-khtn-beh-block">
+              <span>4. Hành vi tiêu dùng</span>
+              <span class="crm-khtn-field-hint muted">Cách mua, tần suất, kênh và quy trình quyết định — có thể bổ sung ở ô ghi chú phía dưới.</span>
+              <div class="crm-khtn-demo-fields" role="group" aria-label="Hành vi tiêu dùng">
+                <label class="crm-khtn-demo-field">
+                  <span>Tần suất mua hàng</span>
+                  <input type="text" id="crm-khtn-s2-beh-frequency" maxlength="4000" autocomplete="off" placeholder="VD: hàng tuần; theo mùa; một lần / dài hạn…" />
+                </label>
+                <label class="crm-khtn-demo-field">
+                  <span>Kênh mua sắm</span>
+                  <input type="text" id="crm-khtn-s2-beh-channels" maxlength="4000" autocomplete="off" placeholder="VD: online, cửa hàng, đại lý, sàn TMĐT…" />
+                </label>
+                <label class="crm-khtn-demo-field">
+                  <span>Số lượng mua</span>
+                  <input type="text" id="crm-khtn-s2-beh-quantity" maxlength="4000" autocomplete="off" placeholder="VD: mua lẻ / theo đơn hàng / số lượng TB mỗi lần…" />
+                </label>
+                <label class="crm-khtn-demo-field">
+                  <span>Quy trình ra quyết định</span>
+                  <input type="text" id="crm-khtn-s2-beh-decision" maxlength="4000" autocomplete="off" placeholder="VD: nghiên cứu online → so giá → hỏi người thân → mua…" />
+                </label>
+              </div>
+              <label class="crm-khtn-demo-field crm-khtn-demo-notes">
+                <span>Ghi chú bổ sung (tuỳ chọn)</span>
+                <textarea
+                  id="crm-khtn-s2-consumption-notes"
+                  rows="2"
+                  maxlength="12000"
+                  placeholder="Thói quen, kênh truyền thông hoặc nội dung đã nhập trước khi tách trường."
+                ></textarea>
+              </label>
+            </label>
+          </div>
+          <div class="crm-khtn-step1-actions">
+            <button type="button" class="btn" id="crm-khtn-s2-save">Lưu dữ liệu</button>
+            <span class="muted crm-khtn-s2-save-msg" id="crm-khtn-s2-save-msg" role="status" aria-live="polite" hidden></span>
+          </div>
+        </div>
+
+        <div id="crm-khtn-step3-extra" class="crm-khtn-step3-extra" hidden>
+          <hr class="crm-khtn-step1-hr" />
+          <h3 class="crm-khtn-step1-form-title">Xác định khách hàng mục tiêu</h3>
+          <p class="muted crm-khtn-step1-form-lead">
+            Điền theo kế hoạch đã chọn phía trên. Nút <strong>Lưu dữ liệu</strong> ghi vào máy chủ với PATCH kế hoạch (cần chọn FY + kế hoạch).
+          </p>
+          <div class="crm-khtn-step1-fields">
+            <label class="crm-khtn-step1-label">
+              Phân tích dữ liệu khách hàng hiện tại
+              <span class="crm-khtn-field-hint muted">
+                Dùng hệ thống <strong>CRM</strong>, <strong>website</strong>, <strong>mạng xã hội</strong> để tìm điểm chung của khách hàng hiện tại.
+              </span>
+              <textarea
+                id="crm-khtn-s3-icp-current"
+                rows="4"
+                maxlength="12000"
+                placeholder="Điểm chung CRM / web / MXH — phân nhóm hành vi, nguồn, đặc điểm đơn hàng…"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              Nghiên cứu thị trường
+              <span class="crm-khtn-field-hint muted">
+                <strong>Khảo sát</strong>, <strong>phỏng vấn</strong>, <strong>nhóm tập trung</strong> để thu thập thông tin về nhu cầu và hành vi khách hàng tiềm năng.
+              </span>
+              <textarea
+                id="crm-khtn-s3-icp-prospect-research"
+                rows="4"
+                maxlength="12000"
+                placeholder="Phương pháp, mẫu, insight nhu cầu &amp; hành vi KHTN…"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              Phân tích đối thủ cạnh tranh
+              <span class="crm-khtn-field-hint muted">
+                Xem khách hàng mà đối thủ đang nhắm tới; <strong>giá</strong> và <strong>chiến lược marketing</strong> của họ.
+              </span>
+              <textarea
+                id="crm-khtn-s3-icp-competitive"
+                rows="4"
+                maxlength="12000"
+                placeholder="Phân khúc đối thủ; giá; kênh; thông điệp — bài học cho ICP…"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              Công cụ phân tích dữ liệu
+              <span class="crm-khtn-field-hint muted">
+                Ví dụ <strong>Google Analytics</strong>, <strong>Facebook Insights</strong>… để phân tích hành vi truy cập và tương tác với sản phẩm / dịch vụ (có thể bổ sung công cụ khác).
+              </span>
+              <textarea
+                id="crm-khtn-s3-icp-tools"
+                rows="4"
+                maxlength="12000"
+                placeholder="Nguồn dữ liệu, báo cáo, chỉ số theo dõi (traffic, funnel, engagement…)…"
+              ></textarea>
+            </label>
+          </div>
+          <div class="crm-khtn-step1-actions">
+            <button type="button" class="btn" id="crm-khtn-s3-save">Lưu dữ liệu</button>
+            <span class="muted crm-khtn-s3-save-msg" id="crm-khtn-s3-save-msg" role="status" aria-live="polite" hidden></span>
+          </div>
+        </div>
+
+        <div id="crm-khtn-step4-extra" class="crm-khtn-step4-extra" hidden>
+          <hr class="crm-khtn-step1-hr" />
+          <h3 class="crm-khtn-step1-form-title">Lựa chọn chiến lược tiếp cận</h3>
+          <p class="muted crm-khtn-step1-form-lead">
+            Chọn <strong>một hoặc nhiều</strong> hình thức (ô chọn). Nút <strong>Lưu dữ liệu</strong> ghi vào máy chủ với PATCH kế hoạch (cần chọn FY + kế hoạch).
+          </p>
+          <fieldset class="crm-khtn-approach-fieldset">
+            <legend class="crm-khtn-approach-legend">Chiến lược tiếp cận thị trường</legend>
+            <div class="crm-khtn-approach-list">
+              <div class="crm-khtn-approach-option">
+                <label class="crm-khtn-approach-opt-row" for="crm-khtn-s4-approach-multisegment">
+                  <input type="checkbox" id="crm-khtn-s4-approach-multisegment" name="crm-khtn-s4-approach" value="multi_segment" />
+                  <span class="crm-khtn-approach-opt-title">Tiếp thị đa phân khúc</span>
+                </label>
+                <p class="crm-khtn-field-hint muted">
+                  Thay vì chỉ tập trung vào một nhóm khách hàng duy nhất, doanh nghiệp nhắm mục tiêu đến <strong>nhiều phân khúc</strong> thị trường khác nhau. Mỗi phân khúc có đặc điểm và nhu cầu riêng, đòi hỏi chiến lược tiếp thị phù hợp.
+                </p>
+              </div>
+              <div class="crm-khtn-approach-option">
+                <label class="crm-khtn-approach-opt-row" for="crm-khtn-s4-approach-concentrated">
+                  <input type="checkbox" id="crm-khtn-s4-approach-concentrated" name="crm-khtn-s4-approach" value="concentrated" />
+                  <span class="crm-khtn-approach-opt-title">Tiếp thị tập trung</span>
+                </label>
+                <p class="crm-khtn-field-hint muted">
+                  Tập trung toàn bộ nguồn lực vào <strong>một phân khúc thị trường cụ thể</strong> thay vì cố tiếp cận toàn bộ thị trường.
+                </p>
+              </div>
+              <div class="crm-khtn-approach-option">
+                <label class="crm-khtn-approach-opt-row" for="crm-khtn-s4-approach-micro">
+                  <input type="checkbox" id="crm-khtn-s4-approach-micro" name="crm-khtn-s4-approach" value="micro" />
+                  <span class="crm-khtn-approach-opt-title">Nhắm mục tiêu vi mô</span>
+                </label>
+                <p class="crm-khtn-field-hint muted">
+                  Chiến lược xác định thị trường mục tiêu tương đối mới: <strong>cô lập các phân khúc nhỏ</strong>, thu thập <strong>càng nhiều dữ liệu càng tốt</strong> về từng phân khúc để nhắm mục tiêu theo hướng <strong>cá nhân hóa</strong>.
+                </p>
+              </div>
+              <div class="crm-khtn-approach-option">
+                <label class="crm-khtn-approach-opt-row" for="crm-khtn-s4-approach-product">
+                  <input type="checkbox" id="crm-khtn-s4-approach-product" name="crm-khtn-s4-approach" value="product_focus" />
+                  <span class="crm-khtn-approach-opt-title">Chuyên môn hóa sản phẩm</span>
+                </label>
+                <p class="crm-khtn-field-hint muted">
+                  Tập trung vào <strong>một hoặc một số sản phẩm</strong> nhất định để đáp ứng nhu cầu cụ thể của nhóm khách hàng mục tiêu. Phù hợp doanh nghiệp nguồn lực hạn chế hoặc muốn tạo vị thế trong một lĩnh vực — cần cân nhắc nhu cầu thị trường, khả năng cạnh tranh và tiềm năng phát triển.
+                </p>
+              </div>
+            </div>
+          </fieldset>
+          <div class="crm-khtn-step1-actions">
+            <button type="button" class="btn" id="crm-khtn-s4-save">Lưu dữ liệu</button>
+            <span class="muted crm-khtn-s4-save-msg" id="crm-khtn-s4-save-msg" role="status" aria-live="polite" hidden></span>
+          </div>
+        </div>
+
+        <div id="crm-khtn-step5-extra" class="crm-khtn-step5-extra" hidden>
+          <hr class="crm-khtn-step1-hr" />
+          <h3 class="crm-khtn-step1-form-title">Thử nghiệm quảng cáo trên thị trường mục tiêu</h3>
+          <div class="crm-khtn-pilot-explainer muted">
+            <p><strong>Diễn giải:</strong></p>
+            <ul class="crm-khtn-pilot-explainer-list">
+              <li>
+                <strong>Kiểm chứng giả thuyết:</strong>
+                Dữ liệu nghiên cứu chỉ là giả thuyết; quảng cáo thực tế mới cho kết quả chính xác.
+              </li>
+              <li>
+                <strong>Tối ưu hóa chi phí:</strong>
+                Tìm ra đối tượng, nội dung, kênh hiệu quả nhất trước khi scale lớn.
+              </li>
+              <li>
+                <strong>Tăng ROAS:</strong>
+                Tối ưu hóa tỷ lệ lợi nhuận trên chi phí quảng cáo (Return on Ad Spend).
+              </li>
+              <li>
+                <strong>Phát hiện phân khúc mới:</strong>
+                Có thể phát hiện những insight mới mà nghiên cứu không thấy.
+              </li>
+            </ul>
+          </div>
+          <p class="muted crm-khtn-step1-form-lead">
+            Chọn <strong>một hoặc nhiều</strong> trọng tâm áp dụng cho giai đoạn thử nghiệm; bổ sung kế hoạch pilot nếu cần. Nút <strong>Lưu dữ liệu</strong> ghi vào máy chủ.
+          </p>
+          <fieldset class="crm-khtn-approach-fieldset">
+            <legend class="crm-khtn-approach-legend">Trọng tâm thử nghiệm quảng cáo</legend>
+            <div class="crm-khtn-approach-list">
+              <div class="crm-khtn-approach-option">
+                <label class="crm-khtn-approach-opt-row" for="crm-khtn-s5-pilot-hypothesis">
+                  <input type="checkbox" id="crm-khtn-s5-pilot-hypothesis" name="crm-khtn-s5-pilot" value="hypothesis" />
+                  <span class="crm-khtn-approach-opt-title">Kiểm chứng giả thuyết</span>
+                </label>
+              </div>
+              <div class="crm-khtn-approach-option">
+                <label class="crm-khtn-approach-opt-row" for="crm-khtn-s5-pilot-cost">
+                  <input type="checkbox" id="crm-khtn-s5-pilot-cost" name="crm-khtn-s5-pilot" value="cost" />
+                  <span class="crm-khtn-approach-opt-title">Tối ưu hóa chi phí</span>
+                </label>
+              </div>
+              <div class="crm-khtn-approach-option">
+                <label class="crm-khtn-approach-opt-row" for="crm-khtn-s5-pilot-roas">
+                  <input type="checkbox" id="crm-khtn-s5-pilot-roas" name="crm-khtn-s5-pilot" value="roas" />
+                  <span class="crm-khtn-approach-opt-title">Tăng ROAS</span>
+                </label>
+              </div>
+              <div class="crm-khtn-approach-option">
+                <label class="crm-khtn-approach-opt-row" for="crm-khtn-s5-pilot-discover">
+                  <input type="checkbox" id="crm-khtn-s5-pilot-discover" name="crm-khtn-s5-pilot" value="discover" />
+                  <span class="crm-khtn-approach-opt-title">Phát hiện phân khúc mới</span>
+                </label>
+              </div>
+            </div>
+          </fieldset>
+
+          <h4 class="crm-khtn-step5-program-title">Chương trình chạy quảng cáo — thiết kế chi tiết</h4>
+          <p class="muted crm-khtn-step5-program-lead">
+            Mô tả cụ thể cách triển khai trên thị trường mục tiêu: ví dụ <strong>A/B testing trên Facebook</strong> (cấu trúc chiến dịch, bài — ad set —
+            creative đối chứng…), đo qua Ads Manager / Pixel; có thể mở rộng sang Google, TikTok, Zalo và kênh khác trong cùng khuôn.
+          </p>
+          <div class="crm-khtn-step1-fields crm-khtn-step5-program-fields">
+            <div class="crm-khtn-step1-label">
+              <strong>Kênh &amp; nền tảng</strong>
+              <span class="crm-khtn-field-hint muted">
+                Mỗi tab là một <strong>nền tảng quảng cáo</strong> (Meta, TikTok, Google, Zalo, Programmatic…). Mỗi tab gồm 5 trường thực hành riêng:
+                <em>Loại chiến dịch &amp; Placement</em> · <em>Audience &amp; Targeting</em> · <em>Creative format &amp; spec</em> · <em>Bid / Budget strategy</em> ·
+                <em>Phương pháp thực hành riêng</em>. Có thể thêm / xoá / đổi tên tab.
+              </span>
+              <div class="crm-khtn-platforms" id="crm-khtn-s5-platforms">
+                <div class="crm-khtn-platforms-tabs-bar" id="crm-khtn-s5-platforms-bar" role="tablist" aria-label="Danh sách nền tảng quảng cáo">
+                  <button type="button" class="crm-khtn-platforms-tab-add" id="crm-khtn-s5-platforms-add">+ Thêm tab</button>
+                  <button type="button" class="crm-khtn-platforms-tab-add crm-khtn-platforms-tab-add--alt" id="crm-khtn-s5-platforms-reset">Khôi phục mẫu mặc định</button>
+                </div>
+                <div class="crm-khtn-platforms-panels" id="crm-khtn-s5-platforms-panels"></div>
+                <p class="muted crm-khtn-platforms-empty" id="crm-khtn-s5-platforms-empty" hidden>
+                  Chưa có nền tảng nào — bấm <strong>+ Thêm tab</strong> hoặc <strong>Khôi phục mẫu mặc định</strong> để bắt đầu.
+                </p>
+              </div>
+              <template id="crm-khtn-platforms-tab-tpl">
+                <div class="crm-khtn-platforms-tab" role="tab">
+                  <button type="button" class="crm-khtn-platforms-tab-btn"></button>
+                  <button type="button" class="crm-khtn-platforms-tab-remove" aria-label="Xoá nền tảng">×</button>
+                </div>
+              </template>
+              <template id="crm-khtn-platforms-panel-tpl">
+                <div class="crm-khtn-platforms-panel" role="tabpanel">
+                  <label class="crm-khtn-platforms-name-label">
+                    <span>Tên nền tảng</span>
+                    <input type="text" class="crm-khtn-platforms-name" maxlength="80" placeholder="VD: Facebook / Meta Ads" />
+                  </label>
+                  <div class="crm-khtn-platforms-fields">
+                    <label class="crm-khtn-platforms-field">
+                      <span>📍 Loại chiến dịch &amp; Placement</span>
+                      <textarea class="crm-khtn-platforms-placement" rows="3" maxlength="3000" placeholder="VD: Feed + Reels (9:16) — objective Conversions; loại trừ Audience Network nếu spam cao."></textarea>
+                    </label>
+                    <label class="crm-khtn-platforms-field">
+                      <span>🎯 Audience &amp; Targeting</span>
+                      <textarea class="crm-khtn-platforms-audience" rows="3" maxlength="3000" placeholder="VD: LAL 1% từ purchasers 180d; Interest stack; Custom Audience web visitors 30d (loại trừ converters 90d)."></textarea>
+                    </label>
+                    <label class="crm-khtn-platforms-field">
+                      <span>🎬 Creative format &amp; spec</span>
+                      <textarea class="crm-khtn-platforms-creative" rows="3" maxlength="3000" placeholder="VD: Video 9:16 (15-30s) + carousel 1:1 5 thẻ; image 1.91:1 cho Feed; ≥ 3 variant / campaign."></textarea>
+                    </label>
+                    <label class="crm-khtn-platforms-field">
+                      <span>💰 Bid / Budget strategy</span>
+                      <textarea class="crm-khtn-platforms-bid" rows="3" maxlength="3000" placeholder="VD: CBO lowest cost với cost cap mềm; learning phase 7d hoặc 50 conv/ad-set; refresh creative khi freq > 3.5."></textarea>
+                    </label>
+                    <label class="crm-khtn-platforms-field crm-khtn-platforms-field--wide">
+                      <span>🧪 Phương pháp thử nghiệm (testing framework — đầy đủ chi tiết để vận hành: Setup · Min · Thời gian · Đọc · Quyết định · Tránh)</span>
+                      <textarea class="crm-khtn-platforms-methodology" rows="14" maxlength="20000" placeholder="Liệt kê các phương pháp thử nghiệm. Mỗi phương pháp ghi: 🎯 Mục đích · 🔧 Setup từng bước · 💰 Min sample/budget · ⏱️ Thời gian · 📊 Đọc kết quả · ✅ Quyết định · ⚠️ Tránh."></textarea>
+                    </label>
+                    <label class="crm-khtn-platforms-field crm-khtn-platforms-field--wide">
+                      <span>🛠️ Phương pháp thực hành riêng (vận hành hàng ngày)</span>
+                      <textarea class="crm-khtn-platforms-practice" rows="4" maxlength="4000" placeholder="VD: Cấu trúc 1 campaign × 2-3 ad-set × 2-3 creative; A/B chỉ một biến; pause khi spend ≥ 3× CPA mục tiêu mà 0 conv. Đọc số rolling 7d."></textarea>
+                    </label>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <label class="crm-khtn-step1-label">
+              Phương pháp thử nghiệm (A/B, split, học có kiểm soát…)
+              <span class="crm-khtn-field-hint muted">
+                Kiểu so sánh: A/B một biến, holdout cell, chia budget 50–50 hay CBO nhiều ad set đối chứng; thời gian học và khi được coi là “đủ mẫu”.
+              </span>
+              <textarea
+                id="crm-khtn-s5-prog-methodology"
+                rows="3"
+                maxlength="12000"
+                placeholder="VD: A/B 2 creative trên cùng audience/ad set; chỉ một biến đổi; chạy 7–14 ngày hoặc X conversions trước kết luận…"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              Ma trận biến thể — bài chạy / creative / audience / landing / offer
+              <span class="crm-khtn-field-hint muted">
+                Phiên bản A vs B (&amp; C nếu có): headline, visual, hook, nhóm nhắm, trang đích, mã UTm, chiến dịch tương ứng.
+              </span>
+              <textarea
+                id="crm-khtn-s5-prog-variants"
+                rows="4"
+                maxlength="12000"
+                placeholder="VD: A — ảnh sản phẩm + CTA “Đăng ký”; B — testimonial clip 15s; audience: Lookalike 1% vs interest stack; landing /form…"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              Ngân sách &amp; lịch chạy pilot
+              <span class="crm-khtn-field-hint muted">
+                Spend tối thiểu / ngày, tổng pilot cap, pacing, blackout (sale, lễ), và chu kỳ review ngắt (daily / rolling 7d).
+              </span>
+              <textarea
+                id="crm-khtn-s5-prog-budget"
+                rows="3"
+                maxlength="12000"
+                placeholder="VD: 300 USD/ngày mỗi arm, max 21 ngày; pause nếu spend &lt; nhưng 0 checkout sau …"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              Đo lường, conversion &amp; KPI
+              <span class="crm-khtn-field-hint muted">
+                Sự kiện chính/phụ (Meta Pixel, GA4, CAPI, CRM import); CPA, CPC, CTR, CPL, ROAS, lift; cửa sổ attrib; ngưỡng an toàn dữ liệu.
+              </span>
+              <textarea
+                id="crm-khtn-s5-prog-tracking"
+                rows="4"
+                maxlength="12000"
+                placeholder="VD: Purchase + Lead; báo Meta + sheet hàng tuần; KPI: CPL ≤ …, ROAS ≥ …; báo động nếu frequency &gt; …"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              Kết quả đo được &amp; quyết định (scale / tối ưu / dừng)
+              <span class="crm-khtn-field-hint muted">
+                Số liệu thực tế sau chạy (hoặc dự kiến cách ghi): thắng variant, insight phân khúc, bước tiếp theo.
+              </span>
+              <textarea
+                id="crm-khtn-s5-prog-results"
+                rows="4"
+                maxlength="12000"
+                placeholder="VD: Arm B thắng ROAS +18%, scale 30% budget; hoặc: chưa chạy — điền sau khi có export Ads Manager / báo cáo…"
+              ></textarea>
+            </label>
+          </div>
+
+          <h4 class="crm-khtn-step5-program-title crm-khtn-step5-practice-heading">Danh mục thực hành — công cụ, phương pháp &amp; thống kê</h4>
+          <p class="muted crm-khtn-step5-program-lead">
+            Ghi lại những gì team <strong>thực sự dùng</strong> khi triển khai &amp; đọc kết quả: <strong>công cụ</strong> (phần mềm / dashboard),
+            <strong>phương pháp</strong> (cách đặt thử &amp; ra quyết định), <strong>thống kê &amp; chỉ số</strong> (bảng số liệu, công thức,
+            kiểm định hoặc ngưỡng kinh doanh).
+          </p>
+          <div class="crm-khtn-step1-fields crm-khtn-step5-program-fields">
+            <label class="crm-khtn-step1-label">
+              1. Công cụ cung cấp / vận hành
+              <span class="crm-khtn-field-hint muted">
+                Ads platform: Meta Ads Manager / TikTok Ads / Google Ads; <strong>tài liệu &amp; tài nguyên</strong> trong Business Suite; <strong>Theo dõi chuyển đổi</strong>:
+                Pixel, Conversions API, GA4 / GTM, server-side tag; CRM / sheet / Looker hay export CSV; QA creative: ô preview, brand safety; bảo vệ domain / catalog.
+              </span>
+              <textarea
+                id="crm-khtn-s5-practice-tools"
+                rows="4"
+                maxlength="12000"
+                placeholder="Liệt kê công cụ + vai trò: VD Ads Manager báo chi tiết breakdown; Sheet template ID…; Slack kênh cảnh báo…"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              2. Phương pháp thực hành
+              <span class="crm-khtn-field-hint muted">
+                Quy trình chạy pilot: học có kiểm soát, chỉ một biến đổi hay split cell; định <strong>mục tiêu thống kê</strong>
+                / kinh doanh trước khi live; luật pause khi anomaly; tránh biased comparison (overlap audience, không reset learning giữa chừng không ghi nhận);
+                checklist QA trước khi publish; cadence họp đọc số (<em>daily standup sóc</em>, report tuần).
+              </span>
+              <textarea
+                id="crm-khtn-s5-practice-methods"
+                rows="4"
+                maxlength="12000"
+                placeholder="VD: pre-register hypothesis + KPI; freeze audience 48h đầu; không đổi bid mid-test trừ khi…; RACI ai sign-off arm thắng…"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              3. Thống kê &amp; chỉ số để đánh giá
+              <span class="crm-khtn-field-hint muted">
+                <strong>Mô tả</strong>: CTR, CPC, CPM, reach, frequency, spend by day; <strong>hiệu quả</strong>: CPL, CPA, ROAS / POAS, conversion rate funnel;
+                <strong>so sánh</strong>: uplift % giữa arm, chia breakdown (tuổi / placement / geo nếu mẫu đủ lớn); <strong>tùy độ tin cậy</strong>: Ngưỡng chênh tối thiểu
+                (business rule), hoặc CI / bootstrap / test two-proportion nếu có số học — ghi rõ bạn dùng quy tắc đơn giản hay mô hình nâng cao.
+              </span>
+              <textarea
+                id="crm-khtn-s5-practice-stats"
+                rows="4"
+                maxlength="12000"
+                placeholder="VD: báo CPA &amp; ROAS 7d click + 1d view; bảng tổng hợp theo placement; chỉ scale khi delta ROAS ≥ 15% và sample ≥ …"
+              ></textarea>
+            </label>
+          </div>
+
+          <h4 class="crm-khtn-step5-program-title crm-khtn-step5-analysis-heading">Phân tích chi tiết khi chạy thử nghiệm quảng cáo trên thị trường mục tiêu</h4>
+          <p class="muted crm-khtn-step5-program-lead">
+            Sau khi pilot có dữ liệu (hoặc đang thiết kế khung đọc số), điền 7 góc phân tích sau để chuyển từ <em>«chạy được»</em>
+            sang <strong>quyết định kinh doanh</strong>: scale, tối ưu, hay dừng. Mỗi ô là một lăng kính riêng — đừng nhồi mọi thứ vào một ô.
+          </p>
+          <ol class="crm-khtn-step5-analysis-summary muted">
+            <li><strong>1. Định lượng &amp; ý nghĩa thống kê</strong> — chỉ số chính &amp; đánh giá độ tin cậy.</li>
+            <li><strong>2. Breakdown phân khúc</strong> — bóc tách hiệu quả theo nhân khẩu / địa lý / placement / thiết bị.</li>
+            <li><strong>3. Creative &amp; funnel</strong> — sức mạnh hook, tỷ lệ rớt từng bước, chất lượng lead.</li>
+            <li><strong>4. Định tính &amp; sentiment</strong> — comment, share, brand lift, phản hồi sales/CSKH.</li>
+            <li><strong>5. So sánh đối chiếu</strong> — vs control / benchmark ngành / chiến dịch trước.</li>
+            <li><strong>6. Bài học &amp; rủi ro</strong> — insight phân khúc mới, nguy cơ brand / pháp lý / dữ liệu.</li>
+            <li><strong>7. Khung quyết định</strong> — Scale / Iterate / Kill cùng tiêu chí định lượng.</li>
+          </ol>
+          <div class="crm-khtn-step1-fields crm-khtn-step5-program-fields">
+            <div class="crm-khtn-step1-label">
+              <strong>1. Phân tích định lượng &amp; ý nghĩa thống kê</strong>
+              <span class="crm-khtn-field-hint muted">
+                Bảng 6 chỉ số chính sau pilot. Cột bên trái là tham chiếu (công thức &amp; ngưỡng), cột bên phải nhập <strong>giá trị thực tế</strong>
+                và <strong>đánh giá / ghi chú</strong> (đạt/chưa đạt, cỡ mẫu, ý nghĩa thống kê, nguồn báo cáo). Mục tiêu là chuyển bảng thô sang nhận định.
+              </span>
+              <div class="crm-khtn-metrics-table-wrap">
+                <table class="crm-khtn-metrics-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Chỉ số</th>
+                      <th scope="col">Công thức</th>
+                      <th scope="col">Mục tiêu tốt</th>
+                      <th scope="col">Lý tưởng</th>
+                      <th scope="col">Ý nghĩa</th>
+                      <th scope="col" class="crm-khtn-metrics-th-input">Giá trị thực tế</th>
+                      <th scope="col" class="crm-khtn-metrics-th-input">Đánh giá / ghi chú</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <th scope="row" class="crm-khtn-metrics-name">CTR</th>
+                      <td class="crm-khtn-metrics-formula">Clicks / Impressions</td>
+                      <td><input type="text" id="crm-khtn-s5-metric-ctr-target" maxlength="60" value="&gt; 1.5%" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-ctr-ideal" maxlength="60" value="&gt; 2.5%" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-ctr-meaning" maxlength="120" value="Hấp dẫn" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-ctr-actual" maxlength="120" placeholder="VD: 1.8%" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-ctr-note" maxlength="240" placeholder="Đạt mục tiêu, mẫu 12k imp…" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row" class="crm-khtn-metrics-name">CPC</th>
+                      <td class="crm-khtn-metrics-formula">Spend / Clicks</td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cpc-target" maxlength="60" value="&lt; 5.000đ" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cpc-ideal" maxlength="60" value="&lt; 3.000đ" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cpc-meaning" maxlength="120" value="Tiết kiệm" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cpc-actual" maxlength="120" placeholder="VD: 4.200đ" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cpc-note" maxlength="240" placeholder="Trong ngưỡng, theo dõi tuần 2…" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row" class="crm-khtn-metrics-name">CPL</th>
+                      <td class="crm-khtn-metrics-formula">Spend / Leads</td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cpl-target" maxlength="60" value="&lt; 150.000đ" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cpl-ideal" maxlength="60" value="&lt; 100.000đ" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cpl-meaning" maxlength="120" value="Chuyển đổi tốt" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cpl-actual" maxlength="120" placeholder="VD: 120.000đ" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cpl-note" maxlength="240" placeholder="Tốt cho arm Reels; Search cao hơn…" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row" class="crm-khtn-metrics-name">CVR</th>
+                      <td class="crm-khtn-metrics-formula">Leads / Clicks</td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cvr-target" maxlength="60" value="&gt; 5%" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cvr-ideal" maxlength="60" value="&gt; 10%" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cvr-meaning" maxlength="120" value="Chất lượng cao" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cvr-actual" maxlength="120" placeholder="VD: 8.4%" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-cvr-note" maxlength="240" placeholder="Landing tốt, form 4 trường…" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row" class="crm-khtn-metrics-name">ROAS</th>
+                      <td class="crm-khtn-metrics-formula">Doanh thu / Chi phí</td>
+                      <td><input type="text" id="crm-khtn-s5-metric-roas-target" maxlength="60" value="&gt; 2×" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-roas-ideal" maxlength="60" value="&gt; 4×" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-roas-meaning" maxlength="120" value="Sinh lời" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-roas-actual" maxlength="120" placeholder="VD: 3.2×" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-roas-note" maxlength="240" placeholder="Tính 7d-click + 1d-view…" /></td>
+                    </tr>
+                    <tr>
+                      <th scope="row" class="crm-khtn-metrics-name">QL</th>
+                      <td class="crm-khtn-metrics-formula">Qualified Leads / Total Leads</td>
+                      <td><input type="text" id="crm-khtn-s5-metric-ql-target" maxlength="60" value="≥ 40%" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-ql-ideal" maxlength="60" value="≥ 60%" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-ql-meaning" maxlength="120" value="Chất lượng lead" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-ql-actual" maxlength="120" placeholder="VD: 62%" /></td>
+                      <td><input type="text" id="crm-khtn-s5-metric-ql-note" maxlength="240" placeholder="Sales chấm theo BANT, 84/135 lead…" /></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <span class="crm-khtn-field-hint muted">
+                Sau bảng, viết <strong>diễn giải tổng hợp</strong>: cỡ mẫu mỗi arm, khoảng tin cậy (CI 95%), p-value (test two-proportion / chi-square)
+                hoặc <em>quy tắc kinh doanh tối thiểu</em> (VD: kết luận khi spend ≥ 3× CPA mục tiêu &amp; ≥ 50 conv); cảnh báo khi mẫu chưa đủ.
+              </span>
+              <textarea
+                id="crm-khtn-s5-analysis-quant"
+                rows="5"
+                maxlength="14000"
+                placeholder="VD: Arm A — 320 conv, CPA 18.4$ ± 1.6$ (95% CI); Arm B — 295 conv, CPA 21.7$. Δ = -15.2%, p ≈ 0.02 → có ý nghĩa…"
+              ></textarea>
+            </div>
+            <div class="crm-khtn-step1-label">
+              <strong>2. Phân tích phân khúc &amp; breakdown</strong>
+              <span class="crm-khtn-field-hint muted">
+                Liệt kê các <strong>tệp / phân khúc</strong> (audience set) đã hoặc sẽ chạy. Mỗi nhóm gồm <em>Tên</em> (mã ngắn: A1, A2…), <em>Diễn giải</em>
+                (mô tả đặc trưng), và 6 thuộc tính: Độ tuổi · Giới tính · Khu vực · Thu nhập · Hành vi · Kích thước (size audience). Lưu ý: đừng đọc breakdown
+                khi mẫu &lt; 30 conversion / cell.
+              </span>
+              <div class="crm-khtn-segment-toolbar">
+                <button type="button" class="btn-mini" id="crm-khtn-s5-segment-add">+ Thêm nhóm</button>
+                <button type="button" class="btn-mini btn-mini--alt" id="crm-khtn-s5-segment-reset">Khôi phục mẫu mặc định</button>
+                <span class="muted crm-khtn-segment-count" id="crm-khtn-s5-segment-count" aria-live="polite"></span>
+              </div>
+              <div class="crm-khtn-segment-groups" id="crm-khtn-s5-segment-groups" role="list" aria-label="Danh sách phân khúc"></div>
+              <template id="crm-khtn-segment-group-tpl">
+                <div class="crm-khtn-segment-group" role="listitem">
+                  <div class="crm-khtn-segment-group-head">
+                    <input type="text" class="crm-khtn-segment-grp-name" maxlength="40" placeholder="Tên nhóm (A1, A2…)" aria-label="Tên nhóm" />
+                    <input type="text" class="crm-khtn-segment-grp-desc" maxlength="200" placeholder="Diễn giải nhóm…" aria-label="Diễn giải nhóm" />
+                    <button type="button" class="crm-khtn-segment-grp-remove" aria-label="Xoá nhóm">×</button>
+                  </div>
+                  <div class="crm-khtn-segment-grp-grid">
+                    <label class="crm-khtn-segment-grp-field">
+                      <span>Độ tuổi</span>
+                      <input type="text" class="crm-khtn-segment-grp-age" maxlength="60" placeholder="VD: 25-34" />
+                    </label>
+                    <label class="crm-khtn-segment-grp-field">
+                      <span>Giới tính</span>
+                      <input type="text" class="crm-khtn-segment-grp-gender" maxlength="40" placeholder="VD: Nam/Nữ" />
+                    </label>
+                    <label class="crm-khtn-segment-grp-field">
+                      <span>Khu vực</span>
+                      <input type="text" class="crm-khtn-segment-grp-region" maxlength="160" placeholder="VD: Q7, Q9, Thủ Đức" />
+                    </label>
+                    <label class="crm-khtn-segment-grp-field">
+                      <span>Thu nhập</span>
+                      <input type="text" class="crm-khtn-segment-grp-income" maxlength="80" placeholder="VD: 15-25tr" />
+                    </label>
+                    <label class="crm-khtn-segment-grp-field crm-khtn-segment-grp-field--wide">
+                      <span>Hành vi</span>
+                      <input type="text" class="crm-khtn-segment-grp-behavior" maxlength="240" placeholder='VD: Tìm "BĐS", "Căn hộ"' />
+                    </label>
+                    <label class="crm-khtn-segment-grp-field">
+                      <span>Kích thước</span>
+                      <input type="text" class="crm-khtn-segment-grp-size" maxlength="60" placeholder="VD: 800k" />
+                    </label>
+                  </div>
+                </div>
+              </template>
+              <span class="crm-khtn-field-hint muted">
+                Sau khi liệt kê nhóm, viết thêm <strong>nhận định breakdown</strong>: nhóm thắng/hoà/thua, phân khúc bất ngờ đáng đào sâu, gợi ý kỳ tới.
+              </span>
+              <textarea
+                id="crm-khtn-s5-analysis-segment"
+                rows="5"
+                maxlength="14000"
+                placeholder="VD: Reels 25–34 nữ HCM — CPA tốt nhất; Search competitor — ROAS dương nhưng volume thấp; mobile vs desktop chênh CVR 1.8×…"
+              ></textarea>
+            </div>
+
+            <div class="crm-khtn-step1-label crm-khtn-step5-breakdown-block">
+              <strong>Tổng hợp breakdown &amp; kế hoạch hành động (từ phân khúc)</strong>
+              <span class="crm-khtn-field-hint muted">
+                Sau khi đã có data breakdown, chuyển sang quyết định: phân khúc nào <strong>scale</strong>, phân khúc nào <strong>test tiếp</strong>,
+                phân khúc nào <strong>pause</strong>; ghi % budget tương ứng. Tiếp đến: liệt kê <em>phân khúc bất ngờ</em> đáng đào sâu, kế hoạch
+                kỳ tới (Test 2), dự kiến 3 tháng, và xác nhận thị trường mục tiêu cuối cùng.
+              </span>
+
+              <h5 class="crm-khtn-breakdown-h5">Breakdown: Thắng / Hoà / Thua</h5>
+              <div class="crm-khtn-breakdown-grid">
+                <div class="crm-khtn-breakdown-card crm-khtn-breakdown-card--win">
+                  <div class="crm-khtn-breakdown-card-head">
+                    <span class="crm-khtn-breakdown-card-emoji" aria-hidden="true">🥇</span>
+                    <span class="crm-khtn-breakdown-card-title">NHÓM THẮNG <span class="crm-khtn-breakdown-card-action">SCALE 12–18×</span></span>
+                    <label class="crm-khtn-breakdown-card-budget">
+                      <span>% Budget</span>
+                      <input type="text" id="crm-khtn-s5-breakdown-win-budget" maxlength="40" placeholder="VD: 78%" />
+                    </label>
+                  </div>
+                  <textarea
+                    id="crm-khtn-s5-breakdown-win-text"
+                    rows="4"
+                    maxlength="6000"
+                    placeholder="VD: A1 (gia đình trẻ Q7) ROAS 4.6× CPA 17$ → scale ×15; A2 (mẹ bỉm) ROAS 3.8× → scale ×12; LAL 1% ổn định…"
+                  ></textarea>
+                </div>
+
+                <div class="crm-khtn-breakdown-card crm-khtn-breakdown-card--tie">
+                  <div class="crm-khtn-breakdown-card-head">
+                    <span class="crm-khtn-breakdown-card-emoji" aria-hidden="true">⚪</span>
+                    <span class="crm-khtn-breakdown-card-title">NHÓM HÒA <span class="crm-khtn-breakdown-card-action">Test tiếp</span></span>
+                    <label class="crm-khtn-breakdown-card-budget">
+                      <span>% Budget</span>
+                      <input type="text" id="crm-khtn-s5-breakdown-tie-budget" maxlength="40" placeholder="VD: 18%" />
+                    </label>
+                  </div>
+                  <textarea
+                    id="crm-khtn-s5-breakdown-tie-text"
+                    rows="4"
+                    maxlength="6000"
+                    placeholder="VD: B1 (NĐT 35-44) chưa đủ tín hiệu, gia hạn pilot 7 ngày + đổi creative; D1 mua nhà lần đầu — đổi landing form ngắn…"
+                  ></textarea>
+                </div>
+
+                <div class="crm-khtn-breakdown-card crm-khtn-breakdown-card--lose">
+                  <div class="crm-khtn-breakdown-card-head">
+                    <span class="crm-khtn-breakdown-card-emoji" aria-hidden="true">❌</span>
+                    <span class="crm-khtn-breakdown-card-title">NHÓM THUA <span class="crm-khtn-breakdown-card-action">PAUSE</span></span>
+                    <label class="crm-khtn-breakdown-card-budget">
+                      <span>% Budget</span>
+                      <input type="text" id="crm-khtn-s5-breakdown-lose-budget" maxlength="40" placeholder="VD: 4%" />
+                    </label>
+                  </div>
+                  <textarea
+                    id="crm-khtn-s5-breakdown-lose-text"
+                    rows="4"
+                    maxlength="6000"
+                    placeholder="VD: C1 (cao cấp Bình Dương) CPA 3× mục tiêu, frequency 5+ — pause; arm Search competitor — ROAS âm, ngừng test…"
+                  ></textarea>
+                </div>
+              </div>
+
+              <h5 class="crm-khtn-breakdown-h5 crm-khtn-breakdown-h5--surprise">💥 Phân khúc bất ngờ đáng đào sâu</h5>
+              <p class="muted crm-khtn-step5-program-lead">
+                Insight nằm ngoài giả thuyết ban đầu nhưng có tín hiệu mạnh — cần kế hoạch ngắn 5–7 ngày để xác nhận. Mỗi card gồm: tiêu đề (rank + tên),
+                điểm nổi bật, budget pilot, target audience, ý tưởng creative (video / carousel), và <em>kỳ vọng định lượng</em>.
+              </p>
+              <div class="crm-khtn-segment-toolbar">
+                <button type="button" class="btn-mini" id="crm-khtn-s5-surprise-add">+ Thêm phân khúc bất ngờ</button>
+                <button type="button" class="btn-mini btn-mini--alt" id="crm-khtn-s5-surprise-reset">Khôi phục mẫu mặc định</button>
+                <span class="muted crm-khtn-segment-count" id="crm-khtn-s5-surprise-count" aria-live="polite"></span>
+              </div>
+              <div class="crm-khtn-surprise-list" id="crm-khtn-s5-surprise-list" role="list" aria-label="Danh sách phân khúc bất ngờ"></div>
+              <template id="crm-khtn-surprise-tpl">
+                <div class="crm-khtn-surprise-card" role="listitem">
+                  <div class="crm-khtn-surprise-card-head">
+                    <input type="text" class="crm-khtn-surprise-title" maxlength="120" placeholder="🔥 #1 Tên phân khúc (VD: MẸ BỈM 28-40 NỮ)" aria-label="Tiêu đề phân khúc" />
+                    <input type="text" class="crm-khtn-surprise-highlight" maxlength="160" placeholder='Điểm nổi bật (VD: "QL 56% — Cao thứ 2")' aria-label="Điểm nổi bật" />
+                    <input type="text" class="crm-khtn-surprise-budget" maxlength="80" placeholder="Budget (VD: 15tr / 5 ngày)" aria-label="Budget" />
+                    <button type="button" class="crm-khtn-segment-grp-remove crm-khtn-surprise-remove" aria-label="Xoá insight">×</button>
+                  </div>
+                  <div class="crm-khtn-surprise-card-body">
+                    <label class="crm-khtn-surprise-field">
+                      <span>🎯 Target audience</span>
+                      <textarea class="crm-khtn-surprise-target" rows="2" maxlength="600" placeholder='VD: Nữ 28-40 + "Giáo dục con cái" + Q7'></textarea>
+                    </label>
+                    <label class="crm-khtn-surprise-field">
+                      <span>🎬 Creative ideas (video / carousel)</span>
+                      <textarea class="crm-khtn-surprise-creatives" rows="3" maxlength="1200" placeholder='VD: Video: "Vinhomes Hóc Môn — Trường ĐHQT đầu tiên VN" (3 versions). Carousel: Trường + hồ + sân chơi.'></textarea>
+                    </label>
+                    <label class="crm-khtn-surprise-field">
+                      <span>📊 Kỳ vọng định lượng</span>
+                      <input type="text" class="crm-khtn-surprise-expected" maxlength="200" placeholder="VD: CPL <75k | QL >60% | ROAS ≥3.5×" />
+                    </label>
+                  </div>
+                </div>
+              </template>
+
+              <h5 class="crm-khtn-breakdown-h5 crm-khtn-breakdown-h5--next">🚀 Gợi ý kỳ tới — Test 2</h5>
+              <label class="crm-khtn-step1-label crm-khtn-breakdown-textarea-label">
+                <span class="crm-khtn-field-hint muted">
+                  Phác họa 3 phase: <strong>Phase 1 Scale Winners</strong> (budget &amp; phân bổ cho các nhóm thắng), <strong>Phase 2 Đào sâu bất ngờ</strong>
+                  (xác nhận insight), <strong>Phase 3 Kênh mới</strong> (TikTok / Zalo / partner…). Kèm <em>nội dung mới test</em> rút từ search results / comment / sales.
+                </span>
+                <textarea
+                  id="crm-khtn-s5-next-test-plan"
+                  rows="7"
+                  maxlength="14000"
+                  placeholder="PHASE 1 — SCALE WINNERS (120tr / 5 ngày):
+- A1 ×15 budget, mở thêm Q2/Q12; A2 tăng 12× + lookalike 1%…
+
+PHASE 2 — ĐÀO SÂU BẤT NGỜ (25tr / 5 ngày):
+- 🔥 Mẹ bỉm 28-40 (15tr) + ⚡ LAL 1% (8tr) + 2tr cho test mở rộng…
+
+PHASE 3 — KÊNH MỚI (10tr):
+- TikTok Reels test creative tương tự A1; Zalo Mini App pilot…
+
+NỘI DUNG MỚI TEST (từ search results / inbox):
+- Hook 'Trường ĐHQT đầu tiên'; UGC khách đã ở 6 tháng; …"
+                ></textarea>
+              </label>
+
+              <h5 class="crm-khtn-breakdown-h5 crm-khtn-breakdown-h5--forecast">📈 Dự kiến 3 tháng (sau 2 kỳ test)</h5>
+              <label class="crm-khtn-step1-label crm-khtn-breakdown-textarea-label">
+                <span class="crm-khtn-field-hint muted">
+                  Phác projection theo từng tháng: spend, conv, CPA, ROAS dự kiến; cột mốc mở rộng / thu hẹp; LTV/CAC; rủi ro mùa vụ &amp; cạnh tranh.
+                </span>
+                <textarea
+                  id="crm-khtn-s5-forecast-3m"
+                  rows="5"
+                  maxlength="14000"
+                  placeholder="M1 (06): spend 250tr · 1.6k lead · CPL 156k · CPA 4.1tr · ROAS 3.2×.
+M2 (07): scale arm A1+A2 → spend 380tr · 2.4k lead · CPA 3.8tr.
+M3 (08): pilot TikTok 20% budget; LTV/CAC dự kiến ≥4×; rủi ro: mùa mưa Q3 — chuẩn bị offer dự phòng…"
+                ></textarea>
+              </label>
+
+              <h5 class="crm-khtn-breakdown-h5 crm-khtn-breakdown-h5--final">✅ Thị trường mục tiêu xác nhận cuối cùng</h5>
+              <label class="crm-khtn-step1-label crm-khtn-breakdown-textarea-label">
+                <span class="crm-khtn-field-hint muted">
+                  Tổng kết phân khúc cốt lõi (primary), phân khúc phụ (secondary), insight chốt định hướng nội dung kỳ tiếp theo, và phân khúc bị loại
+                  cùng lý do — để team brief / sales / sản phẩm cùng dùng một nguồn truth.
+                </span>
+                <textarea
+                  id="crm-khtn-s5-final-target"
+                  rows="6"
+                  maxlength="14000"
+                  placeholder="THỊ TRƯỜNG MỤC TIÊU XÁC NHẬN:
+- Cốt lõi (primary): A1 — gia đình trẻ Q7/Q9/Thủ Đức, 25-34, thu nhập 15-25tr.
+- Phụ (secondary): A2 (mẹ bỉm 28-38) + B1 (NĐT 35-44).
+- Insight chốt: 'trường học + tiện ích nội khu' là proof mạnh nhất → định hướng nội dung Q3/Q4.
+- Loại bỏ: D1 (mua nhà lần đầu) — CPL cao và sản phẩm chưa có offer phù hợp."
+                ></textarea>
+              </label>
+            </div>
+            <label class="crm-khtn-step1-label">
+              3. Phân tích creative &amp; funnel
+              <span class="crm-khtn-field-hint muted">
+                Creative: hook rate (3s view / impression), hold rate (15s / 3s), thumb-stop, CTR sau hold, fatigue (frequency &amp; CTR theo ngày).
+                Funnel: impression → click → landing view → add-to-cart / lead form view → submit → qualified. Chỉ ra <strong>nút thắt</strong>
+                (drop-off lớn nhất) và đề xuất biến thể tiếp theo.
+              </span>
+              <textarea
+                id="crm-khtn-s5-analysis-creative"
+                rows="5"
+                maxlength="14000"
+                placeholder="VD: Hook 38% (B) vs 24% (A); rớt mạnh ở landing → form (CVR 6%); fatigue D7 với freq 4.2 → cần creative refresh…"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              4. Phân tích định tính &amp; sentiment
+              <span class="crm-khtn-field-hint muted">
+                Comment / inbox / share: tỷ lệ tích cực vs tiêu cực, câu hỏi lặp lại (giá, vận chuyển, bảo hành), từ khóa nổi bật. Tín hiệu thương hiệu:
+                brand search lift, direct traffic, đề cập trên social. Phản hồi từ sales / CSKH về chất lượng lead. Cảnh báo nội dung có rủi ro
+                (brand safety / pháp lý).
+              </span>
+              <textarea
+                id="crm-khtn-s5-analysis-qualitative"
+                rows="5"
+                maxlength="14000"
+                placeholder="VD: 78% comment tích cực; câu hỏi lặp về phí ship → bổ sung FAQ; sales báo lead arm B chất lượng cao hơn dù CPA cao hơn…"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              5. So sánh đối chiếu (control / benchmark / lịch sử)
+              <span class="crm-khtn-field-hint muted">
+                So với: <strong>control / holdout</strong> (nhóm không tiếp cận), <strong>benchmark ngành</strong> (Meta / Google reports, đối thủ),
+                <strong>chiến dịch trước</strong> (cùng kênh, cùng mùa). Tính <em>incremental lift</em> nếu có holdout. Cảnh giác novelty effect &amp;
+                seasonality.
+              </span>
+              <textarea
+                id="crm-khtn-s5-analysis-comparison"
+                rows="4"
+                maxlength="14000"
+                placeholder="VD: Lift +22% so holdout; CTR cao hơn benchmark FMCG VN (1.4% vs 0.9%); CPA giảm 12% so Q trước cùng kênh…"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              6. Bài học, rủi ro &amp; insight phân khúc mới
+              <span class="crm-khtn-field-hint muted">
+                Bài học (giả thuyết được xác nhận / bị bác bỏ); rủi ro phát hiện (brand safety, ad fatigue, audience overlap, attribution leakage,
+                privacy / iOS); <strong>phân khúc mới</strong> nghiên cứu chưa thấy (VD: nhóm tuổi 45+ phản hồi tốt creative testimonial). Đặt câu hỏi
+                cho vòng pilot kế tiếp.
+              </span>
+              <textarea
+                id="crm-khtn-s5-analysis-learnings"
+                rows="5"
+                maxlength="14000"
+                placeholder="VD: Giả thuyết «video 15s &gt; ảnh tĩnh» — đúng cho Reels, sai cho Feed. Rủi ro audience overlap A∩B = 18% → tách lookalike riêng…"
+              ></textarea>
+            </label>
+            <label class="crm-khtn-step1-label">
+              7. Khung quyết định: Scale / Iterate / Kill
+              <span class="crm-khtn-field-hint muted">
+                Tiêu chí định lượng cho từng nhánh. <strong>Scale</strong>: ROAS ≥ X &amp; CPA ≤ Y &amp; mẫu ≥ N → tăng budget Z% / tuần.
+                <strong>Iterate</strong>: gần đạt — đổi creative / audience / landing &amp; chạy thêm M ngày.
+                <strong>Kill</strong>: tiêu chí không đạt sau ngân sách / thời gian tối thiểu → dừng &amp; ghi lý do để không lặp.
+                Kèm <em>owner &amp; deadline</em>.
+              </span>
+              <textarea
+                id="crm-khtn-s5-analysis-decision"
+                rows="5"
+                maxlength="14000"
+                placeholder="VD: Scale arm B (+30%/tuần, cap 1500$/ngày, owner: A. Linh, review T2 hàng tuần). Iterate arm A — đổi hook. Kill arm C…"
+              ></textarea>
+            </label>
+          </div>
+
+          <div class="crm-khtn-step1-fields">
+            <label class="crm-khtn-step1-label">
+              Ghi chú thử nghiệm (tuỳ chọn)
+              <span class="crm-khtn-field-hint muted">
+                Giả thuyết ngoài các ô trên, rủi ro brand / pháp lý, phụ thuộc đối tác kênh…
+              </span>
+              <textarea
+                id="crm-khtn-s5-pilot-notes"
+                rows="4"
+                maxlength="12000"
+                placeholder="Bổ sung không nằm trong các ô trên: vendor, timeline nội bộ, rủi ro…"
+              ></textarea>
+            </label>
+          </div>
+          <div class="crm-khtn-step1-actions">
+            <button type="button" class="btn" id="crm-khtn-s5-save">Lưu dữ liệu</button>
+            <span class="muted crm-khtn-s5-save-msg" id="crm-khtn-s5-save-msg" role="status" aria-live="polite" hidden></span>
+          </div>
+        </div>
+      </div>
+      <div class="crm-modal-actions crm-khtn-step-modal-actions">
+        <button type="button" class="btn" data-khtn-step-close>Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="application/json" id="crm-khtn-steps-json">{{ khtn_pipeline_steps | tojson }}</script>
+  {% set _jms = static_js_file('crm_marketing_segment.js') %}
+  <script defer src="{{ url_for('static', filename=_jms) }}?v={{ static_v(_jms) }}"></script>
+  {% endif %}
+
+  <section class="panel crm-mp-segment-detail" aria-labelledby="crm-mp-seg-focus">
+    <h2 class="crm-mp-segment-h2" id="crm-mp-seg-focus">Trọng tâm triển khai</h2>
+    <ul class="crm-mp-segment-points">
+      {% for line in page.bullets %}
+      <li>{{ line | e }}</li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  {% if sibling_pages %}
+  <section class="panel crm-mp-segment-siblings" aria-labelledby="crm-mp-seg-sib">
+    <h2 class="crm-mp-segment-h2" id="crm-mp-seg-sib">Các hạng mục liên quan</h2>
+    <ul class="crm-mp-segment-sibling-grid" role="list">
+      {% for s in sibling_pages %}
+      <li>
+        <a class="crm-mp-segment-sib-card" href="{{ url_for('crm_marketing_plan_segment_page', slug=s.slug) }}">
+          <span class="crm-mp-segment-sib-code">{{ s.abbr | e }}</span>
+          <span class="crm-mp-segment-sib-title">{{ s.title | e }}</span>
+          <span class="crm-mp-segment-sib-arrow" aria-hidden="true">→</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  <p class="crm-mp-segment-foot">
+    <a class="btn-secondary" href="{{ url_for('crm_marketing_plan_page') }}">← Về danh sách kế hoạch marketing</a>
+  </p>
+
+</div>
+{% endblock %}

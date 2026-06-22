@@ -1,0 +1,539 @@
+{% extends "base.html" %}
+{% import '_macros_static.html' as ras %}
+
+{% block title %}{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Creative Martech Platform{% endblock %}
+{% block head %}
+  <meta
+    name="description"
+    content="PTT Advertising Solutions — nền tảng Creative Martech tại Việt Nam: SEO, AEO, quảng cáo số, thiết kế website, tiếp thị nội dung, tư vấn tăng trưởng đa kênh cho doanh nghiệp."
+  />
+  <link rel="canonical" href="{{ request.url_root.rstrip('/') }}{{ url_for('landing') }}" />
+  <meta property="og:site_name" content="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }}" />
+  <meta property="og:locale" content="vi_VN" />
+  <meta property="og:url" content="{{ request.url_root.rstrip('/') }}{{ url_for('landing') }}" />
+  <meta property="og:title" content="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Creative Martech Platform" />
+  <meta property="og:description" content="Nền tảng Creative Martech, marketing đa kênh, tư vấn chiến lược và giải pháp tăng trưởng bền vững cho doanh nghiệp." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='images/ptt-logo.png') }}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Creative Martech Platform" />
+  <meta name="twitter:description" content="Nền tảng Creative Martech, marketing đa kênh, tư vấn chiến lược cho doanh nghiệp tại Việt Nam." />
+  <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='images/ptt-logo.png') }}" />
+{% endblock %}
+{% block structured_data %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": {{ (settings.brand_name if settings else "PTT Advertising Solutions")|tojson }},
+    "url": {{ (request.url_root.rstrip("/") + url_for("landing"))|tojson }},
+    "logo": {{ (request.url_root.rstrip("/") + url_for("static", filename="images/ptt-logo.png"))|tojson }},
+    "description": "Nền tảng Creative Martech, giải pháp marketing tích hợp và tư vấn tăng trưởng cho doanh nghiệp tại Việt Nam.",
+    "areaServed": { "@type": "Country", "name": "Vietnam" },
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "contactType": "customer service",
+      "telephone": "+84-24-7307-7979",
+      "areaServed": "VN",
+      "availableLanguage": [ "Vietnamese", "en" ],
+      "email": {{ (settings.get("contact_email", "contact@pttadvertising.vn") if settings else "contact@pttadvertising.vn")|tojson }}
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": {{ (settings.brand_name if settings else "PTT Advertising Solutions")|tojson }},
+    "url": {{ (request.url_root.rstrip("/") + url_for("landing"))|tojson }},
+    "inLanguage": "vi-VN",
+    "publisher": { "@type": "Organization", "name": {{ (settings.brand_name if settings else "PTT Advertising Solutions")|tojson }} }
+  }
+  </script>
+{% endblock %}
+
+{% block body_class %}landing-body{% endblock %}
+
+{% block header %}
+<header class="topbar landing-topbar">
+  <div class="container nav-wrap">
+    <a href="/" class="logo logo-landing brand-logo" aria-label="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Trang chủ">
+      {{- ras.raster_static_picture('images/ptt-logo.png', (settings.brand_name if settings else 'PTT Advertising Solutions') ~ ' — logo', 60, 60, 'brand-logo-img', loading='eager') -}}
+      <span class="brand-logo-text logo-landing-text">{{ settings.brand_name if settings else "PTT Advertising Solutions" }}</span>
+    </a>
+    <button class="menu-toggle" type="button" aria-label="Mở hoặc đóng menu" data-menu-toggle>
+      <span></span><span></span><span></span>
+    </button>
+    <nav class="landing-nav" aria-label="Menu chính">
+      <div class="nav-mega-hover" data-nav-mega-hover>
+        <div class="nav-mega-wrap" data-nav-mega-wrap>
+          <a href="#main" class="nav-mega-dv-link">Dịch vụ</a>
+          <button
+            type="button"
+            class="nav-mega-opener"
+            id="nav-mega-opener"
+            data-nav-mega-opener
+            aria-expanded="false"
+            aria-haspopup="true"
+            aria-controls="nav-mega-panel"
+            aria-label="Mở danh sách dịch vụ theo nhóm"
+          >
+            <span class="nav-mega-caret" aria-hidden="true">▾</span>
+          </button>
+        </div>
+        <div
+          class="nav-mega-panel"
+          id="nav-mega-panel"
+          role="region"
+          aria-label="Danh sách dịch vụ theo nhóm"
+          data-nav-mega-panel
+          hidden
+        >
+          <div class="container nav-mega-container">
+            {% set _nb_img = (settings.get('nav_mega_banner_image') or '')|trim %}
+            {% set _nb_href = (settings.get('nav_mega_banner_href') or '#contact')|trim or '#contact' %}
+            <div class="nav-mega-body">
+              <div class="nav-mega-cols{% if _nb_img %} nav-mega-cols--five{% endif %}">
+                <h2 class="visually-hidden" id="nav-mega-pillars-title">Dịch vụ theo từng nhóm</h2>
+                <ul class="nav-mega-grid" aria-labelledby="nav-mega-pillars-title">
+                  {% for cat in service_categories %}
+                  <li class="nav-mega-col" id="mega-pillar-{{ loop.index }}">
+                    <div
+                      class="nav-mega-col-head"
+                      role="group"
+                      aria-labelledby="mega-h3-{{ loop.index }}"
+                    >
+                      <h3 class="nav-mega-heading" id="mega-h3-{{ loop.index }}">{{ cat.title }}</h3>
+                    </div>
+                    <ul class="nav-mega-list">
+                      {% for it in cat['items'] %}
+                      <li>
+                        <a href="{{ url_for('service_detail', slug=it.slug) }}">
+                          <span class="nav-mega-link-text">{{ it.name }}</span>
+                          <span class="nav-mega-link-icon" aria-hidden="true">→</span>
+                        </a>
+                      </li>
+                      {% endfor %}
+                    </ul>
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% if _nb_img %}
+                <aside class="nav-mega-ad-col" aria-label="Quảng cáo">
+                  <a
+                    class="nav-mega-promo"
+                    href="{{ _nb_href }}"
+                    aria-label="Quảng cáo — {{ (settings.get('nav_mega_banner_title') or 'Ưu đãi dịch vụ')|e }}"
+                    {% if _nb_href|length > 4 and _nb_href[0:4] == 'http' %}
+                      target="_blank" rel="noopener noreferrer"
+                    {% endif %}
+                  >
+                    <span class="nav-mega-promo-media">
+                      <img
+                        class="nav-mega-promo-img"
+                        src="{{ _nb_img }}"
+                        alt="{{ (settings.get('nav_mega_banner_title') or 'Quảng cáo dịch vụ')|e }}"
+                        width="280"
+                        height="360"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </span>
+                    <span class="nav-mega-promo-label">Quảng cáo</span>
+                    {% if (settings.get('nav_mega_banner_title') or '')|trim %}
+                    <span class="nav-mega-promo-title">{{ settings.get('nav_mega_banner_title')|e }}</span>
+                    {% endif %}
+                    {% if (settings.get('nav_mega_banner_subtitle') or '')|trim %}
+                    <span class="nav-mega-promo-sub">{{ settings.get('nav_mega_banner_subtitle')|e }}</span>
+                    {% endif %}
+                  </a>
+                </aside>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <a class="landing-nav-item" href="#projects">Dự án</a>
+      <a class="landing-nav-item" href="#news">Tin tức</a>
+      <a class="landing-nav-item" href="#careers">Tuyển dụng</a>
+      <a class="landing-nav-item landing-nav-item-cta" href="#contact">Liên hệ</a>
+    </nav>
+  </div>
+
+  <div class="nav-mega-backdrop" data-nav-mega-backdrop hidden aria-hidden="true"></div>
+
+  <div class="mobile-menu" data-mobile-menu>
+    <a href="#main" class="mobile-dv-landing">Dịch vụ</a>
+    <details class="mobile-nav-dd">
+      <summary class="mobile-nav-dd-summary">Dịch vụ theo từng nhóm</summary>
+      <div class="mobile-nav-dd-body">
+        {% set _mb_img = (settings.get('nav_mega_banner_image') or '')|trim %}
+        {% set _mb_href = (settings.get('nav_mega_banner_href') or '#contact')|trim or '#contact' %}
+        {% if _mb_img %}
+        <a
+          class="mobile-nav-dd-banner"
+          href="{{ _mb_href }}"
+          {% if _mb_href|length > 4 and _mb_href[0:4] == 'http' %}
+            target="_blank" rel="noopener noreferrer"
+          {% endif %}
+        >
+          <img
+            class="mobile-nav-dd-banner-img"
+            src="{{ _mb_img }}"
+            alt="{{ (settings.get('nav_mega_banner_title') or 'Ưu đãi dịch vụ')|e }}"
+            width="800"
+            height="280"
+            loading="lazy"
+            decoding="async"
+          />
+        </a>
+        {% endif %}
+        {% for cat in service_categories %}
+        <div class="mobile-nav-dd-block">
+          <p class="mobile-nav-dd-title">{{ cat.title }}</p>
+          <ul class="mobile-nav-dd-list">
+            {% for it in cat['items'] %}
+            <li>
+              <a href="{{ url_for('service_detail', slug=it.slug) }}">{{ it.name }}</a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endfor %}
+        <a href="#main" class="mobile-nav-dd-cta">Vào nội dung trang</a>
+      </div>
+    </details>
+    <a class="mobile-menu-link" href="#projects">Dự án</a>
+    <a class="mobile-menu-link" href="#news">Tin tức</a>
+    <a class="mobile-menu-link" href="#careers">Tuyển dụng</a>
+    <a class="mobile-menu-link mobile-menu-link-cta" href="#contact">Liên hệ</a>
+  </div>
+  </header>
+{% endblock %}
+
+{% block content %}
+<main id="main" class="landing-main" lang="vi" role="main">
+<section
+  class="home-hero-slider"
+  id="home-hero-slider"
+  data-home-slider
+  tabindex="0"
+  aria-roledescription="carousel"
+  aria-label="Slide trang chủ"
+>
+  <div class="home-slider-viewport">
+    <div class="home-slider-track" data-home-slider-track>
+      {% set _total = hero_slides | length %}
+      {% for slide in hero_slides %}
+      <article
+        class="home-slider-slide{% if loop.first %} is-active{% endif %}"
+        style="--home-slide-bg: url({{ slide.image_url | e }})"
+        aria-roledescription="slide"
+        aria-label="{{ loop.index }} / {{ _total }}"
+      >
+        <div class="container home-slider-slide-inner">
+          {% if slide.kicker %}<p class="home-slider-kicker">{{ slide.kicker | e }}</p>{% endif %}
+          {% if loop.first %}
+          <h1>{{ slide.heading | e }}</h1>
+          {% else %}
+          <h2 class="home-slider-heading">{{ slide.heading | e }}</h2>
+          {% endif %}
+          {% if slide.lead %}<p class="home-slider-lead">{{ slide.lead | e }}</p>{% endif %}
+          <div class="home-slider-actions">
+            {% if slide.cta_primary_label %}
+            <a href="{{ slide.cta_primary_href | default('#contact') | e }}" class="btn home-slider-btn-primary">{{ slide.cta_primary_label | e }}</a>
+            {% endif %}
+            {% if slide.cta_ghost_label %}
+            <a href="{{ slide.cta_ghost_href | default('#projects') | e }}" class="btn home-slider-btn-ghost">{{ slide.cta_ghost_label | e }}</a>
+            {% endif %}
+          </div>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+  <button type="button" class="home-slider-arrow home-slider-prev" data-home-slider-prev aria-label="Slide trước">
+    <span aria-hidden="true">‹</span>
+  </button>
+  <button type="button" class="home-slider-arrow home-slider-next" data-home-slider-next aria-label="Slide sau">
+    <span aria-hidden="true">›</span>
+  </button>
+  <div class="home-slider-dots-wrap">
+    <div class="home-slider-dots" data-home-slider-dots role="tablist" aria-label="Chọn slide"></div>
+  </div>
+</section>
+
+<section id="capabilities" class="section capabilities-section capabilities-section--modern">
+  <div class="container capabilities-inner">
+    <p class="capabilities-intro">
+      PTT là nền tảng Creative Martech đa ngành — tích hợp tự động hóa, AI và dữ liệu vào toàn bộ quy trình marketing: từ sáng tạo nội dung, cá nhân hóa trải nghiệm khách hàng đến tối ưu hóa hiệu suất chiến dịch theo thời gian thực.
+    </p>
+    <ul class="capabilities-grid">
+      <li class="capabilities-item">
+        <div class="capabilities-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        </div>
+        <p class="capabilities-text">Marketing Automation</p>
+      </li>
+      <li class="capabilities-item">
+        <div class="capabilities-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        </div>
+        <p class="capabilities-text">AI Content &amp; Personalization</p>
+      </li>
+      <li class="capabilities-item">
+        <div class="capabilities-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        </div>
+        <p class="capabilities-text">Data Analytics &amp; Business Intelligence</p>
+      </li>
+      <li class="capabilities-item">
+        <div class="capabilities-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+        </div>
+        <p class="capabilities-text">CRM &amp; Lead Intelligence</p>
+      </li>
+      <li class="capabilities-item">
+        <div class="capabilities-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
+        </div>
+        <p class="capabilities-text">Paid Media đa kênh &amp; Tối ưu ROI</p>
+      </li>
+      <li class="capabilities-item">
+        <div class="capabilities-icon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
+        </div>
+        <p class="capabilities-text">AI Agent &amp; Customer Experience</p>
+      </li>
+    </ul>
+  </div>
+</section>
+
+{% set saga_projects_initial = 6 %}
+<section id="projects" class="section section-alt saga-work-section">
+  <div class="container">
+    <header class="section-head saga-work-head">
+      <h2>Dự án</h2>
+      <p class="saga-work-intro">
+        Chiến dịch tiêu biểu — nhấn ảnh để mở trang chi tiết; đoạn giới thiệu ngắn hiển thị dưới ảnh.
+      </p>
+    </header>
+    <div
+      class="saga-work-grid{% if projects|length > saga_projects_initial %} saga-work-grid--collapsible{% endif %}"
+      id="saga-work-grid"
+    >
+      {% for project in projects %}
+      <article
+        id="project-{{ project.id }}"
+        class="saga-work-card{% if loop.index0 >= saga_projects_initial %} saga-work-card--extra{% endif %}"
+        tabindex="-1"
+      >
+        <a
+          class="saga-work-card-media"
+          href="{{ url_for('project_detail', project_id=project.id) }}"
+          aria-label="Xem chi tiết dự án: {{ project.title | e }}"
+        >
+          <img
+            src="{{ project.image_url }}"
+            alt=""
+            width="640"
+            height="480"
+            loading="lazy"
+            decoding="async"
+          />
+        </a>
+        <div class="saga-work-card-body">
+          <h3 class="visually-hidden">{{ project.title }}</h3>
+          <p class="saga-work-card-intro">{{ project.description }}</p>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% if projects|length > saga_projects_initial %}
+    <p class="saga-work-more-row">
+      <button
+        type="button"
+        class="btn saga-work-more-btn home-slider-btn-ghost"
+        data-saga-work-more
+        aria-controls="saga-work-grid"
+        aria-expanded="false"
+      >
+        Xem thêm dự án
+      </button>
+    </p>
+    {% endif %}
+  </div>
+</section>
+
+<section id="partners" class="section container partners-section">
+  <div class="section-head section-head-partners">
+    <h2>Đối tác và khách hàng</h2>
+    <p>Một số đối tác tiêu biểu đồng hành cùng PTT Advertising Solutions trên nhiều chiến dịch truyền thông.</p>
+  </div>
+  <div class="partners-shell">
+    <div class="partner-slider" aria-label="Danh sách logo đối tác">
+      <div class="partner-slider-track">
+        {% for _ in range(2) %}
+          {% for partner in partner_logos %}
+          <a
+            class="partner-slide"
+            href="{{ partner['site'] }}"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="{{ partner['name'] }}"
+          >
+            {{- ras.raster_static_picture(partner['logo_file'], '', 188, 58, loading='lazy', partner_slide_onerror=True, aria_hidden=True) -}}
+            <span>{{ partner["name"] }}</span>
+          </a>
+          {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="news" class="section container">
+  <div class="section-head">
+    <h2>Tin tức</h2>
+    <p>Cập nhật các chiến dịch và hoạt động truyền thông mới nhất.</p>
+  </div>
+  <div class="news-list">
+    {% for item in news %}
+    <article class="news-item">
+      <a
+        class="news-item-link"
+        href="{{ url_for('news_detail', news_id=item.id) }}"
+        aria-label="{{ item.title | e }} — Xem chi tiết tin tức"
+      >
+        <div class="news-item-media">
+          <img
+            src="https://picsum.photos/seed/pttnews{{ item.id }}/560/320"
+            alt=""
+            width="560"
+            height="320"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+        <div class="news-item-body">
+          <h3>{{ item.title }}</h3>
+          <p class="news-item-summary">{{ item.summary | e }}</p>
+        </div>
+        <span class="news-item-cta" aria-hidden="true">Chi tiết</span>
+      </a>
+    </article>
+    {% else %}
+    <p class="news-empty">Chưa có tin tức. Vui lòng cập nhật trong CMS.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section id="careers" class="section recruitment-section">
+  <div class="container recruitment-section-inner">
+    <div class="section-head recruitment-section-head">
+      <p class="recruitment-eyebrow">Careers</p>
+      <h2>Tuyển dụng</h2>
+      <p class="recruitment-lead">Tham gia đội ngũ PTT Advertising Solutions — cùng phát triển trong hệ sinh thái Creative Martech và truyền thông hiệu suất.</p>
+    </div>
+    <div class="recruitment-grid">
+      {% for job in recruitment_positions %}
+      <article class="recruitment-card">
+        <header class="recruitment-card-head">
+          <h3>{{ job.title }}</h3>
+          <div class="recruitment-meta" role="group" aria-label="Thông tin vị trí">
+            <span class="recruitment-pill">{{ job.location }}</span>
+            <span class="recruitment-pill recruitment-pill-muted">{{ job.employment_type }}</span>
+          </div>
+        </header>
+        <p class="recruitment-desc">{{ job.description }}</p>
+        <button type="button" class="btn recruitment-apply" data-career-open="{{ job.slug }}">
+          <span class="recruitment-apply-main">Xem chi tiết</span>
+          <span class="recruitment-apply-sub">{{ job.title }}</span>
+        </button>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="section landing-cta-strip" aria-label="Đánh giá hệ thống marketing miễn phí">
+  <div class="container landing-cta-strip-inner">
+    <div class="landing-cta-strip-body">
+      <h2 class="landing-cta-strip-title">{{ (settings.get('footer_cta_title') or 'Hệ thống marketing của bạn đang tối ưu đến đâu?') | e }}</h2>
+      <p class="landing-cta-strip-line">{{ (settings.get('footer_cta_line') or 'PTT cung cấp 1 buổi đánh giá miễn phí — phân tích automation, dữ liệu và đề xuất cải thiện cụ thể, không ràng buộc.') | e }}</p>
+    </div>
+    <a href="#contact" class="btn landing-cta-strip-btn">{{ (settings.get('footer_cta_button_label') or 'Đăng ký đánh giá miễn phí') | e }}</a>
+  </div>
+</section>
+
+<section id="contact" class="contact">
+  <div class="container">
+    <div class="contact-grid">
+      <div>
+        <h2>Liên hệ PTT Creative Martech</h2>
+        <p>Điền thông tin để đội ngũ PTT liên hệ trong 24 giờ làm việc — tư vấn chiến lược automation, AI marketing hoặc giải pháp data phù hợp với ngành và quy mô doanh nghiệp của bạn.</p>
+        <p>* Cam kết bảo mật thông tin. Khách hàng có thể sử dụng hệ thống đo kiểm bên thứ ba.</p>
+      </div>
+      <form
+        class="contact-form"
+        id="contact-form"
+        aria-label="Gửi yêu cầu tư vấn"
+        action="#contact"
+        method="post"
+        autocomplete="on"
+        data-landing-contact="{{ url_for('landing_contact') }}"
+      >
+        <label class="visually-hidden" for="contact-name">Họ và tên</label>
+        <input id="contact-name" name="name" type="text" placeholder="Họ và tên" autocomplete="name" inputmode="text" required maxlength="200" />
+        <label class="visually-hidden" for="contact-email">Email</label>
+        <input id="contact-email" name="email" type="email" placeholder="Email" autocomplete="email" inputmode="email" required />
+        <label class="visually-hidden" for="contact-tel">Số điện thoại</label>
+        <input id="contact-tel" name="phone" type="tel" placeholder="Số điện thoại" autocomplete="tel" inputmode="tel" maxlength="40" />
+        <label class="visually-hidden" for="contact-need">Nhu cầu doanh nghiệp</label>
+        <input id="contact-need" name="message" type="text" placeholder="Nhu cầu của doanh nghiệp" autocomplete="off" maxlength="2000" />
+        <button type="submit" class="btn" id="contact-submit">
+          <span class="contact-submit-label">Gửi tới PTT Advertising Solutions</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</section>
+</main>
+
+<div id="landing-toast" class="landing-toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
+{% endblock %}
+
+{% block footer %}
+<footer class="footer">
+  <div class="container footer-default-grid">
+    <a href="/" class="footer-default-brand" aria-label="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Trang chủ">
+      {{- ras.raster_static_picture(
+          'images/ptt-logo.png',
+          'PTT Advertising Solutions Logo',
+          120,
+          120,
+          'footer-default-logo',
+          loading='lazy') -}}
+    </a>
+    <p class="footer-default-copy">© {{ settings.brand_name if settings else "PTT Advertising Solutions" }} 2026</p>
+    <nav class="footer-default-links" aria-label="Pháp lý">
+      <a href="{{ url_for('privacy_policy') }}">Chính sách bảo mật</a>
+    </nav>
+  </div>
+</footer>
+{% include "_career_modal.html" %}
+<script type="application/json" id="career-recruitment-json">{{ recruitment_positions|tojson }}</script>
+{% set _js_career = static_js_file('career-modal.js') %}
+{% set _js_land = static_js_file('landing.js') %}
+<script defer src="{{ url_for('static', filename=_js_career) }}?v={{ static_v(_js_career) }}"></script>
+<script defer src="{{ url_for('static', filename=_js_land) }}?v={{ static_v(_js_land) }}"></script>
+{% endblock %}
+
+{% block floating_contact %}
+{% include "_contact_fab.html" %}
+{% if settings and settings.get('live_chat_enabled') == '1' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='chat_widget.css') }}?v={{ static_v('chat_widget.css') }}" />
+<script defer src="{{ url_for('static', filename='chat_widget.js') }}?v={{ static_v('chat_widget.js') }}"></script>
+{% endif %}
+{% endblock %}

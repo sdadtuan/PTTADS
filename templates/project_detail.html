@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% import '_macros_static.html' as ras %}
+
+{% block title %}{{ project.title }} | {{ (settings.brand_name if settings else "PTT Advertising Solutions") | e }}{% endblock %}
+{% block head %}
+  {% set _desc = project.description | trim %}
+  {% set meta_desc = (_desc[:158] + "…") if (_desc | length) > 160 else _desc %}
+  <meta name="description" content="{{ meta_desc | e }}" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="{{ request.url_root.rstrip('/') }}{{ url_for('project_detail', project_id=project.id) }}" />
+  <meta property="og:type" content="article" />
+  <meta property="og:locale" content="vi_VN" />
+  <meta property="og:url" content="{{ request.url_root.rstrip('/') }}{{ url_for('project_detail', project_id=project.id) }}" />
+  <meta property="og:title" content="{{ project.title | e }} | {{ (settings.brand_name if settings else "PTT Advertising Solutions") | e }}" />
+  <meta property="og:description" content="{{ meta_desc | e }}" />
+  <meta property="og:image" content="{{ project.image_url | e }}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{{ project.title | e }}" />
+  <meta name="twitter:description" content="{{ meta_desc | e }}" />
+  <meta name="twitter:image" content="{{ project.image_url | e }}" />
+{% endblock %}
+
+{% block structured_data %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "CreativeWork",
+    "name": {{ project.title|tojson }},
+    "description": {{ (project.description or "")|tojson }},
+    "image": {{ project.image_url|tojson }}
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Trang chủ",
+        "item": {{ (request.url_root.rstrip("/") + url_for("landing"))|tojson }}
+      },
+      {
+        "@type": "ListItem",
+        "position": 2,
+        "name": "Dự án",
+        "item": {{ (request.url_root.rstrip("/") + url_for("landing") + "#projects")|tojson }}
+      },
+      {
+        "@type": "ListItem",
+        "position": 3,
+        "name": {{ project.title|tojson }},
+        "item": {{ (request.url_root.rstrip("/") + url_for("project_detail", project_id=project.id))|tojson }}
+      }
+    ]
+  }
+  </script>
+{% endblock %}
+
+{% block body_class %}project-detail-page{% endblock %}
+
+{% block header %}
+<header class="topbar service-subpage-topbar">
+  <div class="container service-subpage-topbar-inner">
+    <a href="{{ url_for('landing') }}" class="logo brand-logo service-subpage-logo" aria-label="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Trang chủ">
+      {{- ras.raster_static_picture('images/ptt-logo.png', '', 60, 60, 'brand-logo-img', loading='eager') -}}
+      <span class="brand-logo-text">{{ settings.brand_name if settings else "PTT Advertising Solutions" }}</span>
+    </a>
+    <nav class="service-subpage-nav" aria-label="Điều hướng">
+      <a class="service-subpage-nav-item" href="{{ url_for('landing') }}#projects">Dự án</a>
+      <a class="service-subpage-nav-item" href="{{ url_for('landing') }}#news">Tin tức</a>
+      <a class="service-subpage-nav-item" href="{{ url_for('career_list') }}">Tuyển dụng</a>
+      <a class="service-subpage-nav-item service-subpage-nav-cta" href="{{ url_for('landing') }}#contact">Liên hệ</a>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<main class="project-detail-saga" id="main" lang="vi">
+  <header class="project-detail-saga-hero" aria-hidden="false">
+    <img
+      class="project-detail-saga-hero-img"
+      src="{{ project.image_url | e }}"
+      alt="{{ project.title | e }}"
+      width="1600"
+      height="900"
+      decoding="async"
+      fetchpriority="high"
+    />
+  </header>
+
+  <div class="container project-detail-saga-shell">
+    <nav class="project-detail-saga-bc" aria-label="Breadcrumb">
+      <ol class="project-detail-saga-bc-list">
+        <li><a href="{{ url_for('landing') }}">Trang chủ</a></li>
+        <li aria-hidden="true">/</li>
+        <li><a href="{{ url_for('landing') }}#projects">Dự án</a></li>
+        <li aria-hidden="true">/</li>
+        <li aria-current="page">{{ project.title | e }}</li>
+      </ol>
+    </nav>
+
+    <article class="project-detail-saga-article">
+      <h1 class="project-detail-saga-h1">{{ project.title | e }}</h1>
+      {% if project.category %}
+      <h2 class="project-detail-saga-h2">{{ project.category | e }}</h2>
+      {% endif %}
+      <hr class="project-detail-saga-rule" />
+      <p class="project-detail-saga-prose">{{ project.description | e }}</p>
+    </article>
+  </div>
+
+  {% if other_projects and (other_projects | length) > 0 %}
+  <section class="project-detail-more" aria-labelledby="project-detail-more-heading">
+    <div class="container">
+      <h2 id="project-detail-more-heading" class="project-detail-more-heading">Dự án khác</h2>
+      <ul class="project-detail-more-grid" role="list">
+        {% for p in other_projects %}
+        <li class="project-detail-more-item">
+          <a class="project-detail-more-card" href="{{ url_for('project_detail', project_id=p.id) }}">
+            <div class="project-detail-more-thumb">
+              <img
+                src="{{ p.image_url | e }}"
+                alt=""
+                width="640"
+                height="480"
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+            <div class="project-detail-more-meta">
+              <span class="project-detail-more-title">{{ p.title | e }}</span>
+            </div>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="container project-detail-saga-back-wrap">
+    <a class="project-detail-saga-back" href="{{ url_for('landing') }}#projects">← Về mục Dự án</a>
+  </div>
+</main>
+{% endblock %}

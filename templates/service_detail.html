@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+{% import '_macros_static.html' as ras %}
+
+{% block title %}{{ service.name }} | {{ (settings.brand_name if settings else "PTT Advertising Solutions") | e }}{% endblock %}
+{% block head %}
+  {% set desc = (service.meta_description|trim) if (service.meta_description) else ((service.summary[:160] + "…") if (service.summary|length > 160) else service.summary) %}
+  <meta name="description" content="{{ desc | e }}" />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="{{ request.url_root.rstrip('/') }}{{ url_for('service_detail', slug=service.slug) }}" />
+  <meta property="og:type" content="article" />
+  <meta property="og:locale" content="vi_VN" />
+  <meta property="og:url" content="{{ request.url_root.rstrip('/') }}{{ url_for('service_detail', slug=service.slug) }}" />
+  <meta property="og:title" content="{{ service.name | e }} | {{ (settings.brand_name if settings else "PTT Advertising Solutions") | e }}" />
+  <meta property="og:description" content="{{ desc | e }}" />
+  <meta property="og:image" content="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='images/ptt-logo.png') }}" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="{{ service.name | e }} | PTT" />
+  <meta name="twitter:description" content="{{ desc | e }}" />
+{% endblock %}
+{% block structured_data %}
+  {% set _svc_desc = (service.meta_description|trim) if (service.meta_description) else (service.overview[0] if (service.overview and (service.overview|length) > 0) else service.summary) %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    "name": {{ service.name|tojson }},
+    "description": {{ _svc_desc|tojson }},
+    "serviceType": "Digital marketing, advertising and creative technology",
+    "provider": {
+      "@type": "Organization",
+      "name": {{ (settings.brand_name if settings else "PTT Advertising Solutions")|tojson }},
+      "url": {{ (request.url_root.rstrip("/") + url_for("landing"))|tojson }}
+    },
+    "areaServed": { "@type": "Country", "name": "Vietnam" }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Trang chủ", "item": {{ (request.url_root.rstrip("/") + url_for("landing"))|tojson }} },
+      { "@type": "ListItem", "position": 2, "name": "Dịch vụ", "item": {{ (request.url_root.rstrip("/") + url_for("landing"))|tojson }} },
+      { "@type": "ListItem", "position": 3, "name": {{ service.name|tojson }}, "item": {{ (request.url_root.rstrip("/") + url_for("service_detail", slug=service.slug))|tojson }} }
+    ]
+  }
+  </script>
+{% endblock %}
+
+{% block body_class %}service-subpage{% endblock %}
+
+{% block header %}
+<header class="topbar service-subpage-topbar">
+  <div class="container service-subpage-topbar-inner">
+    <a href="{{ url_for('landing') }}" class="logo brand-logo service-subpage-logo" aria-label="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Trang chủ">
+      {{- ras.raster_static_picture('images/ptt-logo.png', '', 60, 60, 'brand-logo-img', loading='eager') -}}
+      <span class="brand-logo-text">{{ settings.brand_name if settings else "PTT Advertising Solutions" }}</span>
+    </a>
+    <nav class="service-subpage-nav" aria-label="Điều hướng trang dịch vụ">
+      <a class="service-subpage-nav-item" href="{{ url_for('landing') }}">Dịch vụ</a>
+      <a class="service-subpage-nav-item" href="{{ url_for('landing') }}#news">Tin tức</a>
+      <a class="service-subpage-nav-item" href="{{ url_for('career_list') }}">Tuyển dụng</a>
+      <a class="service-subpage-nav-item service-subpage-nav-cta" href="{{ url_for('landing') }}#contact">Liên hệ</a>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+
+{% block content %}
+<main class="service-subpage-wrap" id="main" role="main" lang="vi">
+  <header class="service-hero{% if service.image_url %} service-hero--has-img{% endif %}" aria-labelledby="service-hero-h1"{% if service.image_url %} style="--service-hero-img: url({{ service.image_url | e }})"{% endif %}>
+    <div class="service-hero-bg" aria-hidden="true"></div>
+    <div class="container service-hero-inner">
+      <p class="service-hero-eyebrow">Dịch vụ · {{ service.category }}</p>
+      <h1 class="service-hero-title" id="service-hero-h1">{{ service.name }}</h1>
+      {% if service.tagline %}
+      <p class="service-hero-tagline">{{ service.tagline }}</p>
+      {% endif %}
+      <p class="service-hero-lead">{{ service.summary }}</p>
+      <div class="service-hero-actions">
+        <button type="button" class="btn service-hero-cta" data-open-consult-popup>Nhận đề xuất</button>
+        <a class="btn service-hero-ghost" href="tel:+842473077979">+84 (24) 7307 7979</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="container service-shell">
+    <nav class="service-breadcrumb" aria-label="Breadcrumb">
+      <ol>
+        <li><a href="{{ url_for('landing') }}">Trang chủ</a></li>
+        <li><a href="{{ url_for('landing') }}">Dịch vụ</a></li>
+        <li><span class="service-bc-cat">{{ service.category }}</span></li>
+        <li aria-current="page">{{ service.name }}</li>
+      </ol>
+    </nav>
+
+    <div class="service-layout">
+      <article class="service-main">
+        <section class="service-block service-block-intro" aria-labelledby="service-intro-h">
+          <h2 class="service-block-title" id="service-intro-h">Tổng quan dịch vụ</h2>
+          {% for para in (service.overview or []) %}
+          {% if para %}
+            {% if '<' in para %}
+          <div class="service-par service-rich-html">{{ para|safe }}</div>
+            {% else %}
+          <p class="service-par{% if not loop.last %} service-par-gap{% endif %}">{{ para }}</p>
+            {% endif %}
+          {% endif %}
+          {% endfor %}
+          {% if not service.overview or (service.overview|length) == 0 %}
+          <p class="service-block-lead">{{ service.summary }}</p>
+          {% endif %}
+        </section>
+
+        {% if service.stats and (service.stats|length) > 0 %}
+        <section class="service-block service-block-stats" aria-labelledby="service-stats-h">
+          <h2 class="service-block-title service-block-title-sub" id="service-stats-h">{{ service.stats_section_title or "Mục tiêu & trọng tâm" }}</h2>
+          <ul class="service-stat-grid" role="list">
+            {% for s in service.stats %}
+            <li class="service-stat-tile">
+              <span class="service-stat-value">{{ s.value }}</span>
+              <span class="service-stat-label">{{ s.label }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </section>
+        {% endif %}
+
+        {% if service.pillars and (service.pillars|length) > 0 %}
+        <section class="service-block service-block-pillars" aria-labelledby="service-pillars-h">
+          <h2 class="service-block-title" id="service-pillars-h">{{ service.pillars_section_title or "Cách PTT triển khai" }}</h2>
+          <div class="service-pillar-grid">
+            {% for p in service.pillars %}
+            <div class="service-pillar-card">
+              <h3 class="service-pillar-h">{{ p.title }}</h3>
+              <p class="service-pillar-body">{{ p.body }}</p>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+
+        {% if service.outcomes and (service.outcomes|length) > 0 %}
+        <section class="service-block service-block-outcomes" aria-labelledby="service-out-h">
+          <h2 class="service-block-title" id="service-out-h">{{ service.outcomes_section_title or "Kết quả hướng tới" }}</h2>
+          <ul class="service-outcome-list">
+            {% for o in service.outcomes %}
+            {% if o %}
+            <li>
+              <span class="service-out-ico" aria-hidden="true">✓</span>
+              <span>{{ o }}</span>
+            </li>
+            {% endif %}
+            {% endfor %}
+          </ul>
+        </section>
+        {% endif %}
+
+        <section class="service-block service-block-deliver" aria-labelledby="service-deliver-h">
+          <h2 class="service-block-title" id="service-deliver-h">{{ service.deliverable_title or "Nội dung & phạm vi triển khai" }}</h2>
+          {% if service.highlights and (service.highlights|length) > 0 %}
+          <ol class="service-deliver-list">
+            {% for line in service.highlights %}
+            {% if line %}
+            <li>
+              <span class="service-deliver-idx" aria-hidden="true">{{ loop.index }}</span>
+              <span class="service-deliver-txt">{{ line }}</span>
+            </li>
+            {% endif %}
+            {% endfor %}
+          </ol>
+          {% else %}
+          <p class="service-block-muted">Hạng mục triển khai sẽ được cập nhật theo gói. Vui lòng để lại thông tin để nhận tư vấn phù hợp.</p>
+          {% endif %}
+        </section>
+
+        {% if service.faq and (service.faq|length) > 0 %}
+        <section class="service-block service-block-faq" aria-labelledby="service-faq-h">
+          <h2 class="service-block-title" id="service-faq-h">Câu hỏi thường gặp</h2>
+          <div class="service-faq-list">
+            {% for faq in service.faq %}
+            <details class="service-faq-item"{% if loop.first %} open{% endif %}>
+              <summary class="service-faq-q">{{ faq.q }}</summary>
+              <p class="service-faq-a">{{ faq.a }}</p>
+            </details>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+
+        <section class="service-block service-inline-cta" aria-label="Gọi tư vấn">
+          <h2 class="visually-hidden">Liên hệ tư vấn</h2>
+          <p class="service-inline-cta-line">{{ service.inline_cta or "Bạn cần lộ trình rõ mục tiêu, phạm vi và ước lượng phù hợp ngành hàng? Đội ngũ sẽ phản hồi với hướng triển khai tương ứng." }}</p>
+          <button type="button" class="btn service-inline-cta-btn" data-open-consult-popup>Nhận đề xuất theo mục tiêu</button>
+        </section>
+      </article>
+
+      <aside class="service-aside" aria-label="Cùng nhóm dịch vụ và tư vấn">
+        {% if service.price_label or service.price_note %}
+        <div class="service-aside-card service-aside-pricing">
+          <p class="service-aside-eyebrow">Báo giá</p>
+          {% if service.price_label %}
+          <p class="service-aside-price-tag">{{ service.price_label | e }}</p>
+          {% endif %}
+          {% if service.price_note %}
+          <p class="service-aside-price-note">{{ service.price_note | e }}</p>
+          {% endif %}
+          <button type="button" class="btn service-aside-btn" data-open-consult-popup>Nhận báo giá chi tiết</button>
+        </div>
+        {% endif %}
+        <div class="service-aside-card service-aside-cta">
+          <p class="service-aside-eyebrow">Tư vấn nhanh</p>
+          <p class="service-aside-title">Nhận lộ trình theo mục tiêu &amp; ngân sách</p>
+          <a class="service-aside-tel" href="tel:+842473077979">+84 (24) 7307 7979</a>
+          <a class="service-aside-mail" href="mailto:{% if settings and settings.get('contact_email') %}{{ settings.get('contact_email') }}{% else %}contact@pttadvertising.vn{% endif %}">{% if settings and settings.get('contact_email') %}{{ settings.get('contact_email') }}{% else %}contact@pttadvertising.vn{% endif %}</a>
+          <button type="button" class="btn service-aside-btn" data-open-consult-popup>Đăng ký nhận đề xuất</button>
+        </div>
+        {% if sibling_services and (sibling_services|length) > 0 %}
+        <div class="service-aside-card service-aside-siblings">
+          <p class="service-aside-eyebrow">Cùng danh mục · {{ service.category }}</p>
+          <p class="service-aside-sib-title">Dịch vụ liên quan</p>
+          <ul class="service-sibling-list">
+            {% for s in sibling_services %}
+            <li>
+              <a href="{{ url_for('service_detail', slug=s.slug) }}">
+                <span class="service-sibling-name">{{ s.name }}</span>
+                <span class="service-sibling-ico" aria-hidden="true">→</span>
+              </a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endif %}
+        <div class="service-aside-card service-aside-back">
+          <a class="service-back-all" href="{{ url_for('landing') }}">← Về trang chủ</a>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <section class="service-cta-wide" aria-labelledby="service-wide-cta-h">
+    <div class="container service-cta-wide-inner">
+      <div>
+        <h2 class="service-cta-wide-title" id="service-wide-cta-h">{% if service.cta_wide_title %}{{ service.cta_wide_title }}{% else %}Sẵn sàng tối ưu {{ service.name | e }} cùng {{ (settings.brand_name if settings else "PTT Advertising Solutions") | e }}?{% endif %}</h2>
+        <p class="service-cta-wide-lead">{% if service.cta_wide_lead %}{{ service.cta_wide_lead }}{% else %}Thảo luận mục tiêu, KPI và giai đoạn triển khai — nhận đề xuất tùy theo nguồn lực thực tế.{% endif %}</p>
+      </div>
+      <button type="button" class="btn service-cta-wide-btn" data-open-consult-popup>Nhận 1 đề xuất</button>
+    </div>
+  </section>
+</main>
+
+<div class="consult-modal hidden" data-consult-modal>
+  <div class="consult-overlay" data-close-consult-modal></div>
+  <div class="consult-dialog">
+    <button type="button" class="consult-close" data-close-consult-modal aria-label="Đóng">×</button>
+    <div class="consult-head">
+      <p class="consult-eyebrow">Đăng ký tư vấn</p>
+      <h3 class="consult-title-main">Nhận đề xuất giải pháp phù hợp</h3>
+      <p class="consult-title-sub">Dịch vụ: <strong>{{ service.name }}</strong> — Điền thông tin ngắn gọn, đội ngũ sẽ liên hệ tư vấn trong thời gian sớm nhất.</p>
+      <div class="consult-pill-row">
+        <span class="consult-pill">Social</span>
+        <span class="consult-pill">Media</span>
+        <span class="consult-pill">Creative</span>
+        <span class="consult-pill">Consulting</span>
+      </div>
+    </div>
+
+    <form class="consult-form" data-consult-form>
+      <input type="hidden" name="service_slug" value="{{ service.slug }}" />
+      <input type="hidden" name="service_name" value="{{ service.name }}" />
+      <input type="text" name="full_name" placeholder="Họ và tên" required />
+      <input type="email" name="email" placeholder="Email" required />
+      <input type="text" name="phone" placeholder="Số điện thoại" required />
+      <select name="budget" required>
+        <option value="">Ngân sách Marketing</option>
+        <option value="Duoi 100 trieu">Dưới 100 triệu</option>
+        <option value="100-300 trieu">100 - 300 triệu</option>
+        <option value="300-500 trieu">300 - 500 triệu</option>
+        <option value="Tren 500 trieu">Trên 500 triệu</option>
+      </select>
+      <input type="text" name="company" placeholder="Tên công ty" required />
+      <input type="text" name="goal" placeholder="Mục tiêu cho dự án sắp tới" required />
+      <input type="text" name="help_request" placeholder="Chúng tôi có thể hỗ trợ gì cho dự án của bạn" required />
+      <textarea name="additional_info" rows="3" placeholder="Thông tin thêm (tuỳ chọn)"></textarea>
+      <button type="submit" class="consult-submit">Đăng ký nhận tư vấn</button>
+      <p class="consult-status muted" data-consult-status></p>
+    </form>
+  </div>
+</div>
+
+{% set _js_sd = static_js_file('service_detail.js') %}
+<script src="{{ url_for('static', filename=_js_sd) }}?v={{ static_v(_js_sd) }}"></script>
+{% endblock %}
+
+{% block footer %}
+<footer class="service-subpage-footer">
+  <div class="container service-subpage-footer-inner">
+    <p class="service-subpage-footer-brand">© {{ (settings.brand_name if settings else "PTT Advertising Solutions") | e }} · Digital Marketing &amp; Creative Martech</p>
+    <div class="service-subpage-footer-links">
+      <a href="{{ url_for('landing') }}">Trang chủ</a>
+      <a href="{{ url_for('landing') }}">Dịch vụ</a>
+      <a href="{{ url_for('landing') }}#contact">Liên hệ</a>
+      <a href="{{ url_for('privacy_policy') }}">Chính sách bảo mật</a>
+    </div>
+  </div>
+</footer>
+{% endblock %}
+
+{% block floating_contact %}
+{% include "_contact_fab.html" %}
+{% if settings and settings.get('live_chat_enabled') == '1' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='chat_widget.css') }}?v={{ static_v('chat_widget.css') }}" />
+<script defer src="{{ url_for('static', filename='chat_widget.js') }}?v={{ static_v('chat_widget.js') }}"></script>
+{% endif %}
+{% endblock %}

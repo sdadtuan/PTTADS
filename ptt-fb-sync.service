@@ -1,0 +1,33 @@
+# Facebook Lead — tự động đồng bộ mỗi 5 phút (systemd oneshot + timer)
+#
+# Trên VPS:
+#   sudo cp scripts/ptt_fb_sync_cron.sh /var/www/ptt/scripts/
+#   sudo chmod +x /var/www/ptt/scripts/ptt_fb_sync_cron.sh
+#   sudo cp ptt-fb-sync.service ptt-fb-sync.timer /etc/systemd/system/
+#   # User/Group phải tồn tại trên VPS — khớp với ptt.service (id deploy; nếu lỗi 217/USER → đổi User=root)
+#   # Tuỳ chọn trong /var/www/ptt/.env (chọn MỘT cách):
+#   #   PTT_GUNICORN_PORT=8002          # cổng -b trong ptt.service
+#   #   PTT_SYNC_URL=http://127.0.0.1:8002/api/crm/integration/facebook/sync-cron
+#   #   CRM_FACEBOOK_SYNC_SECRET=...      # nếu API trả 401
+#   #   PTT_SYNC_DOMAIN=pttads.vn         # khi gọi qua Nginx port 80
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ptt-fb-sync.timer
+#   sudo systemctl start ptt-fb-sync.service
+#   journalctl -u ptt-fb-sync.service -n 10 --no-pager
+
+[Unit]
+Description=PTT — đồng bộ Facebook Lead (một lần)
+After=network.target ptt.service
+Wants=ptt.service
+
+[Service]
+Type=oneshot
+User=deploy
+Group=www-data
+Environment=PTT_APP_DIR=/var/www/ptt
+Environment=PTT_GUNICORN_PORT=8002
+EnvironmentFile=-/var/www/ptt/.env
+ExecStart=/var/www/ptt/scripts/ptt_fb_sync_cron.sh
+
+[Install]
+WantedBy=multi-user.target

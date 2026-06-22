@@ -1,0 +1,65 @@
+{
+  "_comment": "Tài khoản mẫu cho QA manual / staging. Đổi mật khẩu trước khi dùng production.",
+  "admin_full": {
+    "username": "admin",
+    "password": "Admin@PTT2026!",
+    "role_cms": "super_admin",
+    "position_crm": null,
+    "expected_landing": "/admin",
+    "description": "Quản trị toàn quyền CMS + CRM"
+  },
+  "admin_cskh": {
+    "username": "cskh_lead",
+    "password": "Cskh@PTT2026!",
+    "role_cms": "viewer",
+    "position_crm": "CSKH-01",
+    "expected_landing": "/crm",
+    "description": "Chức vụ CSKH — Kanban, khách hàng, nhắc việc"
+  },
+  "admin_kd": {
+    "username": "kd_manager",
+    "password": "Kd@PTT2026!",
+    "role_cms": "viewer",
+    "position_crm": "KD-01",
+    "expected_landing": "/crm",
+    "description": "Chức vụ Kinh doanh — Hub, Lead, Sales"
+  },
+  "portal_sales_a": {
+    "username": "sales_a",
+    "password": "Sales@PTT2026!",
+    "staff_id": 1,
+    "staff_name": "Nguyễn Văn Sales A",
+    "internal_code": "SA-01",
+    "sales_level": "a",
+    "notes": "q.7 căn hộ facebook",
+    "expected_landing": "/crm/home",
+    "description": "NV portal sales — dự án Alpha"
+  },
+  "portal_sales_b": {
+    "username": "sales_b",
+    "password": "Sales@PTT2026!",
+    "staff_id": 2,
+    "staff_name": "Trần Thị Sales B",
+    "internal_code": "SB-01",
+    "sales_level": "b",
+    "notes": "q.2 nhà phố",
+    "expected_landing": "/crm/home",
+    "description": "NV portal sales — dự án Alpha (manager role trên dự án)"
+  },
+  "portal_outsider": {
+    "username": "outsider",
+    "password": "Out@PTT2026!",
+    "staff_id": 3,
+    "staff_name": "Lê Văn Outsider",
+    "internal_code": "OUT-01",
+    "sales_level": "c",
+    "notes": "",
+    "expected_landing": "/crm/home",
+    "description": "NV không thuộc dự án nào — kiểm tra scope portal"
+  },
+  "invalid_login": {
+    "username": "not_exist_user",
+    "password": "wrong_password",
+    "expected": "Thông báo lỗi đăng nhập, không vào được hệ thống"
+  }
+}

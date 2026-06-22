@@ -1,0 +1,385 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}CMS Landing Page — PTT{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+
+{% block admin_head %}
+  <link rel="stylesheet" href="https://cdn.quilljs.com/1.3.7/quill.snow.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='cms_landing.css') }}?v={{ static_v('cms_landing.css') }}" />
+{% endblock %}
+
+{% block admin_page_title %}CMS — Landing Page{% endblock %}
+{% block admin_page_desc %}
+  <p class="admin-page-desc">Quản lý hình ảnh, nội dung và bài viết hiển thị trên trang chủ pttads.vn</p>
+{% endblock %}
+
+{% block admin_page_actions %}
+<button class="btn clp-preview-open-btn" id="preview-open-btn" title="Xem trước trang chủ">
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+  Preview
+</button>
+{% endblock %}
+
+{% block admin_main %}
+
+{# Tab navigation #}
+<nav class="clp-tabs" role="tablist" aria-label="Phần nội dung">
+  <button class="clp-tab is-active" role="tab" data-tab="hero" aria-selected="true">
+    <span class="clp-tab-icon">🖼</span> Hero Slider
+  </button>
+  <button class="clp-tab" role="tab" data-tab="content" aria-selected="false">
+    <span class="clp-tab-icon">✏️</span> Nội dung
+  </button>
+  <button class="clp-tab" role="tab" data-tab="projects" aria-selected="false">
+    <span class="clp-tab-icon">📂</span> Dự án
+  </button>
+  <button class="clp-tab" role="tab" data-tab="blog" aria-selected="false">
+    <span class="clp-tab-icon">📝</span> Blog
+  </button>
+  <button class="clp-tab" role="tab" data-tab="services" aria-selected="false">
+    <span class="clp-tab-icon">▦</span> Dịch vụ
+  </button>
+  <button class="clp-tab" role="tab" data-tab="media" aria-selected="false">
+    <span class="clp-tab-icon">🗂</span> Media
+  </button>
+</nav>
+
+{# ── Tab: Hero Slider ─────────────────────────────────────────────────────── #}
+<section class="clp-panel" id="tab-hero" role="tabpanel">
+  <div class="clp-panel-head">
+    <h2>Hero Slider</h2>
+    <p class="muted">3 slide hiển thị trên trang chủ. Kéo ảnh từ tab Media hoặc dán URL vào ô ảnh.</p>
+  </div>
+  <div id="hero-slides-list" class="clp-slides-list">
+    {# Rendered by JS #}
+  </div>
+  <div class="clp-actions-bar">
+    <button class="btn" id="hero-add-slide">+ Thêm slide</button>
+    <button class="btn btn-primary" id="hero-save">Lưu tất cả slides</button>
+    <span class="clp-save-msg" id="hero-save-msg"></span>
+  </div>
+</section>
+
+{# ── Tab: Nội dung ────────────────────────────────────────────────────────── #}
+<section class="clp-panel is-hidden" id="tab-content" role="tabpanel">
+  <div class="clp-panel-head">
+    <h2>Nội dung Landing Page</h2>
+    <p class="muted">Capabilities intro, CTA strip, thông tin liên hệ và footer.</p>
+  </div>
+
+  <form id="content-form" class="clp-settings-form">
+    <fieldset class="clp-fieldset">
+      <legend>Capabilities</legend>
+      <label class="clp-label">
+        Đoạn giới thiệu (dưới dòng tiêu đề capabilities)
+        <textarea name="capabilities_intro" rows="3" placeholder="PTT là nền tảng Creative Martech..."></textarea>
+      </label>
+    </fieldset>
+
+    <fieldset class="clp-fieldset">
+      <legend>CTA Strip (banner xanh)</legend>
+      <label class="clp-label">
+        Tiêu đề
+        <input type="text" name="footer_cta_title" placeholder="Hệ thống marketing của bạn đang tối ưu đến đâu?" />
+      </label>
+      <label class="clp-label">
+        Mô tả ngắn
+        <input type="text" name="footer_cta_line" placeholder="PTT cung cấp 1 buổi đánh giá miễn phí..." />
+      </label>
+      <label class="clp-label">
+        Nhãn nút CTA
+        <input type="text" name="footer_cta_button_label" placeholder="Đăng ký đánh giá miễn phí" />
+      </label>
+    </fieldset>
+
+    <fieldset class="clp-fieldset">
+      <legend>Thông tin liên hệ</legend>
+      <label class="clp-label">
+        Số điện thoại
+        <input type="text" name="contact_phone" placeholder="0909.965.286" />
+      </label>
+      <label class="clp-label">
+        Email
+        <input type="text" name="contact_email" placeholder="contact@pttadvertising.vn" />
+      </label>
+      <label class="clp-label">
+        Địa chỉ TP.HCM
+        <input type="text" name="office_hcm" placeholder="73, Tạ Hiện, Phường Cát Lái, TP. Hồ Chí Minh" />
+      </label>
+    </fieldset>
+
+    <fieldset class="clp-fieldset">
+      <legend>Footer</legend>
+      <label class="clp-label">
+        Tagline ngắn
+        <input type="text" name="footer_tagline_intro" placeholder="Creative Martech Platform" />
+      </label>
+      <label class="clp-label">
+        Tagline mô tả
+        <textarea name="footer_tagline_body" rows="2" placeholder="Automation · AI · Data..."></textarea>
+      </label>
+      <label class="clp-label">
+        Facebook URL
+        <input type="url" name="footer_facebook_url" placeholder="https://www.facebook.com/..." />
+      </label>
+      <label class="clp-label">
+        LinkedIn URL
+        <input type="url" name="footer_linkedin_url" placeholder="https://www.linkedin.com/..." />
+      </label>
+    </fieldset>
+
+    <div class="clp-actions-bar">
+      <button type="submit" class="btn btn-primary">Lưu cài đặt</button>
+      <span class="clp-save-msg" id="content-save-msg"></span>
+    </div>
+  </form>
+</section>
+
+{# ── Tab: Dự án ───────────────────────────────────────────────────────────── #}
+<section class="clp-panel is-hidden" id="tab-projects" role="tabpanel">
+  <div class="clp-panel-head">
+    <h2>Dự án Portfolio</h2>
+    <p class="muted">Các case study hiển thị trong mục "Dự án" trên landing page.</p>
+  </div>
+
+  <div class="clp-item-form panel">
+    <h3 class="clp-form-title" id="project-form-title">Thêm dự án mới</h3>
+    <input type="hidden" id="project-edit-id" value="" />
+    <div class="clp-image-field">
+      <label class="clp-label">Ảnh đại diện</label>
+      <div class="clp-img-preview-wrap">
+        <img id="project-img-preview" src="" alt="" class="clp-img-preview is-hidden" />
+        <span class="clp-img-placeholder" id="project-img-placeholder">Chưa có ảnh</span>
+      </div>
+      <div class="clp-img-actions">
+        <input type="text" id="project-image-url" placeholder="Dán URL ảnh hoặc chọn từ Media..." />
+        <button type="button" class="btn clp-pick-btn" data-pick-target="project-image-url" data-preview="project-img-preview" data-placeholder="project-img-placeholder">Chọn từ Media</button>
+      </div>
+    </div>
+    <div class="clp-form-row">
+      <label class="clp-label">
+        Tên dự án <span class="req">*</span>
+        <input type="text" id="project-title" placeholder="TNEX - Trạm thanh xuân 0 phí" />
+      </label>
+      <label class="clp-label">
+        Danh mục <span class="req">*</span>
+        <input type="text" id="project-category" placeholder="Digital Campaign" />
+      </label>
+    </div>
+    <label class="clp-label">
+      Mô tả
+      <textarea id="project-description" rows="3" placeholder="Mô tả ngắn về chiến dịch..."></textarea>
+    </label>
+    <div class="clp-form-actions">
+      <button class="btn btn-primary" id="project-submit">Thêm dự án</button>
+      <button class="btn clp-btn-cancel is-hidden" id="project-cancel">Hủy</button>
+      <span class="clp-save-msg" id="project-msg"></span>
+    </div>
+  </div>
+
+  <div class="clp-item-list" id="projects-list">
+    {# Rendered by JS #}
+  </div>
+</section>
+
+{# ── Tab: Blog ────────────────────────────────────────────────────────────── #}
+<section class="clp-panel is-hidden" id="tab-blog" role="tabpanel">
+  <div class="clp-panel-head">
+    <h2>Blog / Tin tức</h2>
+    <p class="muted">Bài viết hiển thị trong mục "Tin tức" trên landing page.</p>
+  </div>
+
+  <div class="clp-item-form panel">
+    <h3 class="clp-form-title" id="blog-form-title">Thêm bài viết mới</h3>
+    <input type="hidden" id="blog-edit-id" value="" />
+    <div class="clp-image-field">
+      <label class="clp-label">Ảnh thumbnail</label>
+      <div class="clp-img-preview-wrap">
+        <img id="blog-img-preview" src="" alt="" class="clp-img-preview is-hidden" />
+        <span class="clp-img-placeholder" id="blog-img-placeholder">Chưa có ảnh</span>
+      </div>
+      <div class="clp-img-actions">
+        <input type="text" id="blog-image-url" placeholder="Dán URL ảnh hoặc chọn từ Media..." />
+        <button type="button" class="btn clp-pick-btn" data-pick-target="blog-image-url" data-preview="blog-img-preview" data-placeholder="blog-img-placeholder">Chọn từ Media</button>
+      </div>
+    </div>
+    <label class="clp-label">
+      Tiêu đề <span class="req">*</span>
+      <input type="text" id="blog-title" placeholder="Tiêu đề bài viết..." />
+    </label>
+    <label class="clp-label">
+      Tóm tắt <span class="req">*</span>
+      <textarea id="blog-summary" rows="3" placeholder="Nội dung tóm tắt hiển thị trên landing..."></textarea>
+    </label>
+    <div class="clp-form-row">
+      <label class="clp-label">
+        Link bài viết đầy đủ
+        <input type="url" id="blog-url" placeholder="https://..." />
+      </label>
+      <label class="clp-label">
+        Ngày đăng
+        <input type="date" id="blog-published-at" />
+      </label>
+    </div>
+    <div class="clp-form-actions">
+      <button class="btn btn-primary" id="blog-submit">Thêm bài viết</button>
+      <button class="btn clp-btn-cancel is-hidden" id="blog-cancel">Hủy</button>
+      <span class="clp-save-msg" id="blog-msg"></span>
+    </div>
+  </div>
+
+  <div class="clp-item-list" id="blog-list">
+    {# Rendered by JS #}
+  </div>
+</section>
+
+{# ── Tab: Dịch vụ ────────────────────────────────────────────────────────── #}
+<section class="clp-panel is-hidden" id="tab-services" role="tabpanel">
+  <div class="clp-panel-head">
+    <h2>Quản lý Dịch vụ</h2>
+    <p class="muted">Danh mục dịch vụ và từng mục hiển thị trong mega menu và trang /services. Thay đổi lưu ngay khi nhấn "Lưu dịch vụ".</p>
+  </div>
+
+  {# Thêm danh mục mới #}
+  <div class="clp-svc-add-cat panel">
+    <h3 class="clp-form-title">Thêm danh mục mới</h3>
+    <div class="clp-form-row">
+      <label class="clp-label">
+        Tên danh mục <span class="req">*</span>
+        <input type="text" id="svc-new-cat-name" placeholder="VD: Quảng cáo kỹ thuật số" />
+      </label>
+      <div style="display:flex;align-items:flex-end">
+        <button class="btn btn-primary" id="svc-add-cat-btn">+ Thêm danh mục</button>
+      </div>
+    </div>
+  </div>
+
+  {# Danh sách categories #}
+  <div id="svc-categories-list">
+    {# Rendered by JS #}
+  </div>
+
+  <div class="clp-actions-bar">
+    <button class="btn btn-primary" id="svc-save-btn">Lưu tất cả dịch vụ</button>
+    <span class="clp-save-msg" id="svc-save-msg"></span>
+  </div>
+</section>
+
+{# ── Tab: Media Library ───────────────────────────────────────────────────── #}
+<section class="clp-panel is-hidden" id="tab-media" role="tabpanel">
+  <div class="clp-panel-head">
+    <h2>Media Library</h2>
+    <p class="muted">Upload ảnh để dùng trên landing page. Định dạng: JPG, PNG, WebP, GIF, SVG — tối đa 10 MB.</p>
+  </div>
+
+  <div class="clp-upload-zone" id="media-upload-zone">
+    <input type="file" id="media-file-input" accept="image/*" multiple hidden />
+    <div class="clp-upload-zone-inner">
+      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+      <p>Kéo thả ảnh vào đây hoặc <button type="button" class="clp-upload-browse" id="media-browse-btn">chọn file</button></p>
+      <p class="muted">JPG · PNG · WebP · GIF · SVG · max 10 MB</p>
+    </div>
+    <div class="clp-upload-progress is-hidden" id="media-upload-progress">
+      <div class="clp-progress-bar"><div class="clp-progress-fill" id="media-progress-fill"></div></div>
+      <span id="media-upload-status">Đang tải lên...</span>
+    </div>
+  </div>
+
+  <div class="clp-media-grid" id="media-grid">
+    {# Rendered by JS #}
+  </div>
+</section>
+
+{# ── Preview Overlay ─────────────────────────────────────────────────────── #}
+<div class="clp-preview-overlay" id="preview-overlay" hidden>
+
+  <div class="clp-preview-bar">
+    <span class="clp-preview-bar-brand">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+      Preview — pttads.vn
+    </span>
+
+    <div class="clp-preview-devices" role="group" aria-label="Kích thước thiết bị">
+      <button class="clp-dev-btn is-active" data-device="desktop" title="Desktop">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        <span>Desktop</span>
+      </button>
+      <button class="clp-dev-btn" data-device="tablet" title="Tablet 768px">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="18" r="1" fill="currentColor"/></svg>
+        <span>Tablet</span>
+      </button>
+      <button class="clp-dev-btn" data-device="mobile" title="Mobile 390px">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><circle cx="12" cy="18" r="1" fill="currentColor"/></svg>
+        <span>Mobile</span>
+      </button>
+    </div>
+
+    <div class="clp-preview-bar-url" id="preview-url-display">pttads.vn</div>
+
+    <div class="clp-preview-bar-actions">
+      <div class="clp-preview-stale-badge is-hidden" id="preview-stale-badge" title="Nội dung đã thay đổi">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        Đã thay đổi
+      </div>
+      <button class="clp-preview-action-btn" id="preview-refresh-btn" title="Làm mới preview (F5)">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Làm mới
+      </button>
+      <a href="/" target="_blank" rel="noopener" class="clp-preview-action-btn" id="preview-newtab-btn" title="Mở trang chủ trong tab mới">
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+        Tab mới
+      </a>
+      <button class="clp-preview-close-btn" id="preview-close-btn" title="Đóng preview (Esc)" aria-label="Đóng preview">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="clp-preview-stage" id="preview-stage">
+    <div class="clp-preview-frame-wrap" id="preview-frame-wrap" data-device="desktop">
+      <div class="clp-preview-loading" id="preview-loading">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" aria-hidden="true" class="clp-spin"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <span>Đang tải trang...</span>
+      </div>
+      <iframe
+        id="preview-iframe"
+        src=""
+        title="Landing page preview"
+        sandbox="allow-same-origin allow-scripts allow-forms"
+      ></iframe>
+    </div>
+  </div>
+
+</div>
+
+{# ── Image Picker Modal ───────────────────────────────────────────────────── #}
+<div class="clp-modal is-hidden" id="media-picker-modal" role="dialog" aria-modal="true" aria-label="Chọn ảnh">
+  <div class="clp-modal-backdrop" id="media-picker-backdrop"></div>
+  <div class="clp-modal-box">
+    <div class="clp-modal-head">
+      <h3>Chọn ảnh</h3>
+      <button type="button" class="clp-modal-close" id="media-picker-close" aria-label="Đóng">✕</button>
+    </div>
+    <div class="clp-modal-body">
+      <div class="clp-modal-upload-row">
+        <input type="file" id="modal-file-input" accept="image/*" hidden />
+        <button type="button" class="btn" id="modal-upload-btn">Upload ảnh mới</button>
+        <span class="muted">hoặc chọn từ thư viện bên dưới</span>
+      </div>
+      <div class="clp-media-grid clp-media-grid--picker" id="media-picker-grid">
+        <p class="muted">Đang tải...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block admin_page_scripts %}
+{% include 'partials/admin_grants_bootstrap.html' %}
+<script>
+  window.CLP_GRANTS = {{ cms_grants_json | safe }};
+</script>
+<script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
+<script src="{{ url_for('static', filename='cms_landing.js') }}?v={{ static_v('cms_landing.js') }}"></script>
+{% endblock %}

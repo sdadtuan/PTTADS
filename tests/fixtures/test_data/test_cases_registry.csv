@@ -1,0 +1,121 @@
+TC-ID,Priority,Module,Flow,Fixture File,Fixture Key,Expected Result Summary
+TC-AUTH-01,P0,Auth,Đăng nhập admin,accounts.json,admin_full,Redirect /admin sidebar đầy đủ
+TC-AUTH-02,P0,Auth,Đăng nhập portal,accounts.json,portal_sales_a,Redirect /crm/home nav gọn
+TC-AUTH-03,P0,Auth,Sai mật khẩu,accounts.json,invalid_login,Thông báo lỗi không vào hệ thống
+TC-AUTH-04,P1,Auth,Đổi mật khẩu đồng bộ,accounts.json,admin_full,Password mới áp dụng mọi nơi
+TC-AUTH-05,P1,Auth,Ưu tiên CMS trước portal,accounts.json,admin_full,Vào admin không vào portal
+TC-AUTH-06,P2,Auth,Đăng xuất,accounts.json,,Session hết redirect login
+TC-PERM-01,P0,Permission,super_admin toàn quyền,permissions_scenarios.json,cms_roles[0],Mọi trang CMS+CRM mở
+TC-PERM-02,P0,Permission,CSKH không Sales,accounts.json,admin_cskh,/crm/sales ẩn hoặc 403
+TC-PERM-03,P0,Permission,content_editor không CRM,permissions_scenarios.json,cms_roles[1],/crm/leads 403
+TC-PERM-04,P1,Permission,Ma trận chức vụ,permissions_scenarios.json,crm_positions,Menu/API khớp tick
+TC-PERM-05,P1,Permission,API chặn delete,permissions_scenarios.json,api_denied_without_permission,HTTP 403
+TC-PERM-06,P2,Permission,UI gating nút,permissions_scenarios.json,,Nút disabled khi thiếu quyền
+TC-CMS-01,P1,CMS,Tạo tin tức,,,Bài hiện landing /news/slug
+TC-CMS-02,P1,CMS,Tạo dịch vụ,,,Trang /services/slug hiển thị
+TC-CMS-03,P2,CMS,Chat MKT export,,,File Excel KPI tải về
+TC-CMS-04,P2,CMS,Ma trận phân quyền,,,Quyền lưu áp dụng user
+TC-CSKH-01,P0,CSKH,Tạo hồ sơ Kanban,cskh_cases.json,case_new,Case cột Mới
+TC-CSKH-02,P0,CSKH,Chuyển pipeline,cskh_cases.json,stage_transition,Status Đang liên hệ + care report
+TC-CSKH-03,P1,CSKH,Portal scope case,cskh_cases.json,portal_scope,NV gán thấy NV khác không
+TC-CSKH-04,P1,CSKH,Tạo khách hàng,cskh_cases.json,customer,KH tìm theo SĐT
+TC-CSKH-05,P2,CSKH,Playbook 6 bước,,,Checklist lưu tiến độ
+TC-CSKH-06,P2,CSKH,AI trợ lý,,,Gợi ý hành động
+TC-LEAD-01,P0,Lead,Tạo lead nhập tay,leads_manual.json,create_valid,Status Mới score≥10 activities log
+TC-LEAD-02,P0,Lead,Chấm điểm phân hạng,leads_manual.json,create_high_score,score≥20 level hot/vip
+TC-LEAD-03,P0,Lead,Trùng SĐT,leads_manual.json,duplicate_phone,is_duplicate=1 match phone
+TC-LEAD-04,P0,Lead,SĐT invalid,leads_manual.json,create_invalid_phone,Validation error
+TC-LEAD-05,P1,Lead,Email invalid,leads_manual.json,create_invalid_email,Validation error
+TC-LEAD-06,P1,Lead,Status hợp lệ,leads_manual.json,status_transitions[0],Mới→Đã liên hệ OK
+TC-LEAD-07,P1,Lead,Status không hợp lệ,leads_manual.json,status_transitions[1],Mới→Chốt bị chặn
+TC-LEAD-08,P1,Lead,Assign owner,leads_manual.json,assign_manual,owner_id=2
+TC-LEAD-09,P1,Lead,Filter trạng thái,,,Danh sách khớp filter
+TC-LEAD-10,P2,Lead,Ghi hoạt động,,,Activity trong timeline
+TC-LEAD-11,P2,Lead,AI Search,,,Subset đúng query
+TC-LEAD-12,P2,Lead,AI Summary,,,Tóm tắt lịch sử
+TC-LEAD-13,P1,Lead,Convert KH,,,Bản ghi khách hàng mới
+TC-LEAD-14,P2,Lead,Cảnh báo SLA,,,Badge SLA trên UI
+TC-PROJ-01,P0,Project Lead,Tạo lead gắn dự án,leads_manual.json,create_valid+DA-A,re_project_id đúng
+TC-PROJ-02,P0,Project Lead,Lọc theo dự án,re_projects_setup.json,projects[0],Chỉ lead DA-A
+TC-PROJ-03,P0,Project Lead,Dedup scoped,leads_manual.json,duplicate_scoped_project,2 lead cùng SĐT khác dự án
+TC-PROJ-04,P0,Project Lead,Pool NV dự án,re_projects_setup.json,projects[0].staff,crm_re_project_staff OK
+TC-PROJ-05,P0,Project Lead,Auto-assign pool,re_projects_setup.json,projects[0],owner trong pool round-robin
+TC-PROJ-06,P0,Webhook,Cấu hình slug,re_projects_setup.json,projects[0],URL slug + form map
+TC-PROJ-07,P0,Webhook,Verify GET,facebook_webhook_payloads.json,verify_get,200 body=challenge
+TC-PROJ-08,P0,Webhook,Leadgen POST,facebook_webhook_payloads.json,leadgen_project_slug,created=1 assign KPI
+TC-PROJ-09,P1,Webhook,Form chưa map,facebook_webhook_payloads.json,leadgen_unmapped_form,created=0
+TC-PROJ-10,P1,Webhook,Field mapping VN,facebook_webhook_payloads.json,field_mapping_vn,Normalize đúng
+TC-PROJ-11,P0,Portal scope,Sales chỉ lead mình,accounts.json,portal_sales_a,Chỉ owner=1
+TC-PROJ-12,P0,Portal scope,Manager mọi lead,accounts.json,portal_sales_b,Tất cả lead DA-A
+TC-PROJ-13,P0,Portal scope,Outsider rỗng,accounts.json,portal_outsider,Danh sách rỗng
+TC-PROJ-14,P0,KPI,RE_LEADS_NEW auto,kpi_payroll_daily.json,project_kpi,actual=2
+TC-PROJ-15,P1,KPI,Refresh API,kpi_payroll_daily.json,project_kpi.refresh_api,JSON updated actual
+TC-PROJ-16,P1,Notification,Scoped dự án,,,Chỉ notify lead dự án NV
+TC-PROJ-17,P2,Migration,Phase5 dry-run,re_projects_setup.json,projects[0].facebook_forms,Preview không ghi DB
+TC-PROJ-18,P0,E2E,Webhook→portal→KPI,facebook_webhook_payloads.json,leadgen_project_slug,Full flow pass
+TC-ASSIGN-01,P0,Auto-assign,Round-robin,,,Luân phiên NV
+TC-ASSIGN-02,P1,Auto-assign,Skill-based Hot,,,Hot→NV cấp A
+TC-ASSIGN-03,P1,Auto-assign,Region/Product,accounts.json,portal_sales_a.notes,NV notes khớp
+TC-ASSIGN-04,P2,Auto-assign,Daily cap,,,Không vượt cap
+TC-ASSIGN-05,P1,Auto-assign,Hybrid,,,Multi-strategy
+TC-SCORE-01,P1,Scoring,Rubric D1-D6,leads_manual.json,create_high_score,score thấp < cao
+TC-SCORE-02,P2,Scoring,Custom keyword,,,score +keyword
+TC-RE-01,P0,RE Project,Tạo dự án,,,List + workflow 0%
+TC-RE-02,P1,RE Project,8 bước workflow,,,% tăng
+TC-RE-03,P1,RE Project,KPI dự án,kpi_payroll_daily.json,project_kpi,KPI row + sync
+TC-RE-04,P2,RE Project,Export Excel,,,File tải về
+TC-RE-05,P1,RE Project,Tồn kho căn,,,Master data OK
+TC-HUB-01,P1,Hub,Chiến dịch,,,Campaign tạo OK
+TC-HUB-02,P2,Hub,Nhắc việc,,,Reminder pending
+TC-MKT-01,P2,MKT Plan,KHTN segment,,,Pipeline KHTN
+TC-SOP-01,P2,SOP,Chạy SOP,,,Task queue
+TC-SALES-01,P1,Sales,Log deal,,,Deal pipeline
+TC-SALES-02,P2,Sales,Báo cáo tháng,,,Chart doanh số
+TC-STAFF-01,P0,Staff,Thêm NV,,,NV trong list
+TC-STAFF-02,P0,Staff,Portal login,,,Login portal OK
+TC-STAFF-03,P1,Staff,Notes skill,,,Auto-assign khớp
+TC-STAFF-04,P2,Staff,Import roster,,,NV import OK
+TC-STAFF-05,P1,Staff,Competency,,,Điểm lưu
+TC-KPI-01,P1,KPI,Admin nhập,kpi_payroll_daily.json,staff_kpi,Achievement chart
+TC-KPI-02,P1,KPI,Portal xem,accounts.json,portal_sales_a,Chỉ KPI mình
+TC-KPI-03,P0,KPI,Sync dự án↔NV,kpi_payroll_daily.json,project_kpi,NV KPI cập nhật
+TC-ATT-01,P1,Payroll,Import công,kpi_payroll_daily.json,attendance_row,Bảng công OK
+TC-ATT-02,P2,Payroll,Tính lương,kpi_payroll_daily.json,payroll_period,net_pay + Khóa
+TC-RPT-01,P0,Daily Report,NV gửi,kpi_payroll_daily.json,daily_report,status submitted
+TC-RPT-02,P1,Daily Report,Admin review,kpi_payroll_daily.json,daily_report,Thấy nội dung
+TC-PORTAL-01,P0,Portal,Trang chủ,accounts.json,portal_sales_a,Widget tóm tắt
+TC-PORTAL-02,P0,Portal,Tạo lead bắt buộc dự án,accounts.json,portal_sales_a,Validation re_project
+TC-PORTAL-03,P0,Portal,Không cấu hình global,accounts.json,portal_sales_a,Nút ẩn
+TC-PORTAL-04,P1,Portal,Không xóa lead,accounts.json,portal_sales_a,403/no action
+TC-PORTAL-05,P1,Portal,Toast lead mới,facebook_webhook_payloads.json,leadgen_project_slug,Toast/badge
+TC-IO-01,P0,Import/Export,Import CSV,leads_import_sample.csv,,3 lead (+1 trùng)
+TC-IO-02,P1,Import/Export,Export XLSX,,,File đúng filter
+TC-IO-03,P2,Import/Export,Export PDF,,,PDF tải về
+TC-IO-04,P2,Import/Export,Export KPI,,,Excel KPI
+TC-MIX-01,P0,KĐT mixed,Lead product_line+zone,leads_manual.json,create_valid+segment,Lọc & lưu segment
+TC-MIX-02,P0,KĐT mixed,Auto-assign scoped,re_projects_setup.json,staff_scope,NV đúng dòng SP/phân khu
+TC-MIX-03,P0,KĐT mixed,Giữ chỗ 1-click,,,hold status + activity
+TC-MIX-04,P0,KĐT mixed,Chống double-book,,,Lead B không giữ được căn của A
+TC-MIX-05,P1,KĐT mixed,Sub-team phân khu,,,scope_zones trên crm_re_project_staff
+TC-MIX-06,P1,KĐT mixed,Đợt giá price_batch,,,Import CSV + lọc đợt giá
+TC-MIX-07,P1,KĐT mixed,Dashboard tồn kho zone,,,Overview card + poll 30s
+TC-MIX-08,P1,KĐT mixed,AI tìm theo segment,,,"Lead shophouse phân khu…"
+TC-MIX-09,P1,KĐT mixed,AI gợi ý căn,,,suggest-products API
+TC-MIX-10,P1,KĐT mixed,AI gợi ý giữ chỗ,,,recommend type=hold
+TC-PRICE-01,P0,Price list,Tạo version + import,,,crm_re_price_lists row
+TC-PRICE-02,P0,Price list,Bulk apply,,,price_batch + list/net updated
+TC-PRICE-03,P0,Price list,Compare Dot1 vs Dot2,,,summary increased/decreased
+TC-PRICE-04,P1,Price list,AI căn áp giá,,,ai_price_list_query products
+TC-PRICE-05,P1,Price list,AI so sánh giá,,,compare in AI response
+TC-ACCT-01,P0,Kế toán dự án,Sync ngân sách từ KH,,,sync_budget_from_plans creates lines
+TC-ACCT-02,P0,Kế toán dự án,Dòng tiền thu chi,,,cash flow dashboard net
+TC-ACCT-03,P0,Kế toán dự án,Sync DT tồn kho,,,sold products → revenue
+TC-ACCT-04,P1,Kế toán dự án,Import CSV dòng tiền,,,import_cash_flow_csv
+TC-ACCT-05,P1,Kế toán dự án,AI kế toán dự án,,,ai_project_finance_query marketing
+TC-ACCT-06,P1,Kế toán dự án,AI search finance route,,,ai_search_leads finance branch
+TC-ACCT-07,P0,Kế toán dự án,Export Excel kế toán,,,build_accounting_export_sheets 7 sheets
+TC-ACCT-08,P0,Kế toán dự án,Dự đoán rủi ro tài chính,,,predict_financial_risks rules
+TC-ACCT-09,P1,Kế toán dự án,Dự báo dòng tiền,,,forecast_financial_outlook
+TC-MKT-PERM-01,P0,Marketing,MKT-01 default grants,,,configure leads export budget
+TC-MKT-PERM-02,P0,Marketing,Seed MKT positions,,,seed_marketing_positions
+TC-MKT-SOP-01,P0,Marketing,SOP Launch 14 ngày,,,MKT-LAUNCH-14D 14 steps

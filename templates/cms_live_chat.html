@@ -1,0 +1,169 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}Live Chat — CMS PTT{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+
+{% block admin_head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='cms_live_chat.css') }}?v={{ static_v('cms_live_chat.css') }}" />
+{% endblock %}
+
+{% block admin_page_title %}Live Chat{% endblock %}
+{% block admin_page_desc %}
+  <p class="admin-page-desc">Hộp thư chat khách truy cập — trả lời nhân viên hoặc AI tự động</p>
+{% endblock %}
+
+{% block admin_page_actions %}
+<span class="lc-mode-badge" id="lc-mode-badge">
+  {% if settings.get('live_chat_mode','ai') == 'ai' %}AI{% else %}Nhân viên{% endif %}
+</span>
+{% endblock %}
+
+{% block admin_main %}
+<div class="lc-root" id="lc-root">
+
+  {# ── Tab bar ──────────────────────────────────────────────── #}
+  <nav class="lc-tabs" role="tablist">
+    <button class="lc-tab is-active" role="tab" data-lc-tab="inbox" aria-selected="true">
+      Hộp thư <span class="lc-unread-badge" id="lc-tab-badge"></span>
+    </button>
+    <button class="lc-tab" role="tab" data-lc-tab="settings" aria-selected="false">
+      Cài đặt
+    </button>
+  </nav>
+
+  {# ── Inbox tab ────────────────────────────────────────────── #}
+  <div class="lc-panel" id="lc-tab-inbox">
+    <div class="lc-inbox">
+
+      {# Left: conversation list #}
+      <aside class="lc-conv-sidebar">
+        <div class="lc-conv-filter">
+          <button class="lc-filter-btn is-active" data-filter="open">Đang mở</button>
+          <button class="lc-filter-btn" data-filter="closed">Đã đóng</button>
+        </div>
+        <div class="lc-conv-list" id="lc-conv-list" role="listbox" aria-label="Hội thoại">
+          <p class="lc-conv-empty" id="lc-conv-empty">Đang tải…</p>
+        </div>
+      </aside>
+
+      {# Right: message thread #}
+      <div class="lc-thread-area" id="lc-thread-area">
+        <div class="lc-thread-empty" id="lc-thread-empty">
+          <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2" opacity="0.3" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+          </svg>
+          <p>Chọn một hội thoại để xem nội dung</p>
+        </div>
+
+        <div class="lc-thread-inner" id="lc-thread-inner" hidden>
+          <div class="lc-thread-head" id="lc-thread-head">
+            <div>
+              <p class="lc-thread-title" id="lc-thread-title">Khách #—</p>
+              <p class="lc-thread-meta" id="lc-thread-meta"></p>
+            </div>
+            <div class="lc-thread-actions">
+              <button class="btn lc-close-conv-btn" id="lc-close-conv-btn" title="Đóng hội thoại" hidden>
+                Đóng hội thoại
+              </button>
+              <button class="btn lc-reopen-conv-btn" id="lc-reopen-conv-btn" title="Mở lại" hidden>
+                Mở lại
+              </button>
+            </div>
+          </div>
+
+          <div class="lc-messages" id="lc-messages" role="log" aria-live="polite" aria-label="Tin nhắn"></div>
+
+          <div class="lc-reply-box" id="lc-reply-box">
+            <textarea
+              class="lc-reply-input"
+              id="lc-reply-input"
+              placeholder="Nhập phản hồi cho khách… (Enter gửi, Shift+Enter xuống dòng)"
+              rows="3"
+              maxlength="2000"
+            ></textarea>
+            <div class="lc-reply-footer">
+              <span class="lc-reply-char" id="lc-reply-char">0/2000</span>
+              <button class="btn btn-primary lc-reply-send" id="lc-reply-send">Gửi</button>
+            </div>
+            <p class="lc-reply-msg" id="lc-reply-msg"></p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  {# ── Settings tab ─────────────────────────────────────────── #}
+  <div class="lc-panel" id="lc-tab-settings" hidden>
+    <div class="lc-settings-wrap">
+
+      <section class="lc-settings-card">
+        <h2 class="lc-settings-title">Bật / Tắt Live Chat</h2>
+        <label class="lc-toggle-wrap">
+          <input type="checkbox" id="lc-enabled-toggle"
+            {% if settings.get('live_chat_enabled') == '1' %}checked{% endif %} />
+          <span class="lc-toggle-track">
+            <span class="lc-toggle-knob"></span>
+          </span>
+          <span class="lc-toggle-label">Hiển thị widget chat trên website</span>
+        </label>
+      </section>
+
+      <section class="lc-settings-card">
+        <h2 class="lc-settings-title">Chế độ trả lời</h2>
+        <div class="lc-mode-radios">
+          <label class="lc-mode-radio {% if settings.get('live_chat_mode','ai') == 'ai' %}is-selected{% endif %}">
+            <input type="radio" name="lc_mode" value="ai"
+              {% if settings.get('live_chat_mode','ai') == 'ai' %}checked{% endif %} />
+            <span class="lc-mode-icon" aria-hidden="true">🤖</span>
+            <span>
+              <strong>AI tự động</strong>
+              <small>GPT trả lời tức thì 24/7</small>
+            </span>
+          </label>
+          <label class="lc-mode-radio {% if settings.get('live_chat_mode') == 'staff' %}is-selected{% endif %}">
+            <input type="radio" name="lc_mode" value="staff"
+              {% if settings.get('live_chat_mode') == 'staff' %}checked{% endif %} />
+            <span class="lc-mode-icon" aria-hidden="true">👤</span>
+            <span>
+              <strong>Nhân viên</strong>
+              <small>Tin nhắn vào hộp thư, nhân viên trả lời</small>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <section class="lc-settings-card">
+        <h2 class="lc-settings-title">Tin nhắn chào</h2>
+        <input type="text" class="lc-settings-input" id="lc-welcome-input"
+          value="{{ settings.get('live_chat_welcome','') | e }}"
+          placeholder="Xin chào! Tôi có thể giúp gì cho bạn?"
+          maxlength="500" />
+        <p class="lc-settings-hint">Hiển thị ngay khi khách mở chat lần đầu</p>
+      </section>
+
+      <section class="lc-settings-card" id="lc-ai-settings" {% if settings.get('live_chat_mode') == 'staff' %}hidden{% endif %}>
+        <h2 class="lc-settings-title">Hướng dẫn AI (System Prompt)</h2>
+        <textarea class="lc-settings-textarea" id="lc-ai-prompt-input" rows="6" maxlength="2000"
+          placeholder="Bạn là trợ lý tư vấn của PTT Advertising Solutions…">{{ settings.get('live_chat_ai_prompt','') | e }}</textarea>
+        <p class="lc-settings-hint">AI đọc hướng dẫn này trước mỗi cuộc trò chuyện. Bỏ trống để dùng mặc định.</p>
+      </section>
+
+      <div class="lc-settings-actions">
+        <button class="btn btn-primary" id="lc-settings-save">Lưu cài đặt</button>
+        <span class="lc-save-msg" id="lc-settings-msg"></span>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script type="application/json" id="lc-init-data">
+  {{ {"settings": {"mode": settings.get("live_chat_mode","ai"), "enabled": settings.get("live_chat_enabled","0"), "welcome": settings.get("live_chat_welcome","")}} | tojson }}
+</script>
+{% endblock %}
+
+{% block admin_page_scripts %}
+<script defer src="{{ url_for('static', filename='cms_live_chat.js') }}?v={{ static_v('cms_live_chat.js') }}"></script>
+{% endblock %}

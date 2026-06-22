@@ -1,0 +1,124 @@
+.crm-dwr-page .crm-dwr-layout {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+
+@media (min-width: 1100px) {
+  .crm-dwr-page .crm-dwr-layout {
+    grid-template-columns: 1.05fr 0.95fr;
+    align-items: start;
+  }
+}
+
+.crm-dwr-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.crm-dwr-form-grid {
+  display: grid;
+  gap: 0.75rem 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin-bottom: 1rem;
+}
+
+.crm-dwr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+}
+
+.crm-dwr-field--full {
+  margin-bottom: 0.75rem;
+}
+
+.crm-dwr-field input,
+.crm-dwr-field select,
+.crm-dwr-field textarea {
+  width: 100%;
+}
+
+.crm-dwr-subtitle {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.crm-dwr-tasks-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.crm-dwr-tasks-wrap {
+  margin-bottom: 1rem;
+}
+
+.crm-dwr-tasks-table input {
+  width: 100%;
+  min-width: 0;
+  font-size: 0.8125rem;
+}
+
+.crm-dwr-tasks-table td {
+  vertical-align: top;
+}
+
+.crm-dwr-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.crm-dwr-filters .crm-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.crm-dwr-detail-modal {
+  max-width: 720px;
+}
+
+.crm-dwr-detail-block {
+  margin-bottom: 1rem;
+}
+
+.crm-dwr-detail-block h4 {
+  margin: 0 0 0.35rem;
+  font-size: 0.9375rem;
+}
+
+.crm-dwr-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  font-size: 0.875rem;
+  color: var(--muted, #5a6b62);
+  margin-bottom: 0.75rem;
+}
+
+.crm-dwr-detail-tasks {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.crm-dwr-detail-tasks th,
+.crm-dwr-detail-tasks td {
+  border: 1px solid rgba(57, 139, 67, 0.14);
+  padding: 0.35rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.crm-dwr-detail-tasks th {
+  background: var(--surface-soft, #f6faf7);
+}

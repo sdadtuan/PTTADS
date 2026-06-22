@@ -1,0 +1,51 @@
+{#
+  Ảnh raster trong static/ — dùng WebP nếu file .webp đồng danh đã được build (scripts/build_ptt_assets.py).
+
+  loading: đặt eager cho logo/header (LCP), lazy cho footer / dưới fold.
+#}
+{% macro raster_static_picture(
+  filename,
+  alt='',
+  width=None,
+  height=None,
+  class='',
+  loading='lazy',
+  decoding='async',
+  fetchpriority=None,
+  partner_slide_onerror=False,
+  aria_hidden=False
+) -%}
+{% set wf = webp_static_file(filename) %}
+{% set v0 = static_v(filename) %}
+{% if wf %}
+{% set vw = static_v(wf) %}
+<picture>
+  <source type="image/webp" srcset="{{ url_for('static', filename=wf) }}?v={{ vw }}" />
+  <img
+    class="{{ class }}"
+    src="{{ url_for('static', filename=filename) }}?v={{ v0 }}"
+    alt="{{ alt | e }}"
+    {% if width is not none %}width="{{ width }}"{% endif %}
+    {% if height is not none %}height="{{ height }}"{% endif %}
+    {% if aria_hidden %}aria-hidden="true"{% endif %}
+    loading="{{ loading | e }}"
+    decoding="{{ decoding | e }}"
+    {% if fetchpriority %}fetchpriority="{{ fetchpriority | e }}"{% endif %}
+    {% if partner_slide_onerror %}onerror="this.closest('.partner-slide').classList.add('is-fallback')"{% endif %}
+  />
+</picture>
+{% else %}
+<img
+  class="{{ class }}"
+  src="{{ url_for('static', filename=filename) }}?v={{ v0 }}"
+  alt="{{ alt | e }}"
+  {% if width is not none %}width="{{ width }}"{% endif %}
+  {% if height is not none %}height="{{ height }}"{% endif %}
+  {% if aria_hidden %}aria-hidden="true"{% endif %}
+  loading="{{ loading | e }}"
+  decoding="{{ decoding | e }}"
+  {% if fetchpriority %}fetchpriority="{{ fetchpriority | e }}"{% endif %}
+  {% if partner_slide_onerror %}onerror="this.closest('.partner-slide').classList.add('is-fallback')"{% endif %}
+/>
+{% endif %}
+{%- endmacro %}

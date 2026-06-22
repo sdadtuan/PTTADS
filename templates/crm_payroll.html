@@ -1,0 +1,519 @@
+{% extends "admin_layout.html" %}
+{% set crm_staff_nav_active = 'attendance' if crm_staff_portal | default(false) else '' %}
+
+{% block title %}{% if crm_staff_portal | default(false) %}Chấm công{% else %}Chấm công &amp; lương — CRM{% endif %}{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+{% block body_class_extra %}crm-body crm-payroll-page{% if crm_staff_portal | default(false) %} crm-payroll-staff-portal{% endif %}{% endblock %}
+
+{% block admin_head %}
+  <meta name="description" content="{% if crm_staff_portal | default(false) %}Xem bảng chấm công theo tháng.{% else %}Chấm công theo ngày và tính lương tháng cho nhân viên CRM.{% endif %}" />
+  <script id="crm-payroll-meta" type="application/json">{{ {
+    "staff_portal": crm_staff_portal | default(false),
+    "staff_id": crm_staff_id,
+    "attendance_readonly": attendance_readonly | default(false)
+  } | tojson }}</script>
+{% endblock %}
+
+{% block admin_page_title %}{% if not crm_staff_portal | default(false) %}Chấm công &amp; lương{% endif %}{% endblock %}
+{% block admin_page_desc %}
+  {% if not crm_staff_portal | default(false) %}
+  <p class="admin-page-desc">Ghi nhận giờ vào / ra; lương tính theo <strong>giờ làm thực tế</strong>, phạt đi trễ, phụ cấp và thưởng theo cấp bậc chức vụ.</p>
+  {% endif %}
+{% endblock %}
+
+{% block admin_main %}
+<div class="crm-app{% if crm_staff_portal | default(false) %} crm-app--staff-portal{% endif %}">
+  <div class="crm-hero crm-staff-hero">
+    <div class="crm-hero-text">
+      <span class="crm-hero-badge" aria-hidden="true">Nhân sự</span>
+      <h1 class="crm-hero-title">{% if crm_staff_portal | default(false) %}Chấm công{% else %}Chấm công &amp; lương{% endif %}</h1>
+      <p class="crm-hero-desc">
+        {% if crm_staff_portal | default(false) %}
+        Xem <strong>bảng chấm công</strong> của bạn theo tháng — giờ vào / ra, nghỉ và ghi chú do hệ thống hoặc quản trị ghi nhận.
+        {% else %}
+        Ghi nhận <strong>giờ vào / ra</strong> theo ngày. <strong>Lương</strong> = lương cơ bản ÷ (ngày làm chuẩn × giờ chuẩn/ngày) × <strong>tổng giờ làm</strong>;
+        trừ <strong>phạt đi trễ</strong>; cộng <strong>phụ cấp</strong> và <strong>thưởng</strong> theo chức vụ / chính sách bên dưới.
+        {% endif %}
+      </p>
+    </div>
+  </div>
+
+  <nav class="crm-payroll-nav crm-payroll-admin-only" aria-label="Điều hướng trang">
+    <a class="crm-payroll-nav-link" href="#crm-payroll-control" data-nav="control">Chính sách</a>
+    <a class="crm-payroll-nav-link" href="#crm-payroll-device" data-nav="device">Thiết bị</a>
+    <a class="crm-payroll-nav-link" href="#crm-payroll-attendance" data-nav="attendance">Chấm công</a>
+    <a class="crm-payroll-nav-link" href="#crm-payroll-salary" data-nav="salary">Bảng lương</a>
+  </nav>
+
+  <div class="crm-payroll-sections">
+  <section class="panel crm-staff-toolbar crm-payroll-period-bar" aria-label="Chọn kỳ">
+    <div class="crm-toolbar-row crm-payroll-period-row">
+      <div class="crm-payroll-period-fields">
+        <div class="crm-payroll-period-nav" aria-label="Chuyển tháng">
+          <button type="button" class="btn-secondary crm-period-step" id="crm-pr-prev-month" aria-label="Tháng trước" title="Tháng trước">‹</button>
+          <button type="button" class="btn-secondary crm-period-step" id="crm-pr-next-month" aria-label="Tháng sau" title="Tháng sau">›</button>
+        </div>
+        <label class="crm-payroll-field">Năm
+          <input type="number" id="crm-pr-year" min="2000" max="2100" step="1" class="crm-pr-period-input" aria-label="Năm" />
+        </label>
+        <label class="crm-payroll-field">Tháng
+          <span class="crm-combobox crm-combobox--compact crm-combobox--month">
+            <select id="crm-pr-month" aria-label="Tháng">
+              <option value="1">Tháng 1</option>
+              <option value="2">Tháng 2</option>
+              <option value="3">Tháng 3</option>
+              <option value="4">Tháng 4</option>
+              <option value="5">Tháng 5</option>
+              <option value="6">Tháng 6</option>
+              <option value="7">Tháng 7</option>
+              <option value="8">Tháng 8</option>
+              <option value="9">Tháng 9</option>
+              <option value="10">Tháng 10</option>
+              <option value="11">Tháng 11</option>
+              <option value="12">Tháng 12</option>
+            </select>
+          </span>
+        </label>
+      </div>
+      <button type="button" class="btn-secondary crm-payroll-period-refresh" id="crm-pr-refresh">
+        <span class="crm-btn-label">Tải dữ liệu kỳ</span>
+      </button>
+      <p class="crm-payroll-period-hint muted" id="crm-pr-period-hint" aria-live="polite"></p>
+      {% if crm_staff_portal | default(false) %}
+      <a class="btn-secondary" href="{{ url_for('crm_daily_reports_page') }}">Báo cáo công việc ngày</a>
+      {% endif %}
+    </div>
+  </section>
+
+  <section id="crm-payroll-control" class="panel crm-staff-section crm-payroll-admin-only crm-payroll-control crm-section-collapsible is-open" data-admin-section="crm_payroll_salary" aria-label="Bảng điều khiển lương">
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Chính sách</p>
+        <h2 class="crm-staff-section-title">Bảng điều khiển</h2>
+        <p class="muted crm-dept-sub">Ngày làm việc, ca làm, phạt đi trễ, đơn giá giờ, thưởng và phụ cấp theo cấp bậc chức vụ.</p>
+      </div>
+      <div class="crm-section-head-actions">
+        <button type="button" class="btn-secondary crm-section-toggle" aria-expanded="true">Thu gọn</button>
+        <button type="button" class="btn-secondary" id="crm-pr-save-policy">Lưu chính sách</button>
+      </div>
+    </div>
+    <div class="crm-section-collapsible-body">
+    <p class="crm-form-msg is-error" id="crm-pr-policy-err" hidden></p>
+
+    <div class="crm-payroll-dash" id="crm-pr-dash" aria-live="polite">
+      <div class="crm-payroll-stat"><span class="crm-payroll-stat-val" id="crm-dash-workdays">—</span><span class="crm-payroll-stat-lbl">Ngày làm chuẩn</span></div>
+      <div class="crm-payroll-stat"><span class="crm-payroll-stat-val" id="crm-dash-hours">—</span><span class="crm-payroll-stat-lbl">Tổng giờ tháng</span></div>
+      <div class="crm-payroll-stat"><span class="crm-payroll-stat-val" id="crm-dash-late">—</span><span class="crm-payroll-stat-lbl">Lượt đi trễ</span></div>
+      <div class="crm-payroll-stat"><span class="crm-payroll-stat-val" id="crm-dash-today">—</span><span class="crm-payroll-stat-lbl">Chấm công hôm nay</span></div>
+    </div>
+
+    <div class="crm-payroll-policy-panel crm-section-collapsible is-open">
+      <div class="crm-payroll-panel-head">
+        <h3 class="crm-payroll-panel-title">Ca làm theo từng ngày &amp; phạt đi trễ</h3>
+        <button type="button" class="btn-secondary crm-section-toggle" aria-expanded="true">Thu gọn</button>
+      </div>
+      <div class="crm-section-collapsible-body">
+      <form id="crm-pr-policy-form" class="crm-detail-form">
+        <div class="crm-staff-table-wrap crm-staff-table-shell crm-payroll-weekday-shifts-wrap">
+          <table class="crm-staff-table crm-staff-table--compact" id="crm-pr-weekday-table">
+            <thead>
+              <tr>
+                <th>Ngày</th>
+                <th>Làm việc</th>
+                <th>Giờ vào</th>
+                <th>Giờ ra</th>
+                <th>Nghỉ (p)</th>
+                <th>Giờ chuẩn</th>
+              </tr>
+            </thead>
+            <tbody id="crm-pr-weekday-tbody">
+              <tr data-weekday="0"><td>T2</td><td><input type="checkbox" class="crm-wd-work" checked aria-label="T2 làm việc" /></td><td><input type="text" class="crm-wd-in" value="08:30" maxlength="5" placeholder="08:30" /></td><td><input type="text" class="crm-wd-out" value="17:30" maxlength="5" placeholder="17:30" /></td><td><input type="number" class="crm-wd-break" value="60" min="0" max="1440" step="1" /></td><td><input type="number" class="crm-wd-hours" value="8" min="0.5" max="24" step="0.5" /></td></tr>
+              <tr data-weekday="1"><td>T3</td><td><input type="checkbox" class="crm-wd-work" checked aria-label="T3 làm việc" /></td><td><input type="text" class="crm-wd-in" value="08:30" maxlength="5" /></td><td><input type="text" class="crm-wd-out" value="17:30" maxlength="5" /></td><td><input type="number" class="crm-wd-break" value="60" min="0" max="1440" step="1" /></td><td><input type="number" class="crm-wd-hours" value="8" min="0.5" max="24" step="0.5" /></td></tr>
+              <tr data-weekday="2"><td>T4</td><td><input type="checkbox" class="crm-wd-work" checked aria-label="T4 làm việc" /></td><td><input type="text" class="crm-wd-in" value="08:30" maxlength="5" /></td><td><input type="text" class="crm-wd-out" value="17:30" maxlength="5" /></td><td><input type="number" class="crm-wd-break" value="60" min="0" max="1440" step="1" /></td><td><input type="number" class="crm-wd-hours" value="8" min="0.5" max="24" step="0.5" /></td></tr>
+              <tr data-weekday="3"><td>T5</td><td><input type="checkbox" class="crm-wd-work" checked aria-label="T5 làm việc" /></td><td><input type="text" class="crm-wd-in" value="08:30" maxlength="5" /></td><td><input type="text" class="crm-wd-out" value="17:30" maxlength="5" /></td><td><input type="number" class="crm-wd-break" value="60" min="0" max="1440" step="1" /></td><td><input type="number" class="crm-wd-hours" value="8" min="0.5" max="24" step="0.5" /></td></tr>
+              <tr data-weekday="4"><td>T6</td><td><input type="checkbox" class="crm-wd-work" checked aria-label="T6 làm việc" /></td><td><input type="text" class="crm-wd-in" value="08:30" maxlength="5" /></td><td><input type="text" class="crm-wd-out" value="17:30" maxlength="5" /></td><td><input type="number" class="crm-wd-break" value="60" min="0" max="1440" step="1" /></td><td><input type="number" class="crm-wd-hours" value="8" min="0.5" max="24" step="0.5" /></td></tr>
+              <tr data-weekday="5"><td>T7</td><td><input type="checkbox" class="crm-wd-work" aria-label="T7 làm việc" /></td><td><input type="text" class="crm-wd-in" value="08:30" maxlength="5" /></td><td><input type="text" class="crm-wd-out" value="17:30" maxlength="5" /></td><td><input type="number" class="crm-wd-break" value="60" min="0" max="1440" step="1" /></td><td><input type="number" class="crm-wd-hours" value="8" min="0.5" max="24" step="0.5" /></td></tr>
+              <tr data-weekday="6"><td>CN</td><td><input type="checkbox" class="crm-wd-work" aria-label="CN làm việc" /></td><td><input type="text" class="crm-wd-in" value="08:30" maxlength="5" /></td><td><input type="text" class="crm-wd-out" value="17:30" maxlength="5" /></td><td><input type="number" class="crm-wd-break" value="60" min="0" max="1440" step="1" /></td><td><input type="number" class="crm-wd-hours" value="8" min="0.5" max="24" step="0.5" /></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="crm-staff-edit-grid">
+          <label>Ân hạn đi trễ (phút)
+            <input name="late_grace_minutes" id="crm-pol-grace" type="number" min="0" max="120" step="1" />
+          </label>
+          <label>Phạt / phút trễ (₫)
+            <input name="late_penalty_vnd_per_min" id="crm-pol-pen-min" type="number" min="0" step="1000" />
+          </label>
+          <label>Trần phạt trễ / ngày (₫)
+            <input name="late_penalty_max_vnd" id="crm-pol-pen-max" type="number" min="0" step="1000" />
+          </label>
+        </div>
+        <div class="crm-staff-edit-grid">
+          <label>Chế độ thưởng
+            <span class="crm-combobox">
+              <select name="bonus_mode" id="crm-pol-bonus-mode">
+                <option value="attendance">Theo chuyên cần (đủ ngày công)</option>
+                <option value="none">Không thưởng tự động</option>
+              </select>
+            </span>
+          </label>
+          <label>% thưởng chung (trên lương CB)
+            <input name="bonus_pct" id="crm-pol-bonus-pct" type="number" min="0" max="100" step="0.5" />
+          </label>
+          <label>Ngày công tối thiểu để thưởng
+            <input name="bonus_min_days" id="crm-pol-bonus-days" type="number" min="0" max="31" step="1" />
+          </label>
+        </div>
+        <p class="muted crm-filter-hint">Mỗi ngày có thể đặt ca riêng (VD: T7 làm nửa ngày). Đơn giá giờ = lương CB ÷ tổng giờ chuẩn các ngày làm trong tháng.</p>
+      </form>
+      </div>
+    </div>
+
+    <div class="crm-payroll-policy-panel crm-section-collapsible is-open">
+      <div class="crm-payroll-panel-head">
+        <h3 class="crm-payroll-panel-title">Phụ cấp &amp; thưởng theo cấp bậc (chức vụ)</h3>
+        <button type="button" class="btn-secondary crm-section-toggle" aria-expanded="true">Thu gọn</button>
+      </div>
+      <div class="crm-section-collapsible-body">
+      <div class="crm-staff-table-wrap crm-staff-table-shell">
+        <table class="crm-staff-table crm-staff-table--compact" id="crm-pr-pos-table">
+          <thead>
+            <tr>
+              <th>Cấp</th>
+              <th>Mã CV</th>
+              <th>Chức vụ</th>
+              <th>Phụ cấp (₫)</th>
+              <th>+ % thưởng</th>
+            </tr>
+          </thead>
+          <tbody id="crm-pr-pos-tbody"></tbody>
+        </table>
+      </div>
+      <div class="crm-modal-actions">
+        <button type="button" class="btn-secondary" id="crm-pr-save-positions">Lưu phụ cấp cấp bậc</button>
+      </div>
+      </div>
+    </div>
+    </div>
+  </section>
+
+  <section id="crm-payroll-device" class="panel crm-staff-section crm-device-integration crm-payroll-admin-only crm-section-collapsible is-open" data-admin-section="crm_payroll_device" aria-label="Tích hợp máy chấm công">
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Thiết bị</p>
+        <h2 class="crm-staff-section-title">Vân tay / khuôn mặt / Face ID</h2>
+      </div>
+      <button type="button" class="btn-secondary crm-section-toggle" aria-expanded="true">Thu gọn</button>
+    </div>
+    <div class="crm-section-collapsible-body">
+        <div class="crm-device-integration-body muted">
+          <p>
+            Trình duyệt <strong>không</strong> đọc trực tiếp cảm biến vân tay hay khuôn mặt. Dùng
+            <strong>máy chấm công</strong> (ZKTeco MB20-VL, MB560-VL, Hikvision…) gửi dữ liệu về PTT qua mạng LAN.
+          </p>
+
+          <h3 class="crm-device-subtitle">ZKTeco MB20-VL (khuyến nghị — giao thức iClock PUSH)</h3>
+          <ol class="crm-device-steps">
+            <li>Cắm máy vào cùng mạng LAN với máy chủ PTT (Wi‑Fi hoặc dây).</li>
+            <li>Trên máy: <strong>Menu → Comm. → Cloud Server / ADMS</strong> (tên menu tuỳ firmware).</li>
+            <li>Đặt <strong>Server Address</strong> = IP máy chạy PTT, cổng <strong>5050</strong>, đường dẫn <code class="crm-code-inline">/iclock/cdata</code>.</li>
+            <li>Bật <strong>Real-time push</strong> (nếu có) → Lưu → khởi động lại máy.</li>
+            <li>Ghi <strong>Serial Number (SN)</strong> trên máy; tuỳ chọn đặt env <code class="crm-code-inline">CRM_ZKTECO_ALLOWED_SN=SN-máy-bạn</code> để chỉ nhận từ máy đó.</li>
+            <li>CRM → <strong>Nhân sự</strong>: với mỗi NV, điền <strong>Mã trên máy chấm công (PIN)</strong> trùng <strong>User ID</strong> trên MB20-VL (số đăng ký khuôn mặt).</li>
+            <li>Đăng ký khuôn mặt trên máy → chấm thử → kiểm tra bảng <strong>Chấm công</strong> bên dưới.</li>
+          </ol>
+          <p class="crm-device-endpoint-row">
+            <span class="crm-device-endpoint-label">URL máy MB20-VL:</span>
+            <code class="crm-device-endpoint" id="crm-zkteco-url">{{ zkteco_iclock_url }}</code>
+            <button type="button" class="btn-secondary crm-device-copy" id="crm-zkteco-copy-url" data-copy="{{ zkteco_iclock_url | e }}">Sao chép</button>
+          </p>
+          <p class="crm-device-json-hint muted">
+            Máy gọi <code>GET /iclock/getrequest</code> và <code>POST /iclock/cdata?SN=…&amp;table=ATTLOG</code> — PTT tự parse giờ vào/ra.
+            Không cần cài ZKBio Time nếu máy push trực tiếp được.
+          </p>
+
+          <h3 class="crm-device-subtitle">API JSON (script / gateway khác)</h3>
+          <ol class="crm-device-steps">
+            <li>Đặt env <code class="crm-code-inline">CRM_ATTENDANCE_DEVICE_KEY</code> = chuỗi bí mật.</li>
+            <li>POST JSON kèm header <code class="crm-code-inline">X-CRM-Device-Key</code> hoặc <code class="crm-code-inline">Authorization: Bearer …</code>.</li>
+          </ol>
+          <p class="crm-device-endpoint-row">
+            <span class="crm-device-endpoint-label">Endpoint:</span>
+            <code class="crm-device-endpoint" id="crm-device-url">{{ attendance_device_url }}</code>
+            <button type="button" class="btn-secondary crm-device-copy" id="crm-device-copy-url" data-copy="{{ attendance_device_url | e }}">Sao chép</button>
+          </p>
+          <p class="crm-device-key-state {% if device_key_configured %}is-on{% else %}is-off{% endif %}">
+            {% if device_key_configured %}Đã có khóa <code>CRM_ATTENDANCE_DEVICE_KEY</code> trên server.{% else %}Chưa có <code>CRM_ATTENDANCE_DEVICE_KEY</code> — API thiết bị trả 503 cho đến khi cấu hình.{% endif %}
+          </p>
+          <p class="crm-device-json-hint">
+            Ví dụ JSON: <code>{"pin":"0001","punched_at":"2026-05-05T08:30:00","kind":"auto","verify":"fingerprint"}</code>
+            — hoặc <code>work_date</code> + <code>time</code>. <code>kind</code>: <code>in</code> / <code>out</code> / <code>auto</code>.
+          </p>
+        </div>
+    </div>
+  </section>
+
+  <section id="crm-payroll-attendance" class="panel crm-staff-section crm-section-collapsible is-open" data-admin-section="crm_payroll_attendance" aria-label="Chấm công">
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Theo ngày</p>
+        <h2 class="crm-staff-section-title">Chấm công</h2>
+        <p class="muted crm-dept-sub">
+          {% if crm_staff_portal | default(false) %}
+          Bảng chấm công của bạn trong tháng đã chọn.
+          {% else %}
+          Lưu hoặc cập nhật bản ghi theo nhân viên + ngày làm việc.
+          {% endif %}
+        </p>
+      </div>
+      <button type="button" class="btn-secondary crm-section-toggle" aria-expanded="true">Thu gọn</button>
+    </div>
+    <div class="crm-section-collapsible-body">
+
+    <p class="crm-form-msg is-error crm-att-section-err" id="crm-att-err" hidden></p>
+
+    <div class="crm-att-workspace crm-payroll-admin-only">
+      <article class="crm-pr-subcard crm-att-import" aria-label="Nhập chấm công từ Excel">
+        <header class="crm-pr-subcard-head">
+          <p class="crm-staff-eyebrow">Nhập từ Excel</p>
+          <p class="muted crm-pr-subcard-desc">File «Bảng chấm công chi tiết»: cột <strong>Mã PIN</strong>, <strong>Ngày</strong>, <strong>Vào</strong>, <strong>Ra</strong>.</p>
+        </header>
+        <div class="crm-att-import-row">
+          <label class="crm-att-import-file-label">
+            <span class="crm-filter-label">Chọn file .xlsx</span>
+            <input type="file" id="crm-att-import-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+          </label>
+          <button type="button" class="btn-secondary" id="crm-att-import-btn" data-admin-section-allow="crm_payroll_attendance:create">Nhập chấm công</button>
+        </div>
+        <p class="crm-form-msg is-ok" id="crm-att-import-ok" hidden></p>
+      </article>
+
+      <article class="crm-pr-subcard crm-att-manual" aria-label="Ghi chấm công thủ công">
+        <header class="crm-pr-subcard-head">
+          <p class="crm-staff-eyebrow">Ghi thủ công</p>
+          <p class="muted crm-pr-subcard-desc">Lưu hoặc cập nhật theo nhân viên và ngày làm việc.</p>
+        </header>
+        <form id="crm-att-form" class="crm-detail-form">
+          <div class="crm-staff-edit-grid crm-att-form-grid">
+            <label>Nhân viên *
+              <span class="crm-combobox">
+                <select name="staff_id" id="crm-att-staff" required>
+                  <option value="">— Chọn nhân viên —</option>
+                </select>
+              </span>
+            </label>
+            <label>Ngày *
+              <span class="crm-combobox crm-combobox--date">
+                <input name="work_date" id="crm-att-date" type="date" required />
+              </span>
+            </label>
+            <label>Giờ vào
+              <input name="check_in" id="crm-att-in" type="text" placeholder="VD: 08:30" maxlength="16" autocomplete="off" />
+            </label>
+            <label>Giờ ra
+              <input name="check_out" id="crm-att-out" type="text" placeholder="VD: 17:45" maxlength="16" autocomplete="off" />
+            </label>
+            <label>Nghỉ (phút)
+              <input name="break_minutes" id="crm-att-break" type="number" min="0" max="1440" step="1" value="0" />
+            </label>
+          </div>
+          <label class="crm-staff-notes-label">Ghi chú
+            <textarea name="note" id="crm-att-note" maxlength="2000" rows="2" placeholder="Tuỳ chọn"></textarea>
+          </label>
+          <div class="crm-modal-actions crm-payroll-form-actions">
+            <button type="submit" class="btn">Lưu chấm công</button>
+          </div>
+        </form>
+      </article>
+    </div>
+
+    <div class="crm-att-list-panel">
+      <div class="crm-att-table-bar">
+        <div class="crm-table-bar-start">
+          <h3 class="crm-att-table-title">Bảng chấm công kỳ</h3>
+          <span class="crm-table-count" id="crm-att-count" aria-live="polite"></span>
+          <div class="crm-att-mini-stats" id="crm-att-mini-stats" aria-live="polite"></div>
+        </div>
+        <div class="crm-table-bar-filters crm-payroll-admin-only">
+          <div class="crm-search-wrap crm-search-wrap--compact">
+            <span class="crm-search-icon" aria-hidden="true">⌕</span>
+            <input type="search" id="crm-att-search" placeholder="Tìm tên, mã, ngày…" autocomplete="off" aria-label="Tìm trong bảng chấm công" />
+          </div>
+          <label class="crm-att-filter">
+            <span class="crm-filter-label">Nhân viên</span>
+            <span class="crm-combobox crm-combobox--compact">
+              <select id="crm-att-filter-staff" aria-label="Chỉ xem nhân viên">
+                <option value="">Tất cả nhân viên</option>
+              </select>
+            </span>
+          </label>
+        </div>
+      </div>
+
+    <div class="crm-staff-table-wrap crm-staff-table-shell crm-payroll-table-shell">
+      <table class="crm-staff-table crm-staff-table--compact">
+        <thead>
+          <tr>
+            <th>Ngày</th>
+            <th class="crm-att-col-staff">Nhân viên</th>
+            <th>Vào</th>
+            <th>Ra</th>
+            <th>Giờ làm</th>
+            <th>Trễ (p)</th>
+            <th>Phạt trễ</th>
+            <th>Nghỉ</th>
+            <th>Ghi chú</th>
+          </tr>
+        </thead>
+        <tbody id="crm-att-tbody"></tbody>
+      </table>
+    </div>
+    <p class="crm-staff-empty muted" id="crm-att-empty" hidden>Chưa có dữ liệu chấm công trong khoảng đã chọn.</p>
+    </div>
+    </div>
+  </section>
+
+  <section id="crm-payroll-salary" class="panel crm-staff-section crm-payroll-admin-only crm-section-collapsible is-open" data-admin-section="crm_payroll_salary" aria-label="Lương tháng">
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Kỳ lương</p>
+        <h2 class="crm-staff-section-title">Bảng lương</h2>
+        <p class="muted crm-dept-sub" id="crm-pr-payroll-meta">Chưa có kỳ cho tháng này — bấm <strong>Tính lương</strong> sau khi đã chấm công.</p>
+      </div>
+      <div class="crm-section-head-actions">
+        <button type="button" class="btn-secondary crm-section-toggle" aria-expanded="true">Thu gọn</button>
+        <div class="crm-payroll-actions">
+        <button type="button" class="btn" id="crm-pr-compute">Tính / cập nhật lương</button>
+        <button type="button" class="btn-secondary" id="crm-pr-lock" hidden>Khóa kỳ</button>
+        <button type="button" class="btn-secondary" id="crm-pr-unlock" hidden>Mở lại (nháp)</button>
+        </div>
+      </div>
+    </div>
+    <div class="crm-section-collapsible-body">
+    <p class="crm-form-msg is-error" id="crm-pr-err" hidden></p>
+
+    <div class="crm-payroll-export crm-pr-subcard" aria-label="Xuất bảng lương">
+      <header class="crm-pr-subcard-head">
+        <p class="crm-staff-eyebrow">Xuất file</p>
+        <p class="muted crm-pr-subcard-desc">Excel hoặc CSV theo tháng, quý hoặc khoảng thời gian — có thể lọc theo nhân viên.</p>
+      </header>
+      <div class="crm-payroll-export-grid">
+        <div class="crm-export-group">
+          <span class="crm-export-group-label">Kỳ xuất</span>
+          <div class="crm-export-period-fields">
+            <label class="crm-payroll-field">Kiểu kỳ
+              <span class="crm-combobox crm-combobox--compact">
+                <select id="crm-pr-export-period" aria-label="Kiểu kỳ xuất">
+                  <option value="month">Theo tháng</option>
+                  <option value="quarter">Theo quý</option>
+                  <option value="range">Khoảng thời gian</option>
+                </select>
+              </span>
+            </label>
+            <label id="crm-pr-export-quarter-wrap" class="crm-payroll-field crm-pr-export-opt" hidden>Quý
+              <span class="crm-combobox crm-combobox--compact">
+                <select id="crm-pr-export-quarter" aria-label="Quý">
+                  <option value="1">Q1 (T1–T3)</option>
+                  <option value="2">Q2 (T4–T6)</option>
+                  <option value="3">Q3 (T7–T9)</option>
+                  <option value="4">Q4 (T10–T12)</option>
+                </select>
+              </span>
+            </label>
+            <label id="crm-pr-export-from-wrap" class="crm-payroll-field crm-pr-export-opt" hidden>Từ ngày
+              <span class="crm-combobox crm-combobox--compact crm-combobox--date">
+                <input type="date" id="crm-pr-export-from" aria-label="Từ ngày" />
+              </span>
+            </label>
+            <label id="crm-pr-export-to-wrap" class="crm-payroll-field crm-pr-export-opt" hidden>Đến ngày
+              <span class="crm-combobox crm-combobox--compact crm-combobox--date">
+                <input type="date" id="crm-pr-export-to" aria-label="Đến ngày" />
+              </span>
+            </label>
+          </div>
+        </div>
+        <div class="crm-export-group">
+          <span class="crm-export-group-label">Nhân viên</span>
+          <div class="crm-pr-export-staff-wrap">
+            <div class="crm-search-wrap crm-search-wrap--compact">
+              <span class="crm-search-icon" aria-hidden="true">⌕</span>
+              <input
+                type="search"
+                id="crm-pr-export-staff-search"
+                placeholder="Tìm tên hoặc mã nhân viên…"
+                autocomplete="off"
+                aria-label="Tìm nhân viên khi xuất"
+              />
+            </div>
+            <span class="crm-combobox crm-combobox--compact">
+              <select id="crm-pr-export-staff" aria-label="Chọn nhân viên khi xuất">
+                <option value="">Tất cả nhân viên</option>
+              </select>
+            </span>
+            <span class="muted crm-pr-export-staff-hint" id="crm-pr-export-staff-hint" hidden></span>
+          </div>
+        </div>
+        <div class="crm-export-group crm-export-group--actions">
+          <span class="crm-export-group-label">Tải xuống</span>
+          <div class="crm-payroll-export-actions">
+            <button type="button" class="btn-secondary" id="crm-pr-export-xlsx" data-admin-section-allow="crm_payroll_salary:export">Xuất Excel</button>
+            <button type="button" class="btn-secondary" id="crm-pr-export-csv" data-admin-section-allow="crm_payroll_salary:export">Xuất CSV</button>
+          </div>
+        </div>
+      </div>
+      <p class="muted crm-filter-hint crm-payroll-export-hint" id="crm-pr-export-hint">Theo tháng: dùng Năm / Tháng ở thanh công cụ phía trên. Quý và khoảng thời gian có thêm tuỳ chọn bên cạnh.</p>
+    </div>
+
+    <div class="crm-pr-table-panel">
+    <div class="crm-att-table-bar">
+      <div class="crm-table-bar-start">
+        <h3 class="crm-att-table-title">Chi tiết lương kỳ</h3>
+        <span class="crm-table-count" id="crm-pr-count" aria-live="polite"></span>
+        <div class="crm-pr-mini-stats" id="crm-pr-mini-stats" aria-live="polite"></div>
+      </div>
+      <div class="crm-table-bar-filters">
+        <div class="crm-search-wrap crm-search-wrap--compact">
+          <span class="crm-search-icon" aria-hidden="true">⌕</span>
+          <input type="search" id="crm-pr-search" placeholder="Tìm tên hoặc mã NV…" autocomplete="off" aria-label="Tìm trong bảng lương" />
+        </div>
+      </div>
+    </div>
+    <div class="crm-staff-table-wrap crm-staff-table-shell crm-payroll-table-shell">
+      <table class="crm-staff-table" id="crm-pr-table" hidden>
+        <thead>
+          <tr>
+            <th>Mã</th>
+            <th>Họ tên</th>
+            <th>Ngày công</th>
+            <th>Giờ làm</th>
+            <th>Trễ (p)</th>
+            <th>Lương CB</th>
+            <th>Theo giờ</th>
+            <th>PC cấp bậc</th>
+            <th>Thưởng</th>
+            <th>Phạt trễ</th>
+            <th>PC thêm</th>
+            <th>Khấu trừ</th>
+            <th>Thực lĩnh</th>
+            <th>Ghi chú dòng</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="crm-pr-tbody"></tbody>
+      </table>
+    </div>
+    <p class="crm-staff-empty muted" id="crm-pr-empty" hidden>Chưa có dòng lương. Bấm <strong>Tính lương</strong>.</p>
+    </div>
+    </div>
+  </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block admin_page_scripts %}
+{% if not crm_staff_portal | default(false) %}
+{% include 'partials/admin_grants_bootstrap.html' %}
+{% endif %}
+{% set _jp = static_js_file('crm_payroll.js') %}
+<script src="{{ url_for('static', filename=_jp) }}?v={{ static_v(_jp) }}"></script>
+{% endblock %}

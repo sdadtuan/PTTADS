@@ -1,0 +1,317 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}Kế hoạch marketing — CRM{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+{% block body_class_extra %}crm-body crm-mp-page{% endblock %}
+
+{% block admin_head %}
+  <meta name="description" content="Lập và theo dõi kế hoạch marketing năm, gắn chiến dịch và mốc tiến độ." />
+  <script id="crm-mp-meta" type="application/json">{{ {
+    "plan_statuses": plan_statuses,
+    "plan_status_labels": plan_status_labels,
+    "plan_priorities": plan_priorities,
+    "plan_priority_labels": plan_priority_labels,
+    "ms_statuses": ms_statuses,
+    "ms_status_labels": ms_status_labels,
+    "campaign_channels": campaign_channels,
+    "campaign_channel_labels": campaign_channel_labels,
+    "strategy_framework_labels": strategy_framework_labels,
+    "strategy_framework_keys": strategy_framework_keys,
+    "target_market_prof_keys": target_market_prof_keys,
+    "target_market_prof_labels": target_market_prof_labels,
+    "target_market_steps4_keys": target_market_steps4_keys,
+    "target_market_steps4_labels": target_market_steps4_labels
+  } | tojson }}</script>
+{% endblock %}
+
+{% block admin_page_title %}Kế hoạch marketing{% endblock %}
+{% block admin_page_desc %}
+  <p class="admin-page-desc">Theo dõi năm tài / kỳ, chiến lược, KPI, ngân sách và mốc theo roadmap; liên kết chiến dịch CRM.</p>
+{% endblock %}
+
+{% block admin_main %}
+<div class="crm-app" data-admin-section="crm_mktplan">
+
+  <div class="crm-hero crm-staff-hero">
+    <div class="crm-hero-text">
+      <span class="crm-hero-badge" aria-hidden="true">Marketing</span>
+      <p class="crm-hero-desc">
+        Theo dõi <strong>năm tài / kỳ</strong>, chiến lược, KPI, ngân sách và mốc theo roadmap. Soạn <strong>khung nghiệp vụ marketing đầy đủ</strong> và liên kết <strong>chiến dịch CRM</strong>.
+      </p>
+    </div>
+  </div>
+
+  <section class="panel crm-mp-segments" aria-labelledby="crm-mp-segments-h">
+    <div class="crm-mp-segments-head">
+      <p class="crm-staff-eyebrow">Phân loại khách hàng</p>
+      <h2 id="crm-mp-segments-h" class="crm-staff-section-title">KHTN · KHQT · CSKH</h2>
+      <p class="muted crm-mp-segments-lead">
+        Chọn một mục dưới đây để mở trang tham chiếu nghiệp vụ (mỗi ô là một liên kết).
+      </p>
+    </div>
+    <nav class="crm-mp-segments-nav" aria-label="KHTN, KHQT, CSKH">
+      <ul class="crm-mp-segments-grid" role="list">
+        {% for card in marketing_segment_cards | default([], true) %}
+        <li class="crm-mp-segments-cell">
+          <a
+            class="crm-mp-segments-item"
+            href="{{ url_for('crm_marketing_plan_segment_page', slug=card.slug) }}"
+          >
+            <span class="crm-mp-segments-code">{{ card.abbr | e }}</span>
+            <span class="crm-mp-segments-title">{{ card.title | e }}</span>
+            <span class="crm-mp-segments-desc">{{ card.lead | e }}</span>
+            <span class="crm-mp-segments-cta">Xem trang <span aria-hidden="true">→</span></span>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+    </nav>
+  </section>
+
+  <section class="panel crm-mp-filters" aria-label="Lọc kế hoạch">
+    <div class="crm-mp-filters-inner">
+      <label class="crm-mp-filter-cell">Năm tài / FY
+        <input type="number" id="crm-mp-filter-fy" min="1990" max="2120" step="1" />
+      </label>
+      <label class="crm-mp-filter-cell">Trạng thái
+        <select id="crm-mp-filter-status"></select>
+      </label>
+      <label class="crm-mp-filter-cell crm-mp-filter-grow">Tìm kiếm
+        <input type="search" id="crm-mp-f-q" placeholder="Tên, mã, nhãn kỳ..." autocomplete="off" />
+      </label>
+      <div class="crm-mp-filter-actions">
+        <button type="button" class="btn" id="crm-mp-open-create">＋ Kế hoạch mới</button>
+      </div>
+    </div>
+    <p class="crm-mp-list-msg muted" id="crm-mp-list-msg" hidden></p>
+  </section>
+
+  <div class="panel crm-mp-table-wrap" aria-busy="true" id="crm-mp-table-wrap">
+    <div class="crm-staff-section-head panel crm-mp-table-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Danh sách</p>
+        <h2 class="crm-staff-section-title">Kế hoạch</h2>
+      </div>
+    </div>
+    <div class="table-scroll-x">
+      <table class="crm-mp-table admin-table">
+        <thead>
+          <tr>
+            <th>Mã</th>
+            <th>Kế hoạch</th>
+            <th>Năm</th>
+            <th>Kỳ</th>
+            <th>TTr</th>
+            <th>U.Tiên</th>
+            <th>Owner</th>
+            <th class="crm-mp-num">Ngân sách (dự kiến)</th>
+            <th>Mốc</th>
+            <th>Campaign</th>
+            <th>Cập nhật</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="crm-mp-tbody"><tr><td colspan="12" class="muted">Đang tải...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL: Plan -->
+<div class="crm-modal-root" id="crm-mp-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-close-modal tabindex="-1"></div>
+  <div class="crm-modal-panel crm-modal-wide crm-modal-panel--detail" role="dialog" aria-modal="true" aria-labelledby="crm-mp-modal-title">
+    <header class="crm-modal-head crm-modal-head--detail">
+      <div>
+        <p class="crm-modal-kicker" id="crm-mp-modal-kicker">Kế hoạch</p>
+        <h2 id="crm-mp-modal-title">Kế hoạch marketing</h2>
+      </div>
+      <button type="button" class="crm-modal-close" data-close-modal aria-label="Đóng">×</button>
+    </header>
+    <form id="crm-mp-form" class="crm-detail-form crm-mp-form">
+      <input type="hidden" name="id" id="crm-mp-f-id" value="" />
+
+      <fieldset class="crm-fieldset crm-mp-fieldset">
+        <legend>Thông tin chung</legend>
+        <div class="crm-form-grid-2">
+          <label>Mã <input name="code" id="crm-mp-f-code" maxlength="64" placeholder="VD: MK_2026_Q1" /></label>
+          <label>Tên kế hoạch * <input name="name" id="crm-mp-f-name" required maxlength="400" /></label>
+        </div>
+        <div class="crm-form-grid-2">
+          <label>Năm (FY) * <input name="fiscal_year" id="crm-mp-form-fiscal" type="number" min="1990" max="2120" required /></label>
+          <label>Nhãn kỳ <input name="period_label" id="crm-mp-f-period" maxlength="120" placeholder="VD: Q1 / H1 / Cả năm" /></label>
+        </div>
+        <div class="crm-form-grid-2">
+          <label>Trạng thái <select name="status" id="crm-mp-form-status"></select></label>
+          <label>Ưu tiên <select name="priority" id="crm-mp-form-priority"></select></label>
+        </div>
+        <div class="crm-form-grid-2">
+          <label>Người phụ trách <select name="owner_staff_id" id="crm-mp-f-owner"><option value="">— Chưa gán —</option></select></label>
+        </div>
+        <div class="crm-form-grid-2">
+          <label>Bắt đầu <input name="start_date" id="crm-mp-f-start" type="date" /></label>
+          <label>Kết thúc <input name="end_date" id="crm-mp-f-end" type="date" /></label>
+        </div>
+      </fieldset>
+
+      <fieldset class="crm-fieldset crm-mp-fieldset">
+        <legend>Chiến lược &amp; đối tượng</legend>
+        <label>North star / Tầm nhìn kỳ <textarea name="north_star" id="crm-mp-f-north" rows="2" maxlength="2000"></textarea></label>
+        <label>Mục tiêu &amp; kết quả kỳ vọng <textarea name="objectives" id="crm-mp-f-obj" rows="4" maxlength="32000"></textarea></label>
+        <label>Trụ cột (mỗi dòng một ý)
+          <textarea name="pillars_text" id="crm-mp-f-pillars" rows="3" placeholder="Awareness&#10;Demand gen&#10;Retention"></textarea>
+        </label>
+        <label>Đối tượng / phân khúc <textarea name="audiences" id="crm-mp-f-aud" rows="3" maxlength="32000"></textarea></label>
+        <fieldset class="crm-mp-channels-fs">
+          <legend>Trọng tâm kênh</legend>
+          <div class="crm-mp-channel-grid" id="crm-mp-channel-checks"></div>
+        </fieldset>
+      </fieldset>
+
+      <fieldset class="crm-fieldset crm-mp-fieldset">
+        <legend>Khung nghiệp vụ marketing</legend>
+        <p class="muted crm-mp-fw-teaser">
+          Chín trụ cốt lõi: TMMT (chương trình chi tiết) → thông điệp → media → giữ chân → chăm sóc → chuyển đổi → trải nghiệm → vòng đời KH → giới thiệu.
+        </p>
+        <div class="crm-mp-fw-trigger-row">
+          <button type="button" class="btn-secondary" id="crm-mp-open-strategy-fw">Mở bảng chi tiết nghiệp vụ…</button>
+          <span class="muted crm-mp-fw-count" id="crm-mp-fw-summary" aria-live="polite">—</span>
+        </div>
+      </fieldset>
+
+      <fieldset class="crm-fieldset crm-mp-fieldset">
+        <legend>Ngân sách &amp; KPI</legend>
+        <div class="crm-form-grid-2">
+          <label>Ngân sách dự kiến (VND)
+            <input type="text" inputmode="numeric" name="budget_planned_vnd" id="crm-mp-f-budget-p" autocomplete="off" />
+          </label>
+          <label>Ngân sách đã chi (VND)
+            <input type="text" inputmode="numeric" name="budget_actual_vnd" id="crm-mp-f-budget-a" autocomplete="off" />
+          </label>
+        </div>
+        <div class="crm-mp-kpi-block">
+          <div class="crm-mp-kpi-head">
+            <span class="crm-staff-eyebrow">KPI / chỉ số thành công</span>
+            <button type="button" class="btn-secondary" id="crm-mp-kpi-add">＋ Chỉ số</button>
+          </div>
+          <table class="crm-mp-kpi-table">
+            <thead><tr><th>Chỉ số</th><th>Mục tiêu / ngưỡng</th><th></th></tr></thead>
+            <tbody id="crm-mp-kpi-tbody"></tbody>
+          </table>
+        </div>
+      </fieldset>
+
+      <fieldset class="crm-fieldset crm-mp-fieldset">
+        <legend>Rủi ro &amp; ghi chú</legend>
+        <label>Ghi nhận rủi ro / phụ thuộc <textarea name="risks_notes" id="crm-mp-f-risks" rows="3" maxlength="32000"></textarea></label>
+        <label>Ghi chú nội bộ <textarea name="notes" id="crm-mp-f-notes" rows="3" maxlength="32000"></textarea></label>
+      </fieldset>
+
+      <fieldset class="crm-fieldset crm-mp-fieldset">
+        <legend>Chiến dịch liên kết</legend>
+        <input type="search" class="crm-mp-campaign-filter" id="crm-mp-camp-filter" placeholder="Lọc theo tên chiến dịch..." autocomplete="off" />
+        <div class="crm-mp-campaign-box" id="crm-mp-campaign-box"></div>
+      </fieldset>
+
+      <fieldset class="crm-fieldset crm-mp-fieldset">
+        <legend>Cột mốc</legend>
+        <p class="muted crm-mp-ms-hint" id="crm-mp-ms-hint" hidden>Các mốc sẽ được thêm sau khi bạn <strong>Lưu kế hoạch</strong> lần đầu (hoặc thêm vào danh sách chờ).</p>
+        <div class="crm-mp-milestone-add-row">
+          <input type="text" id="crm-mp-ms-new-title" placeholder="Tiêu đề mốc *" maxlength="500" />
+          <input type="date" id="crm-mp-ms-new-due" />
+          <select id="crm-mp-ms-new-status"></select>
+          <button type="button" class="btn-secondary" id="crm-mp-ms-add">Thêm mốc</button>
+        </div>
+        <table class="crm-mp-ms-table">
+          <thead>
+            <tr><th>Mốc</th><th>Hạn</th><th>TT</th><th>Ghi chú</th><th></th></tr>
+          </thead>
+          <tbody id="crm-mp-ms-tbody"></tbody>
+        </table>
+      </fieldset>
+
+      <p class="crm-form-msg is-error" id="crm-mp-form-err" hidden></p>
+      <div class="crm-modal-actions crm-mp-modal-actions">
+        <button type="button" class="btn-secondary" id="crm-mp-delete-plan" hidden>Xoá kế hoạch</button>
+        <button type="button" class="btn-secondary" data-close-modal>Hủy</button>
+        <button type="submit" class="btn">Lưu kế hoạch</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Popup: khung nghiệp vụ marketing (9 trụ) — không nằm trong form kế hoạch để tránh reset vô ích -->
+<div class="crm-modal-root crm-mp-modal-strategy-fw" id="crm-mp-modal-strategy-fw" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop crm-mp-strategy-fw-backdrop" data-strategy-fw-close tabindex="-1" aria-hidden="true"></div>
+  <div class="crm-modal-panel crm-modal-wide" role="dialog" aria-modal="true" aria-labelledby="crm-mp-fw-title">
+    <header class="crm-modal-head crm-modal-head--detail">
+      <div>
+        <p class="crm-modal-kicker">Chuyên sâu</p>
+        <h2 id="crm-mp-fw-title">Khung nghiệp vụ marketing</h2>
+        <p class="crm-modal-sub muted">Hoàn thành từng trụ có thể chỉnh sửa ở đây — nhấn <strong>Đã xong</strong> để quay lại kế hoạch; nhớ <strong>Lưu kế hoạch</strong> để ghi vào hệ thống.</p>
+      </div>
+      <button type="button" class="crm-modal-close" data-strategy-fw-close aria-label="Đóng">×</button>
+    </header>
+    <div class="crm-mp-fw-popup-body">
+      <p class="muted crm-mp-fw-intro">Hoàn thành từng trụ có thể chỉnh sửa ở đây. TMMT có <strong>12 trường chương trình chi tiết</strong> và thêm <strong>quy trình 4 bước (14 ô)</strong> — dùng song song hoặc chọn một tùy dự án.</p>
+
+      <section class="crm-mp-tm-pro" aria-labelledby="crm-mp-tm-pro-h">
+        <h3 class="crm-mp-tm-pro-title" id="crm-mp-tm-pro-h">1 · TMMT — chương trình chuyên nghiệp (12 trường)</h3>
+        <p class="muted crm-mp-tm-pro-lead">
+          Bắt đầu bằng tóm tắt elevator, rồi điền 12 mảng cốt lõi: từ bối cảnh thị trường, định lượng TAM/SAM/SOM, ICP &amp; JTBD tới bằng chứng, ưu tiên phân khúc và giả thuyết cần chứng minh.
+        </p>
+        <label class="crm-mp-fw-item">{{ strategy_framework_labels.get("target_market", "TMMT") }}
+          <textarea id="crm-mp-sf-target_market" rows="3" maxlength="12000" placeholder="VD: Doanh nghiệp 20–200 nhân tại HCM cần outsourcing performance marketing B2B SaaS…"></textarea>
+        </label>
+        <div class="crm-mp-tm-pro-grid">
+          {% for key in target_market_prof_keys %}
+          <label class="crm-mp-fw-item">{{ target_market_prof_labels.get(key, key) }}
+            <textarea id="crm-mp-tm-{{ key }}" rows="3" maxlength="8000"></textarea>
+          </label>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="crm-mp-s4-flow" aria-labelledby="crm-mp-s4-h">
+        <h3 class="crm-mp-tm-pro-title" id="crm-mp-s4-h">2 · Quy trình 4 bước xác định TMMT (mẫu BĐS — áp dụng ngành khác)</h3>
+        <p class="muted crm-mp-tm-pro-lead">
+          Tổng quan thị trường → phân khúc → chọn TMMT → quyết định cuối (14 ô). Điền có thể tóm tắt hoặc liệt kê theo bullet; không thay chương trình TMMT chuyên nghiệp 12 trường phía trên.
+        </p>
+        {% for section_title, section_keys in target_market_steps4_sections %}
+        <div class="crm-mp-s4-block">
+          <h4 class="crm-mp-s4-step-title">{{ section_title }}</h4>
+          <div class="crm-mp-s4-grid">
+            {% for key in section_keys %}
+            <label class="crm-mp-fw-item">{{ target_market_steps4_labels.get(key, key) }}
+              <textarea id="crm-mp-s4-{{ key }}" rows="3" maxlength="8000"></textarea>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </section>
+
+      <hr class="crm-mp-fw-sep" aria-hidden="true" />
+
+      <p class="crm-mp-fw-rest-kicker muted">Các trụ nghiệp vụ còn lại</p>
+      <div class="crm-mp-fw-grid">
+        {% for key in strategy_framework_other_keys %}
+        <label class="crm-mp-fw-item">{{ strategy_framework_labels.get(key, key) }}
+          <textarea id="crm-mp-sf-{{ key }}" rows="4" maxlength="12000"></textarea>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="crm-modal-actions crm-mp-strategy-fw-foot">
+      <button type="button" class="btn" data-strategy-fw-close>Đã xong — quay lại kế hoạch</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block admin_page_scripts %}
+{% include 'partials/admin_grants_bootstrap.html' %}
+{% set _mpp_js = static_js_file('crm_marketing_plan.js') %}
+<script src="{{ url_for('static', filename=_mpp_js) }}?v={{ static_v(_mpp_js) }}"></script>
+{% endblock %}

@@ -1,0 +1,242 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}CRM Kinh doanh — PTT{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+{% block body_class_extra %}crm-body crm-sales-page{% endblock %}
+
+{% block admin_head %}
+  <meta name="description" content="CRM Kinh doanh — kế hoạch, phễu bán hàng, đối tác, giao dịch BĐS và báo cáo." />
+  <script id="crm-sales-meta" type="application/json">{{ {
+    "plan_statuses": crm_sales_plan_statuses,
+    "plan_status_labels": crm_sales_plan_status_labels,
+    "partner_types": crm_sales_partner_types,
+    "partner_type_labels": crm_sales_partner_type_labels,
+    "partner_statuses": crm_sales_partner_statuses,
+    "partner_status_labels": crm_sales_partner_status_labels,
+    "training_statuses": crm_sales_training_statuses,
+    "training_status_labels": crm_sales_training_status_labels,
+    "market_statuses": crm_sales_market_statuses,
+    "market_status_labels": crm_sales_market_status_labels,
+    "tx_types": crm_sales_tx_types,
+    "tx_type_labels": crm_sales_tx_type_labels,
+    "tx_stages": crm_sales_tx_stages,
+    "tx_stage_labels": crm_sales_tx_stage_labels,
+    "target_types": crm_sales_target_types,
+    "target_type_labels": crm_sales_target_type_labels,
+    "pipeline_labels": crm_sales_pipeline_labels,
+    "pipeline_stages": crm_sales_pipeline_stages
+  } | tojson }}</script>
+{% endblock %}
+
+{% block admin_page_title %}CRM Kinh doanh{% endblock %}
+{% block admin_page_desc %}
+  <p class="admin-page-desc">Lập kế hoạch &amp; chỉ tiêu, phát triển khách hàng tiềm năng, quản lý giao dịch BĐS, đào tạo sales và nghiên cứu thị trường.</p>
+{% endblock %}
+{% block admin_page_actions %}
+  <a class="btn-secondary" href="{{ url_for('crm_board') }}">Bảng CSKH</a>
+  <a class="btn-secondary" href="{{ url_for('crm_customers_page') }}">Khách hàng</a>
+  <a class="btn-secondary" href="{{ url_for('crm_hub_page') }}">Hub hợp đồng</a>
+{% endblock %}
+
+{% block admin_main %}
+<div class="crm-app crm-sales-app" data-admin-section="crm_sales_overview">
+  <div class="crm-hero crm-staff-hero crm-sales-hero">
+    <div class="crm-hero-text">
+      <span class="crm-hero-badge" aria-hidden="true">Kinh doanh</span>
+      <p class="crm-hero-desc">
+        Triển khai <strong>kế hoạch doanh thu</strong>, theo dõi <strong>phễu bán hàng</strong>,
+        phát triển <strong>đối tác &amp; CTV</strong>, quản lý <strong>giao dịch BĐS</strong> và báo cáo hiệu quả cho ban lãnh đạo.
+      </p>
+    </div>
+  </div>
+
+  <section class="panel crm-sales-summary" id="crm-sales-summary" data-admin-section="crm_sales_overview" aria-label="Tổng quan kinh doanh">
+    <div class="crm-sales-summary-grid" id="crm-sales-summary-grid">
+      <div class="crm-sales-kpi"><span class="crm-sales-kpi-lbl">Lead pipeline</span><strong id="crm-sales-kpi-pipeline">—</strong></div>
+      <div class="crm-sales-kpi"><span class="crm-sales-kpi-lbl">Deal chốt</span><strong id="crm-sales-kpi-won">—</strong></div>
+      <div class="crm-sales-kpi"><span class="crm-sales-kpi-lbl">Đối tác active</span><strong id="crm-sales-kpi-partners">—</strong></div>
+      <div class="crm-sales-kpi"><span class="crm-sales-kpi-lbl">Giao dịch đang xử lý</span><strong id="crm-sales-kpi-tx">—</strong></div>
+      <div class="crm-sales-kpi"><span class="crm-sales-kpi-lbl">NV kinh doanh</span><strong id="crm-sales-kpi-staff">—</strong></div>
+      <div class="crm-sales-kpi crm-sales-kpi--plan"><span class="crm-sales-kpi-lbl">Chỉ tiêu doanh thu</span><strong id="crm-sales-kpi-revenue">—</strong></div>
+    </div>
+    <p class="muted crm-sales-plan-hint" id="crm-sales-plan-hint"></p>
+  </section>
+
+  <nav class="panel crm-sales-tabs" aria-label="Mục CRM Kinh doanh">
+    <button type="button" class="crm-sales-tab is-active" data-sales-tab="overview">Tổng quan</button>
+    <button type="button" class="crm-sales-tab" data-sales-tab="plans">Kế hoạch &amp; KPI</button>
+    <button type="button" class="crm-sales-tab" data-sales-tab="funnel">Phễu bán hàng</button>
+    <button type="button" class="crm-sales-tab" data-sales-tab="prospects">KH &amp; đối tác</button>
+    <button type="button" class="crm-sales-tab" data-sales-tab="deals">Giao dịch</button>
+    <button type="button" class="crm-sales-tab" data-sales-tab="training">Đào tạo</button>
+    <button type="button" class="crm-sales-tab" data-sales-tab="market">Thị trường</button>
+    <button type="button" class="crm-sales-tab" data-sales-tab="reports">Báo cáo</button>
+  </nav>
+
+  <!-- Tổng quan -->
+  <section class="crm-sales-pane panel" data-sales-pane="overview" data-admin-section="crm_sales_overview" aria-label="Dashboard">
+    <div class="crm-sales-pane-grid">
+      <div class="crm-sales-card">
+        <h2 class="crm-sales-card-title">Phễu bán hàng</h2>
+        <div class="crm-sales-funnel-mini" id="crm-sales-funnel-mini"></div>
+      </div>
+      <div class="crm-sales-card">
+        <h2 class="crm-sales-card-title">Điểm nghẽn</h2>
+        <ul class="crm-sales-bottleneck-list" id="crm-sales-bottlenecks"></ul>
+      </div>
+      <div class="crm-sales-card crm-sales-card--wide">
+        <h2 class="crm-sales-card-title">Liên kết nhanh</h2>
+        <div class="crm-sales-quick-links">
+          <a class="btn-secondary" href="{{ url_for('crm_board') }}">Mở Bảng CSKH</a>
+          <a class="btn-secondary" href="{{ url_for('crm_customers_page') }}">Hồ sơ khách hàng</a>
+          <a class="btn-secondary" href="{{ url_for('crm_staff_page') }}">Nhân sự Sales</a>
+          <a class="btn-secondary" href="{{ url_for('crm_kpi_page') }}">KPI nhân viên</a>
+          <a class="btn-secondary" href="{{ url_for('crm_hub_page') }}">Hợp đồng Hub</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Kế hoạch -->
+  <section class="crm-sales-pane panel" data-sales-pane="plans" data-admin-section="crm_sales_plans" aria-label="Kế hoạch kinh doanh" hidden>
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Chiến lược</p>
+        <h2 class="crm-staff-section-title">Kế hoạch &amp; chỉ tiêu</h2>
+      </div>
+      <button type="button" class="btn" id="crm-sales-plan-add">+ Kế hoạch mới</button>
+    </div>
+    <div class="crm-sales-split">
+      <div class="crm-sales-split-col">
+        <h3 class="crm-sales-subtitle">Kế hoạch kinh doanh</h3>
+        <div id="crm-sales-plans-list" class="crm-sales-list"></div>
+      </div>
+      <div class="crm-sales-split-col">
+        <div class="crm-staff-section-head">
+          <h3 class="crm-sales-subtitle">Chỉ tiêu theo kế hoạch</h3>
+          <button type="button" class="btn-secondary btn-sm" id="crm-sales-target-add">+ Chỉ tiêu</button>
+        </div>
+        <div id="crm-sales-targets-list" class="crm-sales-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Phễu -->
+  <section class="crm-sales-pane panel" data-sales-pane="funnel" data-admin-section="crm_sales_funnel" aria-label="Phễu bán hàng" hidden>
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Pipeline</p>
+        <h2 class="crm-staff-section-title">Phễu &amp; lead đang xử lý</h2>
+      </div>
+      <label class="crm-sales-filter-label">
+        Giai đoạn
+        <select id="crm-sales-funnel-stage"></select>
+      </label>
+    </div>
+    <div class="crm-sales-funnel-bars" id="crm-sales-funnel-bars"></div>
+    <div class="crm-staff-table-wrap">
+      <table class="crm-staff-table crm-staff-table--compact">
+        <thead>
+          <tr><th>Hồ sơ</th><th>Khách</th><th>Giai đoạn</th><th>Giá trị</th><th>NV</th><th></th></tr>
+        </thead>
+        <tbody id="crm-sales-pipeline-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Đối tác -->
+  <section class="crm-sales-pane panel" data-sales-pane="prospects" data-admin-section="crm_sales_prospects" aria-label="Khách hàng và đối tác" hidden>
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Phát triển</p>
+        <h2 class="crm-staff-section-title">Đại lý, CTV &amp; đối tác</h2>
+      </div>
+      <button type="button" class="btn" id="crm-sales-partner-add">+ Đối tác mới</button>
+    </div>
+    <label class="crm-search-wrap crm-sales-search">
+      <input type="search" id="crm-sales-partner-q" placeholder="Tìm tên, SĐT, công ty…" autocomplete="off" />
+    </label>
+    <div id="crm-sales-partners-list" class="crm-sales-card-grid"></div>
+  </section>
+
+  <!-- Giao dịch -->
+  <section class="crm-sales-pane panel" data-sales-pane="deals" data-admin-section="crm_sales_deals" aria-label="Giao dịch BĐS" hidden>
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Thủ tục</p>
+        <h2 class="crm-staff-section-title">Giao dịch mua · bán · cho thuê</h2>
+      </div>
+      <button type="button" class="btn" id="crm-sales-tx-add">+ Giao dịch mới</button>
+    </div>
+    <div class="crm-staff-table-wrap">
+      <table class="crm-staff-table">
+        <thead>
+          <tr><th>Loại</th><th>BĐS / mã</th><th>Khách</th><th>Giai đoạn</th><th>Giá trị</th><th>NV</th><th></th></tr>
+        </thead>
+        <tbody id="crm-sales-tx-tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Đào tạo -->
+  <section class="crm-sales-pane panel" data-sales-pane="training" data-admin-section="crm_sales_training" aria-label="Đào tạo sales" hidden>
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Nhân sự Sales</p>
+        <h2 class="crm-staff-section-title">Đào tạo &amp; nâng cao kỹ năng</h2>
+      </div>
+      <button type="button" class="btn" id="crm-sales-training-add">+ Buổi đào tạo</button>
+    </div>
+    <p class="muted crm-sales-hint">Ghi nhận nội dung đào tạo bán hàng, cập nhật chính sách thị trường và kỹ năng tư vấn BĐS.</p>
+    <div id="crm-sales-trainings-list" class="crm-sales-list"></div>
+  </section>
+
+  <!-- Thị trường -->
+  <section class="crm-sales-pane panel" data-sales-pane="market" data-admin-section="crm_sales_market" aria-label="Nghiên cứu thị trường" hidden>
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Phân tích</p>
+        <h2 class="crm-staff-section-title">Nghiên cứu thị trường &amp; chiến lược</h2>
+      </div>
+      <button type="button" class="btn" id="crm-sales-market-add">+ Báo cáo mới</button>
+    </div>
+    <div id="crm-sales-market-list" class="crm-sales-list"></div>
+  </section>
+
+  <!-- Báo cáo -->
+  <section class="crm-sales-pane panel" data-sales-pane="reports" data-admin-section="crm_sales_reports" aria-label="Báo cáo kinh doanh" hidden>
+    <div class="crm-staff-section-head">
+      <div class="crm-staff-section-intro">
+        <p class="crm-staff-eyebrow">Quản lý</p>
+        <h2 class="crm-staff-section-title">Báo cáo kết quả kinh doanh</h2>
+      </div>
+    </div>
+    <div class="crm-sales-report-grid" id="crm-sales-report-grid"></div>
+    <h3 class="crm-sales-subtitle">Hiệu suất theo nhân viên</h3>
+    <div class="crm-staff-table-wrap">
+      <table class="crm-staff-table crm-staff-table--compact">
+        <thead><tr><th>Nhân viên</th><th>Đang mở</th><th>Chốt</th><th>Mất</th><th>Quá SLA</th></tr></thead>
+        <tbody id="crm-sales-report-staff"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<!-- Modal chung -->
+<div class="crm-modal-root" id="crm-sales-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" data-sales-close tabindex="-1"></div>
+  <div class="crm-modal-panel crm-sales-modal-panel" role="dialog" aria-modal="true">
+    <header class="crm-modal-head">
+      <h2 id="crm-sales-modal-title">—</h2>
+      <button type="button" class="crm-modal-close" data-sales-close aria-label="Đóng">×</button>
+    </header>
+    <form id="crm-sales-modal-form" class="crm-detail-form"></form>
+  </div>
+</div>
+{% endblock %}
+
+{% block admin_page_scripts %}
+{% include 'partials/admin_grants_bootstrap.html' %}
+{% set _js = static_js_file('crm_sales.js') %}
+<script src="{{ url_for('static', filename=_js) }}?v={{ static_v(_js) }}"></script>
+{% endblock %}

@@ -1,0 +1,13 @@
+{# Liên kết CRM — dùng trong topbar landing và default-nav #}
+{% macro crm_nav_items(link_class='', active_endpoint='') %}
+<a href="{{ url_for('crm_board') }}" class="{{ link_class }}{% if active_endpoint == 'crm_board' or request.endpoint == 'crm_board' %} is-active{% endif %}" data-admin-nav="crm_board_kanban">Bảng CSKH</a>
+<a href="{{ url_for('crm_leads_page') }}" class="{{ link_class }}{% if active_endpoint == 'crm_leads_page' or request.endpoint == 'crm_leads_page' %} is-active{% endif %}" data-admin-nav="crm_leads">Quản lý Lead</a>
+<a href="{{ url_for('crm_sales_page') }}" class="{{ link_class }}{% if active_endpoint == 'crm_sales_page' or request.endpoint == 'crm_sales_page' %} is-active{% endif %}" data-admin-nav="crm_sales_overview">Kinh doanh</a>
+<a href="{{ url_for('crm_hub_page') }}" class="{{ link_class }}{% if active_endpoint == 'crm_hub_page' or request.endpoint == 'crm_hub_page' %} is-active{% endif %}" data-admin-nav="crm_hub_campaigns">Marketing &amp; hợp đồng</a>
+<a href="{{ url_for('crm_marketing_plan_page') }}" class="{{ link_class }}{% if active_endpoint == 'crm_marketing_plan_page' or request.endpoint == 'crm_marketing_plan_page' %} is-active{% endif %}" data-admin-nav="crm_mktplan">Kế hoạch marketing</a>
+<a href="{{ url_for('crm_sop_page') }}" class="{{ link_class }}{% if active_endpoint == 'crm_sop_page' or request.endpoint == 'crm_sop_page' %} is-active{% endif %}" data-admin-nav="crm_sop_runs">Quy trình SOP</a>
+<a href="{{ url_for('crm_staff_page') }}" class="{{ link_class }}{% if active_endpoint == 'crm_staff_page' or request.endpoint == 'crm_staff_page' %} is-active{% endif %}" data-admin-nav="crm_staff_roster">Nhân viên CRM</a>
+<a href="{{ url_for('crm_daily_reports_page') }}" class="{{ link_class }}{% if active_endpoint == 'crm_daily_reports_page' or request.endpoint == 'crm_daily_reports_page' %} is-active{% endif %}" data-admin-nav="crm_daily_work_report">Báo cáo công việc</a>
+<a href="{{ url_for('crm_kpi_page') }}" class="{{ link_class }}{% if active_endpoint == 'crm_kpi_page' or request.endpoint == 'crm_kpi_page' %} is-active{% endif %}" data-admin-nav="crm_kpi_records">KPI nhân viên</a>
+<a href="{{ url_for('crm_payroll_page') }}" class="{{ link_class }}{% if active_endpoint == 'crm_payroll_page' or request.endpoint == 'crm_payroll_page' %} is-active{% endif %}" data-admin-nav="crm_payroll_attendance">Chấm công &amp; lương</a>
+{% endmacro %}

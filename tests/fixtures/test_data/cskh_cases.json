@@ -1,0 +1,36 @@
+{
+  "_comment": "Dữ liệu test Bảng CSKH Kanban và Khách hàng 360°",
+  "customer": {
+    "name": "Công ty ABC",
+    "phone": "0281234567",
+    "email": "contact@abc-corp.vn",
+    "type": "doanh_nghiep"
+  },
+  "case_new": {
+    "customer_name": "Công ty ABC",
+    "channel": "hotline",
+    "title": "Yêu cầu tư vấn dịch vụ quảng cáo",
+    "description": "Khách muốn chạy Facebook Ads Q3",
+    "initial_stage": "Mới",
+    "assign_staff_id": 1
+  },
+  "pipeline_stages": [
+    "Mới",
+    "Đang liên hệ",
+    "MQL",
+    "SQL",
+    "Báo giá",
+    "Chốt",
+    "Mất"
+  ],
+  "stage_transition": {
+    "case_id": "<AUTO>",
+    "from": "Mới",
+    "to": "Đang liên hệ",
+    "care_report": "Đã gọi lần 1, khách quan tâm gói Premium"
+  },
+  "portal_scope": {
+    "staff_assigned": {"staff_id": 1, "sees_case": true},
+    "staff_unassigned": {"staff_id": 3, "sees_case": false}
+  }
+}

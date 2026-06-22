@@ -1,0 +1,238 @@
+{# Quy trình quản lý CRM 6 bước — dùng trên Bảng CSKH #}
+<section class="crm-staff-zone crm-staff-zone--playbook crm-board-playbook" aria-labelledby="crm-wf-title" id="crm-workflow-playbook">
+  <header class="crm-staff-zone-head">
+    <span class="crm-staff-zone-badge crm-staff-zone-badge--playbook" aria-hidden="true">CRM</span>
+    <div class="crm-staff-zone-head-text">
+      <h2 id="crm-wf-title" class="crm-staff-zone-title">Quy trình quản lý CRM — 6 bước</h2>
+      <p class="crm-staff-zone-desc muted">
+        Khung vận hành khi <strong>khách đổ về từ marketing</strong> (form, ads, email, MXH, hotline…): chọn kênh → làm theo checklist T+0 → áp dụng 6 trụ CRM ngay trên bảng Kanban phía trên.
+      </p>
+    </div>
+  </header>
+
+  <nav class="panel crm-wf-mode-nav" aria-label="Chế độ xem playbook">
+    <button type="button" class="crm-wf-mode-btn is-active" data-wf-mode="ingress">Lead marketing đổ về</button>
+    <button type="button" class="crm-wf-mode-btn" data-wf-mode="pillars">6 trụ quản lý CRM</button>
+  </nav>
+
+  <div class="crm-wf-mode-pane is-active" data-wf-mode-pane="ingress">
+    <section class="panel crm-wf-master" aria-labelledby="crm-wf-master-title">
+      <h3 id="crm-wf-master-title" class="crm-wf-block-title">Luồng chuẩn — từ lúc lead về đến chốt đơn</h3>
+      <p class="muted crm-wf-master-intro">Áp dụng cho mọi kênh. Mỗi giai đoạn map vào 1 trong 6 trụ CRM.</p>
+      <div class="crm-wf-master-timeline">
+        {% for phase in crm_lead_intake_flow %}
+        <article class="crm-wf-master-item">
+          <div class="crm-wf-master-phase">
+            <span class="crm-wf-master-pillar">Bước {{ phase.pillar_num }}</span>
+            <strong>{{ phase.phase }}</strong>
+          </div>
+          <h4 class="crm-wf-master-step-title">{{ phase.title }}</h4>
+          <ul class="crm-wf-checklist">
+            {% for act in phase.actions %}
+            <li>{{ act }}</li>
+            {% endfor %}
+          </ul>
+          <p class="crm-wf-step-meta">
+            <span>Trên CRM: {{ phase.crm_where }}</span>
+            <span>SLA: {{ phase.sla }}</span>
+          </p>
+        </article>
+        {% endfor %}
+      </div>
+      <p class="crm-wf-master-cta muted">
+        <button type="button" class="btn crm-wf-link-btn crm-add-open" data-admin-section-allow>+ Tạo yêu cầu mới trên Kanban</button>
+      </p>
+    </section>
+
+    <section class="crm-wf-ingress" aria-labelledby="crm-wf-ingress-title">
+      <h3 id="crm-wf-ingress-title" class="crm-wf-block-title">Chọn kênh marketing — hướng dẫn chi tiết</h3>
+      <p class="muted">Xác định lead thuộc kênh nào, làm đúng checklist T+0 và ma trận 6 bước bên dưới.</p>
+
+      <nav class="crm-wf-channel-nav" aria-label="Kênh marketing">
+        {% for ch in crm_marketing_channels %}
+        <button
+          type="button"
+          class="crm-wf-channel-btn{% if loop.first %} is-active{% endif %}"
+          data-wf-channel="{{ ch.id }}"
+          aria-controls="crm-wf-channel-{{ ch.id }}"
+        >
+          <span class="crm-wf-channel-icon" aria-hidden="true">{{ ch.icon }}</span>
+          <span>{{ ch.label }}</span>
+        </button>
+        {% endfor %}
+      </nav>
+
+      {% for ch in crm_marketing_channels %}
+      <article
+        class="panel crm-wf-channel-panel{% if loop.first %} is-active{% endif %}"
+        id="crm-wf-channel-{{ ch.id }}"
+        data-wf-channel-panel="{{ ch.id }}"
+        {% if not loop.first %}hidden{% endif %}
+      >
+        <header class="crm-wf-channel-head">
+          <h4>{{ ch.icon }} {{ ch.label }}</h4>
+          <p class="muted"><strong>Nhận diện:</strong> {{ ch.detect }}</p>
+          <div class="crm-wf-channel-badges">
+            <span class="crm-wf-badge">CRM channel: {{ ch.crm_channel_label }}</span>
+            <span class="crm-wf-badge">SLA liên hệ: {{ ch.sla_contact }}</span>
+            <span class="crm-wf-badge">Priority gợi ý: {{ ch.priority_hint }}</span>
+          </div>
+        </header>
+
+        <div class="crm-wf-channel-grid">
+          <section class="crm-wf-block">
+            <h5 class="crm-wf-subtitle">Trường bắt buộc ghi trên case</h5>
+            <ul class="crm-wf-checklist">
+              {% for f in ch.intake_fields %}
+              <li>{{ f }}</li>
+              {% endfor %}
+            </ul>
+            <h5 class="crm-wf-subtitle">Checklist T+0 (ngay khi nhận lead)</h5>
+            <ol class="crm-wf-checklist crm-wf-checklist--ordered">
+              {% for item in ch.t0_checklist %}
+              <li>{{ item }}</li>
+              {% endfor %}
+            </ol>
+          </section>
+
+          <section class="crm-wf-block">
+            <h5 class="crm-wf-subtitle">Ma trận áp dụng 6 trụ CRM</h5>
+            <div class="crm-wf-matrix-wrap">
+              <table class="crm-wf-matrix-table">
+                <thead>
+                  <tr><th>Trụ</th><th>Việc cần làm với kênh này</th></tr>
+                </thead>
+                <tbody>
+                  {% for row in ch.pillar_matrix %}
+                  <tr>
+                    <td>Bước {{ row.pillar }}</td>
+                    <td>{{ row.action }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="crm-wf-block crm-wf-block--script">
+            <h5 class="crm-wf-subtitle">Script &amp; qualify</h5>
+            <p class="crm-wf-script"><strong>Mở đầu:</strong> {{ ch.script_open }}</p>
+            <p class="crm-wf-subtitle">Câu hỏi qualify:</p>
+            <ul class="crm-wf-checklist">
+              {% for q in ch.qualify_questions %}
+              <li>{{ q }}</li>
+              {% endfor %}
+            </ul>
+            <p class="crm-wf-script"><strong>Không liên hệ được:</strong> {{ ch.if_no_answer }}</p>
+            {% if ch.if_spam and ch.if_spam != "N/A" %}
+            <p class="crm-wf-script crm-wf-script--warn"><strong>Lead rác/spam:</strong> {{ ch.if_spam }}</p>
+            {% endif %}
+          </section>
+        </div>
+      </article>
+      {% endfor %}
+    </section>
+  </div>
+
+  <div class="crm-wf-mode-pane" data-wf-mode-pane="pillars" hidden>
+    <nav class="panel crm-wf-nav" aria-label="6 bước quản lý CRM">
+      {% for pillar in crm_workflow_playbook %}
+      <button
+        type="button"
+        class="crm-wf-nav-btn{% if loop.first %} is-active{% endif %}"
+        data-wf-tab="{{ pillar.id }}"
+        aria-controls="crm-wf-panel-{{ pillar.id }}"
+        aria-selected="{{ 'true' if loop.first else 'false' }}"
+      >
+        <span class="crm-wf-nav-num">{{ pillar.num }}</span>
+        <span class="crm-wf-nav-label">{{ pillar.title }}</span>
+      </button>
+      {% endfor %}
+    </nav>
+
+    {% for pillar in crm_workflow_playbook %}
+    <article
+      class="panel crm-wf-panel{% if loop.first %} is-active{% endif %}"
+      id="crm-wf-panel-{{ pillar.id }}"
+      data-wf-panel="{{ pillar.id }}"
+      {% if not loop.first %}hidden{% endif %}
+      aria-labelledby="crm-wf-h-{{ pillar.id }}"
+    >
+      <header class="crm-wf-panel-head">
+        <p class="crm-staff-eyebrow">Bước {{ pillar.num }} / 6</p>
+        <h3 id="crm-wf-h-{{ pillar.id }}" class="crm-wf-panel-title">{{ pillar.title }}</h3>
+        <p class="crm-wf-summary">{{ pillar.summary }}</p>
+        <div class="crm-wf-meta">
+          <span><strong>Mục tiêu:</strong> {{ pillar.goal }}</span>
+          <span><strong>Phụ trách:</strong> {{ pillar.owner }}</span>
+        </div>
+        {% if pillar.crm_links %}
+        <div class="crm-wf-links">
+          {% for link in pillar.crm_links %}
+          <a class="btn-secondary crm-wf-link-btn" href="{{ url_for(link.route) }}">{{ link.label }}</a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </header>
+
+      <div class="crm-wf-grid">
+        {% if pillar.apply_marketing %}
+        <section class="crm-wf-block crm-wf-block--apply" aria-label="Áp dụng khi lead marketing đổ về">
+          <h4 class="crm-wf-block-title">Áp dụng khi lead marketing đổ về</h4>
+          <ul class="crm-wf-checklist">
+            {% for item in pillar.apply_marketing %}
+            <li>{{ item }}</li>
+            {% endfor %}
+          </ul>
+        </section>
+        {% endif %}
+        <section class="crm-wf-block crm-wf-block--steps" aria-label="Các bước thực hiện">
+          <h4 class="crm-wf-block-title">Các bước thực hiện</h4>
+          <ol class="crm-wf-steps">
+            {% for step in pillar.steps %}
+            <li class="crm-wf-step">
+              <strong class="crm-wf-step-title">{{ step.title }}</strong>
+              <p class="muted crm-wf-step-detail">{{ step.detail }}</p>
+              <p class="crm-wf-step-meta">
+                <span>Owner: {{ step.owner }}</span>
+                <span>SLA: {{ step.sla }}</span>
+              </p>
+            </li>
+            {% endfor %}
+          </ol>
+        </section>
+
+        <aside class="crm-wf-side">
+          <section class="crm-wf-block crm-wf-block--check" aria-label="Checklist">
+            <h4 class="crm-wf-block-title">Checklist vận hành</h4>
+            <ul class="crm-wf-checklist">
+              {% for item in pillar.checklist %}
+              <li>{{ item }}</li>
+              {% endfor %}
+            </ul>
+          </section>
+          <section class="crm-wf-block crm-wf-block--kpi" aria-label="KPI theo dõi">
+            <h4 class="crm-wf-block-title">KPI theo dõi</h4>
+            <div class="crm-wf-kpi-table-wrap">
+              <table class="crm-wf-kpi-table">
+                <thead>
+                  <tr><th>Chỉ số</th><th>Mục tiêu</th><th>Tần suất</th></tr>
+                </thead>
+                <tbody>
+                  {% for kpi in pillar.kpis %}
+                  <tr>
+                    <td>{{ kpi.name }}</td>
+                    <td>{{ kpi.target }}</td>
+                    <td>{{ kpi.freq }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>

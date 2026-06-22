@@ -1,0 +1,63 @@
+{
+  "_comment": "Kịch bản phân quyền CMS role + CRM position",
+  "cms_roles": [
+    {
+      "role": "super_admin",
+      "can_access": ["/admin", "/cms", "/crm", "/crm/leads", "/crm/re-projects"],
+      "can_configure_permissions_matrix": false,
+      "note": "super_admin mới gán role super_admin cho người khác"
+    },
+    {
+      "role": "content_editor",
+      "can_access": ["/admin", "/cms"],
+      "cannot_access": ["/crm/leads"],
+      "can_edit": ["landing", "services", "projects_portfolio", "news"]
+    },
+    {
+      "role": "marketing_lead",
+      "can_access": ["/cms", "/cms/chat-marketing"],
+      "can_export": true,
+      "cannot_configure": ["chatbox_settings"]
+    }
+  ],
+  "crm_positions": [
+    {
+      "code": "CSKH-01",
+      "sections_view": ["cskh_board", "customers", "reminders", "kpi_records"],
+      "sections_create": ["customers", "cskh_cases"],
+      "sections_denied": ["crm_sales", "re_projects", "payroll_config"]
+    },
+    {
+      "code": "KD-01",
+      "sections_view": ["cskh_board", "hub", "marketing_plan", "crm_sales", "leads", "kpi"],
+      "sections_create": ["leads", "deals"],
+      "sections_denied": ["payroll_config", "permissions_matrix"]
+    }
+  ],
+  "portal_restrictions": {
+    "sales_on_project": {
+      "staff_id": 1,
+      "project_code": "DA-A",
+      "leads_visible": "own_assigned_only",
+      "can_create_lead": true,
+      "must_select_project": true
+    },
+    "manager_on_project": {
+      "staff_id": 2,
+      "project_code": "DA-A",
+      "leads_visible": "all_in_project",
+      "can_reassign_owner": false
+    },
+    "outsider": {
+      "staff_id": 3,
+      "leads_visible": "none",
+      "cskh_cases_visible": "assigned_only"
+    }
+  },
+  "api_denied_without_permission": {
+    "user": "content_editor",
+    "method": "DELETE",
+    "path": "/api/crm/leads/1",
+    "expected": "HTTP 403 Forbidden"
+  }
+}
