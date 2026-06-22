@@ -16778,6 +16778,88 @@ def cms_live_chat_save_settings() -> Any:
     return jsonify({"ok": True})
 
 
+# ── Service Delivery Dashboard ─────────────────────────────────────────────
+
+@app.get("/crm/service-delivery")
+def crm_service_delivery_page() -> Any:
+    from collections import defaultdict
+    with get_connection() as conn:
+        lifecycles = _svc_list_active(conn, include_draft=True)
+    by_stage: dict = defaultdict(list)
+    for lc in lifecycles:
+        by_stage[lc["stage"]].append(lc)
+    return render_template(
+        "crm_service_delivery.html",
+        by_stage=by_stage,
+        stages=SVC_LIFECYCLE_STAGES,
+        valid_slugs=sorted(SVC_LIFECYCLE_SLUGS),
+    )
+
+
+@app.get("/api/crm/service-lifecycle")
+def api_svc_lifecycle_list() -> Any:
+    service_slug = request.args.get("service_slug") or None
+    am_id = _opt_pos_int(request.args.get("am_id"))
+    include_draft = request.args.get("include_draft", "0") == "1"
+    with get_connection() as conn:
+        rows = _svc_list_active(conn, service_slug=service_slug, am_id=am_id, include_draft=include_draft)
+    return jsonify(rows)
+
+
+@app.post("/api/crm/service-lifecycle")
+def api_svc_lifecycle_create() -> Any:
+    payload = request.get_json(force=True) or {}
+    lead_id = _opt_pos_int(payload.get("lead_id"))
+    service_slug = str(payload.get("service_slug", "")).strip()
+    if not lead_id or not service_slug:
+        return jsonify({"error": "Cần lead_id và service_slug"}), 400
+    from crm_service_lifecycle import create_draft_lifecycle
+    with get_connection() as conn:
+        lid = create_draft_lifecycle(conn, lead_id=lead_id, service_slug=service_slug, suggested_by="human")
+        row = conn.execute("SELECT * FROM crm_service_lifecycle WHERE id = ?", (lid,)).fetchone()
+    return jsonify(dict(row)), 201
+
+
+@app.patch("/api/crm/service-lifecycle/<int:lifecycle_id>")
+def api_svc_lifecycle_patch(lifecycle_id: int) -> Any:
+    payload = request.get_json(force=True) or {}
+    to_stage = str(payload.get("stage", "")).strip()
+    notes = str(payload.get("notes", "")).strip()[:2000]
+    actor_id = _opt_pos_int(payload.get("actor_id"))
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM crm_service_lifecycle WHERE id = ?", (lifecycle_id,)
+        ).fetchone()
+        if row is None:
+            return jsonify({"error": "Không tìm thấy lifecycle"}), 404
+        if to_stage:
+            if to_stage not in SVC_LIFECYCLE_STAGES:
+                return jsonify({"error": f"Stage không hợp lệ: {to_stage}"}), 400
+            _svc_advance_stage(conn, lifecycle_id, to_stage, actor_id=actor_id, notes=notes)
+        if "service_slug" in payload:
+            slug = str(payload["service_slug"]).strip()
+            ts = _crm_ts()
+            conn.execute(
+                "UPDATE crm_service_lifecycle SET service_slug = ?, updated_at = ? WHERE id = ?",
+                (slug, ts, lifecycle_id),
+            )
+            conn.commit()
+        updated = conn.execute(
+            "SELECT * FROM crm_service_lifecycle WHERE id = ?", (lifecycle_id,)
+        ).fetchone()
+    return jsonify(dict(updated))
+
+
+@app.get("/api/crm/service-lifecycle/<int:lifecycle_id>/events")
+def api_svc_lifecycle_events(lifecycle_id: int) -> Any:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM crm_service_lifecycle_events WHERE lifecycle_id = ? ORDER BY id ASC",
+            (lifecycle_id,),
+        ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
 init_db()
 
 if __name__ == "__main__":

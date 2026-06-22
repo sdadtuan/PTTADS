@@ -1,0 +1,126 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}Service Delivery — CRM{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+{% block body_class_extra %}crm-body crm-service-delivery-page{% endblock %}
+
+{% block admin_head %}
+<script id="svc-delivery-meta" type="application/json">{{ {
+  "stages": stages,
+  "stage_labels": {
+    "lead": "Lead",
+    "consult": "Tư vấn",
+    "proposal": "Báo giá",
+    "onboard": "Onboarding",
+    "deliver": "Triển khai",
+    "handover": "Nghiệm thu",
+    "retain": "Chăm sóc"
+  }
+} | tojson }}</script>
+{% endblock %}
+
+{% block admin_page_title %}Service Delivery{% endblock %}
+{% block admin_page_desc %}
+  <p class="admin-page-desc">Theo dõi vòng đời 12 dịch vụ PTTP — từ lead đến chăm sóc sau bán.</p>
+{% endblock %}
+
+{% block admin_content %}
+<div class="svc-kanban-wrap" style="overflow-x:auto; padding-bottom:2rem;">
+  <div class="svc-kanban" style="display:flex; gap:1rem; min-width:max-content;">
+    {% set stage_labels = {
+      "lead": "Lead", "consult": "Tư vấn", "proposal": "Báo giá",
+      "onboard": "Onboarding", "deliver": "Triển khai",
+      "handover": "Nghiệm thu", "retain": "Chăm sóc"
+    } %}
+    {% for stage in stages %}
+    <div class="svc-col" data-stage="{{ stage }}"
+         style="min-width:200px; background:#f5f7fa; border-radius:8px; padding:0.75rem;">
+      <div class="svc-col-header" style="font-weight:600; margin-bottom:0.5rem; font-size:.875rem;">
+        {{ stage_labels.get(stage, stage) }}
+        <span class="svc-count" style="color:#888; font-weight:400;">
+          ({{ (by_stage[stage] or [])|length }})
+        </span>
+      </div>
+      {% for lc in (by_stage[stage] or []) %}
+      <div class="svc-card" data-id="{{ lc.id }}"
+           style="background:#fff; border-radius:6px; padding:.625rem; margin-bottom:.5rem;
+                  border:1px solid #e2e8f0; cursor:pointer;"
+           onclick="svcOpenCard({{ lc.id }})">
+        <div style="font-size:.7rem; color:#6366f1; font-weight:600; margin-bottom:2px;">
+          {{ lc.service_slug }}
+        </div>
+        <div style="font-size:.8rem; font-weight:500; margin-bottom:2px;">
+          KH #{{ lc.customer_id or '—' }}
+        </div>
+        <div style="font-size:.7rem; color:#888;">
+          {% if lc.status == 'draft' %}
+          <span style="color:#f59e0b;">● draft</span>
+          {% else %}
+          <span style="color:#22c55e;">● active</span>
+          {% endif %}
+          · {{ lc.stage_entered_at[:10] if lc.stage_entered_at else '—' }}
+        </div>
+      </div>
+      {% else %}
+      <div style="color:#bbb; font-size:.75rem; text-align:center; padding:.5rem 0;">trống</div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Modal advance stage -->
+<div id="svc-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.4);
+     z-index:1000; align-items:center; justify-content:center;">
+  <div style="background:#fff; border-radius:10px; padding:1.5rem; width:340px; max-width:95vw;">
+    <h3 style="margin:0 0 1rem; font-size:1rem;">Advance Stage</h3>
+    <p id="svc-modal-info" style="font-size:.8rem; color:#555; margin-bottom:1rem;"></p>
+    <label style="font-size:.8rem; font-weight:600;">Stage mới</label>
+    <select id="svc-modal-stage" style="width:100%; margin:.25rem 0 .75rem; padding:.375rem;">
+      {% for stage in stages %}
+      <option value="{{ stage }}">{{ stage_labels.get(stage, stage) }}</option>
+      {% endfor %}
+    </select>
+    <label style="font-size:.8rem; font-weight:600;">Ghi chú</label>
+    <textarea id="svc-modal-notes" rows="2"
+              style="width:100%; margin:.25rem 0 .75rem; padding:.375rem; box-sizing:border-box;"></textarea>
+    <div style="display:flex; gap:.5rem; justify-content:flex-end;">
+      <button onclick="svcCloseModal()"
+              style="padding:.375rem .75rem; border:1px solid #ddd; border-radius:6px; background:#fff; cursor:pointer;">
+        Huỷ
+      </button>
+      <button onclick="svcSaveStage()"
+              style="padding:.375rem .75rem; background:#6366f1; color:#fff; border:none; border-radius:6px; cursor:pointer;">
+        Lưu
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _svcActiveId = null;
+function svcOpenCard(id) {
+  _svcActiveId = id;
+  document.getElementById('svc-modal-info').textContent = 'Lifecycle #' + id;
+  document.getElementById('svc-modal-notes').value = '';
+  document.getElementById('svc-modal').style.display = 'flex';
+}
+function svcCloseModal() {
+  document.getElementById('svc-modal').style.display = 'none';
+  _svcActiveId = null;
+}
+function svcSaveStage() {
+  if (!_svcActiveId) return;
+  const stage = document.getElementById('svc-modal-stage').value;
+  const notes = document.getElementById('svc-modal-notes').value;
+  fetch('/api/crm/service-lifecycle/' + _svcActiveId, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({stage, notes})
+  }).then(r => r.json()).then(() => {
+    svcCloseModal();
+    location.reload();
+  }).catch(err => alert('Lỗi: ' + err));
+}
+</script>
+{% endblock %}
