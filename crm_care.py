@@ -133,3 +133,25 @@ def fetch_last_care_reports_map(
         d = care_report_row_to_dict(r)
         out[int(d["case_id"])] = d
     return out
+
+
+def get_lifecycle_stage_context(conn: sqlite3.Connection, customer_id: int) -> str:
+    """Trả về chuỗi context lifecycle để thêm vào AI prompt. Trả '' nếu không có."""
+    try:
+        from crm_service_lifecycle import get_stage_context
+        ctx = get_stage_context(conn, customer_id)
+        if ctx:
+            stage_labels = {
+                "lead": "Lead", "consult": "Tư vấn", "proposal": "Báo giá",
+                "onboard": "Onboarding", "deliver": "Triển khai",
+                "handover": "Nghiệm thu", "retain": "Chăm sóc",
+            }
+            stage_label = stage_labels.get(ctx["stage"], ctx["stage"])
+            return (
+                f"Dịch vụ: {ctx['service_slug']} · "
+                f"Giai đoạn: {stage_label} ({ctx['stage_days']} ngày). "
+                f"Ưu tiên chăm sóc phù hợp giai đoạn này."
+            )
+    except Exception:
+        pass
+    return ""

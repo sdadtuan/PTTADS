@@ -213,3 +213,23 @@ def daily_work_report_xlsx_response(
     wb.save(buf)
     buf.seek(0)
     return buf, fname
+
+
+def enrich_report_rows_with_service(
+    conn: "sqlite3.Connection",
+    rows: "list[dict]",
+    customer_id_key: str = "customer_id",
+) -> "list[dict]":
+    """Thêm service_slug vào mỗi row dựa trên customer_id. Fail silent."""
+    try:
+        from crm_service_lifecycle import get_stage_context
+        for row in rows:
+            cid = row.get(customer_id_key)
+            if cid and not row.get("service_slug"):
+                ctx = get_stage_context(conn, int(cid))
+                if ctx:
+                    row["service_slug"] = ctx["service_slug"]
+                    row["lifecycle_stage"] = ctx["stage"]
+    except Exception:
+        pass
+    return rows

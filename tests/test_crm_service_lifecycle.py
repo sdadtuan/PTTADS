@@ -206,5 +206,36 @@ class TestListActive(unittest.TestCase):
         self.assertEqual(len(results_none), 0)
 
 
+class TestMigrationContractsColumn(unittest.TestCase):
+    def test_service_slug_added_idempotent(self):
+        """ensure_schema chạy 2 lần không lỗi."""
+        conn = _setup_conn()
+        ensure_schema(conn)  # lần 2 — không được raise
+        cols = {
+            r[1]
+            for r in conn.execute("PRAGMA table_info(crm_contracts)").fetchall()
+        }
+        self.assertIn("service_slug", cols)
+
+
+class TestStageContextForCare(unittest.TestCase):
+    def test_active_lifecycle_returns_context(self):
+        conn = _setup_conn()
+        lid = create_draft_lifecycle(conn, lead_id=1, service_slug="quang-cao-facebook")
+        conn.execute(
+            "UPDATE crm_service_lifecycle SET customer_id=1, status='active', stage='deliver' WHERE id=?",
+            (lid,),
+        )
+        conn.commit()
+        ctx = get_stage_context(conn, customer_id=1)
+        self.assertEqual(ctx["service_slug"], "quang-cao-facebook")
+        self.assertEqual(ctx["stage"], "deliver")
+        self.assertGreaterEqual(ctx["stage_days"], 0)
+
+    def test_no_active_lifecycle_returns_none(self):
+        conn = _setup_conn()
+        self.assertIsNone(get_stage_context(conn, customer_id=999))
+
+
 if __name__ == "__main__":
     unittest.main()
