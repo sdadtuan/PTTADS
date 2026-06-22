@@ -206,6 +206,32 @@ class TestListActive(unittest.TestCase):
         self.assertEqual(len(results_none), 0)
 
 
+class TestKpiAlertAsync(unittest.TestCase):
+    def test_check_kpi_alert_async_does_not_raise(self):
+        """check_kpi_alert_async không raise dù không có API key."""
+        import tempfile
+        import os
+        from crm_service_lifecycle import check_kpi_alert_async
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            ensure_schema(conn)
+            conn.execute("CREATE TABLE IF NOT EXISTS crm_leads (id INTEGER PRIMARY KEY)")
+            conn.execute("CREATE TABLE IF NOT EXISTS crm_customers (id INTEGER PRIMARY KEY)")
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS crm_contracts (id INTEGER PRIMARY KEY, customer_id INTEGER, service_slug TEXT DEFAULT '', status TEXT DEFAULT 'draft')"
+            )
+            conn.execute("CREATE TABLE IF NOT EXISTS crm_staff (id INTEGER PRIMARY KEY)")
+            lid = create_draft_lifecycle(conn, lead_id=1, service_slug="dich-vu-seo-tong-the")
+            conn.close()
+            t = check_kpi_alert_async(lifecycle_id=lid, db_path=db_path)
+            t.join(timeout=3)
+        finally:
+            os.unlink(db_path)
+
+
 class TestMigrationContractsColumn(unittest.TestCase):
     def test_service_slug_added_idempotent(self):
         """ensure_schema chạy 2 lần không lỗi."""

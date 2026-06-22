@@ -277,6 +277,97 @@ Trả về JSON: {{"service_slug": "...", "confidence": 0.0-1.0, "reason": "1 c�
 Nếu không xác định được, trả về service_slug rỗng: {{"service_slug": "", "confidence": 0.0, "reason": "..."}}"""
 
 
+import threading
+
+
+# KPI targets tham chiếu từ service specs (ngưỡng tối thiểu)
+_KPI_TARGETS: dict[str, dict] = {
+    "dich-vu-seo-tong-the": {"organic_traffic_growth_pct": 20, "keywords_top10_pct": 50},
+    "dich-vu-seo-local": {"gbp_views_growth_pct": 30, "local_pack_pct": 50},
+    "quang-cao-facebook": {"ctr_min": 1.5, "cpl_on_target_pct": 70},
+    "quang-cao-google": {"impression_share_min": 60, "cpa_on_target_pct": 70},
+}
+
+_KPI_ALERT_SYSTEM = """Bạn là trợ lý phân tích KPI cho agency marketing PTT.
+Dựa vào số liệu thực tế so với mục tiêu, đánh giá mức độ cảnh báo.
+Trả về JSON: {"severity": "ok|warn|critical", "message": "1-2 câu cho AM", "suggested_action": "hành động gợi ý"}
+- ok: đạt ≥ 90% mục tiêu
+- warn: đạt 70–89%
+- critical: dưới 70%"""
+
+
+def check_kpi_alert_async(
+    lifecycle_id: int,
+    db_path: str,
+    kpi_actual: dict | None = None,
+) -> threading.Thread:
+    """Chạy KPI alert trong background thread. Ghi severity vào lifecycle.notes."""
+
+    def _run() -> None:
+        import json
+        import os
+        conn = None
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.row_factory = sqlite3.Row
+            lc = conn.execute(
+                "SELECT * FROM crm_service_lifecycle WHERE id = ?", (lifecycle_id,)
+            ).fetchone()
+            if lc is None:
+                return
+            slug = lc["service_slug"]
+            targets = _KPI_TARGETS.get(slug, {})
+            if not targets or not kpi_actual:
+                return
+            api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+            if not api_key:
+                return
+            import anthropic
+            client = anthropic.Anthropic(api_key=api_key)
+            prompt = (
+                f"Dịch vụ: {slug}\n"
+                f"Mục tiêu: {json.dumps(targets, ensure_ascii=False)}\n"
+                f"Thực tế: {json.dumps(kpi_actual, ensure_ascii=False)}"
+            )
+            response = client.messages.create(
+                model=_HAIKU,
+                max_tokens=300,
+                system=_KPI_ALERT_SYSTEM,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = response.content[0].text.strip()
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            alert = json.loads(raw)
+            severity = str(alert.get("severity", "ok"))
+            message = str(alert.get("message", ""))
+            ts = _ts()
+            conn.execute(
+                """
+                UPDATE crm_service_lifecycle
+                SET notes = notes || ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (f"\n[KPI {severity.upper()} {ts[:10]}] {message}", ts, lifecycle_id),
+            )
+            conn.commit()
+            logger.info("KPI alert lifecycle_id=%s severity=%s", lifecycle_id, severity)
+        except Exception as exc:
+            logger.warning("check_kpi_alert_async lỗi lifecycle_id=%s: %s", lifecycle_id, exc)
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+    t = threading.Thread(target=_run, daemon=True, name=f"kpi-alert-{lifecycle_id}")
+    t.start()
+    return t
+
+
 def _suggest_service_slug(
     *,
     niche: str = "",

@@ -16836,6 +16836,12 @@ def api_svc_lifecycle_patch(lifecycle_id: int) -> Any:
             if to_stage not in SVC_LIFECYCLE_STAGES:
                 return jsonify({"error": f"Stage không hợp lệ: {to_stage}"}), 400
             _svc_advance_stage(conn, lifecycle_id, to_stage, actor_id=actor_id, notes=notes)
+            if to_stage == "retain":
+                try:
+                    from crm_service_lifecycle import check_kpi_alert_async
+                    check_kpi_alert_async(lifecycle_id=lifecycle_id, db_path=str(DB_PATH))
+                except Exception as _ka_exc:
+                    logger.warning("KPI alert trigger lỗi: %s", _ka_exc)
         if "service_slug" in payload:
             slug = str(payload["service_slug"]).strip()
             ts = _crm_ts()
