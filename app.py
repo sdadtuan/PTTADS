@@ -318,6 +318,17 @@ from admin_page_permissions import (
 )
 from ptt_ui_button_permissions import CRM_UI_BUTTON_BY_ID
 from crm_sop_seed import LAUNCH_CAMPAIGN_TEMPLATE_CODE, seed_launch_campaign_sop_template
+from crm_service_lifecycle import (
+    ensure_schema as _ensure_service_lifecycle_schema,
+    activate_lifecycle,
+    advance_stage as _svc_advance_stage,
+    get_by_lead as _svc_get_by_lead,
+    get_by_contract as _svc_get_by_contract,
+    list_active as _svc_list_active,
+    get_stage_context as _svc_get_stage_context,
+    VALID_STAGES as SVC_LIFECYCLE_STAGES,
+    VALID_SLUGS as SVC_LIFECYCLE_SLUGS,
+)
 from cms_permissions import (
     CMS_ACTIONS,
     CMS_ACTION_LABELS_VI,
@@ -2257,6 +2268,7 @@ def _ensure_enterprise_crm_schema(conn: sqlite3.Connection) -> None:
     from crm_cross_module import ensure_cross_module_schema
 
     ensure_cross_module_schema(conn)
+    _ensure_service_lifecycle_schema(conn)
 
 
 def _ensure_cms_permissions_schema(conn: sqlite3.Connection) -> None:
