@@ -12821,6 +12821,12 @@ def api_crm_patch_contract(contract_id: int) -> Any:
             ),
         )
         _crm_hub_sync_contract_renewal_reminder(conn, contract_id)
+        # Wire: khi contract active → activate lifecycle
+        if merged.get("status") == "active":
+            try:
+                activate_lifecycle(conn, contract_id)
+            except Exception as _lc_exc:
+                logger.warning("activate_lifecycle lỗi contract=%s: %s", contract_id, _lc_exc)
         row2 = conn.execute(
             """
             SELECT ct.*,

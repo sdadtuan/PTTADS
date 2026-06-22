@@ -204,8 +204,25 @@ def trigger_qualify_brief_async(
             conn.row_factory = sqlite3.Row
             ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
             save_qualify_brief(conn, lead_id, brief, ts)
-            conn.close()
             logger.info("AI qualify brief saved: lead_id=%s niche=%s", lead_id, brief.get("niche"))
+            # Wire: tạo draft lifecycle từ AI qualify
+            try:
+                from crm_service_lifecycle import (
+                    _suggest_service_slug,
+                    create_draft_lifecycle,
+                    get_by_lead,
+                )
+                if get_by_lead(conn, lead_id) is None:
+                    slug = _suggest_service_slug(
+                        niche=str(brief.get("niche") or ""),
+                        pain_points=str(brief.get("pain_points") or ""),
+                        lead_message=str(brief.get("need") or ""),
+                    )
+                    create_draft_lifecycle(conn, lead_id=lead_id, service_slug=slug)
+                    logger.info("Draft lifecycle created: lead_id=%s slug=%s", lead_id, slug)
+            except Exception as _lc_exc:
+                logger.warning("Lifecycle draft tạo lỗi: %s", _lc_exc)
+            conn.close()
         except Exception as exc:
             logger.warning("AI qualify save lỗi: %s", exc)
 

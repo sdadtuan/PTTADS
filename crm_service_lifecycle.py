@@ -261,3 +261,55 @@ def list_active(
         params,
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+# ── AI helpers (internal) ──────────────────────────────────────────────────
+
+_HAIKU = "claude-haiku-4-5-20251001"
+
+_SLUG_LIST = "\n".join(f"- {s}" for s in sorted(VALID_SLUGS))
+
+_SUGGEST_SYSTEM = f"""Bạn là trợ lý phân loại dịch vụ marketing cho agency PTT.
+Dựa vào thông tin lead, chọn service_slug phù hợp nhất trong danh sách sau:
+{_SLUG_LIST}
+
+Trả về JSON: {{"service_slug": "...", "confidence": 0.0-1.0, "reason": "1 câu"}}
+Nếu không xác định được, trả về service_slug rỗng: {{"service_slug": "", "confidence": 0.0, "reason": "..."}}"""
+
+
+def _suggest_service_slug(
+    *,
+    niche: str = "",
+    pain_points: str = "",
+    lead_message: str = "",
+) -> str:
+    """Gọi Claude Haiku để gợi ý service_slug. Trả về slug hợp lệ hoặc '' nếu fail."""
+    import json
+    import os
+    try:
+        import anthropic
+    except ImportError:
+        return ""
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return ""
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        prompt = f"Ngách: {niche}\nVấn đề: {pain_points}\nNhắn: {lead_message[:500]}"
+        response = client.messages.create(
+            model=_HAIKU,
+            max_tokens=200,
+            system=_SUGGEST_SYSTEM,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = response.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        data = json.loads(raw)
+        slug = str(data.get("service_slug", "")).strip()
+        return slug if slug in VALID_SLUGS else ""
+    except Exception as exc:
+        logger.warning("_suggest_service_slug lỗi: %s", exc)
+        return ""
