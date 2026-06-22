@@ -16782,6 +16782,9 @@ def cms_live_chat_save_settings() -> Any:
 
 @app.get("/crm/service-delivery")
 def crm_service_delivery_page() -> Any:
+    redir = _ensure_admin_session_html()
+    if redir is not None:
+        return redir
     from collections import defaultdict
     with get_connection() as conn:
         lifecycles = _svc_list_active(conn, include_draft=True)
@@ -16793,6 +16796,7 @@ def crm_service_delivery_page() -> Any:
         by_stage=by_stage,
         stages=SVC_LIFECYCLE_STAGES,
         valid_slugs=sorted(SVC_LIFECYCLE_SLUGS),
+        **_admin_page_template_kwargs(),
     )
 
 
