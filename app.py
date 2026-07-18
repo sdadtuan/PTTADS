@@ -2710,9 +2710,6 @@ def _ensure_cms_permissions_schema(conn: sqlite3.Connection) -> None:
     ensure_role_grants_customized_column(conn)
     ensure_position_grants_customized_column(conn)
     backfill_role_grants_customized(conn)
-    backfill_position_grants_customized(conn)
-    migrate_cms_role_sidebar_modules(conn)
-
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS crm_position_section_permissions (
@@ -2729,6 +2726,9 @@ def _ensure_cms_permissions_schema(conn: sqlite3.Connection) -> None:
         ON crm_position_section_permissions(position_id)
         """
     )
+    backfill_position_grants_customized(conn)
+    migrate_cms_role_sidebar_modules(conn)
+
     n_pos_perm = conn.execute(
         "SELECT COUNT(*) AS n FROM crm_position_section_permissions"
     ).fetchone()
