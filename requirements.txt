@@ -7,6 +7,7 @@ rjsmin>=1.2.2
 reportlab>=4.0.0
 psycopg2-binary>=2.9.9
 cryptography>=42.0.0
+gunicorn>=22.0.0
 sentry-sdk[flask]>=2.0.0
 jsonschema>=4.0.0
 # Optional — RabbitMQ outbox publisher (PTT_EVENT_PUBLISH_RMQ=1)
