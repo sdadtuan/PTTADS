@@ -1,0 +1,23 @@
+{
+  "phase": "3",
+  "signed_at": null,
+  "environment": "production",
+  "gates": {
+    "portal_tls": false,
+    "pilot_users_scrypt": false,
+    "creative_approve_e2e": false,
+    "cross_tenant_403": false,
+    "temporal_worker_healthy": false,
+    "google_oauth_pilot": false,
+    "hub_pg_primary_staging": false,
+    "regression_l01_l26": false,
+    "playwright_temporal": false
+  },
+  "signoffs": {
+    "am_lead": null,
+    "client_approver": null,
+    "devops": null,
+    "qa": null
+  },
+  "notes": ""
+}

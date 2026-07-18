@@ -109,6 +109,20 @@ ADMIN_CRM_SECTIONS: tuple[dict[str, Any], ...] = (
         "page": "/crm/marketing-plan",
         "description": "KHTN, KHQT, CSKH — lập và chỉnh kế hoạch.",
     },
+    {
+        "id": "crm_business_dashboard",
+        "label": "Business Dashboard KPI",
+        "group": "CRM — Marketing",
+        "page": "/crm/business-dashboard",
+        "description": "KPI executive, trend, cảnh báo, export.",
+    },
+    {
+        "id": "crm_owner_weekly_dashboard",
+        "label": "Dashboard tuần (Chủ DN)",
+        "group": "CRM — Marketing",
+        "page": "/crm/owner-weekly",
+        "description": "4 khối Tiền/KD/Hiệu quả/Rủi ro, RAG, phân tích trước thực thi.",
+    },
     # —— SOP ——
     {
         "id": "crm_sop_runs",
@@ -195,6 +209,20 @@ ADMIN_CRM_SECTIONS: tuple[dict[str, Any], ...] = (
         "group": "CRM — KPI",
         "page": "/crm/kpi",
         "description": "Ghi nhận mục tiêu / thực tế nhân viên.",
+    },
+    {
+        "id": "crm_staff_kpi_am_sp",
+        "label": "KPI AM/SP",
+        "group": "CRM — KPI",
+        "page": "/crm/staff-kpi",
+        "description": "KPI AM/SP/Lead tự động — target, AI scan.",
+    },
+    {
+        "id": "crm_hdsd",
+        "label": "HDSD — Hướng dẫn sử dụng",
+        "group": "CRM — Hướng dẫn",
+        "page": "/crm/hdsd",
+        "description": "Đọc & tải tài liệu Markdown từ docs/.",
     },
     # —— Chấm công & lương ——
     {
@@ -332,6 +360,20 @@ ADMIN_CRM_SECTIONS: tuple[dict[str, Any], ...] = (
         "page": "/crm/re-projects",
         "description": "Doanh thu, chi phí, lợi nhuận kế hoạch vs thực tế.",
     },
+    {
+        "id": "crm_agency",
+        "label": "Agency Ops",
+        "group": "CRM · Agency Ops",
+        "page": "/crm/agency",
+        "description": "Client registry, pipeline ingest, thông báo SLA, KPI dictionary.",
+    },
+    {
+        "id": "crm_facebook_ads",
+        "label": "Facebook Ads",
+        "group": "CRM · Quảng cáo",
+        "page": "/crm/facebook-ads",
+        "description": "Hub Meta/Facebook — token, CPL, map Hub, truy cập nhanh Lead Ads.",
+    },
 )
 
 ADMIN_CRM_SECTION_IDS: frozenset[str] = frozenset(s["id"] for s in ADMIN_CRM_SECTIONS)
@@ -344,13 +386,19 @@ SIDEBAR_CRM_NAV_SECTIONS: tuple[str, ...] = (
     "crm_leads",
     "crm_hub_campaigns",
     "crm_mktplan",
+    "crm_business_dashboard",
+    "crm_owner_weekly_dashboard",
     "crm_sop_runs",
     "crm_sales_overview",
     "crm_re_projects",
     "crm_staff_roster",
     "crm_daily_work_report",
     "crm_kpi_records",
+    "crm_staff_kpi_am_sp",
+    "crm_hdsd",
     "crm_payroll_attendance",
+    "crm_agency",
+    "crm_facebook_ads",
 )
 
 # Map section → nhóm trang (để gating nav)
@@ -371,6 +419,7 @@ _POSITION_DEFAULT: dict[str, dict[str, frozenset[str]]] = {
         "crm_kpi_records": frozenset({"view", "edit"}),
         "crm_payroll_attendance": frozenset({"view"}),
         "crm_daily_work_report": frozenset({"view", "create", "edit"}),
+        "crm_hdsd": frozenset({"view", "export"}),
     },
     "KD-01": {
         "crm_leads": frozenset({"view", "edit", "create"}),
@@ -393,12 +442,17 @@ _POSITION_DEFAULT: dict[str, dict[str, frozenset[str]]] = {
         "crm_leads__btn_save": frozenset(),
         "crm_leads__btn_edit": frozenset({"edit"}),
         "crm_leads__btn_activity": frozenset({"create"}),
+        "crm_hdsd": frozenset({"view", "export"}),
+        "crm_agency": frozenset({"view", "edit", "create", "configure"}),
+        "crm_facebook_ads": frozenset({"view", "edit", "create", "configure"}),
     },
     "MKT-01": {
         "crm_hub_campaigns": frozenset({"view", "edit", "create", "delete"}),
         "crm_hub_contracts": frozenset({"view", "edit"}),
         "crm_hub_reminders": frozenset({"view", "edit", "create"}),
         "crm_mktplan": frozenset({"view", "edit", "create", "export"}),
+        "crm_business_dashboard": frozenset({"view", "export", "configure"}),
+        "crm_owner_weekly_dashboard": frozenset({"view", "export", "configure"}),
         "crm_leads": frozenset({"view", "edit", "create", "export", "configure"}),
         "crm_board_funnel": frozenset({"view", "export"}),
         "crm_assistant": frozenset({"view", "create", "export"}),
@@ -421,6 +475,9 @@ _POSITION_DEFAULT: dict[str, dict[str, frozenset[str]]] = {
         "crm_re_projects_budget": frozenset({"view", "edit", "create", "export"}),
         "crm_daily_work_report": frozenset({"view", "edit", "create", "export"}),
         "crm_board_customers": frozenset({"view"}),
+        "crm_hdsd": frozenset({"view", "export"}),
+        "crm_agency": frozenset({"view", "edit", "create", "configure"}),
+        "crm_facebook_ads": frozenset({"view", "edit", "create", "configure"}),
     },
     "MKT-02": {
         "crm_hub_campaigns": frozenset({"view", "edit", "create"}),
@@ -438,6 +495,7 @@ _POSITION_DEFAULT: dict[str, dict[str, frozenset[str]]] = {
         "crm_re_projects_budget": frozenset({"view", "edit", "create"}),
         "crm_re_projects_kpi": frozenset({"view", "edit"}),
         "crm_daily_work_report": frozenset({"view", "create"}),
+        "crm_hdsd": frozenset({"view", "export"}),
     },
     "VH-01": {
         "crm_board_kanban": frozenset({"view"}),
@@ -456,6 +514,7 @@ _POSITION_DEFAULT: dict[str, dict[str, frozenset[str]]] = {
         "crm_daily_work_report": frozenset({"view", "edit", "create", "export", "delete"}),
         "crm_kpi_alerts": frozenset({"view"}),
         "crm_kpi_records": frozenset({"view", "edit"}),
+        "crm_hdsd": frozenset({"view", "export"}),
     },
 }
 
@@ -742,6 +801,29 @@ def apply_position_default_grants(
                 (pid, sid, act),
             )
     return True
+
+
+def migrate_hdsd_position_permissions(conn) -> None:
+    """Bổ sung quyền HDSD — menu sidebar/topbar (INSERT OR IGNORE, không ghi đè ma trận cũ)."""
+    rows = conn.execute(
+        "SELECT id, code FROM crm_positions WHERE active = 1"
+    ).fetchall()
+    for prow in rows:
+        pid = int(prow["id"])
+        code = str(prow["code"] or "")
+        defaults = default_grants_for_position(code)
+        acts = list(defaults.get("crm_hdsd") or [])
+        if not acts:
+            acts = ["view", "export"]
+        for act in acts:
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO crm_position_section_permissions
+                (position_id, section_id, action)
+                VALUES (?, 'crm_hdsd', ?)
+                """,
+                (pid, act),
+            )
 
 
 def migrate_kd01_leads_only_permissions(conn) -> None:

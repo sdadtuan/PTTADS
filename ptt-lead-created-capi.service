@@ -1,0 +1,13 @@
+[Unit]
+Description=PTT LeadCreated outbox to CAPI enqueue (Sprint 0)
+After=network.target
+
+[Service]
+Type=oneshot
+User=deploy
+WorkingDirectory=/var/www/ptt
+EnvironmentFile=-/var/www/ptt/.env
+ExecStart=/var/www/ptt/scripts/process_lead_created_capi.sh
+
+[Install]
+WantedBy=multi-user.target

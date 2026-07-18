@@ -1,0 +1,16 @@
+{
+  "id": 1,
+  "full_name": "Lead A",
+  "phone": "0901111111",
+  "email": "",
+  "status": "new",
+  "source": "facebook",
+  "channel": "meta",
+  "client_id": "550e8400-e29b-41d4-a716-446655440000",
+  "campaign_id": null,
+  "external_lead_id": "fb-1",
+  "owner_id": null,
+  "created_at": "2026-07-17",
+  "received_at": "2026-07-17",
+  "is_duplicate": false
+}

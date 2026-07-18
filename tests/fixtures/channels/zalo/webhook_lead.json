@@ -1,0 +1,11 @@
+{
+  "event_name": "user_submit_info",
+  "app_id": "12345",
+  "oa_id": "OA_001",
+  "user_id": "U001",
+  "info": {
+    "name": "Nguyen Van A",
+    "phone": "0901234567",
+    "campaign_id": "ZALO_CAMP_01"
+  }
+}

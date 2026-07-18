@@ -1599,20 +1599,17 @@ def count_project_leads_new_actual(
     *,
     period_month: str = "",
 ) -> int:
-    """Đếm lead mới qualified trong tháng — nguồn KPI RE_LEADS_NEW."""
+    """Đếm lead đủ chuẩn trong tháng — nguồn KPI RE_LEADS_NEW (thống nhất)."""
+    from crm_lead_kpi_metrics import count_qualified_leads_in_month
+
     pm = str(period_month or "").strip()[:7] or datetime.now().strftime("%Y-%m")
-    placeholders = ", ".join("?" for _ in RE_LEADS_NEW_EXCLUDED_STATUSES)
-    row = conn.execute(
-        f"""
-        SELECT COUNT(*) AS c FROM crm_leads
-        WHERE re_project_id = ?
-          AND COALESCE(is_duplicate, 0) = 0
-          AND status NOT IN ({placeholders})
-          AND substr(COALESCE(created_at, ''), 1, 7) = ?
-        """,
-        (int(project_id), *RE_LEADS_NEW_EXCLUDED_STATUSES, pm),
-    ).fetchone()
-    return int(row["c"] or 0) if row else 0
+    try:
+        y, m = pm.split("-", 1)
+        return count_qualified_leads_in_month(
+            conn, year=int(y), month=int(m), re_project_id=int(project_id)
+        )
+    except (TypeError, ValueError):
+        return 0
 
 
 def refresh_project_re_leads_new_kpi(

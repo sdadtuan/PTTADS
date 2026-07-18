@@ -1,0 +1,142 @@
+{# templates/crm_proposal_preview.html #}
+{% extends "admin_layout.html" %}
+{% block title %}Đề xuất PRO-{{ "%04d"|format(proposal.id) }}{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+{% block admin_page_title %}Xem Đề xuất{% endblock %}
+{% block admin_page_breadcrumb %}
+  <a href="{{ url_for('crm_proposals_page') }}">← Danh sách đề xuất</a>
+{% endblock %}
+
+{% block admin_main %}
+<style>
+@media print {
+  nav, header, .admin-sidebar, .admin-topbar, .breadcrumb, .no-print { display: none !important; }
+  .proposal-doc { max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+  .proposal-section { page-break-inside: avoid; }
+  body { font-size: 11pt; }
+}
+</style>
+
+<div class="proposal-doc" style="max-width:800px;margin:0 auto;padding:1.5rem 1rem;">
+
+  {# Print button #}
+  <div class="no-print" style="margin-bottom:1.5rem;display:flex;justify-content:flex-end;">
+    <button onclick="window.print()"
+            style="padding:.5rem 1.25rem;background:#1e40af;color:#fff;border:none;border-radius:6px;font-size:.875rem;cursor:pointer;font-weight:600;">
+      🖨 In / Tải PDF
+    </button>
+  </div>
+
+  {# Header #}
+  <div class="proposal-section" style="border:2px solid #1e40af;border-radius:8px;padding:1.25rem 1.5rem;margin-bottom:1.25rem;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:.5rem;">
+      <div>
+        <div style="font-size:1.3rem;font-weight:800;color:#1e40af;letter-spacing:.02em;">PTTCOM</div>
+        <div style="font-size:.8rem;color:#6b7280;margin-top:.15rem;">Digital Marketing Agency</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:1rem;font-weight:700;color:#374151;">ĐỀ XUẤT DỊCH VỤ</div>
+        <div style="font-size:.8rem;color:#6b7280;margin-top:.2rem;">Mã: PRO-{{ "%04d"|format(proposal.id) }}</div>
+        <div style="font-size:.8rem;color:#6b7280;">Ngày: {{ proposal.created_at[:10] }}</div>
+      </div>
+    </div>
+  </div>
+
+  {# Customer info #}
+  <div class="proposal-section" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1.25rem;">
+    <div style="font-weight:600;font-size:.8rem;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem;">Kính gửi</div>
+    <div style="font-size:1rem;font-weight:700;color:#1e3a5f;">{{ customer.name }}</div>
+    {% if customer.company %}
+    <div style="font-size:.875rem;color:#374151;margin-top:.2rem;">{{ customer.company }}</div>
+    {% endif %}
+    {% if customer.address %}
+    <div style="font-size:.8rem;color:#6b7280;margin-top:.15rem;">{{ customer.address }}</div>
+    {% endif %}
+    {% if customer.phone or customer.email %}
+    <div style="font-size:.8rem;color:#6b7280;margin-top:.15rem;">
+      {% if customer.phone %}{{ customer.phone }}{% endif %}
+      {% if customer.phone and customer.email %} · {% endif %}
+      {% if customer.email %}{{ customer.email }}{% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% set ao = proposal.ai_output %}
+
+  {% if ao.problem %}
+  <div class="proposal-section" style="margin-bottom:1rem;">
+    <div style="font-size:.95rem;font-weight:700;color:#1e3a5f;border-left:3px solid #3b82f6;padding-left:.6rem;margin-bottom:.5rem;">
+      Phân tích vấn đề
+    </div>
+    <div style="font-size:.875rem;line-height:1.7;color:#374151;white-space:pre-wrap;">{{ ao.problem }}</div>
+  </div>
+  {% endif %}
+
+  {% if ao.solution %}
+  <div class="proposal-section" style="margin-bottom:1rem;">
+    <div style="font-size:.95rem;font-weight:700;color:#1e3a5f;border-left:3px solid #3b82f6;padding-left:.6rem;margin-bottom:.5rem;">
+      Giải pháp đề xuất
+    </div>
+    <div style="font-size:.875rem;line-height:1.7;color:#374151;white-space:pre-wrap;">{{ ao.solution }}</div>
+  </div>
+  {% endif %}
+
+  {% if ao.usp %}
+  <div class="proposal-section" style="margin-bottom:1rem;">
+    <div style="font-size:.95rem;font-weight:700;color:#1e3a5f;border-left:3px solid #3b82f6;padding-left:.6rem;margin-bottom:.5rem;">
+      Tại sao chọn PTTCOM
+    </div>
+    <div style="font-size:.875rem;line-height:1.7;color:#374151;white-space:pre-wrap;">{{ ao.usp }}</div>
+  </div>
+  {% endif %}
+
+  {% if ao.kpi %}
+  <div class="proposal-section" style="margin-bottom:1rem;">
+    <div style="font-size:.95rem;font-weight:700;color:#1e3a5f;border-left:3px solid #3b82f6;padding-left:.6rem;margin-bottom:.5rem;">
+      Kết quả kỳ vọng
+    </div>
+    <div style="font-size:.875rem;line-height:1.7;color:#374151;white-space:pre-wrap;">{{ ao.kpi }}</div>
+  </div>
+  {% endif %}
+
+  {% if not ao.problem and not ao.solution %}
+  <div style="text-align:center;padding:2rem;color:#9ca3af;font-size:.9rem;border:1px dashed #e2e8f0;border-radius:8px;margin-bottom:1.25rem;">
+    Nội dung AI chưa được tạo. Quay lại danh sách và nhấn "Tạo AI".
+  </div>
+  {% endif %}
+
+  {# Pricing table #}
+  <div class="proposal-section" style="background:#1e3a5f;color:#fff;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1.25rem;">
+    <div style="font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;opacity:.7;margin-bottom:.75rem;">Bảng giá dịch vụ</div>
+    {% for slug in proposal.service_slugs %}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid rgba(255,255,255,.1);font-size:.875rem;">
+      <span>• {{ service_names.get(slug, slug) }}</span>
+    </div>
+    {% endfor %}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:.6rem 0 0;margin-top:.25rem;font-size:1rem;font-weight:700;">
+      <span>Tổng cộng</span>
+      <span>{{ "{:,}".format(proposal.total_vnd) }} VNĐ / {{ proposal.timeline_months }} tháng</span>
+    </div>
+  </div>
+
+  {% if ao.pricing_narrative %}
+  <div class="proposal-section" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1.25rem;">
+    <div style="font-size:.875rem;line-height:1.7;color:#1e40af;white-space:pre-wrap;font-style:italic;">{{ ao.pricing_narrative }}</div>
+  </div>
+  {% endif %}
+
+  {# Footer / Terms #}
+  <div class="proposal-section" style="border-top:1px solid #e2e8f0;padding-top:.75rem;font-size:.75rem;color:#9ca3af;text-align:center;">
+    Báo giá có hiệu lực trong vòng <strong>30 ngày</strong> kể từ ngày phát hành.
+    Mọi thay đổi về phạm vi dịch vụ sẽ được thỏa thuận lại bằng văn bản.
+    <br>PTTCOM — pttcom.vn
+  </div>
+
+</div>
+{% endblock %}
+
+{% block admin_page_scripts %}
+<script>
+// Print shortcut: Ctrl+P / Cmd+P works natively — no extra JS needed
+</script>
+{% endblock %}

@@ -518,6 +518,10 @@ def ingest_webhook_leads(
             skipped.append({"reason": "Thiếu phone/email", "item": name})
             continue
         try:
+            meta_obj = dict(item.get("meta") if isinstance(item.get("meta"), dict) else {})
+            meta_obj.setdefault("ingest_channel", f"webhook_{default_source}")
+            if webhook_slug:
+                meta_obj.setdefault("webhook_slug", webhook_slug)
             row, _dups, _dup_matches = create_lead(
                 conn,
                 full_name=name,
@@ -528,7 +532,7 @@ def ingest_webhook_leads(
                 product_interest=str(item.get("product_interest") or ""),
                 need=str(item.get("need") or ""),
                 utm_campaign=str(item.get("utm_campaign") or ""),
-                meta=item.get("meta") if isinstance(item.get("meta"), dict) else None,
+                meta=meta_obj,
                 auto_assign=True,
                 duplicate_policy=None,
                 created_by=created_by,

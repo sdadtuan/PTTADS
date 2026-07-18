@@ -1,0 +1,12 @@
+[Unit]
+Description=PTT — timer Meta token refresh hàng ngày 06:00 ICT (Phase 2 M1-03)
+
+[Timer]
+OnBootSec=15min
+OnCalendar=*-*-* 06:00:00
+Timezone=Asia/Ho_Chi_Minh
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

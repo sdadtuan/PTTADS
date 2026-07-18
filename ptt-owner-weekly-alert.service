@@ -1,0 +1,32 @@
+# Dashboard tuần — digest Slack/email + inbox Hub (systemd oneshot + timer)
+#
+# Trên VPS:
+#   sudo cp scripts/ptt_owner_weekly_alert_cron.sh /var/www/ptt/scripts/
+#   sudo chmod +x /var/www/ptt/scripts/ptt_owner_weekly_alert_cron.sh
+#   sudo cp ptt-owner-weekly-alert.service ptt-owner-weekly-alert.timer /etc/systemd/system/
+#   # .env gợi ý:
+#   #   CRM_FINANCE_KPI_CRON_SECRET=...          (dùng chung cron secret)
+#   #   PTT_OWNER_WEEKLY_SLACK_WEBHOOK=...       (tuỳ chọn, fallback finance webhook)
+#   #   PTT_OWNER_WEEKLY_ALERT_EMAIL=...         (tuỳ chọn, fallback finance email)
+#   #   PTT_OWNER_WEEKLY_ALERT_ONLY_RED=0        (1 = chỉ gửi khi có chỉ số đỏ)
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ptt-owner-weekly-alert.timer
+#   sudo systemctl start ptt-owner-weekly-alert.service
+#   journalctl -u ptt-owner-weekly-alert.service -n 20 --no-pager
+
+[Unit]
+Description=PTT — digest dashboard tuần chủ DN (một lần)
+After=network.target ptt.service
+Wants=ptt.service
+
+[Service]
+Type=oneshot
+User=deploy
+Group=www-data
+Environment=PTT_APP_DIR=/var/www/ptt
+Environment=PTT_GUNICORN_PORT=8002
+EnvironmentFile=-/var/www/ptt/.env
+ExecStart=/var/www/ptt/scripts/ptt_owner_weekly_alert_cron.sh
+
+[Install]
+WantedBy=multi-user.target

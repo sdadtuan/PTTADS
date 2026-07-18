@@ -48,17 +48,109 @@
 <section class="clp-panel" id="tab-hero" role="tabpanel">
   <div class="clp-panel-head">
     <h2>Hero Slider</h2>
-    <p class="muted">3 slide hiển thị trên trang chủ. Kéo ảnh từ tab Media hoặc dán URL vào ô ảnh.</p>
+    <p class="muted">Các slide hiển thị trên trang chủ. Mỗi slide cần <strong>2 ảnh riêng</strong>: desktop (16:9) và mobile (9:16). Nhấn <strong>+ Thêm slide</strong> hoặc <strong>Sửa</strong> để chỉnh nội dung.</p>
   </div>
   <div id="hero-slides-list" class="clp-slides-list">
     {# Rendered by JS #}
   </div>
   <div class="clp-actions-bar">
-    <button class="btn" id="hero-add-slide">+ Thêm slide</button>
-    <button class="btn btn-primary" id="hero-save">Lưu tất cả slides</button>
+    <button class="btn btn-primary" id="hero-add-slide">+ Thêm slide</button>
     <span class="clp-save-msg" id="hero-save-msg"></span>
   </div>
 </section>
+
+{# ── Modal: Hero Slide Edit ───────────────────────────────────────────────── #}
+<div class="clp-modal is-hidden" id="slide-modal" role="dialog" aria-modal="true" aria-label="Chỉnh slide">
+  <div class="clp-modal-backdrop" id="slide-modal-backdrop"></div>
+  <div class="clp-modal-box" style="max-width:680px;max-height:92vh;overflow-y:auto">
+    <div class="clp-modal-head">
+      <h3 id="slide-modal-title">Thêm slide</h3>
+      <button type="button" class="clp-modal-close" id="slide-modal-close" aria-label="Đóng">✕</button>
+    </div>
+    <div class="clp-modal-body" style="padding:1.25rem 1.5rem;display:flex;flex-direction:column;gap:.9rem">
+      <input type="hidden" id="slide-edit-idx" value="" />
+
+      <div class="clp-slide-hero-images">
+        <div class="clp-slide-hero-image-block">
+          <span class="clp-label-text">Ảnh Desktop <span class="clp-aspect-hint">16:9 · màn rộng</span></span>
+          <div class="clp-img-actions">
+            <input type="text" id="slide-image-url" placeholder="URL hoặc upload ảnh desktop..." />
+            <input type="file" id="slide-upload-desktop-input" accept="image/jpeg,image/png,image/webp" hidden />
+            <button type="button" class="btn" id="slide-upload-desktop-btn">⬆ Upload</button>
+            <button type="button" class="btn" id="slide-pick-desktop-btn">Thư viện</button>
+          </div>
+          <span id="slide-upload-desktop-status" class="clp-upload-hint"></span>
+          <div id="slide-desktop-thumb" class="clp-img-preview-wrap clp-img-preview-wrap--16x9 is-hidden">
+            <img id="slide-desktop-preview" class="clp-img-preview" src="" alt="" />
+          </div>
+        </div>
+
+        <div class="clp-slide-hero-image-block clp-slide-hero-image-block--mobile">
+          <span class="clp-label-text">Ảnh Mobile <span class="clp-aspect-hint">9:16 · điện thoại</span></span>
+          <div class="clp-img-actions">
+            <input type="text" id="slide-image-mobile-url" placeholder="URL hoặc upload ảnh mobile..." />
+            <input type="file" id="slide-upload-mobile-input" accept="image/jpeg,image/png,image/webp" hidden />
+            <button type="button" class="btn" id="slide-upload-mobile-btn">⬆ Upload</button>
+            <button type="button" class="btn" id="slide-pick-mobile-btn">Thư viện</button>
+          </div>
+          <span id="slide-upload-mobile-status" class="clp-upload-hint"></span>
+          <div id="slide-mobile-thumb" class="clp-img-preview-wrap clp-img-preview-wrap--9x16 is-hidden">
+            <img id="slide-mobile-preview" class="clp-img-preview" src="" alt="" />
+          </div>
+        </div>
+      </div>
+
+      <label class="clp-label">Alt text (mô tả ảnh cho SEO &amp; accessibility)
+        <input type="text" id="slide-alt-text" placeholder="Ví dụ: Văn phòng PTT — nền tảng Marketing Automation" />
+      </label>
+
+      <label class="clp-label">Video nền MP4 — URL (tùy chọn, ưu tiên hơn ảnh)
+        <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.35rem">
+          <input type="text" id="slide-video-url" placeholder="https://.../video.mp4 hoặc /static/uploads/..." style="flex:1;min-width:180px" />
+          <input type="file" id="slide-video-upload-input" accept="video/mp4,video/webm,video/quicktime" hidden />
+          <button type="button" class="btn" id="slide-video-upload-btn" style="white-space:nowrap">⬆ Upload MP4</button>
+        </div>
+        <span id="slide-video-upload-status" style="font-size:.75rem;color:#64748b"></span>
+        <span class="clp-field-hint">MP4, WebM hoặc MOV — tối đa 80 MB. Server tự nén H.264 + faststart. Nên thêm ảnh desktop/mobile làm poster để load nhanh hơn.</span>
+      </label>
+
+      <label class="clp-label">Kicker (dòng nhỏ trên heading)
+        <input type="text" id="slide-kicker" placeholder="Creative Martech Platform — Automation · AI · Data" />
+      </label>
+
+      <label class="clp-label">Heading (tùy chọn)
+        <input type="text" id="slide-heading" placeholder="Tiêu đề lớn hiển thị ở giữa slide..." />
+      </label>
+
+      <label class="clp-label">Mô tả (lead)
+        <textarea id="slide-lead" rows="3" placeholder="Đoạn mô tả ngắn bên dưới heading..."></textarea>
+      </label>
+
+      <div class="clp-form-row">
+        <label class="clp-label">Nút chính — nhãn
+          <input type="text" id="slide-cta-p-label" placeholder="Nhận tư vấn miễn phí" />
+        </label>
+        <label class="clp-label">Nút chính — href
+          <input type="text" id="slide-cta-p-href" placeholder="#contact" />
+        </label>
+      </div>
+
+      <div class="clp-form-row">
+        <label class="clp-label">Nút phụ — nhãn (tùy chọn)
+          <input type="text" id="slide-cta-g-label" placeholder="Xem case study" />
+        </label>
+        <label class="clp-label">Nút phụ — href
+          <input type="text" id="slide-cta-g-href" placeholder="#projects" />
+        </label>
+      </div>
+    </div>
+    <div class="clp-modal-foot" style="padding:.9rem 1.5rem;display:flex;gap:.6rem;border-top:1px solid var(--border,#e2e8f0)">
+      <button class="btn btn-primary" id="slide-modal-save">Lưu slide</button>
+      <button class="btn" id="slide-modal-cancel">Hủy</button>
+      <span class="clp-save-msg" id="slide-modal-msg" style="margin-left:auto"></span>
+    </div>
+  </div>
+</div>
 
 {# ── Tab: Nội dung ────────────────────────────────────────────────────────── #}
 <section class="clp-panel is-hidden" id="tab-content" role="tabpanel">
@@ -73,6 +165,47 @@
       <label class="clp-label">
         Đoạn giới thiệu (dưới dòng tiêu đề capabilities)
         <textarea name="capabilities_intro" rows="3" placeholder="PTT là nền tảng Creative Martech..."></textarea>
+      </label>
+      <p class="muted">Thêm, sửa hoặc xóa từng mục — chọn icon có sẵn hoặc upload/chọn ảnh tùy chỉnh.</p>
+      <input type="hidden" name="capabilities_items_json" id="capabilities-items-json" value="" />
+      <div id="capabilities-editor-list" class="clp-capabilities-editor"></div>
+      <button type="button" class="btn clp-btn-sm" id="capability-add-btn">+ Thêm mục năng lực</button>
+    </fieldset>
+
+    <fieldset class="clp-fieldset">
+      <legend>Logo đối tác</legend>
+      <p class="muted">Danh sách logo đang hiển thị trên landing — thêm, sửa hoặc xóa từng đối tác. Nhấn <strong>Lưu cài đặt</strong> để ghi lại.</p>
+      <input type="hidden" name="partner_logos_json" id="partner-logos-json" value="" />
+      <div id="partners-editor-list" class="clp-partners-editor"></div>
+      <button type="button" class="btn clp-btn-sm" id="partner-add-btn">+ Thêm đối tác</button>
+    </fieldset>
+
+    <fieldset class="clp-fieldset">
+      <legend>Sidebar tư vấn (trang chi tiết dịch vụ)</legend>
+      <p class="muted">Khung tư vấn nhanh bên phải trên mọi trang /services/… — SĐT &amp; email lấy từ mục Thông tin liên hệ bên dưới.</p>
+      <label class="clp-label">
+        Dòng eyebrow
+        <input type="text" name="service_aside_eyebrow" placeholder="Tư vấn nhanh" />
+      </label>
+      <label class="clp-label">
+        Tiêu đề
+        <input type="text" name="service_aside_title" placeholder="Nhận lộ trình theo mục tiêu &amp; ngân sách" />
+      </label>
+      <label class="clp-label">
+        Nhãn nút CTA
+        <input type="text" name="service_aside_btn_label" placeholder="Đăng ký nhận đề xuất" />
+      </label>
+    </fieldset>
+
+    <fieldset class="clp-fieldset">
+      <legend>Popup tư vấn nhanh (FAB)</legend>
+      <label class="clp-label">
+        Dòng eyebrow
+        <input type="text" name="cfab_eyebrow" placeholder="Miễn phí · Phản hồi trong 2 giờ" />
+      </label>
+      <label class="clp-label">
+        Tiêu đề popup
+        <input type="text" name="cfab_title" placeholder="Nhận tư vấn giải pháp" />
       </label>
     </fieldset>
 
@@ -93,14 +226,30 @@
     </fieldset>
 
     <fieldset class="clp-fieldset">
-      <legend>Thông tin liên hệ</legend>
+      <legend>Thông tin liên hệ (footer &amp; form)</legend>
       <label class="clp-label">
-        Số điện thoại
-        <input type="text" name="contact_phone" placeholder="0909.965.286" />
+        Tên thương hiệu
+        <input type="text" name="brand_name" placeholder="PTT Advertising Solutions" />
+      </label>
+      <label class="clp-label">
+        Nhãn mục liên hệ trên footer
+        <input type="text" name="footer_contact_label" placeholder="Liên hệ tư vấn" />
+      </label>
+      <label class="clp-label">
+        Số điện thoại chính
+        <input type="text" name="contact_phone" placeholder="+84 (24) 7307 7979" />
+      </label>
+      <label class="clp-label">
+        Hotline hiển thị footer (mỗi dòng một số)
+        <textarea name="footer_phones_lines" rows="3" placeholder="+84 (24) 7307 7979 (HN)&#10;+84 (28) 7307 7979 (HCM)"></textarea>
       </label>
       <label class="clp-label">
         Email
         <input type="text" name="contact_email" placeholder="contact@pttadvertising.vn" />
+      </label>
+      <label class="clp-label">
+        Địa chỉ Hà Nội
+        <input type="text" name="office_hn" placeholder="Tầng …, Hà Nội" />
       </label>
       <label class="clp-label">
         Địa chỉ TP.HCM
@@ -109,14 +258,15 @@
     </fieldset>
 
     <fieldset class="clp-fieldset">
-      <legend>Footer</legend>
+      <legend>Footer — Logo, slogan &amp; mạng xã hội</legend>
+      <p class="muted">Chân trang 4 cột: logo + slogan, liên kết, dịch vụ, thông tin liên hệ.</p>
       <label class="clp-label">
-        Tagline ngắn
+        Slogan ngắn (dưới logo)
         <input type="text" name="footer_tagline_intro" placeholder="Creative Martech Platform" />
       </label>
       <label class="clp-label">
-        Tagline mô tả
-        <textarea name="footer_tagline_body" rows="2" placeholder="Automation · AI · Data..."></textarea>
+        Mô tả slogan
+        <textarea name="footer_tagline_body" rows="2" placeholder="Tích hợp sáng tạo, dữ liệu và công nghệ..."></textarea>
       </label>
       <label class="clp-label">
         Facebook URL
@@ -126,6 +276,16 @@
         LinkedIn URL
         <input type="url" name="footer_linkedin_url" placeholder="https://www.linkedin.com/..." />
       </label>
+      <div class="clp-form-row">
+        <label class="clp-label">
+          Năm bản quyền
+          <input type="text" name="footer_legal_years" placeholder="2020 – 2026" />
+        </label>
+        <label class="clp-label">
+          Hậu tố bản quyền
+          <input type="text" name="footer_legal_rights" placeholder=". All rights reserved." />
+        </label>
+      </div>
     </fieldset>
 
     <div class="clp-actions-bar">
@@ -139,7 +299,7 @@
 <section class="clp-panel is-hidden" id="tab-projects" role="tabpanel">
   <div class="clp-panel-head">
     <h2>Dự án Portfolio</h2>
-    <p class="muted">Các case study hiển thị trong mục "Dự án" trên landing page.</p>
+    <p class="muted">Ảnh + intro ngắn hiển thị trên landing; nội dung chi tiết chỉ xuất hiện ở trang dự án.</p>
   </div>
 
   <div class="clp-item-form panel">
@@ -167,8 +327,13 @@
       </label>
     </div>
     <label class="clp-label">
-      Mô tả
-      <textarea id="project-description" rows="3" placeholder="Mô tả ngắn về chiến dịch..."></textarea>
+      Intro (landing page) <span class="req">*</span>
+      <textarea id="project-intro" rows="3" maxlength="500" placeholder="Mô tả ngắn 1–2 câu hiển thị trên trang chủ (tối đa ~180 ký tự khuyến nghị)..."></textarea>
+      <span class="clp-field-hint">Chỉ hiển thị trên landing — không dùng HTML.</span>
+    </label>
+    <label class="clp-label">
+      Nội dung chi tiết (trang dự án)
+      <div id="project-description-editor" style="background:#fff;border-radius:0 0 6px 6px;min-height:280px"></div>
     </label>
     <div class="clp-form-actions">
       <button class="btn btn-primary" id="project-submit">Thêm dự án</button>
@@ -185,8 +350,8 @@
 {# ── Tab: Blog ────────────────────────────────────────────────────────────── #}
 <section class="clp-panel is-hidden" id="tab-blog" role="tabpanel">
   <div class="clp-panel-head">
-    <h2>Blog / Tin tức</h2>
-    <p class="muted">Bài viết hiển thị trong mục "Tin tức" trên landing page.</p>
+    <h2>Blog / Tin tức &amp; Kiến thức</h2>
+    <p class="muted">Bài viết hiển thị trong mục "Tin tức &amp; Kiến thức" trên landing page.</p>
   </div>
 
   <div class="clp-item-form panel">
@@ -209,7 +374,7 @@
     </label>
     <label class="clp-label">
       Tóm tắt <span class="req">*</span>
-      <textarea id="blog-summary" rows="3" placeholder="Nội dung tóm tắt hiển thị trên landing..."></textarea>
+      <div id="blog-summary-editor" style="background:#fff;border-radius:0 0 6px 6px;min-height:280px"></div>
     </label>
     <div class="clp-form-row">
       <label class="clp-label">
@@ -237,7 +402,7 @@
 <section class="clp-panel is-hidden" id="tab-services" role="tabpanel">
   <div class="clp-panel-head">
     <h2>Quản lý Dịch vụ</h2>
-    <p class="muted">Danh mục dịch vụ và từng mục hiển thị trong mega menu và trang /services. Thay đổi lưu ngay khi nhấn "Lưu dịch vụ".</p>
+    <p class="muted">Nhấn <strong>Sửa</strong> từng dịch vụ để chỉnh <strong>Hero đầu trang</strong> (ảnh nền, tiêu đề, mô tả, nút CTA) và nội dung chi tiết. Nhớ nhấn <strong>Lưu dịch vụ này</strong> rồi <strong>Lưu tất cả dịch vụ</strong>.</p>
   </div>
 
   {# Thêm danh mục mới #}
@@ -379,6 +544,8 @@
 {% include 'partials/admin_grants_bootstrap.html' %}
 <script>
   window.CLP_GRANTS = {{ cms_grants_json | safe }};
+  window.CLP_PARTNER_LOGOS_SEED = {{ partner_logos_seed_json | safe }};
+  window.CLP_CAPABILITIES_ITEMS_SEED = {{ capabilities_items_seed_json | safe }};
 </script>
 <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
 <script src="{{ url_for('static', filename='cms_landing.js') }}?v={{ static_v('cms_landing.js') }}"></script>

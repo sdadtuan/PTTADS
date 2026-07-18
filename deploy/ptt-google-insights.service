@@ -1,0 +1,23 @@
+# Google Ads → daily_performance (Phase 3 G2)
+#
+# VPS:
+#   sudo cp deploy/ptt-google-insights.service deploy/ptt-google-insights.timer /etc/systemd/system/
+#   # .env: PTT_GOOGLE_INSIGHTS_SYNC=1, PTT_GOOGLE_ADS_* OAuth, hub_campaign_map channel=google
+#   sudo systemctl enable --now ptt-google-insights.timer
+
+[Unit]
+Description=PTT — Google Ads insights sync (một lần)
+After=network.target ptt.service
+Wants=ptt.service
+
+[Service]
+Type=oneshot
+User=deploy
+Group=www-data
+Environment=PTT_APP_DIR=/var/www/ptt
+Environment=PTT_GOOGLE_INSIGHTS_SYNC=1
+EnvironmentFile=-/var/www/ptt/.env
+ExecStart=/var/www/ptt/scripts/sync_google_insights.sh
+
+[Install]
+WantedBy=multi-user.target

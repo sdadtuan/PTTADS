@@ -1,0 +1,30 @@
+# ============================================================
+# PTT CRM API — NestJS read-only (Phase 1b Bước 7–8)
+#
+# VPS:
+#   sudo cp deploy/ptt-crm-api.service /etc/systemd/system/
+#   sudo nano /etc/systemd/system/ptt-crm-api.service  # User, paths
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ptt-crm-api
+#   curl http://127.0.0.1:3000/health
+# ============================================================
+
+[Unit]
+Description=PTT CRM API — NestJS leads read (PG replica)
+After=network.target docker.service
+Wants=ptt-postgres.service
+
+[Service]
+Type=simple
+User=deploy
+Group=www-data
+WorkingDirectory=/var/www/ptt/services/ptt-crm-api
+Environment=NODE_ENV=production
+Environment=PORT=3000
+EnvironmentFile=-/var/www/ptt/.env
+ExecStart=/usr/bin/node dist/main.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

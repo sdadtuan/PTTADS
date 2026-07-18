@@ -1,0 +1,20 @@
+{% import '_macros_static.html' as ras %}
+{% macro render(href='/', variant='header', loading='eager', show_text=true) %}
+  {% set _brand = (settings.brand_name if settings else 'PTT Advertising Solutions') | e %}
+  <a
+    href="{{ href }}"
+    class="logo logo-landing brand-logo{% if variant == 'footer' %} brand-logo--footer{% endif %}"
+    aria-label="{{ _brand }} — Trang chủ"
+  >
+    {{- ras.raster_static_picture(
+        'images/ptt-logo.png',
+        _brand ~ ' — logo',
+        60,
+        60,
+        'brand-logo-img',
+        loading=loading) -}}
+    {% if show_text %}
+    <span class="brand-logo-text logo-landing-text">{{ _brand }}</span>
+    {% endif %}
+  </a>
+{% endmacro %}

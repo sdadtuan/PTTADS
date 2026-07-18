@@ -959,12 +959,14 @@ def _enrich_facebook_placeholder_lead(
     summary["status"] = "enriched"
     summary["message"] = "Đã bổ sung dữ liệu lead Facebook từ Graph API."
     if not summary.get("owner_id") and fb_cfg.get("auto_assign", True):
-        from crm_lead_auto_assign import assign_lead_owner
+        from crm_lead_store import assign_lead_owner
 
+        rd = dict(refreshed)
         owner_id, _owner_name, strategy = assign_lead_owner(
             conn,
-            region=str(item.get("region") or ""),
-            product_interest=str(item.get("product_interest") or ""),
+            region=str(item.get("region") or rd.get("region") or ""),
+            product_interest=str(item.get("product_interest") or rd.get("product_interest") or ""),
+            industry_slug=str(rd.get("industry_slug") or ""),
             lead_level=str(summary.get("lead_level") or ""),
             lead_score=int(summary.get("lead_score") or 0),
             source="facebook",
@@ -1007,31 +1009,12 @@ def process_facebook_lead_item(
     ).strip()
     page_id_pre = str(meta_pre.get("facebook_page_id") or item.get("facebook_page_id") or "").strip()
 
-    if re_project_id is None:
-        from crm_project_webhooks import resolve_project_from_webhook
+    from crm_lead_product_model_p3 import resolve_facebook_industry_slug
 
-        re_project_id = resolve_project_from_webhook(
-            conn,
-            webhook_slug=webhook_slug,
-            page_id=page_id_pre,
-            form_id=form_id_pre,
-        )
-
-    project_auto_assign: bool | None = None
-    if re_project_id is not None:
-        from crm_project_webhooks import get_project_lead_config, project_webhook_ingest_allowed
-
-        ok_proj, proj_reason = project_webhook_ingest_allowed(conn, int(re_project_id))
-        if not ok_proj:
-            return {
-                "status": "filtered_out",
-                "message": proj_reason,
-                "re_project_id": int(re_project_id),
-                "facebook_form_id": form_id_pre or None,
-            }
-        pcfg = get_project_lead_config(conn, int(re_project_id))
-        project_auto_assign = bool(pcfg.get("auto_assign", True))
-        skip_source_filter = True
+    industry_slug = resolve_facebook_industry_slug(
+        conn, item, webhook_slug=webhook_slug
+    )
+    _ = re_project_id  # legacy param — ignored (P3)
 
     if not skip_source_filter:
         ok, reason = matches_facebook_source(item, cfg)
@@ -1095,8 +1078,6 @@ def process_facebook_lead_item(
         placeholder = True
 
     do_assign = cfg.get("auto_assign", True) if auto_assign is None else bool(auto_assign)
-    if project_auto_assign is not None and auto_assign is None:
-        do_assign = project_auto_assign
 
     try:
         row, dups, dup_matches = create_lead(
@@ -1107,6 +1088,7 @@ def process_facebook_lead_item(
             source="facebook",
             region=str(item.get("region") or ""),
             product_interest=str(item.get("product_interest") or ""),
+            industry_slug=industry_slug,
             need=str(item.get("need") or ""),
             utm_campaign=str(item.get("utm_campaign") or ""),
             meta=meta_obj,
@@ -1114,7 +1096,6 @@ def process_facebook_lead_item(
             duplicate_policy=None,
             created_by=created_by,
             ts=ts,
-            re_project_id=re_project_id,
         )
     except ValueError as exc:
         return {
@@ -1150,8 +1131,7 @@ def process_facebook_lead_item(
         )
     if placeholder or meta_obj.get("awaiting_facebook_graph"):
         summary["awaiting_facebook_graph"] = True
-    if re_project_id is not None:
-        summary["re_project_id"] = int(re_project_id)
+    summary["industry_slug"] = industry_slug
     return summary
 
 

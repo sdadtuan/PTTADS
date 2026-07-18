@@ -160,7 +160,17 @@
     });
 
     document.querySelectorAll("[data-admin-nav]").forEach((link) => {
+      if (link.classList.contains("admin-nav-link--always")) {
+        link.classList.remove("admin-nav-hidden");
+        link.removeAttribute("aria-disabled");
+        return;
+      }
       const sid = link.getAttribute("data-admin-nav");
+      if (sid === "crm_hdsd") {
+        link.classList.remove("admin-nav-hidden");
+        link.removeAttribute("aria-disabled");
+        return;
+      }
       const pageOk = !sid || can(sid, "view");
       link.classList.toggle("admin-nav-hidden", !pageOk);
       if (!pageOk && link.tagName === "A") {
@@ -186,6 +196,10 @@
 
     document.querySelectorAll(".admin-nav-group").forEach((group) => {
       if (!(group instanceof HTMLElement)) return;
+      if (group.classList.contains("admin-nav-group--always")) {
+        group.classList.remove("admin-nav-group--empty");
+        return;
+      }
       const links = group.querySelectorAll(".admin-nav-link:not(.admin-nav-hidden):not(.cms-nav-hidden)");
       group.classList.toggle("admin-nav-group--empty", links.length === 0);
     });

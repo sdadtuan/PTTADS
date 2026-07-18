@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pttads.vn/schemas/crm/lead-v1.schema.json",
+  "title": "LeadV1",
+  "description": "CRM lead read DTO — Flask/NestJS dual-run contract (Phase 1b). Source: ptt_crm/leads_read.py lead_row_to_v1().",
+  "type": "object",
+  "required": [
+    "id",
+    "full_name",
+    "phone",
+    "email",
+    "status",
+    "source",
+    "channel",
+    "client_id",
+    "campaign_id",
+    "external_lead_id",
+    "owner_id",
+    "created_at",
+    "received_at",
+    "is_duplicate"
+  ],
+  "properties": {
+    "id": { "type": "integer", "minimum": 1 },
+    "full_name": { "type": "string" },
+    "phone": { "type": "string" },
+    "email": { "type": "string" },
+    "status": { "type": "string" },
+    "source": { "type": "string" },
+    "channel": { "type": "string" },
+    "client_id": { "type": ["string", "null"], "format": "uuid" },
+    "campaign_id": { "type": ["string", "null"] },
+    "external_lead_id": { "type": ["string", "null"] },
+    "owner_id": { "type": ["integer", "null"] },
+    "created_at": { "type": "string" },
+    "received_at": { "type": "string" },
+    "is_duplicate": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

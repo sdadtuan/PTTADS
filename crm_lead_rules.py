@@ -32,6 +32,8 @@ DEFAULT_LEAD_CONFIG: dict[str, Any] = {
     "hot_priority_assign": True,
     "inactive_owner_fallback": "round_robin",
     "activity_sla_enabled": True,
+    "b2_review_queue_enabled": True,
+    "b2_contact_deadline_hours": 24,
     "scoring_rules": None,
     "scoring_rubric": None,
     "scoring_mode": "rubric",
@@ -91,6 +93,12 @@ def fetch_lead_config(conn: sqlite3.Connection) -> dict[str, Any]:
     cfg["inactive_owner_fallback"] = fb if fb in INACTIVE_FALLBACK_MODES else "round_robin"
     cfg["hot_priority_assign"] = bool(cfg.get("hot_priority_assign", True))
     cfg["activity_sla_enabled"] = bool(cfg.get("activity_sla_enabled", True))
+    from crm_lead_review_queue import normalize_b2_contact_deadline_hours
+
+    cfg["b2_review_queue_enabled"] = bool(cfg.get("b2_review_queue_enabled", True))
+    cfg["b2_contact_deadline_hours"] = normalize_b2_contact_deadline_hours(
+        cfg.get("b2_contact_deadline_hours")
+    )
     from crm_lead_scoring import merge_scoring_rules
 
     cfg["scoring_rules"] = merge_scoring_rules(cfg.get("scoring_rules"))
@@ -145,6 +153,14 @@ def save_lead_config(
         merged["hot_priority_assign"] = bool(config["hot_priority_assign"])
     if "activity_sla_enabled" in config:
         merged["activity_sla_enabled"] = bool(config["activity_sla_enabled"])
+    if "b2_review_queue_enabled" in config:
+        merged["b2_review_queue_enabled"] = bool(config["b2_review_queue_enabled"])
+    if "b2_contact_deadline_hours" in config:
+        from crm_lead_review_queue import normalize_b2_contact_deadline_hours
+
+        merged["b2_contact_deadline_hours"] = normalize_b2_contact_deadline_hours(
+            config["b2_contact_deadline_hours"]
+        )
     if "scoring_rules" in config:
         from crm_lead_scoring import normalize_scoring_rules
 

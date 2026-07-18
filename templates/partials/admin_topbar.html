@@ -9,6 +9,8 @@
     </a>
     <div class="admin-topbar-spacer"></div>
     <a href="{{ url_for('landing') }}" class="admin-topbar-link" title="Xem trang công khai">Trang chủ</a>
+    <a href="{{ url_for('crm_hdsd_page') }}" class="admin-topbar-link admin-topbar-link--hdsd">HDSD</a>
+    <a href="{{ url_for('crm_test_cases_download_xlsx') }}" class="admin-topbar-link">Test case</a>
     <a href="{{ url_for('account_password_page') }}" class="admin-topbar-link">Đổi mật khẩu</a>
     <div class="admin-topbar-user" title="{{ admin_ui_role | default('') }}">
       <span class="admin-topbar-user-name">{{ admin_ui_user | default('Admin') }}</span>

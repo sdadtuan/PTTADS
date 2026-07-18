@@ -1,11 +1,15 @@
 <aside class="admin-sidebar" id="admin-sidebar" aria-label="Menu quản trị">
   <nav class="admin-sidebar-nav">
 {% if crm_leads_only_ui | default(false) %}
-    <div class="admin-nav-group">
+    <div class="admin-nav-group admin-nav-group--always">
       <p class="admin-nav-label">Kinh doanh</p>
       <a href="{{ url_for('crm_leads_page') }}" class="admin-nav-link{% if request.endpoint == 'crm_leads_page' %} is-active{% endif %}" data-admin-nav="crm_leads">
         <span class="admin-nav-icon" aria-hidden="true">🎯</span>
         Danh sách lead
+      </a>
+      <a href="{{ url_for('crm_hdsd_page') }}" class="admin-nav-link admin-nav-link--always{% if request.endpoint == 'crm_hdsd_page' %} is-active{% endif %}">
+        <span class="admin-nav-icon" aria-hidden="true">📖</span>
+        HDSD
       </a>
     </div>
 {% else %}
@@ -38,6 +42,10 @@
       <a href="{{ url_for('cms_landing') }}?tab=media" class="admin-nav-link{% if request.endpoint == 'cms_landing' %} is-active{% endif %}" data-cms-nav="landing_media">
         <span class="admin-nav-icon" aria-hidden="true">🗂</span>
         Media Library
+      </a>
+      <a href="{{ url_for('cms_recruitment') }}" class="admin-nav-link{% if request.endpoint == 'cms_recruitment' %} is-active{% endif %}" data-cms-nav="recruitment_jobs">
+        <span class="admin-nav-icon" aria-hidden="true">💼</span>
+        Tuyển dụng
       </a>
     </div>
 
@@ -107,6 +115,46 @@
     </div>
 
     <div class="admin-nav-group">
+      <p class="admin-nav-label">CRM · Quảng cáo</p>
+      <a href="{{ url_for('crm_agency.crm_facebook_ads_hub_page') }}" class="admin-nav-link{% if request.endpoint == 'crm_agency.crm_facebook_ads_hub_page' %} is-active{% endif %}" data-admin-nav="crm_facebook_ads">
+        <span class="admin-nav-icon" aria-hidden="true">📘</span>
+        Facebook Ads
+      </a>
+    </div>
+
+    <div class="admin-nav-group">
+      <p class="admin-nav-label">CRM · Agency Ops</p>
+      <a href="{{ url_for('crm_agency.crm_agency_dashboard_page') }}" class="admin-nav-link{% if request.endpoint and request.endpoint.startswith('crm_agency.') %} is-active{% endif %}" data-admin-nav="crm_agency">
+        <span class="admin-nav-icon" aria-hidden="true">◆</span>
+        Tổng quan vận hành
+      </a>
+      <a href="{{ url_for('crm_agency.crm_agency_clients_page') }}" class="admin-nav-link{% if request.endpoint == 'crm_agency.crm_agency_clients_page' or request.endpoint == 'crm_agency.crm_agency_client_detail_page' %} is-active{% endif %}" data-admin-nav="crm_agency">
+        <span class="admin-nav-icon" aria-hidden="true">🏢</span>
+        Khách hàng (Client)
+      </a>
+      <a href="{{ url_for('crm_agency.crm_agency_ingest_page') }}" class="admin-nav-link{% if request.endpoint == 'crm_agency.crm_agency_ingest_page' %} is-active{% endif %}" data-admin-nav="crm_agency">
+        <span class="admin-nav-icon" aria-hidden="true">⇄</span>
+        Pipeline ingest
+      </a>
+      <a href="{{ url_for('crm_agency.crm_agency_notifications_page') }}" class="admin-nav-link{% if request.endpoint == 'crm_agency.crm_agency_notifications_page' %} is-active{% endif %}" data-admin-nav="crm_agency">
+        <span class="admin-nav-icon" aria-hidden="true">🔔</span>
+        Thông báo
+      </a>
+      <a href="{{ url_for('crm_agency.crm_agency_kpi_page') }}" class="admin-nav-link{% if request.endpoint == 'crm_agency.crm_agency_kpi_page' %} is-active{% endif %}" data-admin-nav="crm_agency">
+        <span class="admin-nav-icon" aria-hidden="true">📊</span>
+        Từ điển KPI
+      </a>
+    </div>
+
+    <div class="admin-nav-group admin-nav-group--always">
+      <p class="admin-nav-label">CRM · Hướng dẫn</p>
+      <a href="{{ url_for('crm_hdsd_page') }}" class="admin-nav-link admin-nav-link--always{% if request.endpoint == 'crm_hdsd_page' %} is-active{% endif %}">
+        <span class="admin-nav-icon" aria-hidden="true">📖</span>
+        HDSD
+      </a>
+    </div>
+
+    <div class="admin-nav-group">
       <p class="admin-nav-label">CRM · Kinh doanh</p>
       <a href="{{ url_for('crm_sales_page') }}" class="admin-nav-link{% if request.endpoint == 'crm_sales_page' %} is-active{% endif %}" data-admin-nav="crm_sales_overview">
         <span class="admin-nav-icon" aria-hidden="true">📈</span>
@@ -131,6 +179,10 @@
       <a href="{{ url_for('crm_kpi_page') }}" class="admin-nav-link{% if request.endpoint == 'crm_kpi_page' %} is-active{% endif %}" data-admin-nav="crm_kpi_records">
         <span class="admin-nav-icon" aria-hidden="true">📊</span>
         KPI
+      </a>
+      <a href="{{ url_for('crm_staff_kpi_page') }}" class="admin-nav-link{% if request.endpoint == 'crm_staff_kpi_page' %} is-active{% endif %}" data-admin-nav="crm_staff_kpi_am_sp">
+        <span class="admin-nav-icon" aria-hidden="true">🎯</span>
+        KPI AM/SP
       </a>
       <a href="{{ url_for('crm_payroll_page') }}" class="admin-nav-link{% if request.endpoint in ('crm_payroll_page', 'crm_attendance_redirect') %} is-active{% endif %}" data-admin-nav="crm_payroll_attendance">
         <span class="admin-nav-icon" aria-hidden="true">🕐</span>

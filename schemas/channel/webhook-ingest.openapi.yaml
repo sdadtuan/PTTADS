@@ -1,0 +1,122 @@
+openapi: 3.1.0
+info:
+  title: PTT Channel Webhook Ingress
+  version: 0.1.0
+  description: |
+    Unified webhook API for multi-channel ads platform.
+    Target path (future): `/api/v1/webhooks/{channel}/{client_slug}`
+    Legacy paths remain during migration.
+
+servers:
+  - url: https://pttads.vn
+    description: Production
+  - url: http://127.0.0.1:5050
+    description: Local
+
+paths:
+  /api/v1/webhooks/{channel}:
+    get:
+      summary: Webhook verification (Meta subscribe)
+      parameters:
+        - name: channel
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [meta, zalo, google, email]
+        - name: hub.mode
+          in: query
+          schema:
+            type: string
+        - name: hub.verify_token
+          in: query
+          schema:
+            type: string
+        - name: hub.challenge
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Challenge echo
+          content:
+            text/plain:
+              schema:
+                type: string
+        "403":
+          description: Invalid verify token
+
+    post:
+      summary: Ingest channel webhook
+      parameters:
+        - name: channel
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [meta, zalo, google, email]
+        - name: X-Hub-Signature-256
+          in: header
+          schema:
+            type: string
+          description: Meta HMAC signature
+        - name: X-Zalo-Signature
+          in: header
+          schema:
+            type: string
+          description: Zalo HMAC signature
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Parsed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookIngestResponse"
+        "401":
+          description: Signature verification failed
+
+  /api/v1/channels:
+    get:
+      summary: List registered channel adapters and capabilities
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  channels:
+                    type: array
+                    items:
+                      type: string
+
+components:
+  schemas:
+    WebhookIngestResponse:
+      type: object
+      required: [verified, channel]
+      properties:
+        verified:
+          type: boolean
+        channel:
+          type: string
+        reject_reason:
+          type: string
+        challenge:
+          oneOf:
+            - type: string
+            - type: integer
+        leads:
+          type: array
+          items:
+            $ref: "./normalized-lead.schema.json"
+        events:
+          type: array
+          items:
+            $ref: "./normalized-event.schema.json"

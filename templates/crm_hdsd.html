@@ -1,0 +1,155 @@
+{% extends "admin_layout.html" %}
+{% block admin_page_title %}HDSD — Hướng dẫn sử dụng{% endblock %}
+{% block admin_page_desc %}
+  <p class="admin-page-desc">Tài liệu vận hành CRM — đọc HDSD, tải test case Excel (đầy đủ cột + sơ đồ) cho tester.</p>
+{% endblock %}
+
+{% block admin_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='crm_hdsd.css') }}?v={{ static_v('crm_hdsd.css') }}" />
+{% endblock %}
+
+{% block admin_main %}
+<div class="crm-hdsd-wrap">
+  {% if not view_doc %}
+  <div class="crm-hdsd-bulk panel crm-hdsd-qa">
+    <div class="crm-hdsd-qa-main">
+      <p class="crm-hdsd-bulk-label">QA · Test case</p>
+      <p class="muted crm-hdsd-qa-desc">Excel 10 sheet: cột đầy đủ cho tester, sơ đồ Lead→Retain, hướng dẫn chụp hình minh họa, Smoke P0.</p>
+    </div>
+    <a href="{{ url_for('crm_test_cases_download_xlsx') }}" class="btn-primary btn-sm">Tải bộ Test Case (.xlsx)</a>
+  </div>
+  {% endif %}
+  {% if can_export and not view_doc %}
+  <div class="crm-hdsd-bulk panel">
+    <p class="crm-hdsd-bulk-label">Xuất hàng loạt</p>
+    <a href="{{ url_for('crm_hdsd_export_all_zip') }}" class="btn-primary btn-sm">Tải tất cả (.zip Excel)</a>
+  </div>
+  {% endif %}
+  {% if view_doc %}
+  <div class="crm-hdsd-layout">
+    <aside class="crm-hdsd-sidebar panel" aria-label="Danh mục tài liệu">
+      <div class="crm-hdsd-sidebar-head">
+        <a href="{{ url_for('crm_hdsd_page') }}" class="crm-hdsd-back">← Tất cả tài liệu</a>
+      </div>
+      {% for group in catalog %}
+      {% if group.docs %}
+      <div class="crm-hdsd-nav-group">
+        <p class="crm-hdsd-nav-label">{{ group.label }}</p>
+        {% for doc in group.docs %}
+        <a href="{{ url_for('crm_hdsd_page', section=doc.section, slug=doc.slug) }}"
+           class="crm-hdsd-nav-link{% if doc.section == view_doc.section and doc.slug == view_doc.slug %} is-active{% endif %}">
+          {{ doc.title }}
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% endfor %}
+    </aside>
+
+    <article class="crm-hdsd-article panel">
+      <header class="crm-hdsd-article-head">
+        <div>
+          <p class="crm-hdsd-breadcrumb muted">{{ view_doc.section_label }} · {{ view_doc.filename }}</p>
+          <h2 class="crm-hdsd-doc-title">{{ view_doc.title }}</h2>
+        </div>
+        <div class="crm-hdsd-actions">
+          {% if can_export %}
+          <a href="{{ url_for('crm_hdsd_doc_download', section=view_doc.section, slug=view_doc.slug) }}"
+             class="btn-secondary btn-sm" download>Tải .md</a>
+          <a href="{{ url_for('crm_hdsd_doc_download_xlsx', section=view_doc.section, slug=view_doc.slug) }}"
+             class="btn-secondary btn-sm">Tải Excel</a>
+          {% endif %}
+          <button type="button" class="btn-secondary btn-sm" onclick="window.print()">In</button>
+        </div>
+      </header>
+      <div id="crm-hdsd-content" class="crm-hdsd-content prose"></div>
+      <script type="application/json" id="crm-hdsd-md-json">{{ doc_markdown | tojson }}</script>
+    </article>
+  </div>
+  {% else %}
+  <div class="crm-hdsd-index">
+    {% for group in catalog %}
+    <section class="panel crm-hdsd-index-section">
+      <header class="crm-hdsd-index-head">
+        <h2>{{ group.label }}</h2>
+        <p class="muted">{{ group.description }}</p>
+      </header>
+      {% if group.docs %}
+      <ul class="crm-hdsd-doc-list">
+        {% for doc in group.docs %}
+        <li class="crm-hdsd-doc-item">
+          <div class="crm-hdsd-doc-item-main">
+            <a href="{{ url_for('crm_hdsd_page', section=doc.section, slug=doc.slug) }}" class="crm-hdsd-doc-link">
+              {{ doc.title }}
+            </a>
+            <span class="muted crm-hdsd-doc-file">{{ doc.filename }}</span>
+          </div>
+          <div class="crm-hdsd-doc-item-actions">
+            <a href="{{ url_for('crm_hdsd_page', section=doc.section, slug=doc.slug) }}" class="btn-secondary btn-sm">Đọc</a>
+            {% if can_export %}
+            <a href="{{ url_for('crm_hdsd_doc_download', section=doc.section, slug=doc.slug) }}"
+               class="btn-secondary btn-sm" download>Tải .md</a>
+            <a href="{{ url_for('crm_hdsd_doc_download_xlsx', section=doc.section, slug=doc.slug) }}"
+               class="btn-secondary btn-sm">Excel</a>
+            {% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">Chưa có file .md trong thư mục này.</p>
+      {% endif %}
+    </section>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+{% if view_doc %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>
+(function () {
+  var raw = '';
+  try {
+    raw = JSON.parse(document.getElementById('crm-hdsd-md-json').textContent || '""');
+  } catch (e) { raw = ''; }
+  var el = document.getElementById('crm-hdsd-content');
+  if (!el || !raw) return;
+
+  if (window.marked) {
+    marked.setOptions({ gfm: true, breaks: false });
+    el.innerHTML = marked.parse(raw);
+  } else {
+    el.textContent = raw;
+  }
+
+  el.querySelectorAll('pre code.language-mermaid, pre > code').forEach(function (node) {
+    var txt = (node.textContent || '').trim();
+    if (txt.indexOf('flowchart') === 0 || txt.indexOf('sequenceDiagram') === 0 ||
+        txt.indexOf('stateDiagram') === 0 || txt.indexOf('graph ') === 0) {
+      var div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = txt;
+      var pre = node.closest('pre');
+      if (pre) pre.replaceWith(div);
+    }
+  });
+
+  if (window.mermaid) {
+    mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' });
+    mermaid.run({ querySelector: '.crm-hdsd-content .mermaid' }).catch(function () {});
+  }
+
+  el.querySelectorAll('a[href]').forEach(function (a) {
+    var href = a.getAttribute('href') || '';
+    if (href.endsWith('.md') && !href.startsWith('http')) {
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener');
+    }
+  });
+})();
+</script>
+{% endif %}
+{% include 'partials/admin_grants_bootstrap.html' %}
+{% endblock %}

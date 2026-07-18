@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pttads.vn/schemas/crm/leads-list-response-v1.schema.json",
+  "title": "LeadsListResponseV1",
+  "type": "object",
+  "required": ["leads", "total", "limit", "offset"],
+  "properties": {
+    "leads": {
+      "type": "array",
+      "items": { "$ref": "lead-v1.schema.json" }
+    },
+    "total": { "type": "integer", "minimum": 0 },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 200 },
+    "offset": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": false
+}

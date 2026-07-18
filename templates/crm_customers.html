@@ -131,6 +131,7 @@
             <a class="crm-cu-quick-btn" id="crm-cu-quick-email" href="#" hidden title="Gửi email">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
             </a>
+            <a class="btn-secondary btn-sm" id="crm-cu-lc-open" href="#" title="Tạo Lifecycle dịch vụ" style="font-size:.78rem;padding:.3rem .7rem;text-decoration:none;">+ Lifecycle</a>
             <button type="button" class="crm-cu-detail-close" id="crm-cu-detail-close" aria-label="Đóng chi tiết">×</button>
           </div>
         </header>
@@ -179,6 +180,12 @@
           <div class="crm-cu-content">
             <div class="crm-cu-tab-panel is-active" id="crm-cu-panel-overview" data-cu-panel="overview" role="tabpanel">
               <div class="crm-cu-contact-grid" id="crm-cu-contact-grid" aria-label="Liên hệ nhanh"></div>
+              <div style="padding:.75rem 1.25rem .25rem">
+                <a href="#" id="crm-cu-lc-trigger" onclick="event.preventDefault();openLifecycleModal();" style="display:inline-flex;align-items:center;gap:.4rem;font-size:.82rem;font-weight:600;color:var(--primary-600,#398b43);text-decoration:none;padding:.35rem .75rem;border:1.5px solid var(--primary-600,#398b43);border-radius:6px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Tạo Lifecycle
+                </a>
+              </div>
               <form id="crm-cu-profile-form" class="crm-detail-form crm-cu-form-section crm-cu-form-card panel">
                 <h3 class="crm-cu-form-title">Thông tin liên hệ</h3>
                 <div class="crm-staff-edit-grid">
@@ -438,12 +445,213 @@
     </form>
   </div>
 </div>
+
+  <!-- Brief Quick Panel -->
+  <div id="brief-panel-overlay"
+       style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:900;"
+       onclick="closeBriefPanel()"></div>
+  <div id="brief-panel"
+       style="display:none;position:fixed;top:0;right:0;width:420px;max-width:100vw;height:100vh;background:#fff;box-shadow:-4px 0 24px rgba(0,0,0,.15);z-index:901;overflow-y:auto;flex-direction:column;">
+    <div style="padding:1rem 1.25rem;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div id="brief-panel-name" style="font-weight:700;font-size:1rem;"></div>
+        <a id="brief-panel-fulllink" href="#" style="font-size:.78rem;color:#3b82f6;">Xem đầy đủ →</a>
+      </div>
+      <button onclick="closeBriefPanel()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#6b7280;">×</button>
+    </div>
+    <div style="padding:1rem 1.25rem;">
+      <div style="margin-bottom:.75rem;">
+        <input id="brief-panel-purpose" type="text" placeholder="Mục đích cuộc họp (tuỳ chọn)"
+               style="width:100%;box-sizing:border-box;padding:.5rem .7rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.85rem;" />
+      </div>
+      <button id="brief-panel-gen-btn" onclick="briefPanelGenerate()"
+              style="width:100%;padding:.55rem;background:#3b82f6;color:#fff;border:none;border-radius:6px;font-size:.875rem;cursor:pointer;font-weight:600;margin-bottom:1rem;">
+        Tạo Brief
+      </button>
+      <div id="brief-panel-loading" hidden style="text-align:center;color:#6b7280;font-size:.85rem;margin-bottom:.75rem;">⏳ Đang tạo...</div>
+      <div id="brief-panel-content">
+        <div id="brief-panel-empty" style="text-align:center;color:#9ca3af;padding:2rem 0;font-size:.875rem;">Chưa có brief — nhấn "Tạo Brief" để tạo</div>
+        <div id="brief-panel-cards" hidden>
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:.75rem;margin-bottom:.5rem;">
+            <div style="font-weight:600;font-size:.8rem;color:#1e40af;margin-bottom:.3rem;">Tóm tắt</div>
+            <div id="brief-panel-summary" style="font-size:.8rem;line-height:1.5;white-space:pre-wrap;"></div>
+          </div>
+          <div style="background:#fefce8;border:1px solid #fde68a;border-radius:6px;padding:.75rem;margin-bottom:.5rem;">
+            <div style="font-weight:600;font-size:.8rem;color:#92400e;margin-bottom:.3rem;">Điểm chú ý</div>
+            <div id="brief-panel-points" style="font-size:.8rem;line-height:1.5;white-space:pre-wrap;"></div>
+          </div>
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:.75rem;margin-bottom:.75rem;">
+            <div style="font-weight:600;font-size:.8rem;color:#14532d;margin-bottom:.3rem;">Câu hỏi gợi ý</div>
+            <div id="brief-panel-questions" style="font-size:.8rem;line-height:1.5;white-space:pre-wrap;"></div>
+          </div>
+          <div style="font-size:.75rem;color:#9ca3af;">Tạo lúc: <span id="brief-panel-date"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
 {% endblock %}
 
 {% block admin_page_scripts %}
 {% if not crm_staff_portal %}
 {% include 'partials/admin_grants_bootstrap.html' %}
 {% endif %}
+<!-- Modal tạo Lifecycle -->
+<div class="crm-modal-root" id="crm-lc-modal" hidden data-admin-section-allow>
+  <div class="crm-modal-backdrop" onclick="closeLifecycleModal()" tabindex="-1"></div>
+  <div class="crm-modal-panel" role="dialog" aria-modal="true" aria-labelledby="crm-lc-title" style="max-width:420px">
+    <header class="crm-modal-head">
+      <div>
+        <p class="crm-modal-kicker">Dịch vụ mới</p>
+        <h2 id="crm-lc-title">Tạo Lifecycle dịch vụ</h2>
+      </div>
+      <button type="button" class="crm-modal-close" onclick="closeLifecycleModal()" aria-label="Đóng">×</button>
+    </header>
+    <form id="crm-lc-form" onsubmit="submitLifecycleModal(event)" class="crm-detail-form" style="padding:1.25rem">
+      <p class="muted" id="crm-lc-customer-name" style="margin-bottom:1rem;font-weight:600;"></p>
+      <label style="display:block;margin-bottom:1rem;">Chọn dịch vụ *
+        <select id="crm-lc-slug" required style="width:100%;margin-top:.35rem;">
+          <option value="">-- Chọn dịch vụ --</option>
+          <option value="dich-vu-seo-tong-the">SEO Tổng thể</option>
+          <option value="dich-vu-seo-local">SEO Local</option>
+          <option value="dich-vu-seo-audit">SEO Audit</option>
+          <option value="dich-vu-aeo">AEO (Answer Engine Optimization)</option>
+          <option value="dich-vu-quan-tri-website">Quản trị Website</option>
+          <option value="thiet-ke-website">Thiết kế Website</option>
+          <option value="thiet-ke-website-tron-goi">Thiết kế Website Trọn gói</option>
+          <option value="thiet-ke-landing-page">Thiết kế Landing Page</option>
+          <option value="quang-cao-facebook">Quảng cáo Facebook</option>
+          <option value="quang-cao-google">Quảng cáo Google</option>
+          <option value="thue-tai-khoan-quang-cao">Thuê tài khoản Quảng cáo</option>
+          <option value="tiep-thi-noi-dung">Tiếp thị Nội dung</option>
+        </select>
+      </label>
+      <p class="crm-form-msg is-error" id="crm-lc-err" hidden></p>
+      <div class="crm-modal-actions">
+        <button type="button" class="btn-secondary" onclick="closeLifecycleModal()">Hủy</button>
+        <button type="submit" class="btn" id="crm-lc-submit">Tạo Lifecycle</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% set _jcu = static_js_file('crm_customers.js') %}
 <script src="{{ url_for('static', filename=_jcu) }}?v={{ static_v(_jcu) }}"></script>
+<script>
+(function() {
+  function _lcGetCustomerId() {
+    if (window._lcCid) return String(window._lcCid);
+    var sel = document.querySelector('.crm-cu-card.is-selected');
+    if (sel && sel.dataset.customerId) return sel.dataset.customerId;
+    var panel = document.getElementById('crm-cu-detail-panel');
+    return panel ? (panel.dataset.customerId || null) : null;
+  }
+  window.openLifecycleModal = function() {
+    var cid = _lcGetCustomerId();
+    if (!cid) { alert('Vui lòng chọn khách hàng trước.'); return; }
+    var name = document.getElementById('crm-cu-drawer-title');
+    document.getElementById('crm-lc-customer-name').textContent = name ? name.textContent : '';
+    document.getElementById('crm-lc-slug').value = '';
+    document.getElementById('crm-lc-err').hidden = true;
+    document.getElementById('crm-lc-modal').hidden = false;
+  };
+  window.closeLifecycleModal = function() {
+    document.getElementById('crm-lc-modal').hidden = true;
+  };
+  window.submitLifecycleModal = function(e) {
+    e.preventDefault();
+    var cid = _lcGetCustomerId();
+    var slug = document.getElementById('crm-lc-slug').value;
+    var errEl = document.getElementById('crm-lc-err');
+    var btn = document.getElementById('crm-lc-submit');
+    if (!cid || !slug) return;
+    btn.disabled = true;
+    fetch('/api/crm/customers/' + cid + '/lifecycle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service_slug: slug })
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, d: d }; }); })
+    .then(function(res) {
+      if (!res.ok) { errEl.textContent = res.d.error || 'Lỗi tạo lifecycle'; errEl.hidden = false; return; }
+      closeLifecycleModal();
+      window.location.href = '/crm/service-delivery/' + res.d.id;
+    })
+    .catch(function() { errEl.textContent = 'Lỗi kết nối'; errEl.hidden = false; })
+    .finally(function() { btn.disabled = false; });
+  };
+})();
+
+(function() {
+  var _briefCustomerId = null;
+
+  function parseBriefSections(text) {
+    var s = { summary: '', points: '', questions: '' };
+    var parts = text.split(/^## /m);
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i];
+      if (p.startsWith('Tóm tắt')) s.summary = p.replace(/^Tóm tắt[^\n]*\n/, '').trim();
+      else if (p.startsWith('Điểm')) s.points = p.replace(/^Điểm[^\n]*\n/, '').trim();
+      else if (p.startsWith('Câu hỏi')) s.questions = p.replace(/^Câu hỏi[^\n]*\n/, '').trim();
+    }
+    return s;
+  }
+
+  function renderPanelBrief(data) {
+    if (!data || !data.ai_output) {
+      document.getElementById('brief-panel-empty').removeAttribute('hidden');
+      document.getElementById('brief-panel-cards').setAttribute('hidden', '');
+      return;
+    }
+    var s = parseBriefSections(data.ai_output);
+    document.getElementById('brief-panel-summary').textContent = s.summary || data.ai_output;
+    document.getElementById('brief-panel-points').textContent = s.points;
+    document.getElementById('brief-panel-questions').textContent = s.questions;
+    document.getElementById('brief-panel-date').textContent = data.created_at || '';
+    document.getElementById('brief-panel-empty').setAttribute('hidden', '');
+    document.getElementById('brief-panel-cards').removeAttribute('hidden');
+  }
+
+  window.openBriefPanel = function(customerId, customerName) {
+    _briefCustomerId = customerId;
+    document.getElementById('brief-panel-name').textContent = customerName;
+    document.getElementById('brief-panel-fulllink').href = '/crm/customer/' + customerId + '/meeting-brief';
+    document.getElementById('brief-panel-purpose').value = '';
+    document.getElementById('brief-panel-empty').removeAttribute('hidden');
+    document.getElementById('brief-panel-cards').setAttribute('hidden', '');
+    document.getElementById('brief-panel-overlay').style.display = 'block';
+    document.getElementById('brief-panel').style.display = 'flex';
+    fetch('/api/crm/customers/' + customerId + '/brief/latest')
+      .then(function(r) { return r.json(); })
+      .then(function(data) { renderPanelBrief(data); })
+      .catch(function() {});
+  };
+
+  window.closeBriefPanel = function() {
+    document.getElementById('brief-panel-overlay').style.display = 'none';
+    document.getElementById('brief-panel').style.display = 'none';
+    _briefCustomerId = null;
+  };
+
+  window.briefPanelGenerate = function() {
+    if (!_briefCustomerId) return;
+    var purpose = document.getElementById('brief-panel-purpose').value.trim();
+    var btn = document.getElementById('brief-panel-gen-btn');
+    var loading = document.getElementById('brief-panel-loading');
+    btn.disabled = true;
+    loading.removeAttribute('hidden');
+    fetch('/api/crm/customers/' + _briefCustomerId + '/brief/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ meeting_purpose: purpose })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { renderPanelBrief(data); })
+    .catch(function(e) { console.error(e); })
+    .finally(function() {
+      btn.disabled = false;
+      loading.setAttribute('hidden', '');
+    });
+  };
+})();
+</script>
 {% endblock %}

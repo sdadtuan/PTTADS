@@ -1,6 +1,7 @@
 """Lead theo dự án BĐS — Phase 1–2: gắn dự án, nhân viên dự án, phân công scoped."""
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime
 from typing import Any
@@ -258,6 +259,15 @@ def staff_can_view_lead(
 ) -> bool:
     """Portal NV — chỉ lead thuộc dự án tham gia (manager/viewer: mọi lead dự án)."""
     d = dict(row)
+    meta_raw = d.get("meta_json") or "{}"
+    try:
+        meta = json.loads(meta_raw) if isinstance(meta_raw, str) else dict(meta_raw or {})
+    except (TypeError, json.JSONDecodeError):
+        meta = {}
+    from crm_lead_review_queue import is_lead_in_review_queue
+
+    if is_lead_in_review_queue(meta if isinstance(meta, dict) else {}):
+        return False
     pid = d.get("re_project_id")
     if not pid:
         return False
@@ -622,8 +632,9 @@ def format_project_full_label(
 
 
 def _project_option_label(row: sqlite3.Row | dict[str, Any]) -> str:
+    rid = row["id"] if isinstance(row, sqlite3.Row) else row.get("id")
     return format_project_display_label(
         code=str(row["code"] or ""),
         name=str(row["name"] or ""),
-        project_id=int(row["id"]) if row.get("id") is not None else None,
+        project_id=int(rid) if rid is not None else None,
     )

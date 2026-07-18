@@ -31,19 +31,7 @@
 {% block body_class %}career-page{% endblock %}
 
 {% block header %}
-<header class="career-site-header">
-  <div class="container career-site-nav">
-    <a href="/" class="career-site-logo brand-logo" aria-label="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Trang chủ">
-      {{- ras.raster_static_picture('images/ptt-logo.png', (settings.brand_name if settings else 'PTT Advertising Solutions') ~ ' — logo', 40, 40, 'brand-logo-img', loading='eager') -}}
-      <span class="brand-logo-text">{{ settings.brand_name if settings else "PTT Advertising Solutions" }}</span>
-    </a>
-    <nav class="career-site-links" aria-label="Điều hướng chính">
-      <a href="/">Trang chủ</a>
-      <a href="{{ url_for('career_list') }}" class="is-active" aria-current="page">Tuyển dụng</a>
-      <a href="/#contact">Liên hệ</a>
-    </nav>
-  </div>
-</header>
+{% include 'partials/public_header.html' %}
 {% endblock %}
 
 {% block content %}

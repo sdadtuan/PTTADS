@@ -17,6 +17,48 @@ logger = logging.getLogger(__name__)
 
 _HAIKU = "claude-haiku-4-5-20251001"
 
+# Map product_interest → service_slug (12 dịch vụ agency PTT)
+_PRODUCT_INTEREST_SLUGS: tuple[tuple[str, str], ...] = (
+    ("aeo", "dich-vu-aeo"),
+    ("seo tổng", "dich-vu-seo-tong-the"),
+    ("seo tong", "dich-vu-seo-tong-the"),
+    ("seo local", "dich-vu-seo-local"),
+    ("seo audit", "dich-vu-seo-audit"),
+    ("quản trị website", "dich-vu-quan-tri-website"),
+    ("quan tri website", "dich-vu-quan-tri-website"),
+    ("thiết kế website trọn", "thiet-ke-website-tron-goi"),
+    ("website trọn gói", "thiet-ke-website-tron-goi"),
+    ("thiết kế website", "thiet-ke-website"),
+    ("thiet ke website", "thiet-ke-website"),
+    ("landing page", "thiet-ke-landing-page"),
+    ("facebook ads", "quang-cao-facebook"),
+    ("quảng cáo facebook", "quang-cao-facebook"),
+    ("google ads", "quang-cao-google"),
+    ("quảng cáo google", "quang-cao-google"),
+    ("thuê tài khoản", "thue-tai-khoan-quang-cao"),
+    ("thue tai khoan", "thue-tai-khoan-quang-cao"),
+    ("content marketing", "tiep-thi-noi-dung"),
+    ("tiếp thị nội dung", "tiep-thi-noi-dung"),
+    ("tiep thi noi dung", "tiep-thi-noi-dung"),
+)
+
+
+def map_product_interest_to_slug(product_interest: str) -> str:
+    """Gợi ý service_slug từ product_interest (keyword match, không gọi API)."""
+    text = str(product_interest or "").strip().lower()
+    if not text:
+        return ""
+    try:
+        from crm_service_lifecycle import VALID_SLUGS
+    except Exception:
+        VALID_SLUGS = frozenset()
+    if text in VALID_SLUGS:
+        return text
+    for needle, slug in _PRODUCT_INTEREST_SLUGS:
+        if needle in text:
+            return slug
+    return ""
+
 # Bản đồ ngách → gợi ý tài liệu gửi khách
 _NICHE_MATERIALS: dict[str, list[str]] = {
     "shophouse_sme": [
@@ -84,6 +126,32 @@ Trả về JSON với cấu trúc:
   "opening_line": "<câu mở đầu cuộc gọi đầu tiên, tự nhiên, không sáo rỗng>"
 }}"""
 
+_AGENCY_SYSTEM_PROMPT = """Bạn là chuyên gia qualify lead dịch vụ digital marketing tại agency PTT (Việt Nam).
+Phân tích lead theo dịch vụ agency và trả về JSON hợp lệ. Không giải thích thêm."""
+
+_AGENCY_USER_TEMPLATE = """Phân tích lead dịch vụ {service_name} (slug: {service_slug}) và trả về JSON:
+
+Tên: {full_name}
+Sản phẩm quan tâm: {product_interest}
+Nguồn: {source}
+Ghi chú / nhu cầu: {need}
+Ngân sách (VND): {budget}
+
+Trả về JSON:
+{{
+  "service_slug": "{service_slug}",
+  "service_name": "{service_name}",
+  "niche": "agency",
+  "niche_label": "{service_name}",
+  "niche_confidence": <0.0-1.0>,
+  "summary": "<1-2 câu tóm tắt khách và nhu cầu>",
+  "qualify_questions": [
+    "<5 câu hỏi qualify phù hợp dịch vụ {service_name}>"
+  ],
+  "key_risks": ["<rủi ro 1>", "<rủi ro 2>"],
+  "opening_line": "<câu mở đầu cuộc gọi intake PHẦN A>"
+}}"""
+
 
 def _get_client():
     """Lấy Anthropic client, trả về None nếu chưa cấu hình API key."""
@@ -114,20 +182,39 @@ def generate_qualify_brief(
         return None
 
     budget_str = f"{budget_vnd:,} VND" if budget_vnd else "chưa khai báo"
-    prompt = _USER_TEMPLATE.format(
-        full_name=full_name or "Chưa có tên",
-        product_interest=product_interest or "chưa rõ",
-        source=source or "chưa rõ",
-        need=(need or "").strip()[:1000] or "chưa có ghi chú",
-        budget=budget_str,
-        project_name=project_name or "chưa rõ",
-    )
+    service_slug = map_product_interest_to_slug(product_interest)
+    if service_slug:
+        try:
+            from crm_svc_tasks import SERVICE_LABELS
+            service_name = SERVICE_LABELS.get(service_slug, service_slug)
+        except Exception:
+            service_name = service_slug
+        prompt = _AGENCY_USER_TEMPLATE.format(
+            service_slug=service_slug,
+            service_name=service_name,
+            full_name=full_name or "Chưa có tên",
+            product_interest=product_interest or service_name,
+            source=source or "chưa rõ",
+            need=(need or "").strip()[:1000] or "chưa có ghi chú",
+            budget=budget_str,
+        )
+        system_prompt = _AGENCY_SYSTEM_PROMPT
+    else:
+        prompt = _USER_TEMPLATE.format(
+            full_name=full_name or "Chưa có tên",
+            product_interest=product_interest or "chưa rõ",
+            source=source or "chưa rõ",
+            need=(need or "").strip()[:1000] or "chưa có ghi chú",
+            budget=budget_str,
+            project_name=project_name or "chưa rõ",
+        )
+        system_prompt = _SYSTEM_PROMPT
 
     try:
         response = client.messages.create(
             model=_HAIKU,
             max_tokens=800,
-            system=_SYSTEM_PROMPT,
+            system=system_prompt,
             messages=[{"role": "user", "content": prompt}],
         )
         raw = response.content[0].text.strip()
@@ -137,9 +224,12 @@ def generate_qualify_brief(
             if raw.startswith("json"):
                 raw = raw[4:]
         brief = json.loads(raw)
-        # Thêm tài liệu gợi ý dựa trên ngách
+        if service_slug and not brief.get("service_slug"):
+            brief["service_slug"] = service_slug
+        # Thêm tài liệu gợi ý dựa trên ngách (BĐS)
         niche = str(brief.get("niche") or "khac")
-        brief["recommended_materials"] = _NICHE_MATERIALS.get(niche, [])
+        if niche != "agency":
+            brief["recommended_materials"] = _NICHE_MATERIALS.get(niche, [])
         brief["generated_at"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
         brief["model"] = _HAIKU
         return brief
@@ -205,23 +295,43 @@ def trigger_qualify_brief_async(
             ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
             save_qualify_brief(conn, lead_id, brief, ts)
             logger.info("AI qualify brief saved: lead_id=%s niche=%s", lead_id, brief.get("niche"))
-            # Wire: tạo draft lifecycle từ AI qualify
             try:
-                from crm_service_lifecycle import (
-                    _suggest_service_slug,
-                    create_draft_lifecycle,
-                    get_by_lead,
+                from crm_lead_presales import (
+                    ensure_presales as _ensure_lead_presales,
+                    get_by_lead as _presales_by_lead,
+                    presales_on_lead_enabled,
                 )
-                if get_by_lead(conn, lead_id) is None:
-                    slug = _suggest_service_slug(
-                        niche=str(brief.get("niche") or ""),
-                        pain_points=str(brief.get("pain_points") or ""),
-                        lead_message=str(brief.get("need") or ""),
+
+                slug = str(brief.get("service_slug") or "").strip()
+                if not slug:
+                    slug = map_product_interest_to_slug(product_interest)
+                if presales_on_lead_enabled():
+                    if slug and _presales_by_lead(conn, lead_id) is None:
+                        _ensure_lead_presales(conn, lead_id, slug, suggested_by="ai")
+                        logger.info(
+                            "Lead presales created: lead_id=%s slug=%s", lead_id, slug
+                        )
+                else:
+                    from crm_service_lifecycle import (
+                        _suggest_service_slug,
+                        create_draft_lifecycle,
+                        get_by_lead,
                     )
-                    create_draft_lifecycle(conn, lead_id=lead_id, service_slug=slug)
-                    logger.info("Draft lifecycle created: lead_id=%s slug=%s", lead_id, slug)
+
+                    if get_by_lead(conn, lead_id) is None:
+                        if not slug:
+                            slug = _suggest_service_slug(
+                                niche=str(brief.get("niche") or ""),
+                                pain_points=str(brief.get("pain_points") or ""),
+                                lead_message=str(need or ""),
+                            )
+                        if slug:
+                            create_draft_lifecycle(conn, lead_id=lead_id, service_slug=slug)
+                            logger.info(
+                                "Draft lifecycle created: lead_id=%s slug=%s", lead_id, slug
+                            )
             except Exception as _lc_exc:
-                logger.warning("Lifecycle draft tạo lỗi: %s", _lc_exc)
+                logger.warning("Post-qualify presales/lifecycle lỗi: %s", _lc_exc)
             conn.close()
         except Exception as exc:
             logger.warning("AI qualify save lỗi: %s", exc)

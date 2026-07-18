@@ -1,0 +1,152 @@
+{# public_header.html — topbar dùng cho trang trong (không phải landing) #}
+{% import '_macros_static.html' as ras %}
+{% from 'partials/brand_logo_lockup.html' import render as brand_logo_lockup %}
+{% set _nb_img = (settings.get('nav_mega_banner_image') or '')|trim %}
+{% set _nb_href = (settings.get('nav_mega_banner_href') or '/#contact')|trim or '/#contact' %}
+<header class="topbar landing-topbar">
+  <div class="container nav-wrap">
+    {{ brand_logo_lockup('/', 'header', 'eager') }}
+    <button class="menu-toggle" type="button" aria-label="Mở hoặc đóng menu" data-menu-toggle>
+      <span></span><span></span><span></span>
+    </button>
+    <nav class="landing-nav" aria-label="Menu chính">
+      <div class="nav-mega-hover" data-nav-mega-hover>
+        <div class="nav-mega-wrap" data-nav-mega-wrap>
+          <a href="/" class="nav-mega-dv-link{% if request.endpoint == 'service_detail' %} is-active{% endif %}">Dịch vụ</a>
+          <button
+            type="button"
+            class="nav-mega-opener"
+            id="nav-mega-opener"
+            data-nav-mega-opener
+            aria-expanded="false"
+            aria-haspopup="true"
+            aria-controls="nav-mega-panel"
+            aria-label="Mở danh sách dịch vụ theo nhóm"
+          >
+            <span class="nav-mega-caret" aria-hidden="true">▾</span>
+          </button>
+        </div>
+        <div
+          class="nav-mega-panel"
+          id="nav-mega-panel"
+          role="region"
+          aria-label="Danh sách dịch vụ theo nhóm"
+          data-nav-mega-panel
+          hidden
+        >
+          <div class="container nav-mega-container">
+            <div class="nav-mega-body">
+              <div class="nav-mega-cols{% if _nb_img %} nav-mega-cols--five{% endif %}">
+                <h2 class="visually-hidden" id="nav-mega-pillars-title">Dịch vụ theo từng nhóm</h2>
+                <ul class="nav-mega-grid" aria-labelledby="nav-mega-pillars-title">
+                  {% for cat in service_categories %}
+                  <li class="nav-mega-col" id="mega-pillar-{{ loop.index }}">
+                    <div class="nav-mega-col-head" role="group" aria-labelledby="mega-h3-{{ loop.index }}">
+                      <h3 class="nav-mega-heading" id="mega-h3-{{ loop.index }}">{{ cat.title }}</h3>
+                    </div>
+                    <ul class="nav-mega-list">
+                      {% for it in cat['items'] %}
+                      <li>
+                        <a href="{{ url_for('service_detail', slug=it.slug) }}"{% if request.endpoint == 'service_detail' and request.view_args.get('slug') == it.slug %} aria-current="page"{% endif %}>
+                          <span class="nav-mega-link-text">{{ it.name }}</span>
+                          <span class="nav-mega-link-icon" aria-hidden="true">→</span>
+                        </a>
+                      </li>
+                      {% endfor %}
+                    </ul>
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% if _nb_img %}
+                <aside class="nav-mega-ad-col" aria-label="Quảng cáo">
+                  <a
+                    class="nav-mega-promo"
+                    href="{{ _nb_href }}"
+                    aria-label="Quảng cáo — {{ (settings.get('nav_mega_banner_title') or 'Ưu đãi dịch vụ')|e }}"
+                    {% if _nb_href|length > 4 and _nb_href[0:4] == 'http' %}
+                      target="_blank" rel="noopener noreferrer"
+                    {% endif %}
+                  >
+                    <span class="nav-mega-promo-media">
+                      <img
+                        class="nav-mega-promo-img"
+                        src="{{ _nb_img }}"
+                        alt="{{ (settings.get('nav_mega_banner_title') or 'Quảng cáo dịch vụ')|e }}"
+                        width="280"
+                        height="360"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </span>
+                    <span class="nav-mega-promo-label">Quảng cáo</span>
+                    {% if (settings.get('nav_mega_banner_title') or '')|trim %}
+                    <span class="nav-mega-promo-title">{{ settings.get('nav_mega_banner_title')|e }}</span>
+                    {% endif %}
+                    {% if (settings.get('nav_mega_banner_subtitle') or '')|trim %}
+                    <span class="nav-mega-promo-sub">{{ settings.get('nav_mega_banner_subtitle')|e }}</span>
+                    {% endif %}
+                  </a>
+                </aside>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <a class="landing-nav-item{% if request.endpoint == 'project_detail' %} is-active{% endif %}" href="/#projects">Dự án</a>
+      <a class="landing-nav-item{% if request.endpoint == 'news_detail' %} is-active{% endif %}" href="/#news">Tin tức &amp; Kiến thức</a>
+      <a class="landing-nav-item{% if request.endpoint == 'career_list' %} is-active{% endif %}" href="{{ url_for('career_list') }}">Tuyển dụng</a>
+      <a class="landing-nav-item landing-nav-item-cta" href="/#contact">Liên hệ</a>
+    </nav>
+  </div>
+
+  <div class="nav-mega-backdrop" data-nav-mega-backdrop hidden aria-hidden="true"></div>
+
+  <div class="mobile-menu" data-mobile-menu>
+    <details class="mobile-nav-dd">
+      <summary class="mobile-nav-dd-summary">Dịch vụ</summary>
+      <div class="mobile-nav-dd-body">
+        {% set _mb_img = (settings.get('nav_mega_banner_image') or '')|trim %}
+        {% set _mb_href = (settings.get('nav_mega_banner_href') or '/#contact')|trim or '/#contact' %}
+        {% if _mb_img %}
+        <a
+          class="mobile-nav-dd-banner"
+          href="{{ _mb_href }}"
+          {% if _mb_href|length > 4 and _mb_href[0:4] == 'http' %}
+            target="_blank" rel="noopener noreferrer"
+          {% endif %}
+        >
+          <img
+            class="mobile-nav-dd-banner-img"
+            src="{{ _mb_img }}"
+            alt="{{ (settings.get('nav_mega_banner_title') or 'Ưu đãi dịch vụ')|e }}"
+            width="800"
+            height="280"
+            loading="lazy"
+            decoding="async"
+          />
+        </a>
+        {% endif %}
+        {% for cat in service_categories %}
+        <div class="mobile-nav-dd-block">
+          <p class="mobile-nav-dd-title">{{ cat.title }}</p>
+          <ul class="mobile-nav-dd-list">
+            {% for it in cat['items'] %}
+            <li>
+              <a href="{{ url_for('service_detail', slug=it.slug) }}">{{ it.name }}</a>
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endfor %}
+        <a href="/#main" class="mobile-nav-dd-cta">Xem tất cả dịch vụ trên trang</a>
+      </div>
+    </details>
+    <div class="mobile-menu-nav-grid">
+      <a class="mobile-menu-link" href="/#projects">Dự án</a>
+      <a class="mobile-menu-link" href="/#news">Tin tức &amp; Kiến thức</a>
+      <a class="mobile-menu-link{% if request.endpoint == 'career_list' %} is-active{% endif %}" href="{{ url_for('career_list') }}">Tuyển dụng</a>
+    </div>
+    <a class="mobile-menu-link mobile-menu-link-cta" href="/#contact">Liên hệ</a>
+  </div>
+</header>

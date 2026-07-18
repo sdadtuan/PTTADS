@@ -1,0 +1,205 @@
+{% extends "admin_layout.html" %}
+{% block admin_main %}
+{% macro sparkline(values, color='#2563eb') %}
+{% if values and values|length > 1 %}
+{% set mx = values|max %}
+{% set mn = values|min %}
+{% set span = mx - mn if mx != mn else 1 %}
+<svg width="140" height="36" viewBox="0 0 140 36" role="img" aria-label="Trend">
+  <polyline fill="none" stroke="{{ color }}" stroke-width="2" stroke-linejoin="round"
+    points="{% for v in values %}{{ (loop.index0 * 140 / (values|length - 1))|round(2) }},{{ (30 - ((v - mn) / span * 24))|round(2) }}{% if not loop.last %} {% endif %}{% endfor %}" />
+</svg>
+{% else %}
+<span style="font-size:.7rem;color:#94a3b8;">—</span>
+{% endif %}
+{% endmacro %}
+
+<div style="padding:1.5rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem;">
+    <div>
+      <h2 style="margin:0;font-size:1.15rem;font-weight:700;">Business Dashboard</h2>
+      <p style="margin:.25rem 0 0;font-size:.78rem;color:#64748b;">
+        KPI executive · trend {{ trend_months }} tháng ·
+        <a href="/crm/financials?year={{ year }}&month={{ month }}" style="color:#6366f1;">Chi tiết tài chính →</a>
+      </p>
+    </div>
+    <form method="get" style="display:flex;align-items:center;gap:.5rem;font-size:.8rem;flex-wrap:wrap;">
+      <label style="color:#64748b;">Kỳ</label>
+      <input type="number" name="month" min="1" max="12" value="{{ month }}"
+             style="width:3rem;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;">
+      <span>/</span>
+      <input type="number" name="year" min="2020" max="2099" value="{{ year }}"
+             style="width:4.5rem;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;">
+      <label style="color:#64748b;">Trend</label>
+      <input type="number" name="trend_months" min="3" max="12" value="{{ trend_months }}"
+             style="width:2.5rem;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;">
+      <button type="submit"
+              style="padding:.25rem .6rem;background:#6366f1;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+        Xem
+      </button>
+      <a href="/api/crm/finance/kpi-export?year={{ year }}&month={{ month }}&format=xlsx"
+         style="padding:.25rem .55rem;border:1px solid #cbd5e1;border-radius:4px;text-decoration:none;color:#334155;font-size:.78rem;">
+        Export
+      </a>
+    </form>
+  </div>
+
+  {% if kpi_alerts.alert_count %}
+  <div style="margin-bottom:1.25rem;border-radius:8px;padding:.85rem 1rem;
+              background:{% if kpi_alerts.has_critical %}#fef2f2{% else %}#fffbeb{% endif %};
+              border:1px solid {% if kpi_alerts.has_critical %}#fecaca{% else %}#fde68a{% endif %};">
+    <strong style="font-size:.88rem;color:{% if kpi_alerts.has_critical %}#991b1b{% else %}#92400e{% endif %};">
+      {{ kpi_alerts.alert_count }} cảnh báo
+      {% if kpi_alerts.critical_count %}· {{ kpi_alerts.critical_count }} nghiêm trọng{% endif %}
+    </strong>
+    <ul style="margin:.5rem 0 0;padding-left:1.1rem;font-size:.78rem;line-height:1.5;
+               color:{% if kpi_alerts.has_critical %}#7f1d1d{% else %}#78350f{% endif %};">
+      {% for alert in kpi_alerts.alerts[:6] %}
+      <li>{{ alert.title }} — {{ alert.message }}</li>
+      {% endfor %}
+      {% if kpi_alerts.alert_count > 6 %}
+      <li>… và {{ kpi_alerts.alert_count - 6 }} cảnh báo khác (xem /crm/financials)</li>
+      {% endif %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <div style="margin-bottom:1.25rem;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:.85rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;">
+    <div style="font-size:.82rem;">
+      <strong>Inbox CRM</strong> (Hub → tab Nhắc việc · scope KPI tài chính):
+      {{ kpi_inbox.pending_count }} đang chờ
+      {% if kpi_inbox.critical_count %}· {{ kpi_inbox.critical_count }} nghiêm trọng{% endif %}
+    </div>
+    <div style="display:flex;gap:.45rem;align-items:center;">
+      <a href="/crm/hub" style="font-size:.78rem;color:#6366f1;text-decoration:none;">Mở Hub →</a>
+      <button type="button" id="crm-kpi-inbox-sync"
+              style="padding:.25rem .55rem;font-size:.72rem;border:1px solid #cbd5e1;background:#fff;border-radius:4px;cursor:pointer;">
+        Đồng bộ inbox
+      </button>
+      <span id="crm-kpi-inbox-msg" style="font-size:.68rem;color:#64748b;"></span>
+    </div>
+  </div>
+
+  {% set cac = exec_metrics.cac %}
+  {% set ot = exec_metrics.delivery_ontime %}
+  {% set mrr = exec_metrics.mrr_arr %}
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1.25rem;">
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:.85rem;">
+      <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;">MRR bookings</div>
+      <div style="font-size:1.05rem;font-weight:700;color:#2563eb;">{{ "{:,.0f}".format(mrr.mrr_bookings_vnd) }} ₫</div>
+      {{ sparkline(trends.mrr_bookings_vnd, '#2563eb') }}
+    </div>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:.85rem;">
+      <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;">CAC</div>
+      <div style="font-size:1.05rem;font-weight:700;color:#ea580c;">{{ "{:,.0f}".format(cac.cac_vnd) }} ₫</div>
+      {{ sparkline(trends.cac_vnd, '#ea580c') }}
+    </div>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:.85rem;">
+      <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;">Top-2 concentration</div>
+      <div style="font-size:1.05rem;font-weight:700;color:{% if concentration.concentration_risk %}#dc2626{% else %}#1e293b{% endif %};">
+        {{ "%.1f"|format(concentration.top2_concentration_pct) }}%
+      </div>
+      {{ sparkline(trends.top2_concentration_pct, '#dc2626') }}
+    </div>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:.85rem;">
+      <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;">Delivery on-time</div>
+      <div style="font-size:1.05rem;font-weight:700;color:#059669;">{{ "%.1f"|format(ot.on_time_rate_pct) }}%</div>
+      <div style="font-size:.72rem;color:#64748b;margin-top:.35rem;">{{ ot.tasks_on_time }}/{{ ot.tasks_decided }} task</div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.75rem;margin-bottom:1.5rem;">
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:.85rem;font-size:.82rem;">
+      <div style="font-weight:600;margin-bottom:.35rem;">Sales & retention</div>
+      <div>Close cohort: <strong>{{ "%.1f"|format(lead_kpi.cohort_close_rate_pct) }}%</strong></div>
+      <div>Renewal rate: <strong>{{ "%.1f"|format(retention_metrics.renewal_cohort.renewal_rate_pct) }}%</strong></div>
+      <div>Retention MoM: <strong>{{ "%.1f"|format(retention_metrics.customer_retention_pct) }}%</strong></div>
+    </div>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:.85rem;font-size:.82rem;">
+      <div style="font-weight:600;margin-bottom:.35rem;">AR & cash</div>
+      <div>AR quá hạn: <strong style="color:#dc2626;">{{ "{:,.0f}".format(ar_aging.total_overdue_vnd) }} ₫</strong></div>
+      <div>MRR cash tháng: <strong>{{ "{:,.0f}".format(mrr.mrr_cash_vnd) }} ₫</strong></div>
+      <div>ARR bookings: <strong>{{ "{:,.0f}".format(mrr.arr_bookings_vnd) }} ₫</strong></div>
+    </div>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:.85rem;font-size:.82rem;">
+      <div style="font-weight:600;margin-bottom:.35rem;">Trend labels</div>
+      <div style="font-size:.72rem;color:#64748b;line-height:1.6;">
+        {% for label in trends.labels %}{{ label }}{% if not loop.last %} · {% endif %}{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+    <h3 style="margin:0 0 .5rem;font-size:.9rem;font-weight:700;color:#334155;">Ngưỡng cảnh báo (DB ưu tiên · env fallback)</h3>
+    <p style="margin:0 0 .75rem;font-size:.72rem;color:#64748b;">
+      Sửa qua API <code>PATCH /api/crm/finance/kpi-config</code> hoặc env <code>PTT_KPI_ALERT_*</code>.
+    </p>
+    <form id="crm-kpi-threshold-form" style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;font-size:.78rem;">
+      {% for key, val in thresholds.items() %}
+      <label style="display:flex;flex-direction:column;gap:.15rem;">
+        <span style="color:#64748b;font-size:.68rem;">{{ key }}</span>
+        <input name="{{ key }}" type="number" step="any" value="{{ val }}"
+               style="padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;">
+      </label>
+      {% endfor %}
+      <div style="grid-column:1 / -1;display:flex;align-items:center;gap:.5rem;margin-top:.35rem;">
+        <button type="submit"
+                style="padding:.3rem .7rem;background:#6366f1;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+          Lưu ngưỡng
+        </button>
+        <span id="crm-kpi-threshold-msg" style="font-size:.72rem;color:#64748b;"></span>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+(function () {
+  const syncBtn = document.getElementById("crm-kpi-inbox-sync");
+  const syncMsg = document.getElementById("crm-kpi-inbox-msg");
+  if (syncBtn) {
+    syncBtn.addEventListener("click", async function () {
+      if (syncMsg) syncMsg.textContent = "Đang đồng bộ…";
+      try {
+        const res = await fetch("/api/crm/finance/kpi-inbox/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ year: {{ year }}, month: {{ month }} }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Lỗi");
+        if (syncMsg) syncMsg.textContent = "Đã đồng bộ " + (data.inbox && data.inbox.synced != null ? data.inbox.synced : 0) + " mục.";
+        window.location.reload();
+      } catch (e) {
+        if (syncMsg) syncMsg.textContent = e instanceof Error ? e.message : "Lỗi";
+      }
+    });
+  }
+
+  const form = document.getElementById("crm-kpi-threshold-form");
+  const msg = document.getElementById("crm-kpi-threshold-msg");
+  if (!form) return;
+  form.addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    const thresholds = {};
+    form.querySelectorAll("input[name]").forEach(function (inp) {
+      const v = inp.value.trim();
+      if (v !== "") thresholds[inp.name] = Number(v);
+    });
+    if (msg) msg.textContent = "Đang lưu…";
+    try {
+      const res = await fetch("/api/crm/finance/kpi-config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thresholds: thresholds }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Lỗi");
+      if (msg) msg.textContent = "Đã lưu. Tải lại để cập nhật cảnh báo.";
+      window.location.reload();
+    } catch (e) {
+      if (msg) msg.textContent = e instanceof Error ? e.message : "Lỗi";
+    }
+  });
+})();
+</script>
+{% endblock %}

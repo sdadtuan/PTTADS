@@ -1,0 +1,41 @@
+{% extends "admin_layout.html" %}
+{% block title %}Tạo Lifecycle — {{ customer.name }}{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+{% block admin_page_title %}Tạo Lifecycle dịch vụ{% endblock %}
+{% block admin_breadcrumb %}
+  <a href="/crm/customers">Khách hàng</a> &rsaquo; {{ customer.name }}
+{% endblock %}
+{% block admin_main %}
+<div class="panel" style="max-width:480px;padding:1.75rem 2rem">
+  <p class="muted" style="margin:0 0 1.25rem">Khách hàng: <strong>{{ customer.name }}</strong></p>
+  <form method="POST">
+    <label style="display:block;margin-bottom:1rem">
+      <span style="font-weight:600;display:block;margin-bottom:.4rem">Dịch vụ</span>
+      <select name="service_slug" required style="width:100%;padding:.5rem .75rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.95rem">
+        <option value="">— Chọn dịch vụ —</option>
+        {% set labels = {
+          'dich-vu-aeo': 'AEO (Answer Engine Optimization)',
+          'dich-vu-seo-tong-the': 'SEO Tổng thể',
+          'dich-vu-seo-local': 'SEO Local',
+          'dich-vu-seo-audit': 'SEO Audit',
+          'dich-vu-quan-tri-website': 'Quản trị Website',
+          'thiet-ke-website': 'Thiết kế Website',
+          'thiet-ke-website-tron-goi': 'Thiết kế Website Trọn gói',
+          'thiet-ke-landing-page': 'Thiết kế Landing Page',
+          'quang-cao-facebook': 'Quảng cáo Facebook',
+          'quang-cao-google': 'Quảng cáo Google',
+          'thue-tai-khoan-quang-cao': 'Thuê tài khoản Quảng cáo',
+          'tiep-thi-noi-dung': 'Tiếp thị Nội dung',
+        } %}
+        {% for slug in slugs %}
+        <option value="{{ slug }}">{{ labels.get(slug, slug) }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div style="display:flex;gap:.75rem;margin-top:1.5rem">
+      <button type="submit" class="btn">Tạo Lifecycle</button>
+      <a href="/crm/customers" class="btn-secondary">Hủy</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

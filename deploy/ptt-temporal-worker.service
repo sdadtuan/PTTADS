@@ -1,0 +1,16 @@
+[Unit]
+Description=PTT Temporal worker (Phase 3 creative approval)
+After=network.target
+
+[Service]
+Type=simple
+User=ptt
+WorkingDirectory=/var/www/ptt
+Environment=PYTHONPATH=/var/www/ptt
+EnvironmentFile=-/etc/ptt/temporal.env
+ExecStart=/var/www/ptt/.venv/bin/python /var/www/ptt/ptt_temporal/worker.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

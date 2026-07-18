@@ -1,0 +1,239 @@
+# PTT Agency Platform — Domain Event Catalog v1
+# Transport Phase 1: PostgreSQL domain_events outbox (async publish Phase 1b RabbitMQ)
+# Schema version: 1.0
+# Related: docs/specs/2026-07-17-architecture-phase-1.md §7
+
+version: "1.0"
+updated: "2026-07-17"
+
+exchange:
+  name: ptt.events
+  type: topic
+  deferred_phase: "1b"
+
+events:
+  - name: LeadCreated
+    version: 1
+    publisher: crm_sync
+    subscribers:
+      - ai_lead_scoring
+      - sla_service
+      - metrics_engine
+    aggregate_type: lead
+    payload:
+      required:
+        - lead_id
+        - channel
+      optional:
+        - client_id
+        - external_lead_id
+        - owner_id
+        - correlation_id
+    idempotency_key: "lead:{lead_id}:created"
+
+  - name: LeadScored
+    version: 1
+    publisher: ai_lead_scoring
+    subscribers:
+      - crm_sync
+      - notification_service
+    aggregate_type: lead
+    payload:
+      required:
+        - lead_id
+        - score
+      optional:
+        - tier
+        - model
+    idempotency_key: "lead:{lead_id}:scored:{score_version}"
+
+  - name: LeadAssigned
+    version: 1
+    publisher: crm_sync
+    subscribers:
+      - notification_service
+      - sla_service
+    aggregate_type: lead
+    payload:
+      required:
+        - lead_id
+        - owner_id
+      optional:
+        - assigned_by
+    idempotency_key: "lead:{lead_id}:assigned:{owner_id}"
+
+  - name: SlaBreached
+    version: 1
+    publisher: workflow
+    subscribers:
+      - notification_service
+    aggregate_type: sla
+    payload:
+      required:
+        - object_type
+        - object_id
+        - breach_type
+      optional:
+        - owner_id
+        - due_at
+    idempotency_key: "sla:{object_type}:{object_id}:{breach_at}"
+
+  - name: ClientOnboarded
+    version: 1
+    publisher: tenant_service
+    subscribers:
+      - asset_access
+      - workflow
+    aggregate_type: client
+    payload:
+      required:
+        - client_id
+        - client_code
+    idempotency_key: "client:{client_id}:onboarded"
+
+  - name: ContractActivated
+    version: 1
+    publisher: hub_service
+    subscribers:
+      - service_delivery
+      - sop_service
+    aggregate_type: contract
+    payload:
+      required:
+        - contract_id
+        - client_id
+      optional:
+        - hub_campaign_id
+    idempotency_key: "contract:{contract_id}:activated"
+
+  - name: CampaignLaunched
+    version: 1
+    publisher: campaign_ops
+    subscribers:
+      - sop_service
+      - metrics_engine
+    aggregate_type: campaign
+    payload:
+      required:
+        - campaign_id
+        - client_id
+      optional:
+        - external_campaign_id
+        - channel
+    idempotency_key: "campaign:{campaign_id}:launched"
+
+  - name: BudgetChanged
+    version: 1
+    publisher: campaign_ops
+    subscribers:
+      - audit_service
+      - notification_service
+      - ai_analytics
+    aggregate_type: campaign
+    payload:
+      required:
+        - campaign_id
+        - old_budget
+        - new_budget
+      optional:
+        - changed_by
+        - approval_id
+    idempotency_key: "campaign:{campaign_id}:budget:{new_budget}"
+
+  - name: DailyPerformanceSynced
+    version: 1
+    publisher: meta_integration
+    subscribers:
+      - metrics_engine
+      - ai_analytics
+    aggregate_type: performance
+    payload:
+      required:
+        - client_id
+        - channel
+        - date
+      optional:
+        - rows_count
+    idempotency_key: "perf:{client_id}:{channel}:{date}"
+
+  - name: CreativeApproved
+    version: 1
+    publisher: workflow
+    subscribers:
+      - campaign_ops
+    aggregate_type: creative
+    payload:
+      required:
+        - creative_id
+        - version
+      optional:
+        - approved_by
+    idempotency_key: "creative:{creative_id}:v{version}:approved"
+
+  - name: DealWon
+    version: 1
+    publisher: crm_sync
+    subscribers:
+      - re_inventory
+      - finance
+    aggregate_type: lead
+    payload:
+      required:
+        - lead_id
+      optional:
+        - unit_id
+        - customer_id
+    idempotency_key: "lead:{lead_id}:deal_won"
+
+  - name: ClientOffboarded
+    version: 1
+    publisher: tenant_service
+    subscribers:
+      - asset_access
+      - archive_service
+    aggregate_type: client
+    payload:
+      required:
+        - client_id
+    idempotency_key: "client:{client_id}:offboarded"
+
+  - name: JobCompleted
+    version: 1
+    publisher: ptt_worker
+    subscribers:
+      - observability
+    aggregate_type: job
+    payload:
+      required:
+        - job_id
+        - job_type
+        - status
+      optional:
+        - correlation_id
+        - duration_ms
+    idempotency_key: "job:{job_id}:completed"
+
+  - name: JobDead
+    version: 1
+    publisher: ptt_worker
+    subscribers:
+      - notification_service
+      - observability
+    aggregate_type: job
+    payload:
+      required:
+        - job_id
+        - job_type
+        - last_error
+      optional:
+        - correlation_id
+    idempotency_key: "job:{job_id}:dead"
+
+# Phase 1 implemented emitters
+phase_1_active:
+  - LeadCreated
+  - LeadAssigned
+  - JobCompleted
+  - JobDead
+
+# LeadAssigned: Flask assign (future) + Nest staging PATCH (Phase 1b B9)

@@ -1,0 +1,46 @@
+TC-ID,Priority,Module,Flow,Role,URL,Fixture File,Fixture Key,Expected Result Summary,Diagram Ref,Automated Test
+TC-FLOW-L01,P0,Nguồn Lead,Zalo webhook ingest,MKT,POST /api/crm/integration/webhooks/zalo,,,201 created; source=zalo,So_do_Nguon_Lead,tests/test_crm_lead_webhooks.py
+TC-FLOW-L02,P0,Nguồn Lead,Landing webform,Guest,POST /api/landing-contact,,,Lead/case tạo; source website,So_do_Nguon_Lead,
+TC-FLOW-L03,P1,Nguồn Lead,Marketing ingest API,MKT,POST /api/crm/integration/marketing/ingest,,,Bearer OK; lead ingested,So_do_Nguon_Lead,
+TC-FLOW-L04,P1,Nguồn Lead,Form tư vấn dịch vụ,Guest,POST /api/consultations,,,Consultation lưu + notify,So_do_Nguon_Lead,
+TC-FLOW-L05,P1,Nguồn Lead,Nhập FB thủ công,MKT,/crm/leads,,,Lead source facebook; UI modal,So_do_Nguon_Lead,
+TC-FLOW-L06,P0,Nguồn Lead,Auto-assign sau lead mới,System,/crm/leads,,,owner_id gán theo rule,So_do_Nguon_Lead,tests/test_crm_lead_auto_assign.py
+TC-FLOW-L07,P1,Nguồn Lead,Merge lead trùng SĐT,AM,/crm/leads/{id},leads_manual.json,duplicate_phone,Merge OK; 1 lead còn,So_do_Nguon_Lead,
+TC-FLOW-L08,P1,Nguồn Lead,Cấu hình phân lead,Admin,/crm/leads,,,Tab cấu hình lưu rule,So_do_Nguon_Lead,
+TC-FLOW-L09,P2,Nguồn Lead,FB autosync cron,System,POST /api/crm/integration/facebook/sync-cron,,,Sync gần đây; log OK,So_do_Nguon_Lead,
+TC-FLOW-D01,P0,Service Delivery,Mở workflow lifecycle,AM,/crm/service-delivery/{id},,,7 stage tabs; task list,So_do_Delivery_Gate,
+TC-FLOW-D02,P0,Service Delivery,Chuyển stage tuần tự,AM,/crm/service-delivery/{id},,,lead→consult→…→retain order,So_do_Delivery_Gate,tests/test_crm_service_lifecycle.py
+TC-FLOW-D03,P1,Service Delivery,SOP task giai đoạn,AM,/crm/service-delivery/{id},,,Task template load; tick done,So_do_Delivery_Gate,tests/test_crm_sop.py
+TC-FLOW-D04,P1,Service Delivery,Consult bridge BANT,AM,/crm/leads/{id},,,Intake sync consult stage,So_do_Presales_Gate,
+TC-FLOW-D05,P2,Service Delivery,Proposal AI generate,AM,/crm/leads/{id},,,Proposal draft từ AI,So_do_Presales_Gate,
+TC-FLOW-D06,P1,Service Delivery,Customer brief / meeting,AM,/crm/customer/{id}/meeting-brief,,,Brief PDF/HTML export,So_do_Delivery_Gate,
+TC-FLOW-C01,P0,CSKH,Kanban tạo case mới,CSKH,/crm,,,Case cột Mới; cskh_cases,So_do_CSKH,tests/test_crm_cases.py
+TC-FLOW-C02,P0,CSKH,Chuyển pipeline + care report,CSKH,/crm,,,Status + care report log,So_do_CSKH,
+TC-FLOW-C03,P1,CSKH,Khách hàng 360,CSKH,/crm/customers,,,Profile + issues + purchases,So_do_CSKH,
+TC-FLOW-C04,P2,CSKH,Playbook checklist,CSKH,/crm,,,6 bước lưu tiến độ,So_do_CSKH,
+TC-FLOW-M01,P0,Hub,Hợp đồng draft→Active,AM,/crm/hub,,,Contract status Active; promote lifecycle,So_do_Hub_MKT,
+TC-FLOW-M02,P1,Hub,Chiến dịch + reminder,MKT,/crm/hub,,,Campaign + nhắc việc pending,So_do_Hub_MKT,
+TC-FLOW-M03,P1,MKT Plan,Kế hoạch segment KHTN,MKT,/crm/marketing-plan,,,Pipeline segment lưu,So_do_Hub_MKT,
+TC-FLOW-M04,P0,MKT Plan,SOP Launch 14 ngày,MKT,/crm/sop,,,14 bước template chạy,So_do_Hub_MKT,tests/test_crm_sop.py
+TC-FLOW-M05,P1,Kinh doanh,Sales pipeline deal,AM,/crm/sales,,,Deal log + funnel chart,So_do_Sales,
+TC-FLOW-M06,P2,Kinh doanh,Export báo cáo KD,AM,/crm/sales,,,Excel/PDF tải về,So_do_Sales,
+TC-FLOW-F01,P1,Tài chính,Finance KPI config,Director,/crm/business-dashboard,,,PATCH ngưỡng alert lưu,So_do_Finance,
+TC-FLOW-F02,P1,Tài chính,Cảnh báo KPI cron,System,POST /api/crm/finance/kpi-alert-cron,,,Slack/email/inbox nếu cấu hình,So_do_Finance,
+TC-FLOW-F03,P0,Tài chính,Kế toán dự án BĐS,KT,/crm/re-projects,,,Cash flow + export 7 sheet,So_do_Finance,tests/test_crm_re_projects.py
+TC-FLOW-F04,P1,Tài chính,Chi phí lifecycle,AM,/crm/service-delivery/{id},,,Expense log pre/delivery phase,So_do_Finance,
+TC-FLOW-P01,P0,Portal,NV gửi báo cáo ngày,NV,/crm/daily-reports,kpi_payroll_daily.json,daily_report,status submitted,So_do_Portal,tests/test_crm_daily_reports.py
+TC-FLOW-P02,P0,Portal,NV xem KPI cá nhân,NV,/crm/kpi,accounts.json,portal_sales_a,Chỉ KPI mình,So_do_Portal,
+TC-FLOW-P03,P1,Portal,NV tạo lead gắn dự án,NV,/crm/leads,accounts.json,portal_sales_a,re_project bắt buộc,So_do_Portal,
+TC-FLOW-P04,P1,Payroll,Import chấm công,HR,/crm/payroll,kpi_payroll_daily.json,attendance_row,Bảng công hiển thị,So_do_Portal,
+TC-FLOW-PR01,P1,Product Model,Catalog dịch vụ,Admin,/crm/catalog,,,Service list CRUD,So_do_Product,
+TC-FLOW-PR02,P1,Product Model,Lead industry addon,AM,/crm/leads/{id},,,Addon tab lưu JSON,So_do_Product,
+TC-FLOW-PR03,P2,Product Model,Review queue sync,MKT,/crm/leads,,,Queue release/sync API,So_do_Product,
+TC-FLOW-Q01,P1,HDSD,Đọc tài liệu MD,All,/crm/hdsd,,,Render markdown + mermaid,So_do_QA,tests/test_crm_hdsd_docs.py
+TC-FLOW-Q02,P1,HDSD,Tải Excel HDSD,All,/crm/hdsd/.../download.xlsx,,,File .xlsx tải về,So_do_QA,
+TC-FLOW-Q03,P0,QA,Tải bộ test case,QA,/crm/test-cases/download.xlsx,,,10+ sheets; dropdown status,So_do_QA,tests/test_crm_test_cases_workbook.py
+TC-FLOW-N01,P1,Xử lý sự cố,KPI toàn 0 — banner vàng,AM,/crm/staff-kpi,,,Banner gap; nút đồng bộ AM,So_do_KPI,tests/test_crm_staff_kpi_readiness.py
+TC-FLOW-N02,P1,Xử lý sự cố,Lifecycle orphan lead_id,Admin,/crm/staff-kpi,,,Backfill AM gán từ owner,So_do_KPI,tests/test_crm_svc_lead_am_sync.py
+TC-FLOW-N03,P0,Xử lý sự cố,PTT_PRESALES_ON_LEAD=0,Admin,/crm/leads,,,Không panel pre-sales 3 tab,So_do_Presales_Gate,
+TC-FLOW-N04,P1,Xử lý sự cố,Quyền thiếu — menu ẩn,NV,/crm/leads,permissions_scenarios.json,,Menu/API 403 đúng ma trận,So_do_Perm,
+TC-FLOW-A01,P0,Auth,Đăng nhập admin,Admin,/admin/login,accounts.json,admin_full,Redirect /admin,So_do_Auth,
+TC-FLOW-A02,P0,Auth,Portal NV,NV,/admin/login,accounts.json,portal_sales_a,Redirect /crm/home,So_do_Portal,

@@ -3,7 +3,7 @@
 
 {% block title %}{{ project.title }} | {{ (settings.brand_name if settings else "PTT Advertising Solutions") | e }}{% endblock %}
 {% block head %}
-  {% set _desc = project.description | trim %}
+  {% set _desc = (project.intro or project.description) | striptags | trim %}
   {% set meta_desc = (_desc[:158] + "…") if (_desc | length) > 160 else _desc %}
   <meta name="description" content="{{ meta_desc | e }}" />
   <meta name="robots" content="index, follow" />
@@ -26,7 +26,7 @@
     "@context": "https://schema.org",
     "@type": "CreativeWork",
     "name": {{ project.title|tojson }},
-    "description": {{ (project.description or "")|tojson }},
+    "description": {{ (project.description or "")|striptags|tojson }},
     "image": {{ project.image_url|tojson }}
   }
   </script>
@@ -61,20 +61,7 @@
 {% block body_class %}project-detail-page{% endblock %}
 
 {% block header %}
-<header class="topbar service-subpage-topbar">
-  <div class="container service-subpage-topbar-inner">
-    <a href="{{ url_for('landing') }}" class="logo brand-logo service-subpage-logo" aria-label="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Trang chủ">
-      {{- ras.raster_static_picture('images/ptt-logo.png', '', 60, 60, 'brand-logo-img', loading='eager') -}}
-      <span class="brand-logo-text">{{ settings.brand_name if settings else "PTT Advertising Solutions" }}</span>
-    </a>
-    <nav class="service-subpage-nav" aria-label="Điều hướng">
-      <a class="service-subpage-nav-item" href="{{ url_for('landing') }}#projects">Dự án</a>
-      <a class="service-subpage-nav-item" href="{{ url_for('landing') }}#news">Tin tức</a>
-      <a class="service-subpage-nav-item" href="{{ url_for('career_list') }}">Tuyển dụng</a>
-      <a class="service-subpage-nav-item service-subpage-nav-cta" href="{{ url_for('landing') }}#contact">Liên hệ</a>
-    </nav>
-  </div>
-</header>
+{% include 'partials/public_header.html' %}
 {% endblock %}
 
 {% block content %}
@@ -108,7 +95,7 @@
       <h2 class="project-detail-saga-h2">{{ project.category | e }}</h2>
       {% endif %}
       <hr class="project-detail-saga-rule" />
-      <p class="project-detail-saga-prose">{{ project.description | e }}</p>
+      <div class="project-detail-saga-prose">{{ project.description | safe }}</div>
     </article>
   </div>
 

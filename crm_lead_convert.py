@@ -45,6 +45,7 @@ def _find_customer(conn: sqlite3.Connection, phone: str, email: str) -> int | No
             """
             SELECT id FROM crm_customers
             WHERE REPLACE(REPLACE(REPLACE(COALESCE(phone,''),' ',''),'-',''),'.','') = ?
+              AND COALESCE(is_placeholder, 0) = 0
             ORDER BY id ASC LIMIT 1
             """,
             (ph,),
@@ -54,7 +55,11 @@ def _find_customer(conn: sqlite3.Connection, phone: str, email: str) -> int | No
     em = str(email or "").strip().lower()
     if em and "@" in em:
         hit = conn.execute(
-            "SELECT id FROM crm_customers WHERE lower(trim(email)) = ? ORDER BY id ASC LIMIT 1",
+            """
+            SELECT id FROM crm_customers
+            WHERE lower(trim(email)) = ? AND COALESCE(is_placeholder, 0) = 0
+            ORDER BY id ASC LIMIT 1
+            """,
             (em,),
         ).fetchone()
         if hit:

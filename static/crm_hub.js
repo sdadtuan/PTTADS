@@ -18,9 +18,11 @@
     reminder_scope_labels = {},
     reminder_kind_labels = {},
     reminder_status_labels = {},
+    presales_on_lead = false,
   } = meta;
 
   let customerSearchTimer;
+  let leadSearchTimer;
   let campaignListDebounceTimer;
   /** @type {Array<Record<string, unknown>>} */
   let lastCustomerHits = [];
@@ -183,19 +185,175 @@
     el.classList.toggle("is-error", !ok);
   }
 
+  /** @type {Record<string, Record<string, unknown>>} */
+  let hubCampaignsById = {};
+  let hubMetaInlineBound = false;
+
+  function isValidMetaCampaignId(value) {
+    const v = String(value || "").trim();
+    if (!v) return true;
+    return /^[0-9]{5,20}$/.test(v);
+  }
+
+  /** @type {Array<{id:string,code:string,name:string}>} */
+  let hubAgencyClients = [];
+
+  async function loadAgencyClients() {
+    try {
+      const data = await reqJson("/api/v1/clients?status=active&limit=200");
+      hubAgencyClients = (data.clients || []).map(function (c) {
+        return { id: String(c.id || ""), code: String(c.code || ""), name: String(c.name || "") };
+      });
+      fillAgencyClientSelect("");
+    } catch {
+      hubAgencyClients = [];
+    }
+  }
+
+  function fillAgencyClientSelect(selectedId) {
+    const sel = document.getElementById("crm-hub-campaign-client");
+    if (!sel) return;
+    sel.innerHTML = '<option value="">— Chọn client —</option>';
+    hubAgencyClients.forEach(function (c) {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = c.code + " — " + c.name;
+      sel.appendChild(opt);
+    });
+    if (selectedId) sel.value = selectedId;
+  }
+
+  function fmtTargetCpl(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v) || v <= 0) return "—";
+    return fmtVnd(v);
+  }
+
+  function hubMapBadgeHtml(c) {
+    if (c.hub_map_synced) {
+      return '<span class="agency-badge agency-badge--mapped hub-map-badge" title="Đã sync PG hub_campaign_map">✓ PG</span>';
+    }
+    if (c.hub_map_ready && String(c.hub_map_last_error || "").trim()) {
+      return '<span class="agency-badge agency-badge--failed hub-map-badge" title="' +
+        escapeAttr(String(c.hub_map_last_error || "")) + '">Lỗi sync</span>';
+    }
+    if (c.hub_map_ready) {
+      return '<span class="agency-badge agency-badge--pending hub-map-badge" title="Sẵn sàng — chờ sync PG">⟳</span>';
+    }
+    if (isMetaMapped(c)) {
+      return '<span class="agency-badge agency-badge--unmap hub-map-badge" title="Thiếu agency client">Meta ID</span>';
+    }
+    return '<span class="agency-badge agency-badge--unmap hub-map-badge">—</span>';
+  }
+
+  function updateHubRowMapBadge(campaignId) {
+    const row = document.querySelector('#crm-hub-campaign-tbody tr[data-row-id="' + campaignId + '"]');
+    const c = hubCampaignsById[campaignId];
+    if (!row || !c) return;
+    const cell = row.querySelector(".hub-map-cell");
+    if (cell) cell.innerHTML = hubMapBadgeHtml(c);
+  }
+
+  async function saveHubMetaInline(campaignId, input) {
+    const c = hubCampaignsById[campaignId];
+    if (!c || !input) return;
+    const value = String(input.value || "").trim();
+    const prev = String(c.external_ref || "").trim();
+    input.classList.remove("is-invalid");
+    if (value === prev) return;
+    const ch = String(c.channel || "").toLowerCase();
+    if (value && (ch === "meta" || ch === "facebook" || ch === "ads") && !isValidMetaCampaignId(value)) {
+      input.classList.add("is-invalid");
+      showInlineMsg(document.getElementById("crm-hub-campaign-msg"), "Meta Campaign ID phải là số (5–20 chữ số).", false);
+      input.value = prev;
+      return;
+    }
+    input.classList.add("is-saving");
+    try {
+      const updated = await reqJson("/api/crm/campaigns/" + encodeURIComponent(String(campaignId)), {
+        method: "PATCH",
+        body: JSON.stringify({ external_ref: value }),
+      });
+      hubCampaignsById[campaignId] = Object.assign({}, c, updated);
+      input.dataset.saved = value;
+      showInlineMsg(document.getElementById("crm-hub-campaign-msg"), "Meta Campaign ID đã lưu.", true);
+      updateHubRowMapBadge(campaignId);
+    } catch (e) {
+      input.value = prev;
+      showInlineMsg(
+        document.getElementById("crm-hub-campaign-msg"),
+        e instanceof Error ? e.message : "Lỗi lưu Meta ID",
+        false,
+      );
+    } finally {
+      input.classList.remove("is-saving");
+    }
+  }
+
+  function bindHubMetaInlineEdit() {
+    const tbody = document.getElementById("crm-hub-campaign-tbody");
+    if (!tbody || hubMetaInlineBound) return;
+    hubMetaInlineBound = true;
+    tbody.addEventListener("focusout", (ev) => {
+      const input = ev.target;
+      if (!(input instanceof HTMLInputElement) || !input.classList.contains("hub-meta-inline")) return;
+      void saveHubMetaInline(input.dataset.campaignId || "", input);
+    });
+    tbody.addEventListener("keydown", (ev) => {
+      const input = ev.target;
+      if (ev.key === "Enter" && input instanceof HTMLInputElement && input.classList.contains("hub-meta-inline")) {
+        ev.preventDefault();
+        input.blur();
+      }
+      if (ev.key === "Escape" && input instanceof HTMLInputElement && input.classList.contains("hub-meta-inline")) {
+        const c = hubCampaignsById[input.dataset.campaignId || ""];
+        input.value = c ? String(c.external_ref || "") : "";
+        input.blur();
+      }
+    });
+  }
+
+  function isMetaMapped(c) {
+    const ch = String(c.channel || "").toLowerCase();
+    const ref = String(c.external_ref || "").trim();
+    if (!ref) return false;
+    if (ch === "meta" || ch === "facebook" || ch === "ads") return /^[0-9]{5,20}$/.test(ref);
+    return ref.length > 0;
+  }
+
+  function canEditMetaInline(chRaw) {
+    return chRaw === "meta" || chRaw === "facebook" || chRaw === "ads";
+  }
+
   function campaignRow(c) {
+    hubCampaignsById[String(c.id)] = c;
     const id = escapeAttr(String(c.id));
     const code = escapeAttr(String(c.code || ""));
     const inactive = Number(c.active) === 0;
     const ch = escapeAttr(String(campaign_channel_labels[c.channel] || c.channel || ""));
+    const chRaw = String(c.channel || "").toLowerCase();
     const utm = escapeAttr(String(c.utm_campaign || ""));
     const name = escapeAttr(String(c.name || ""));
+    const metaId = String(c.external_ref || "").trim();
+    const canEditMeta = canEditMetaInline(chRaw);
+    const clientLabel = c.agency_client_code
+      ? esc(String(c.agency_client_code))
+      : (String(c.agency_client_id || "").trim() ? '<span class="muted">UUID</span>' : "—");
+    const metaCell = canEditMeta
+      ? `<input type="text" class="agency-input hub-meta-inline" data-campaign-id="${id}" data-saved="${escapeAttr(metaId)}" value="${escapeAttr(metaId)}" placeholder="Meta Campaign ID" maxlength="240" inputmode="numeric" aria-label="Meta Campaign ID" />`
+      : metaId
+        ? `<code class="hub-meta-id">${esc(metaId)}</code>`
+        : '<span class="muted">—</span>';
     return `
       <tr data-row-id="${id}">
         <td>${code || "—"}</td>
         <td>${name}${inactive ? ` <span class="crm-staff-pill is-off">Tắt</span>` : ""}</td>
         <td>${ch}</td>
+        <td>${clientLabel}</td>
         <td>${utm || "—"}</td>
+        <td class="hub-meta-cell">${metaCell}</td>
+        <td>${fmtTargetCpl(c.target_cpl_vnd)}</td>
+        <td class="hub-map-cell">${hubMapBadgeHtml(c)}</td>
         <td class="crm-hub-cell-actions"><button type="button" class="btn-secondary crm-hub-action-btn crm-hub-edit-campaign" data-id="${id}">Sửa</button></td>
       </tr>`;
   }
@@ -218,7 +376,8 @@
           return name.includes(q) || code.includes(q);
         });
       }
-      if (tbody) tbody.innerHTML = list.length ? list.map(campaignRow).join("") : '<tr><td colspan="5" class="muted">Chưa có chiến dịch.</td></tr>';
+      if (tbody) tbody.innerHTML = list.length ? list.map(campaignRow).join("") : '<tr><td colspan="9" class="muted">Chưa có chiến dịch.</td></tr>';
+      bindHubMetaInlineEdit();
     } finally {
       setBusy("");
     }
@@ -290,6 +449,9 @@
       /** @type {HTMLSelectElement|null} */ (formCampaign.querySelector("select[name='channel']")).value =
         String(hit.channel || "other");
       /** @type {HTMLInputElement|null} */ (formCampaign.querySelector("input[name='external_ref']")).value = String(hit.external_ref || "");
+      fillAgencyClientSelect(String(hit.agency_client_id || ""));
+      /** @type {HTMLInputElement|null} */ (formCampaign.querySelector("input[name='target_cpl_vnd']")).value =
+        hit.target_cpl_vnd ? String(hit.target_cpl_vnd) : "";
       /** @type {HTMLInputElement|null} */ (formCampaign.querySelector("input[name='utm_campaign']")).value =
         String(hit.utm_campaign || "");
       /** @type {HTMLTextAreaElement|null} */ (formCampaign.querySelector("textarea[name='notes']")).value = String(hit.notes || "");
@@ -311,6 +473,20 @@
     ev.preventDefault();
     showInlineMsg(document.getElementById("crm-hub-campaign-err"), "");
     const fd = new FormData(formCampaign);
+    const channel = String(fd.get("channel") || "other");
+    const externalRef = String(fd.get("external_ref") || "").trim();
+    if (
+      (channel === "meta" || channel === "facebook" || channel === "ads") &&
+      externalRef &&
+      !isValidMetaCampaignId(externalRef)
+    ) {
+      showInlineMsg(
+        document.getElementById("crm-hub-campaign-err"),
+        "Meta Campaign ID phải là số (5–20 chữ số).",
+        false,
+      );
+      return;
+    }
     const idHidden = fd.get("id");
     const payload = {
       code: fd.get("code") || "",
@@ -319,6 +495,8 @@
       external_ref: fd.get("external_ref") || "",
       utm_campaign: fd.get("utm_campaign") || "",
       notes: fd.get("notes") || "",
+      agency_client_id: fd.get("agency_client_id") || "",
+      target_cpl_vnd: fd.get("target_cpl_vnd") || 0,
       active:
         !!(formCampaign.querySelector("input[name='active']") && /** @type {HTMLInputElement} */ (
           formCampaign.querySelector("input[name='active']")
@@ -353,13 +531,16 @@
     const id = escapeAttr(String(c.id));
     const st = escapeAttr(String(contract_status_labels[c.status] || c.status || ""));
     const cust = escapeAttr(String(c.customer_name || c.customer_company || c.customer_id));
+    const leadHint = c.lead_id
+      ? ` · Lead #${c.lead_id}${c.lead_name ? ` ${String(c.lead_name)}` : ""}`
+      : "";
     const title = escapeAttr(String(c.title || ""));
     const ends = escapeAttr(String((c.ends_on || "").slice(0, 10)));
     const amt = fmtVnd(c.amount_vnd);
     return `
       <tr data-row-id="${id}">
         <td>${title}</td>
-        <td>${cust}</td>
+        <td>${cust}${leadHint ? `<span class="muted">${escapeAttr(leadHint)}</span>` : ""}</td>
         <td><span class="crm-staff-pill is-on">${st}</span></td>
         <td>${ends || "—"}</td>
         <td>${amt}</td>
@@ -387,9 +568,62 @@
   const formContract = document.getElementById("crm-hub-form-contract");
   const modalContract = document.getElementById("crm-hub-modal-contract");
   /** @type {HTMLSelectElement|null} */
+  const selBillingType = document.getElementById("crm-hub-contract-billing-type");
+  /** @type {HTMLElement|null} */
+  const wrapBillingCycle = document.getElementById("crm-hub-contract-billing-cycle-wrap");
+  /** @type {HTMLSelectElement|null} */
+  const selBillingCycle = document.getElementById("crm-hub-contract-billing-cycle");
+
+  function syncBillingCycleVisibility() {
+    const recurring = selBillingType && selBillingType.value === "recurring";
+    if (wrapBillingCycle) wrapBillingCycle.hidden = !recurring;
+  }
+
+  selBillingType?.addEventListener("change", syncBillingCycleVisibility);
+  /** @type {HTMLSelectElement|null} */
   const selCustomer = document.getElementById("crm-hub-contract-customer-select");
   /** @type {HTMLInputElement|null} */
   const inpCustomerSearch = document.getElementById("crm-hub-contract-customer-search");
+  /** @type {HTMLSelectElement|null} */
+  const selLead = document.getElementById("crm-hub-contract-lead-select");
+  /** @type {HTMLInputElement|null} */
+  const inpLeadSearch = document.getElementById("crm-hub-contract-lead-search");
+
+  async function populateLeadHits(q) {
+    if (!selLead || !presales_on_lead) return;
+    const url = `/api/crm/leads?limit=80${q ? `&q=${encodeURIComponent(q)}` : ""}`;
+    const data = await reqJson(url);
+    const hits = data.leads || [];
+    const cur = selLead.value;
+    selLead.innerHTML = '<option value="">— Không — dùng khách hàng bên dưới —</option>';
+    hits.forEach((l) => {
+      const opt = document.createElement("option");
+      opt.value = String(l.id);
+      opt.textContent = `#${l.id} · ${l.full_name || "—"} · ${l.phone || l.email || ""}`.trim();
+      selLead.appendChild(opt);
+    });
+    if (cur && Array.from(selLead.options).some((o) => o.value === cur)) selLead.value = cur;
+  }
+
+  inpLeadSearch?.addEventListener("input", () => {
+    if (!presales_on_lead) return;
+    window.clearTimeout(leadSearchTimer);
+    leadSearchTimer = window.setTimeout(() => {
+      const q = inpLeadSearch.value.trim();
+      if (q.length < 2 && q.length !== 0) return;
+      populateLeadHits(q).catch(() => {});
+    }, 380);
+  });
+
+  selLead?.addEventListener("change", () => {
+    if (!selCustomer) return;
+    if (selLead.value) {
+      selCustomer.removeAttribute("required");
+      selCustomer.value = "";
+    } else {
+      selCustomer.setAttribute("required", "required");
+    }
+  });
 
   async function populateCustomerHits(q) {
     if (!selCustomer) return;
@@ -424,9 +658,18 @@
     /** @type {HTMLInputElement|null} */ (formContract.querySelector("input[name='renewal_reminder_days']")).value =
       "30";
     inpCustomerSearch && (inpCustomerSearch.value = "");
-    if (selCustomer) selCustomer.innerHTML = '<option value="">— Tìm hoặc tải mặc định —</option>';
+    if (selLead) {
+      selLead.innerHTML = '<option value="">— Không — dùng khách hàng bên dưới —</option>';
+      inpLeadSearch && (inpLeadSearch.value = "");
+    }
+    if (selCustomer) {
+      selCustomer.innerHTML = '<option value="">— Tìm hoặc tải mặc định —</option>';
+      selCustomer.setAttribute("required", "required");
+    }
     await loadCampaignChoicesForContracts().catch(() => {});
     populateCustomerHits("").catch(() => {});
+    if (presales_on_lead) populateLeadHits("").catch(() => {});
+    syncBillingCycleVisibility();
     openModal(modalContract);
     formContract.querySelector("input[name='title']")?.focus();
   });
@@ -476,6 +719,17 @@
           `<option value="${escapeAttr(custId)}">${esc(hit.customer_name || custId)}</option>`;
         selCustomer.value = custId;
       }
+      if (selLead && hit.lead_id) {
+        selLead.innerHTML = `<option value="${escapeAttr(String(hit.lead_id))}">${esc(
+          hit.lead_name ? `#${hit.lead_id} ${hit.lead_name}` : `#${hit.lead_id}`,
+        )}</option>`;
+        selLead.value = String(hit.lead_id);
+        selCustomer?.removeAttribute("required");
+      } else if (selLead) {
+        selLead.innerHTML = '<option value="">— Không —</option>';
+        selLead.value = "";
+        selCustomer?.setAttribute("required", "required");
+      }
       /** @type {HTMLInputElement|null} */ (formContract.querySelector("input[name='title']")).value =
         String(hit.title || "");
       /** @type {HTMLInputElement|null} */ (formContract.querySelector("input[name='reference_code']")).value =
@@ -501,6 +755,13 @@
       /** @type {HTMLInputElement|null} */ (
         formContract.querySelector("input[name='renewal_reminder_days']")
       ).value = String(hit.renewal_reminder_days ?? 30);
+      /** @type {HTMLSelectElement|null} */ (
+        formContract.querySelector("select[name='billing_type']")
+      ).value = String(hit.billing_type || "one_off");
+      /** @type {HTMLSelectElement|null} */ (
+        formContract.querySelector("select[name='billing_cycle']")
+      ).value = String(hit.billing_cycle || "monthly");
+      syncBillingCycleVisibility();
       /** @type {HTMLTextAreaElement|null} */ (formContract.querySelector("textarea[name='notes']")).value = String(
         hit.notes || "",
       );
@@ -522,21 +783,30 @@
     showInlineMsg(document.getElementById("crm-hub-contract-err"), "");
     const fd = new FormData(formContract);
     const idStr = fd.get("id") ? String(fd.get("id")).trim() : "";
+    const leadRaw = fd.get("lead_id");
+    const leadNum = leadRaw != null && String(leadRaw).trim() ? Number(leadRaw) : NaN;
     const cid = fd.get("customer_id");
-    const cidNum = cid != null ? Number(cid) : NaN;
-    if (!cidNum || Number.isNaN(cidNum))
+    const cidNum = cid != null && String(cid).trim() ? Number(cid) : NaN;
+    const useLead = presales_on_lead && !idStr && leadNum && !Number.isNaN(leadNum);
+    if (!useLead && (!cidNum || Number.isNaN(cidNum)))
       return showInlineMsg(document.getElementById("crm-hub-contract-err"), "Chọn khách hàng hợp lệ.", false);
 
     /** @type {Record<string, unknown>} */
     const payload = {
-      customer_id: cidNum,
       title: String(fd.get("title") || ""),
       reference_code: String(fd.get("reference_code") || ""),
       status: String(fd.get("status") || "draft"),
       notes: String(fd.get("notes") || ""),
       amount_vnd: Number(fd.get("amount_vnd") || 0) || 0,
       renewal_reminder_days: Number(fd.get("renewal_reminder_days") || 30) || 0,
+      billing_type: String(fd.get("billing_type") || "one_off"),
+      billing_cycle: String(fd.get("billing_cycle") || "monthly"),
     };
+    if (useLead) {
+      payload.lead_id = leadNum;
+    } else {
+      payload.customer_id = cidNum;
+    }
     const caseRaw = fd.get("case_id");
     const caseStr = caseRaw != null ? String(caseRaw).trim() : "";
     const campRaw = fd.get("campaign_id");
@@ -608,10 +878,21 @@
       const data = await reqJson(`/api/crm/reminders?status=${encodeURIComponent(stParam)}`);
       const list = data.reminders || [];
       /** @type {(r:any)=>string} */
-      const rowHtml = (r) => `
+      const rowHtml = (r) => {
+        let meta = {};
+        try {
+          meta = r.meta_json ? JSON.parse(String(r.meta_json)) : {};
+        } catch {
+          meta = {};
+        }
+        const dashLink =
+          (r.scope === "finance_kpi" || r.scope === "owner_weekly") && meta.dashboard_url
+            ? `<br/><a href="${escapeAttr(String(meta.dashboard_url))}" style="font-size:.72rem;color:#6366f1;">Mở dashboard →</a>`
+            : "";
+        return `
         <tr data-row-id="${escapeAttr(String(r.id))}">
           <td>${esc(String(r.remind_at || "").slice(0, 10))}</td>
-          <td><strong>${esc(r.title)}</strong>${r.body ? `<br/><span class="muted">${esc(r.body)}</span>` : ""}</td>
+          <td><strong>${esc(r.title)}</strong>${r.body ? `<br/><span class="muted">${esc(r.body)}</span>` : ""}${dashLink}</td>
           <td>${esc(String(reminder_scope_labels[r.scope] || r.scope))}</td>
           <td>${esc(String(reminder_kind_labels[r.reminder_kind] || r.reminder_kind))}</td>
           <td>${esc(String(reminder_status_labels[r.status] || r.status))}</td>
@@ -620,6 +901,7 @@
             <button type="button" class="btn-secondary crm-hub-action-btn crm-hub-done-reminder" data-id="${escapeAttr(String(r.id))}">Đã xong</button>
           </td>
         </tr>`;
+      };
       if (tbody) tbody.innerHTML = list.length ? list.map(rowHtml).join("") : '<tr><td colspan="6" class="muted">Không có nhắc việc.</td></tr>';
     } finally {
       setBusy("");
@@ -770,5 +1052,6 @@
   });
 
   switchTab("campaigns");
+  loadAgencyClients().catch(function () {});
   syncSummary().catch(() => {});
 })();

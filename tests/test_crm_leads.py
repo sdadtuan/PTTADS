@@ -488,7 +488,7 @@ class TestLeadFunctionalRequirements(unittest.TestCase):
         self.conn.commit()
         updated = fetch_lead_by_id(self.conn, lid)
         assert updated is not None
-        self.assertEqual(str(updated["status"]), "intake")
+        self.assertEqual(str(updated["status"]), "first_contact")
 
     def test_activity_logs_pipeline_status_snapshot(self) -> None:
         row, _, _ = create_lead(
@@ -497,6 +497,8 @@ class TestLeadFunctionalRequirements(unittest.TestCase):
             phone="0933333377",
             email="",
             status="qualified",
+            need="Tu van",
+            industry_slug="spa",
             created_by="test",
             ts=TS,
         )
@@ -513,7 +515,7 @@ class TestLeadFunctionalRequirements(unittest.TestCase):
         acts = fetch_lead_activities(self.conn, lid)
         user_acts = [a for a in acts if str(a["activity_type"]) != "system"]
         self.assertTrue(user_acts)
-        self.assertEqual(str(dict(user_acts[0]).get("lead_status_at_log") or ""), "qualify")
+        self.assertEqual(str(dict(user_acts[0]).get("lead_status_at_log") or ""), "first_contact")
 
     def test_activity_stores_care_report_fields(self) -> None:
         row, _, _ = create_lead(
@@ -548,7 +550,7 @@ class TestLeadFunctionalRequirements(unittest.TestCase):
         self.assertEqual(act["care_status_label"], "Đã liên hệ thành công")
         updated = fetch_lead_by_id(self.conn, lid)
         assert updated is not None
-        self.assertEqual(str(updated["status"]), "intake")
+        self.assertEqual(str(updated["status"]), "first_contact")
 
     def test_activity_note_does_not_auto_status(self) -> None:
         """Ghi chú thường không tự đổi trạng thái."""
@@ -574,7 +576,7 @@ class TestLeadFunctionalRequirements(unittest.TestCase):
         self.conn.commit()
         updated = fetch_lead_by_id(self.conn, lid)
         assert updated is not None
-        self.assertEqual(str(updated["status"]), "intake")
+        self.assertEqual(str(updated["status"]), "first_contact")
 
     def test_fr08_sla_overdue(self) -> None:
         """FR-08: Phát hiện quá SLA."""
@@ -712,26 +714,30 @@ class TestLeadFunctionalRequirements(unittest.TestCase):
         update_lead(
             self.conn,
             lid,
-            status="first_contact",
+            status="lost",
             updated_by="admin",
             ts=TS,
-            status_note="Da goi",
+            status_note="Khong phu hop",
         )
         self.conn.commit()
         logs = fetch_lead_status_logs(self.conn, lid)
         self.assertEqual(len(logs), 1)
-        self.assertEqual(logs[0]["new_status"], "first_contact")
+        self.assertEqual(logs[0]["new_status"], "lost")
 
     def test_status_transition_valid(self) -> None:
-        """§11: Chuyển trạng thái hợp lệ intake → first_contact."""
-        self.assertTrue(is_status_transition_allowed("intake", "first_contact"))
-        self.assertFalse(is_status_transition_allowed("intake", "post_sale"))
-        self.assertFalse(is_status_transition_allowed("post_sale", "first_contact"))
+        """§11: Chuyển trạng thái hợp lệ pipeline B2."""
+        self.assertTrue(is_status_transition_allowed("first_contact", "lost"))
+        self.assertTrue(is_status_transition_allowed("pending_cleanup", "first_contact"))
 
     def test_status_transition_blocked_missing_data(self) -> None:
         """§11: Không đổi trạng thái khi thiếu dữ liệu (trừ override)."""
         with self.assertRaises(ValueError):
-            validate_status_transition("intake", "first_contact", needs_cleanup=True, allow_override=False)
+            validate_status_transition(
+                "pending_cleanup",
+                "first_contact",
+                needs_cleanup=True,
+                allow_override=False,
+            )
 
     def test_merge_duplicate_leads(self) -> None:
         """Mục 4: Gộp lead trùng vào lead chính."""
@@ -932,24 +938,28 @@ class TestLeadFunctionalRequirements(unittest.TestCase):
         delete_lead(self.conn, lid, deleted_by="admin", force=True)
         self.assertIsNone(fetch_lead_by_id(self.conn, lid))
 
-    def test_fetch_leads_sort_by_assigned_at_desc(self) -> None:
-        """Danh sách sắp theo ngày phân công DESC — lead gán sau đứng trước."""
+    def test_fetch_leads_sort_by_received_at_desc(self) -> None:
+        """Danh sách sắp giảm dần theo ngày đổ về (ingested_at / created_at)."""
         row1, _, _ = create_lead(
-            self.conn, full_name="Assigned early", phone="0902000001", email="", created_by="test", ts=TS
+            self.conn,
+            full_name="Older FB",
+            phone="0902000001",
+            email="",
+            source="facebook",
+            created_by="test",
+            ts="2026-06-10 08:00:00",
+            meta={"ingested_at": "2026-06-10T08:00:00Z"},
         )
         row2, _, _ = create_lead(
-            self.conn, full_name="Assigned late", phone="0902000002", email="", created_by="test", ts=TS
+            self.conn,
+            full_name="Newer FB",
+            phone="0902000002",
+            email="",
+            source="facebook",
+            created_by="test",
+            ts="2026-06-10 08:00:00",
+            meta={"ingested_at": "2026-06-11T10:00:00Z"},
         )
-        for lid, at in ((int(row1["id"]), "2026-06-11 08:00:00"), (int(row2["id"]), "2026-06-11 10:00:00")):
-            self.conn.execute("UPDATE crm_leads SET owner_id = 3 WHERE id = ?", (lid,))
-            self.conn.execute(
-                """
-                INSERT INTO crm_lead_assignment_logs
-                    (lead_id, from_user_id, to_user_id, reason, created_by, created_at)
-                VALUES (?, NULL, 3, 'test', 'admin', ?)
-                """,
-                (lid, at),
-            )
         self.conn.commit()
         rows = fetch_leads(self.conn, limit=10)
         ids = [int(r["id"]) for r in rows]
@@ -997,9 +1007,95 @@ class TestLeadFunctionalRequirements(unittest.TestCase):
         )
         self.conn.commit()
         out = lead_row_to_dict(fetch_lead_by_id(self.conn, int(row["id"])), self.conn)
+        self.assertEqual(out["received_at"], "2026-06-11 08:30:00")
         self.assertEqual(out["facebook_received_at"], "2026-06-11 08:30:00")
         self.assertEqual(out["assigned_at"], "2026-06-11 08:32:00")
         self.assertFalse(out["pipeline_alert"])
+
+    def test_lead_received_at_manual_fallback_created_at(self) -> None:
+        """Lead nhập tay / webform không có meta → received_at = created_at."""
+        row, _, _ = create_lead(
+            self.conn,
+            full_name="Manual lead",
+            phone="0904000001",
+            email="",
+            source="manual",
+            created_by="admin",
+            ts="2026-06-12 14:00:00",
+        )
+        self.conn.commit()
+        out = lead_row_to_dict(fetch_lead_by_id(self.conn, int(row["id"])), self.conn)
+        self.assertEqual(out["received_at"], "2026-06-12 14:00:00")
+        self.assertEqual(out["facebook_received_at"], out["received_at"])
+
+        row_zalo, _, _ = create_lead(
+            self.conn,
+            full_name="Zalo lead",
+            phone="0904000002",
+            email="",
+            source="zalo",
+            created_by="webhook:zalo",
+            ts="2026-06-12 14:00:00",
+            meta={"ingested_at": "2026-06-12T09:15:00Z"},
+        )
+        self.conn.commit()
+        out_z = lead_row_to_dict(fetch_lead_by_id(self.conn, int(row_zalo["id"])), self.conn)
+        self.assertEqual(out_z["received_at"], "2026-06-12 09:15:00")
+
+    def test_create_lead_auto_ingest_sets_ingested_at(self) -> None:
+        """Webhook / system:ingest tự ghi meta.ingested_at; nhập tay thì không."""
+        row_sys, _, _ = create_lead(
+            self.conn,
+            full_name="Form web",
+            phone="0905000001",
+            email="",
+            source="website",
+            created_by="system:ingest",
+            ts="2026-06-15 10:00:00",
+            meta={"ingest_channel": "website_form", "ingest_site": "landing-ptt"},
+        )
+        out_sys = lead_row_to_dict(fetch_lead_by_id(self.conn, int(row_sys["id"])), self.conn)
+        self.assertEqual(out_sys["meta"].get("ingested_at"), "2026-06-15 10:00:00")
+        self.assertEqual(out_sys["meta"].get("ingest_channel"), "website_form")
+        self.assertEqual(out_sys["received_at"], "2026-06-15 10:00:00")
+
+        row_wh, _, _ = create_lead(
+            self.conn,
+            full_name="Webhook generic",
+            phone="0905000002",
+            email="",
+            source="api",
+            created_by="webhook:generic",
+            ts="2026-06-15 11:00:00",
+        )
+        out_wh = lead_row_to_dict(fetch_lead_by_id(self.conn, int(row_wh["id"])), self.conn)
+        self.assertEqual(out_wh["meta"].get("ingested_at"), "2026-06-15 11:00:00")
+
+        row_manual, _, _ = create_lead(
+            self.conn,
+            full_name="Manual",
+            phone="0905000003",
+            email="",
+            source="manual",
+            created_by="admin",
+            ts="2026-06-15 12:00:00",
+        )
+        out_manual = lead_row_to_dict(fetch_lead_by_id(self.conn, int(row_manual["id"])), self.conn)
+        self.assertNotIn("ingested_at", out_manual["meta"])
+        self.assertEqual(out_manual["received_at"], "2026-06-15 12:00:00")
+
+        row_fb, _, _ = create_lead(
+            self.conn,
+            full_name="FB keep meta",
+            phone="0905000004",
+            email="",
+            source="facebook",
+            created_by="webhook:facebook",
+            ts="2026-06-15 13:00:00",
+            meta={"ingested_at": "2026-06-01 08:00:00"},
+        )
+        out_fb = lead_row_to_dict(fetch_lead_by_id(self.conn, int(row_fb["id"])), self.conn)
+        self.assertEqual(out_fb["meta"].get("ingested_at"), "2026-06-01 08:00:00")
 
     def test_lead_pipeline_alert_unassigned_manual(self) -> None:
         alert, msg = lead_pipeline_alert(

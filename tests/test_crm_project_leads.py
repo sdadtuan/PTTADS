@@ -14,6 +14,7 @@ from crm_lead_store import (
     fetch_leads,
     find_duplicate_matches,
     lead_row_to_dict,
+    log_lead_activity,
 )
 from crm_project_leads import (
     _UNSET,
@@ -742,10 +743,22 @@ class TestProjectLeadsPhase4(unittest.TestCase):
             created_by="test",
             ts=TS,
         )
+        log_lead_activity(
+            self.conn,
+            lead_id=int(row2["id"]),
+            activity_type="call",
+            content="Bao cao phan loai",
+            care_contact_type="goi_dien",
+            care_status="da_phan_loai",
+            care_stage_key="intake",
+            created_by="test",
+            ts="2026-05-25 10:59:00",
+        )
         complete_lead_care_stage(
             self.conn,
             lead_id=int(row2["id"]),
             stage_key="intake",
+            note="Phan loai lead B",
             created_by="test",
             ts="2026-05-25 11:00:00",
         )

@@ -23,20 +23,30 @@ CRM_CARE_CONTACT_LABELS_VI: dict[str, str] = {
 }
 
 CRM_CARE_STATUS_TYPES: tuple[str, ...] = (
+    "da_phan_loai",
     "da_lien_he_thanh_cong",
-    "khach_hen_goi_lai",
+    "khong_goi_duoc",
+    "khong_nghe_may",
+    "khach_khong_tra_loi",
     "cho_phan_hoi_khach",
+    "khach_hen_goi_lai",
     "khong_lien_lac_duoc",
+    "so_sai",
     "da_tu_van_xong",
     "chuyen_cap_truong",
     "hoan_tat",
 )
 
 CRM_CARE_STATUS_LABELS_VI: dict[str, str] = {
+    "da_phan_loai": "Đã phân loại xong",
     "da_lien_he_thanh_cong": "Đã liên hệ thành công",
-    "khach_hen_goi_lai": "Khách hẹn gọi lại",
+    "khong_goi_duoc": "Không gọi được",
+    "khong_nghe_may": "Không nghe máy",
+    "khach_khong_tra_loi": "Khách không trả lời",
     "cho_phan_hoi_khach": "Chờ phản hồi khách",
+    "khach_hen_goi_lai": "Khách hẹn gọi lại",
     "khong_lien_lac_duoc": "Không liên lạc được",
+    "so_sai": "Số sai / không tồn tại",
     "da_tu_van_xong": "Đã tư vấn xong",
     "chuyen_cap_truong": "Chuyển cấp / escalation",
     "hoan_tat": "Hoàn tất chăm sóc",

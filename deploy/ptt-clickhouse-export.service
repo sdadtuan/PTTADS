@@ -1,0 +1,18 @@
+[Unit]
+Description=PTT — export domain_events PG → ClickHouse (Phase 4 F4)
+After=network.target docker.service
+Wants=ptt-clickhouse.service
+
+[Service]
+Type=oneshot
+User=deploy
+Group=www-data
+WorkingDirectory=/var/www/ptt
+EnvironmentFile=-/var/www/ptt/.env
+Environment=CLICKHOUSE_URL=http://127.0.0.1:8123
+Environment=CLICKHOUSE_USER=ptt
+Environment=CLICKHOUSE_PASSWORD=ptt_dev
+ExecStart=/var/www/ptt/scripts/export_domain_events_clickhouse.sh
+
+[Install]
+WantedBy=multi-user.target

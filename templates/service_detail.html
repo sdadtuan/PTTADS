@@ -3,7 +3,7 @@
 
 {% block title %}{{ service.name }} | {{ (settings.brand_name if settings else "PTT Advertising Solutions") | e }}{% endblock %}
 {% block head %}
-  {% set desc = (service.meta_description|trim) if (service.meta_description) else ((service.summary[:160] + "…") if (service.summary|length > 160) else service.summary) %}
+  {% set desc = (service.meta_description|trim) if (service.meta_description) else ((service.summary|striptags|truncate(160, True, '…')) if (service.summary|length > 160) else (service.summary|striptags)) %}
   <meta name="description" content="{{ desc | e }}" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="{{ request.url_root.rstrip('/') }}{{ url_for('service_detail', slug=service.slug) }}" />
@@ -12,13 +12,13 @@
   <meta property="og:url" content="{{ request.url_root.rstrip('/') }}{{ url_for('service_detail', slug=service.slug) }}" />
   <meta property="og:title" content="{{ service.name | e }} | {{ (settings.brand_name if settings else "PTT Advertising Solutions") | e }}" />
   <meta property="og:description" content="{{ desc | e }}" />
-  <meta property="og:image" content="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='images/ptt-logo.png') }}" />
+  <meta property="og:image" content="{{ (service.image_url if service.image_url else (request.url_root.rstrip('/') + url_for('static', filename='images/ptt-logo.png'))) | e }}" />
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="{{ service.name | e }} | PTT" />
   <meta name="twitter:description" content="{{ desc | e }}" />
 {% endblock %}
 {% block structured_data %}
-  {% set _svc_desc = (service.meta_description|trim) if (service.meta_description) else (service.overview[0] if (service.overview and (service.overview|length) > 0) else service.summary) %}
+  {% set _svc_desc = ((service.meta_description|trim) if (service.meta_description) else (service.overview[0] if (service.overview and (service.overview|length) > 0) else service.summary)) | striptags | trim %}
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -50,20 +50,7 @@
 {% block body_class %}service-subpage{% endblock %}
 
 {% block header %}
-<header class="topbar service-subpage-topbar">
-  <div class="container service-subpage-topbar-inner">
-    <a href="{{ url_for('landing') }}" class="logo brand-logo service-subpage-logo" aria-label="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Trang chủ">
-      {{- ras.raster_static_picture('images/ptt-logo.png', '', 60, 60, 'brand-logo-img', loading='eager') -}}
-      <span class="brand-logo-text">{{ settings.brand_name if settings else "PTT Advertising Solutions" }}</span>
-    </a>
-    <nav class="service-subpage-nav" aria-label="Điều hướng trang dịch vụ">
-      <a class="service-subpage-nav-item" href="{{ url_for('landing') }}">Dịch vụ</a>
-      <a class="service-subpage-nav-item" href="{{ url_for('landing') }}#news">Tin tức</a>
-      <a class="service-subpage-nav-item" href="{{ url_for('career_list') }}">Tuyển dụng</a>
-      <a class="service-subpage-nav-item service-subpage-nav-cta" href="{{ url_for('landing') }}#contact">Liên hệ</a>
-    </nav>
-  </div>
-</header>
+{% include 'partials/public_header.html' %}
 {% endblock %}
 
 {% block content %}
@@ -71,15 +58,18 @@
   <header class="service-hero{% if service.image_url %} service-hero--has-img{% endif %}" aria-labelledby="service-hero-h1"{% if service.image_url %} style="--service-hero-img: url({{ service.image_url | e }})"{% endif %}>
     <div class="service-hero-bg" aria-hidden="true"></div>
     <div class="container service-hero-inner">
-      <p class="service-hero-eyebrow">Dịch vụ · {{ service.category }}</p>
+      <p class="service-hero-eyebrow">{{ (service.hero_eyebrow or ('Dịch vụ · ' ~ service.category)) | e }}</p>
       <h1 class="service-hero-title" id="service-hero-h1">{{ service.name }}</h1>
       {% if service.tagline %}
-      <p class="service-hero-tagline">{{ service.tagline }}</p>
+      <p class="service-hero-tagline">{{ service.tagline | e }}</p>
       {% endif %}
-      <p class="service-hero-lead">{{ service.summary }}</p>
+      <p class="service-hero-lead">{{ service.summary | e }}</p>
       <div class="service-hero-actions">
-        <button type="button" class="btn service-hero-cta" data-open-consult-popup>Nhận đề xuất</button>
-        <a class="btn service-hero-ghost" href="tel:+842473077979">+84 (24) 7307 7979</a>
+        <button type="button" class="btn service-hero-cta" data-open-consult-popup>{{ (service.hero_cta_primary_label or 'Nhận đề xuất') | e }}</button>
+        {% set _hero_phone = (service.hero_cta_phone_label or settings.get('contact_phone') or '') | trim %}
+        {% if _hero_phone %}
+        <a class="btn service-hero-ghost" href="{{ contact_tel_href or ('tel:' ~ _hero_phone) }}">{{ _hero_phone | e }}</a>
+        {% endif %}
       </div>
     </div>
   </header>
@@ -209,11 +199,17 @@
         </div>
         {% endif %}
         <div class="service-aside-card service-aside-cta">
-          <p class="service-aside-eyebrow">Tư vấn nhanh</p>
-          <p class="service-aside-title">Nhận lộ trình theo mục tiêu &amp; ngân sách</p>
-          <a class="service-aside-tel" href="tel:+842473077979">+84 (24) 7307 7979</a>
-          <a class="service-aside-mail" href="mailto:{% if settings and settings.get('contact_email') %}{{ settings.get('contact_email') }}{% else %}contact@pttadvertising.vn{% endif %}">{% if settings and settings.get('contact_email') %}{{ settings.get('contact_email') }}{% else %}contact@pttadvertising.vn{% endif %}</a>
-          <button type="button" class="btn service-aside-btn" data-open-consult-popup>Đăng ký nhận đề xuất</button>
+          {% set _aside_phone = (settings.get('contact_phone') or '+84 (24) 7307 7979') | trim %}
+          {% set _aside_email = (settings.get('contact_email') or 'contact@pttadvertising.vn') | trim %}
+          <p class="service-aside-eyebrow">{{ (settings.get('service_aside_eyebrow') or 'Tư vấn nhanh') | e }}</p>
+          <p class="service-aside-title">{{ (settings.get('service_aside_title') or 'Nhận lộ trình theo mục tiêu & ngân sách') | e }}</p>
+          {% if contact_tel_href %}
+          <a class="service-aside-tel" href="{{ contact_tel_href }}">{{ _aside_phone | e }}</a>
+          {% else %}
+          <span class="service-aside-tel">{{ _aside_phone | e }}</span>
+          {% endif %}
+          <a class="service-aside-mail" href="mailto:{{ _aside_email | e }}">{{ _aside_email | e }}</a>
+          <button type="button" class="btn service-aside-btn" data-open-consult-popup>{{ (settings.get('service_aside_btn_label') or 'Đăng ký nhận đề xuất') | e }}</button>
         </div>
         {% if sibling_services and (sibling_services|length) > 0 %}
         <div class="service-aside-card service-aside-siblings">
@@ -293,17 +289,7 @@
 {% endblock %}
 
 {% block footer %}
-<footer class="service-subpage-footer">
-  <div class="container service-subpage-footer-inner">
-    <p class="service-subpage-footer-brand">© {{ (settings.brand_name if settings else "PTT Advertising Solutions") | e }} · Digital Marketing &amp; Creative Martech</p>
-    <div class="service-subpage-footer-links">
-      <a href="{{ url_for('landing') }}">Trang chủ</a>
-      <a href="{{ url_for('landing') }}">Dịch vụ</a>
-      <a href="{{ url_for('landing') }}#contact">Liên hệ</a>
-      <a href="{{ url_for('privacy_policy') }}">Chính sách bảo mật</a>
-    </div>
-  </div>
-</footer>
+{% include 'partials/site_footer.html' %}
 {% endblock %}
 
 {% block floating_contact %}

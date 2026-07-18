@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pttads.vn/schemas/channel/normalized-lead.schema.json",
+  "title": "NormalizedLead",
+  "type": "object",
+  "required": [
+    "client_id",
+    "channel",
+    "external_lead_id",
+    "idempotency_key",
+    "occurred_at",
+    "contact"
+  ],
+  "properties": {
+    "client_id": { "type": "string", "minLength": 1 },
+    "channel": {
+      "type": "string",
+      "enum": ["meta", "zalo", "google", "email", "tiktok"]
+    },
+    "external_lead_id": { "type": "string", "minLength": 1 },
+    "idempotency_key": { "type": "string", "minLength": 8, "maxLength": 128 },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "contact": {
+      "type": "object",
+      "properties": {
+        "full_name": { "type": ["string", "null"] },
+        "phone": { "type": ["string", "null"] },
+        "email": { "type": ["string", "null"], "format": "email" }
+      },
+      "additionalProperties": false
+    },
+    "fields": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "external_form_id": { "type": ["string", "null"] },
+    "external_campaign_id": { "type": ["string", "null"] },
+    "external_ad_id": { "type": ["string", "null"] },
+    "utm": {
+      "type": "object",
+      "properties": {
+        "source": { "type": ["string", "null"] },
+        "medium": { "type": ["string", "null"] },
+        "campaign": { "type": ["string", "null"] },
+        "content": { "type": ["string", "null"] },
+        "term": { "type": ["string", "null"] }
+      }
+    },
+    "raw": { "type": "object" }
+  },
+  "additionalProperties": false
+}

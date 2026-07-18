@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pttads.vn/schemas/channel/normalized-event.schema.json",
+  "title": "NormalizedEvent",
+  "type": "object",
+  "required": ["event_id", "event_name", "occurred_at", "source"],
+  "properties": {
+    "event_id": { "type": "string", "minLength": 1 },
+    "event_name": {
+      "type": "string",
+      "enum": [
+        "page_view",
+        "view_content",
+        "lead",
+        "complete_registration",
+        "contact",
+        "add_to_cart",
+        "initiate_checkout",
+        "purchase",
+        "subscribe",
+        "unsubscribe",
+        "email_open",
+        "email_click"
+      ]
+    },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "string",
+      "enum": ["browser", "server", "webhook", "crm", "email"]
+    },
+    "client_id": { "type": ["string", "null"] },
+    "channel": {
+      "type": ["string", "null"],
+      "enum": ["meta", "zalo", "google", "email", "tiktok", null]
+    },
+    "user": {
+      "type": "object",
+      "properties": {
+        "email": { "type": ["string", "null"] },
+        "phone": { "type": ["string", "null"] },
+        "external_id": { "type": ["string", "null"] }
+      }
+    },
+    "custom_data": { "type": "object" },
+    "utm": { "type": "object" },
+    "page_url": { "type": ["string", "null"] },
+    "raw": { "type": "object" }
+  },
+  "additionalProperties": false
+}

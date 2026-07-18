@@ -1,5 +1,7 @@
 {% extends "admin_layout.html" %}
 
+{% block body_class_extra %}admin-live-chat-page{% endblock %}
+
 {% block title %}Live Chat — CMS PTT{% endblock %}
 {% block meta_robots %}noindex, nofollow{% endblock %}
 
@@ -72,21 +74,23 @@
           </div>
 
           <div class="lc-messages" id="lc-messages" role="log" aria-live="polite" aria-label="Tin nhắn"></div>
+        </div>
 
-          <div class="lc-reply-box" id="lc-reply-box">
-            <textarea
-              class="lc-reply-input"
-              id="lc-reply-input"
-              placeholder="Nhập phản hồi cho khách… (Enter gửi, Shift+Enter xuống dòng)"
-              rows="3"
-              maxlength="2000"
-            ></textarea>
-            <div class="lc-reply-footer">
-              <span class="lc-reply-char" id="lc-reply-char">0/2000</span>
-              <button class="btn btn-primary lc-reply-send" id="lc-reply-send">Gửi</button>
-            </div>
-            <p class="lc-reply-msg" id="lc-reply-msg"></p>
+        <div class="lc-reply-box" id="lc-reply-box" hidden>
+          <p class="lc-reply-label">Trả lời khách</p>
+          <p class="lc-reply-hint" id="lc-reply-hint" hidden></p>
+          <textarea
+            class="lc-reply-input"
+            id="lc-reply-input"
+            placeholder="Nhập phản hồi cho khách… (Enter gửi, Shift+Enter xuống dòng)"
+            rows="2"
+            maxlength="2000"
+          ></textarea>
+          <div class="lc-reply-footer">
+            <span class="lc-reply-char" id="lc-reply-char">0/2000</span>
+            <button type="button" class="btn btn-primary lc-reply-send" id="lc-reply-send">Gửi</button>
           </div>
+          <p class="lc-reply-msg" id="lc-reply-msg"></p>
         </div>
       </div>
 
@@ -160,7 +164,7 @@
 </div>
 
 <script type="application/json" id="lc-init-data">
-  {{ {"settings": {"mode": settings.get("live_chat_mode","ai"), "enabled": settings.get("live_chat_enabled","0"), "welcome": settings.get("live_chat_welcome","")}} | tojson }}
+  {{ {"settings": {"mode": settings.get("live_chat_mode","ai"), "enabled": settings.get("live_chat_enabled","0"), "welcome": settings.get("live_chat_welcome","")}, "can_reply": can_reply_live_chat | default(true)} | tojson }}
 </script>
 {% endblock %}
 

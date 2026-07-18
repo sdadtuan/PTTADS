@@ -1,0 +1,24 @@
+# Write dual-run soak evidence — hourly sample (Phase 2 prod gate)
+#
+# VPS (staging pre-cutover):
+#   sudo cp ptt-write-soak.service ptt-write-soak.timer /etc/systemd/system/
+#   # .env: DATABASE_URL, PTT_WRITE_SOAK_LOG=/var/www/ptt/.local-dev/write-soak-evidence.jsonl
+#   sudo systemctl enable --now ptt-write-soak.timer
+#   journalctl -u ptt-write-soak.service -n 10 --no-pager
+
+[Unit]
+Description=PTT — write dual-run soak sample (một lần)
+After=network.target ptt.service
+Wants=ptt.service
+
+[Service]
+Type=oneshot
+User=deploy
+Group=www-data
+Environment=PTT_APP_DIR=/var/www/ptt
+Environment=PTT_WRITE_SOAK_LOG=/var/www/ptt/.local-dev/write-soak-evidence.jsonl
+EnvironmentFile=-/var/www/ptt/.env
+ExecStart=/var/www/ptt/scripts/write_soak_record.sh
+
+[Install]
+WantedBy=multi-user.target

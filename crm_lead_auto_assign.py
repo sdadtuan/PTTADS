@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from crm_sales_pipeline import round_robin_assign
-from crm_project_leads import assignment_pool_key
+from crm_lead_assign_scope import lead_assignment_pool_key
 
 ASSIGNMENT_POOL = "lead_round_robin"
 
@@ -172,6 +172,7 @@ class LeadAssignContext:
     lead_score: int = 0
     region: str = ""
     product_interest: str = ""
+    industry_slug: str = ""
     source: str = ""
     need: str = ""
     prefer_staff_id: int | None = None
@@ -179,6 +180,7 @@ class LeadAssignContext:
     re_project_id: int | None = None
     product_line: str = ""
     zone: str = ""
+    exclude_staff_ids: frozenset[int] = field(default_factory=frozenset)
 
 
 def _norm(s: str) -> str:
@@ -292,19 +294,11 @@ def _staff_open_load(conn: Any, staff_id: int) -> int:
 
 
 def _staff_performance_score(conn: Any, staff_id: int) -> float:
-    row = conn.execute(
-        """
-        SELECT
-            COUNT(*) AS total,
-            SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) AS won
-        FROM crm_leads
-        WHERE owner_id = ? AND COALESCE(is_duplicate, 0) = 0
-        """,
-        (int(staff_id),),
-    ).fetchone()
-    total = int(row["total"] or 0) if row else 0
-    won = int(row["won"] or 0) if row else 0
-    close_rate = (won / total) if total > 0 else 0.05
+    from crm_lead_kpi_metrics import get_staff_close_rate_pct
+
+    close_rate = get_staff_close_rate_pct(conn, int(staff_id)) / 100.0
+    if close_rate <= 0:
+        close_rate = 0.05
     load = _staff_open_load(conn, staff_id)
     return close_rate * 100.0 - load * 1.5
 
@@ -322,20 +316,20 @@ def _fetch_candidates(conn: Any, ctx: LeadAssignContext) -> list[StaffCandidate]
     sl_expr = "COALESCE(sales_level, '') AS sales_level" if has_sl else "'' AS sales_level"
     params: list[Any] = []
     where = "COALESCE(active, 1) = 1"
-    if ctx.re_project_id:
-        from crm_project_leads import fetch_project_assign_staff_ids
+    from crm_lead_assign_scope import eligible_staff_ids_for_lead
 
-        staff_ids = fetch_project_assign_staff_ids(
-            conn,
-            int(ctx.re_project_id),
-            product_line=str(ctx.product_line or ""),
-            zone=str(ctx.zone or ""),
-        )
-        if not staff_ids:
+    scope_ids = eligible_staff_ids_for_lead(
+        conn,
+        industry_slug=str(ctx.industry_slug or ""),
+        service_slug=str(ctx.product_interest or ""),
+    )
+    if scope_ids is not None:
+        if not scope_ids:
             return []
-        placeholders = ",".join("?" * len(staff_ids))
+        scope_list = sorted(scope_ids)
+        placeholders = ",".join("?" * len(scope_list))
         where += f" AND id IN ({placeholders})"
-        params.extend(staff_ids)
+        params.extend(scope_list)
     rows = conn.execute(
         f"""
         SELECT id, name, notes, {sl_expr}
@@ -557,11 +551,6 @@ def auto_assign_lead_owner(
     tier_map = cfg.get("tier_level_map") or DEFAULT_TIER_LEVEL_MAP
 
     if ctx.prefer_staff_id:
-        if ctx.re_project_id:
-            from crm_project_leads import staff_may_receive_project_lead
-
-            if not staff_may_receive_project_lead(conn, int(ctx.re_project_id), int(ctx.prefer_staff_id)):
-                return None, "", "staff_not_in_project"
         row = conn.execute(
             "SELECT id, name FROM crm_staff WHERE id = ? AND COALESCE(active, 1) = 1",
             (ctx.prefer_staff_id,),
@@ -569,11 +558,25 @@ def auto_assign_lead_owner(
         if row:
             return int(row["id"]), str(row["name"]), "prefer_staff"
 
-    pool_key = assignment_pool_key(ctx.re_project_id)
+    from crm_lead_assign_scope import lead_assignment_pool_key_v1
+
+    pool_key = lead_assignment_pool_key_v1(
+        industry_slug=str(ctx.industry_slug or ""),
+        service_slug=str(ctx.product_interest or ""),
+    )
+    from crm_lead_assign_scope import eligible_staff_ids_for_lead
+
+    scope_ids = eligible_staff_ids_for_lead(
+        conn,
+        industry_slug=str(ctx.industry_slug or ""),
+        service_slug=str(ctx.product_interest or ""),
+    )
     candidates = _fetch_candidates(conn, ctx)
+    if ctx.exclude_staff_ids:
+        candidates = [c for c in candidates if c.id not in ctx.exclude_staff_ids]
     if not candidates:
-        if ctx.re_project_id:
-            return None, "", "no_project_staff"
+        if scope_ids is not None and len(scope_ids or ()) == 0:
+            return None, "", "no_scope_staff"
         try:
             _, aid = round_robin_assign(conn, pool_key=ASSIGNMENT_POOL)
             if aid:

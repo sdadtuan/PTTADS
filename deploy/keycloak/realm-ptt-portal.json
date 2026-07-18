@@ -1,0 +1,65 @@
+{
+  "realm": "ptt-portal",
+  "enabled": true,
+  "displayName": "PTT Client Portal",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "roles": {
+    "realm": [
+      { "name": "viewer", "description": "Client viewer — read performance" },
+      { "name": "approver", "description": "Client approver — creative approve/reject" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "ptt-portal",
+      "name": "PTT Portal Web",
+      "enabled": true,
+      "publicClient": true,
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "redirectUris": [
+        "http://127.0.0.1:3100/*",
+        "http://localhost:3100/*",
+        "https://portal.pttads.vn/*"
+      ],
+      "webOrigins": ["+"],
+      "protocolMappers": [
+        {
+          "name": "client_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "client_id",
+            "claim.name": "client_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "viewer@demo.local",
+      "email": "viewer@demo.local",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "demo123", "temporary": false }],
+      "attributes": { "client_id": ["550e8400-e29b-41d4-a716-446655440000"] },
+      "realmRoles": ["viewer"]
+    },
+    {
+      "username": "approver@demo.local",
+      "email": "approver@demo.local",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "demo123", "temporary": false }],
+      "attributes": { "client_id": ["550e8400-e29b-41d4-a716-446655440000"] },
+      "realmRoles": ["approver"]
+    }
+  ]
+}

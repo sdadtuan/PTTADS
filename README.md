@@ -43,6 +43,7 @@ Mặc định chạy tại `http://127.0.0.1:5050`.
 | [`docs/SPEC_UI_UX_PTT.md`](docs/SPEC_UI_UX_PTT.md) | Spec UI/UX & design system |
 | [`docs/HUONG_DAN_SU_DUNG_PTT.md`](docs/HUONG_DAN_SU_DUNG_PTT.md) | Hướng dẫn sử dụng |
 | [`docs/HE_THONG_PTT.md`](docs/HE_THONG_PTT.md) | Mục lục tóm tắt |
+| [`docs/crm/README.md`](docs/crm/README.md) | **CRM Service Delivery** — Lead Intake, Consult Stage, runbooks |
 
 ## Route chính
 

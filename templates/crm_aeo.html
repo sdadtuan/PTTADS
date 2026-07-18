@@ -1,0 +1,220 @@
+{# templates/crm_aeo.html #}
+{% extends "admin_layout.html" %}
+{% block title %}AEO Workspace{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+{% block admin_page_title %}AEO Workspace{% endblock %}
+
+{% block admin_main %}
+<div style="max-width:1000px;margin:0 auto;padding:1rem;">
+
+  {# Customer selector #}
+  <form method="get" style="margin-bottom:1.5rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+    <label style="font-weight:600;font-size:.9rem;">Khách hàng:</label>
+    <select name="customer_id" onchange="this.form.submit()"
+            style="padding:.45rem .7rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.9rem;min-width:220px;">
+      <option value="">-- Chọn khách hàng --</option>
+      {% for cu in all_customers %}
+      <option value="{{ cu.id }}" {% if cu.id == customer_id %}selected{% endif %}>
+        {{ cu.name }}{% if cu.company %} — {{ cu.company }}{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+  </form>
+
+  {% if selected_customer %}
+  {# Add query form #}
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:1rem 1.25rem;margin-bottom:1.25rem;">
+    <div style="font-weight:600;font-size:.875rem;margin-bottom:.6rem;">+ Thêm câu hỏi mới</div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-start;">
+      <input id="new-query-text" type="text" placeholder="Câu hỏi người dùng hay hỏi AI..."
+             style="flex:2;min-width:200px;padding:.45rem .7rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.875rem;" />
+      <input id="new-brand-name" type="text" placeholder="Tên brand cần monitor"
+             style="flex:1;min-width:140px;padding:.45rem .7rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.875rem;" />
+      <input id="new-query-notes" type="text" placeholder="Ghi chú thêm về brand (tuỳ chọn)"
+             style="flex:1;min-width:140px;padding:.45rem .7rem;border:1px solid #cbd5e1;border-radius:6px;font-size:.875rem;" />
+      <button onclick="addQuery({{ selected_customer.id }})"
+              style="padding:.45rem 1rem;background:#3b82f6;color:#fff;border:none;border-radius:6px;font-size:.875rem;cursor:pointer;white-space:nowrap;">
+        Thêm
+      </button>
+    </div>
+  </div>
+
+  {% if queries %}
+  {# Summary bar #}
+  {% set visible_count = queries | selectattr('brand_visible', 'equalto', 1) | list | length %}
+  {% set scanned_count = queries | selectattr('last_scan_date') | list | length %}
+  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:.6rem 1rem;margin-bottom:.75rem;font-size:.85rem;color:#1e40af;">
+    Brand visible: <strong>{{ visible_count }}/{{ queries|length }}</strong> queries đã scan
+    &nbsp;·&nbsp; Chưa scan: <strong>{{ queries|length - scanned_count }}</strong>
+  </div>
+
+  <table style="width:100%;border-collapse:collapse;font-size:.875rem;">
+    <thead>
+      <tr style="border-bottom:2px solid #e2e8f0;text-align:left;">
+        <th style="padding:.5rem .75rem;color:#6b7280;font-weight:600;">Câu hỏi</th>
+        <th style="padding:.5rem .75rem;color:#6b7280;font-weight:600;">Brand</th>
+        <th style="padding:.5rem .75rem;color:#6b7280;font-weight:600;">Lần scan</th>
+        <th style="padding:.5rem .75rem;color:#6b7280;font-weight:600;">Visibility</th>
+        <th style="padding:.5rem .75rem;color:#6b7280;font-weight:600;">Hành động</th>
+      </tr>
+    </thead>
+    <tbody id="aeo-query-list">
+    {% for q in queries %}
+    <tr id="row-{{ q.id }}" style="border-bottom:1px solid #f1f5f9;">
+      <td style="padding:.6rem .75rem;max-width:300px;">{{ q.query_text }}</td>
+      <td style="padding:.6rem .75rem;color:#6b7280;">{{ q.brand_name }}</td>
+      <td style="padding:.6rem .75rem;color:#6b7280;font-size:.8rem;">
+        {{ q.last_scan_date or 'Chưa scan' }}
+      </td>
+      <td style="padding:.6rem .75rem;">
+        {% if q.last_scan_date is none %}
+        <span style="color:#9ca3af;">—</span>
+        {% elif q.brand_visible == 1 %}
+        <span style="color:#16a34a;font-weight:600;">✓ Có</span>
+        {% else %}
+        <span style="color:#dc2626;font-weight:600;">✗ Chưa</span>
+        {% endif %}
+      </td>
+      <td style="padding:.6rem .75rem;white-space:nowrap;">
+        <button onclick="scanQuery({{ q.id }})" id="scan-btn-{{ q.id }}"
+                style="padding:.25rem .6rem;font-size:.78rem;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;margin-right:.25rem;">
+          {% if q.last_scan_date %}Scan lại{% else %}Scan{% endif %}
+        </button>
+        <button onclick="toggleResult({{ q.id }})"
+                style="padding:.25rem .6rem;font-size:.78rem;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;margin-right:.25rem;">
+          Kết quả
+        </button>
+        <button onclick="generateContent({{ q.id }})" id="content-btn-{{ q.id }}"
+                style="padding:.25rem .6rem;font-size:.78rem;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;margin-right:.25rem;">
+          Content
+        </button>
+        <button onclick="deleteQuery({{ q.id }})"
+                style="padding:.25rem .6rem;font-size:.78rem;background:#fff;border:1px solid #fca5a5;color:#dc2626;border-radius:4px;cursor:pointer;">
+          Xoá
+        </button>
+      </td>
+    </tr>
+    {# Result slide-down #}
+    <tr id="result-{{ q.id }}" hidden>
+      <td colspan="5" style="padding:0 .75rem .75rem;">
+        <div id="result-body-{{ q.id }}" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:.75rem;font-size:.8rem;"></div>
+      </td>
+    </tr>
+    {# Content slide-down #}
+    <tr id="content-{{ q.id }}" hidden>
+      <td colspan="5" style="padding:0 .75rem .75rem;">
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:.75rem;font-size:.8rem;">
+          <div style="font-weight:600;color:#14532d;margin-bottom:.5rem;">Q&A Pairs</div>
+          <pre id="content-qa-{{ q.id }}" style="white-space:pre-wrap;margin:0 0 .75rem;font-family:inherit;"></pre>
+          <div style="font-weight:600;color:#14532d;margin-bottom:.5rem;">FAQ Schema JSON-LD
+            <button onclick="copySchema({{ q.id }})"
+                    style="margin-left:.5rem;padding:.15rem .5rem;font-size:.75rem;background:#fff;border:1px solid #bbf7d0;border-radius:3px;cursor:pointer;">
+              Copy Schema
+            </button>
+          </div>
+          <pre id="content-schema-{{ q.id }}" style="white-space:pre-wrap;margin:0;font-family:monospace;font-size:.75rem;background:#fff;padding:.5rem;border-radius:4px;"></pre>
+        </div>
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="text-align:center;padding:3rem;color:#9ca3af;font-size:.9rem;">
+    Chưa có câu hỏi nào. Thêm câu hỏi đầu tiên ở trên.
+  </div>
+  {% endif %}
+  {% else %}
+  <div style="text-align:center;padding:3rem;color:#9ca3af;font-size:.9rem;">
+    Chọn khách hàng để bắt đầu quản lý AEO queries.
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block admin_page_scripts %}
+<script>
+function addQuery(customerId) {
+  var qt = document.getElementById('new-query-text').value.trim();
+  var bn = document.getElementById('new-brand-name').value.trim();
+  var notes = document.getElementById('new-query-notes').value.trim();
+  if (!qt || !bn) { alert('Vui lòng nhập câu hỏi và tên brand.'); return; }
+  fetch('/api/crm/aeo/queries', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({customer_id: customerId, query_text: qt, brand_name: bn, notes: notes}),
+  }).then(function(r) { return r.json(); }).then(function() { location.reload(); }).catch(console.error);
+}
+
+function deleteQuery(queryId) {
+  if (!confirm('Xoá câu hỏi này?')) return;
+  fetch('/api/crm/aeo/queries/' + queryId, {method: 'DELETE'})
+    .then(function() { location.reload(); }).catch(console.error);
+}
+
+function scanQuery(queryId) {
+  var btn = document.getElementById('scan-btn-' + queryId);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  fetch('/api/crm/aeo/queries/' + queryId + '/scan', {method: 'POST'})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      renderResult(queryId, data);
+      if (btn) { btn.disabled = false; btn.textContent = 'Scan lại'; }
+    })
+    .catch(function(e) { console.error(e); if (btn) { btn.disabled = false; btn.textContent = 'Scan'; } });
+}
+
+function toggleResult(queryId) {
+  var row = document.getElementById('result-' + queryId);
+  if (!row) return;
+  if (row.hidden) {
+    var body = document.getElementById('result-body-' + queryId);
+    if (body && !body.textContent.trim()) {
+      body.textContent = 'Chưa có kết quả scan. Nhấn "Scan" để tạo kết quả.';
+    }
+    row.removeAttribute('hidden');
+  } else {
+    row.setAttribute('hidden', '');
+  }
+}
+
+function renderResult(queryId, data) {
+  var body = document.getElementById('result-body-' + queryId);
+  if (!body) return;
+  var text = data.ai_response || '';
+  var visibility = data.brand_visible === 1 ? '✓ Brand XUẤT HIỆN' : '✗ Brand CHƯA xuất hiện';
+  body.innerHTML = '<strong style="color:' + (data.brand_visible ? '#16a34a' : '#dc2626') + '">' + visibility + '</strong><br><br>' +
+    '<pre style="white-space:pre-wrap;font-size:.78rem;margin:0;">' + escHtml(text) + '</pre>';
+  var row = document.getElementById('result-' + queryId);
+  if (row) row.removeAttribute('hidden');
+}
+
+function generateContent(queryId) {
+  var btn = document.getElementById('content-btn-' + queryId);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+  fetch('/api/crm/aeo/queries/' + queryId + '/content', {method: 'POST'})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var qaEl = document.getElementById('content-qa-' + queryId);
+      var schemaEl = document.getElementById('content-schema-' + queryId);
+      if (qaEl) qaEl.textContent = data.qa_text || '';
+      if (schemaEl) schemaEl.textContent = data.schema_json || '';
+      var row = document.getElementById('content-' + queryId);
+      if (row) row.removeAttribute('hidden');
+      if (btn) { btn.disabled = false; btn.textContent = 'Content'; }
+    })
+    .catch(function(e) { console.error(e); if (btn) { btn.disabled = false; btn.textContent = 'Content'; } });
+}
+
+function copySchema(queryId) {
+  var el = document.getElementById('content-schema-' + queryId);
+  if (!el) return;
+  navigator.clipboard.writeText(el.textContent).then(function() { alert('Đã copy schema!'); }).catch(console.error);
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+{% endblock %}

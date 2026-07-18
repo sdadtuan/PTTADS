@@ -1,0 +1,47 @@
+# Phase 3 Track T — Temporal workflow engine (local dev)
+# Usage: docker compose -f docker-compose.temporal.yml up -d
+# UI: http://127.0.0.1:8088
+
+services:
+  temporal-db:
+    image: postgres:15-alpine
+    container_name: ptt-temporal-db
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+    volumes:
+      - ptt_temporal_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  temporal:
+    image: temporalio/auto-setup:1.26.2
+    container_name: ptt-temporal
+    depends_on:
+      temporal-db:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: temporal-db
+    ports:
+      - "7233:7233"
+
+  temporal-ui:
+    image: temporalio/ui:2.31.2
+    container_name: ptt-temporal-ui
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:8088,http://127.0.0.1:8088
+    ports:
+      - "8088:8080"
+
+volumes:
+  ptt_temporal_pg:

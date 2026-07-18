@@ -11,6 +11,7 @@
       <a href="{{ url_for('crm_board') }}"{% if crm_staff_nav_active == 'crm' %} class="is-active"{% endif %}>Chăm sóc KH</a>
       <a href="{{ url_for('crm_customers_page') }}"{% if crm_staff_nav_active == 'customers' %} class="is-active"{% endif %}>Khách hàng</a>
       <a href="{{ url_for('crm_payroll_page') }}"{% if crm_staff_nav_active == 'attendance' %} class="is-active"{% endif %}>Chấm công</a>
+      <a href="{{ url_for('crm_hdsd_page') }}"{% if crm_staff_nav_active == 'hdsd' %} class="is-active"{% endif %}>HDSD</a>
       <a href="{{ url_for('account_password_page') }}">Đổi mật khẩu</a>
       <form method="post" action="{{ url_for('admin_logout') }}" class="admin-logout-form crm-staff-logout">
         <button type="submit" class="btn-logout">Đăng xuất</button>

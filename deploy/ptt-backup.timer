@@ -1,0 +1,12 @@
+[Unit]
+Description=PTT — timer backup hàng ngày 03:00 ICT (Phase 2)
+
+[Timer]
+OnBootSec=20min
+OnCalendar=*-*-* 03:00:00
+Timezone=Asia/Ho_Chi_Minh
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

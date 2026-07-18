@@ -1,0 +1,27 @@
+TC-ID,Priority,Module,Flow,Role,URL,Fixture File,Fixture Key,Expected Result Summary,Diagram Ref,Automated Test
+TC-CRM-L01,P0,CRM Lifecycle,Lead vào + gán AM,AM,/crm/leads,leads_manual.json,create_valid,Lead Mới; owner_id = AM đăng nhập,,tests/test_crm_leads.py
+TC-CRM-L02,P0,CRM Lifecycle,B2 Liên hệ lần đầu (care gate),AM,/crm/leads/{id},,,Gate B2 pass; mở Pre-sales,,tests/test_crm_lead_presales.py
+TC-CRM-L03,P0,CRM Lifecycle,Pre-sales tab Lead — task 100%,AM,/crm/leads/{id},,,Tab Lead ✓ trước chuyển Consult,So_do_Lead_Retain,tests/test_crm_lead_presales.py
+TC-CRM-L04,P0,CRM Lifecycle,Intake BANT Go,AM,/crm/intake?lead_id=,,,decision=go; mở Consult,,tests/test_crm_lead_presales.py
+TC-CRM-L05,P0,CRM Lifecycle,Pre-sales Consult + TMMT sơ bộ,AM,/crm/leads/{id},,,Consult ✓; R5 TMMT,,tests/test_crm_lead_presales.py
+TC-CRM-L06,P0,CRM Lifecycle,Pre-sales Proposal + cap chi phí,AM,/crm/leads/{id},,,Proposal ✓; trong cap,,tests/test_crm_lead_presales.py
+TC-CRM-L07,P0,CRM Lifecycle,Ký HĐ Active → promote Onboard,AM,/crm/hub,,,Lifecycle stage=onboard; AM sync,,tests/test_crm_lead_presales.py
+TC-CRM-L08,P0,CRM Lifecycle,Onboard — gán SP,AM,/crm/service-delivery/{id},,,assigned_sp có giá trị,,tests/test_crm_service_lifecycle.py
+TC-CRM-L09,P0,CRM Lifecycle,Deliver — task stage 100%,SP,/crm/service-delivery/{id},,,Không chuyển nếu task chưa ✓,,tests/test_crm_service_lifecycle.py
+TC-CRM-L10,P0,CRM Lifecycle,Handover → Retain,AM,/crm/service-delivery/{id},,,Stage retain; payment gate,,tests/test_crm_service_lifecycle.py
+TC-CRM-L11,P1,CRM Lifecycle,KPI AM/SP sau lifecycle,Director,/crm/staff-kpi,,,Metric > 0 sau backfill AM,So_do_KPI,tests/test_crm_staff_kpi_readiness.py
+TC-CRM-L12,P1,CRM Lifecycle,Backfill assigned_am,Admin,/crm/staff-kpi,,,Nút đồng bộ AM; banner xanh,,tests/test_crm_svc_lead_am_sync.py
+TC-CRM-L13,P1,CRM Lifecycle,Nguồn lead Facebook webhook,MKT,/api/crm/integration/webhooks/facebook,facebook_webhook_payloads.json,leadgen_project_slug,Lead created=1,So_do_Nguon_Lead,tests/test_crm_facebook_leads.py
+TC-CRM-L14,P1,CRM Lifecycle,HDSD đọc tài liệu,All,/crm/hdsd,,,Danh mục + đọc MD,,tests/test_crm_hdsd_docs.py
+TC-CRM-L15,P2,CRM Lifecycle,Tải Excel test case,QA,/crm/test-cases/download.xlsx,,,File xlsx 12+ sheets,,tests/test_crm_test_cases_workbook.py
+TC-CRM-L16,P0,CRM Lifecycle,B2 chưa xong — chặn Pre-sales,AM,/crm/leads/{id},,,Thông báo gate B2; không mở tab PS,So_do_Presales_Gate,tests/test_crm_lead_presales.py
+TC-CRM-L17,P0,CRM Lifecycle,Intake No-Go — chặn Consult,AM,/crm/intake?lead_id=,,,decision=no_go; không sang Consult,So_do_Presales_Gate,tests/test_crm_lead_presales.py
+TC-CRM-L18,P1,CRM Lifecycle,Director override No-Go→Consult,Director,/crm/intake?lead_id=,,,Override + lý do; mở Consult,So_do_Presales_Gate,tests/test_crm_lead_presales.py
+TC-CRM-L19,P0,CRM Lifecycle,Task chưa 100% — chặn Chuyển →,AM,/crm/service-delivery/{id},,,HTTP/UI block; message task gate,So_do_Delivery_Gate,tests/test_crm_service_lifecycle.py
+TC-CRM-L20,P1,CRM Lifecycle,Lùi 1 stage (rollback),AM,/crm/service-delivery/{id},,,Stage lùi đúng 1 bước,So_do_Delivery_Gate,tests/test_crm_service_lifecycle.py
+TC-CRM-L21,P1,CRM Lifecycle,Pre-sales vượt cap chi phí,AM,/crm/leads/{id},,,Banner/cảnh báo cap; không vượt ngưỡng,So_do_Presales_Gate,tests/test_crm_svc_presales_l4.py
+TC-CRM-L22,P0,CRM Lifecycle,TMMT chưa đủ — chặn Deliver,SP,/crm/service-delivery/{id},,,Gate R5 TMMT; không advance,So_do_Delivery_Gate,tests/test_crm_service_lifecycle.py
+TC-CRM-L23,P1,CRM Lifecycle,Payment gate Handover→Retain,AM,/crm/service-delivery/{id},,,Cần payment received trước Retain,So_do_Delivery_Gate,tests/test_crm_service_lifecycle.py
+TC-CRM-L24,P1,CRM Lifecycle,Service Delivery Kanban,AM,/crm/service-delivery,,,Board hiển thị lifecycle theo stage,So_do_Delivery_Gate,
+TC-CRM-L25,P2,CRM Lifecycle,Owner weekly dashboard,Director,/crm/owner-weekly,,,Widget tuần + drill-down,So_do_Finance,
+TC-CRM-L26,P2,CRM Lifecycle,Business dashboard KPI,Director,/crm/business-dashboard,,,Cards KPI + trend sparkline,So_do_Finance,

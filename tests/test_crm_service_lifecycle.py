@@ -2,6 +2,7 @@
 """Tests cho crm_service_lifecycle module."""
 from __future__ import annotations
 
+import json
 import sqlite3
 import unittest
 from datetime import datetime, timedelta
@@ -28,7 +29,7 @@ def _setup_conn() -> sqlite3.Connection:
     ensure_schema(conn)
     # Seed bảng phụ tối thiểu
     conn.execute(
-        "CREATE TABLE IF NOT EXISTS crm_leads (id INTEGER PRIMARY KEY, meta_json TEXT DEFAULT '{}')"
+        "CREATE TABLE IF NOT EXISTS crm_leads (id INTEGER PRIMARY KEY, owner_id INTEGER, meta_json TEXT DEFAULT '{}')"
     )
     conn.execute(
         "CREATE TABLE IF NOT EXISTS crm_customers (id INTEGER PRIMARY KEY, name TEXT DEFAULT '')"
@@ -49,7 +50,11 @@ def _setup_conn() -> sqlite3.Connection:
     conn.execute(
         "INSERT INTO crm_contracts (id, customer_id, service_slug, status) VALUES (1, 1, 'dich-vu-seo-tong-the', 'draft')"
     )
+    conn.execute("INSERT INTO crm_staff (id) VALUES (1)")
     conn.commit()
+    from crm_svc_tasks import ensure_schema as task_schema
+
+    task_schema(conn)
     return conn
 
 
@@ -126,12 +131,35 @@ class TestActivateLifecycle(unittest.TestCase):
 class TestAdvanceStage(unittest.TestCase):
     def test_advances_stage_and_logs_event(self):
         conn = _setup_conn()
+        from crm_lead_intake import ensure_schema as intake_schema
+        from crm_svc_tasks import complete_all_stage_tasks, ensure_schema as task_schema, seed_tasks, update_task
+
+        task_schema(conn)
+        intake_schema(conn)
         lid = create_draft_lifecycle(conn, lead_id=1, service_slug="dich-vu-aeo")
+        seed_tasks(conn, lifecycle_id=lid, service_slug="dich-vu-aeo")
+        lead_task = conn.execute(
+            "SELECT id FROM crm_svc_tasks WHERE lifecycle_id = ? AND stage = 'lead'",
+            (lid,),
+        ).fetchone()
+        update_task(
+            conn,
+            int(lead_task[0]),
+            form_data={"need": "Cần AEO cho brand"},
+        )
+        complete_all_stage_tasks(conn, lid, "lead")
         advance_stage(conn, lid, "consult", actor_type="human")
         row = conn.execute(
             "SELECT stage FROM crm_service_lifecycle WHERE id = ?", (lid,)
         ).fetchone()
         self.assertEqual(row["stage"], "consult")
+        consult_form = json.loads(
+            conn.execute(
+                "SELECT form_data FROM crm_svc_tasks WHERE lifecycle_id = ? AND stage = 'consult'",
+                (lid,),
+            ).fetchone()[0]
+        )
+        self.assertIn("Pain: Cần AEO cho brand", consult_form.get("current_status", ""))
         events = conn.execute(
             "SELECT * FROM crm_service_lifecycle_events WHERE lifecycle_id = ? ORDER BY id",
             (lid,),
@@ -140,6 +168,28 @@ class TestAdvanceStage(unittest.TestCase):
         self.assertEqual(events[1]["from_stage"], "lead")
         self.assertEqual(events[1]["to_stage"], "consult")
         self.assertEqual(events[1]["actor_type"], "human")
+
+    def test_blocks_skip_stage(self):
+        conn = _setup_conn()
+        from crm_service_lifecycle import StageAdvanceError
+        from crm_svc_tasks import ensure_schema as task_schema, seed_tasks
+
+        task_schema(conn)
+        lid = create_draft_lifecycle(conn, lead_id=1, service_slug="dich-vu-aeo")
+        seed_tasks(conn, lifecycle_id=lid, service_slug="dich-vu-aeo")
+        with self.assertRaises(StageAdvanceError):
+            advance_stage(conn, lid, "proposal")
+
+    def test_blocks_forward_when_tasks_incomplete(self):
+        conn = _setup_conn()
+        from crm_service_lifecycle import StageAdvanceError
+        from crm_svc_tasks import ensure_schema as task_schema, seed_tasks
+
+        task_schema(conn)
+        lid = create_draft_lifecycle(conn, lead_id=1, service_slug="dich-vu-seo-audit")
+        seed_tasks(conn, lifecycle_id=lid, service_slug="dich-vu-seo-audit")
+        with self.assertRaises(StageAdvanceError):
+            advance_stage(conn, lid, "consult")
 
 
 class TestGetters(unittest.TestCase):

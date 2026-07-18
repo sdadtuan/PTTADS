@@ -1,0 +1,36 @@
+<div id="agency-toast-root" class="agency-toast-root" aria-live="polite"></div>
+
+<div class="agency-modal-root" id="agency-job-modal" hidden>
+  <div class="agency-modal-backdrop" data-agency-modal-close tabindex="-1"></div>
+  <div class="agency-modal-panel" role="dialog" aria-modal="true" aria-labelledby="agency-job-modal-title">
+    <header class="agency-modal-head">
+      <h2 id="agency-job-modal-title">Chi tiết job</h2>
+      <button type="button" class="agency-modal-close" data-agency-modal-close aria-label="Đóng">×</button>
+    </header>
+    <div class="agency-modal-body" id="agency-job-modal-body">
+      <p class="agency-muted">Đang tải…</p>
+    </div>
+    <footer class="agency-modal-foot">
+      <button type="button" class="btn btn-secondary" data-agency-modal-close>Đóng</button>
+      <button type="button" class="btn" id="agency-job-modal-replay" hidden>Replay job</button>
+    </footer>
+  </div>
+</div>
+
+<div class="agency-modal-root" id="agency-replay-modal" hidden>
+  <div class="agency-modal-backdrop" data-agency-modal-close tabindex="-1"></div>
+  <div class="agency-modal-panel agency-modal-panel--sm" role="dialog" aria-modal="true" aria-labelledby="agency-replay-modal-title">
+    <header class="agency-modal-head">
+      <h2 id="agency-replay-modal-title">Replay job</h2>
+      <button type="button" class="agency-modal-close" data-agency-modal-close aria-label="Đóng">×</button>
+    </header>
+    <div class="agency-modal-body">
+      <p>Bạn có chắc muốn đưa job này vào hàng đợi replay?</p>
+      <p class="agency-muted" id="agency-replay-modal-hint"></p>
+    </div>
+    <footer class="agency-modal-foot">
+      <button type="button" class="btn btn-secondary" data-agency-modal-close>Hủy</button>
+      <button type="button" class="btn" id="agency-replay-modal-confirm">Replay</button>
+    </footer>
+  </div>
+</div>

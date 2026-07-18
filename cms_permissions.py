@@ -60,6 +60,27 @@ CMS_CRM_NAV_MODULES: tuple[dict[str, Any], ...] = (
         "routes": ["/crm/marketing-plan"],
     },
     {
+        "id": "crm_business_dashboard",
+        "label": "Business Dashboard",
+        "group": "CRM · Marketing",
+        "description": "Menu → /crm/business-dashboard — KPI executive, trend, cảnh báo.",
+        "routes": ["/crm/business-dashboard", "/crm/financials"],
+    },
+    {
+        "id": "crm_owner_weekly_dashboard",
+        "label": "Dashboard tuần (Chủ DN)",
+        "group": "CRM · Marketing",
+        "description": "Menu → /crm/owner-weekly — 4 khối Tiền/KD/Hiệu quả/Rủi ro + RAG.",
+        "routes": [
+            "/crm/owner-weekly",
+            "/api/crm/owner-weekly",
+            "/api/crm/owner-weekly/config",
+            "/api/crm/owner-weekly/export",
+            "/api/crm/owner-weekly/inbox/sync",
+            "/api/crm/owner-weekly/alert-cron",
+        ],
+    },
+    {
         "id": "crm_sop_runs",
         "label": "Quy trình SOP",
         "group": "CRM · Marketing",
@@ -100,6 +121,20 @@ CMS_CRM_NAV_MODULES: tuple[dict[str, Any], ...] = (
         "group": "CRM · Nhân sự",
         "description": "Menu → /crm/kpi — chỉ tiêu nhân viên.",
         "routes": ["/crm/kpi"],
+    },
+    {
+        "id": "crm_staff_kpi_am_sp",
+        "label": "KPI AM/SP",
+        "group": "CRM · Nhân sự",
+        "description": "Menu → /crm/staff-kpi — KPI AM/SP/Lead tự động từ CRM.",
+        "routes": ["/crm/staff-kpi", "/api/crm/staff-kpi"],
+    },
+    {
+        "id": "crm_hdsd",
+        "label": "HDSD",
+        "group": "CRM · Hướng dẫn",
+        "description": "Menu → /crm/hdsd — đọc & tải tài liệu docs/.",
+        "routes": ["/crm/hdsd", "/api/crm/hdsd"],
     },
     {
         "id": "crm_payroll_attendance",
@@ -238,6 +273,18 @@ CMS_CORE_MODULES: tuple[dict[str, Any], ...] = (
         "description": "Menu → /admin — danh mục kênh dropdown CSKH.",
         "routes": ["/admin", "POST/PATCH /api/crm/channels"],
     },
+    {
+        "id": "recruitment_jobs",
+        "label": "Tuyển dụng",
+        "group": "Nội dung site",
+        "description": "Menu → /cms/recruitment — quản lý vị trí tuyển dụng.",
+        "routes": [
+            "GET /api/cms/recruitment",
+            "POST /api/cms/recruitment",
+            "PUT /api/cms/recruitment/<id>",
+            "DELETE /api/cms/recruitment/<id>",
+        ],
+    },
 )
 
 CMS_MODULES: tuple[dict[str, Any], ...] = CMS_CORE_MODULES + CMS_CRM_NAV_MODULES
@@ -294,18 +341,26 @@ _CRM_NAV_MARKETING_LEAD: dict[str, frozenset[str]] = {
     "crm_leads": frozenset({"view", "edit", "create", "export", "configure"}),
     "crm_hub_campaigns": frozenset({"view", "edit", "create", "delete"}),
     "crm_mktplan": frozenset({"view", "edit", "create", "export"}),
+    "crm_business_dashboard": frozenset({"view", "export", "configure"}),
+    "crm_owner_weekly_dashboard": frozenset({"view", "export", "configure"}),
     "crm_sop_runs": frozenset({"view", "edit", "create"}),
     "crm_sales_overview": frozenset({"view", "export"}),
     "crm_re_projects": frozenset({"view", "export"}),
     "crm_kpi_records": frozenset({"view", "edit", "create"}),
+    "crm_staff_kpi_am_sp": frozenset({"view", "export", "configure"}),
+    "crm_hdsd": frozenset({"view", "export"}),
 }
 _CRM_NAV_MARKETING_STAFF: dict[str, frozenset[str]] = {
     **_CRM_NAV_VIEW,
     "crm_leads": frozenset({"view", "edit", "create", "export"}),
     "crm_hub_campaigns": frozenset({"view", "edit"}),
     "crm_mktplan": frozenset({"view", "edit", "export"}),
+    "crm_business_dashboard": frozenset({"view", "export"}),
+    "crm_owner_weekly_dashboard": frozenset({"view", "export"}),
     "crm_sop_runs": frozenset({"view", "edit"}),
     "crm_kpi_records": frozenset({"view", "edit"}),
+    "crm_staff_kpi_am_sp": frozenset({"view", "export"}),
+    "crm_hdsd": frozenset({"view", "export"}),
 }
 
 _DEFAULT_GRANTS: dict[str, dict[str, frozenset[str]]] = {

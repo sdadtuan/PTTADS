@@ -1,11 +1,12 @@
 {% extends "base.html" %}
 {% import '_macros_static.html' as ras %}
 
+{% set _news_summary = (item.summary or '') | striptags | trim %}
+{% set meta_desc = (_news_summary[:158] + "…") if (_news_summary | length) > 160 else _news_summary %}
+{% set news_img = item.image_url or ('https://picsum.photos/seed/pttnews' ~ item.id ~ '/1200/630') %}
+
 {% block title %}{{ item.title }} | {{ (settings.brand_name if settings else "PTT Advertising Solutions") | e }}{% endblock %}
 {% block head %}
-  {% set meta_desc = (item.summary | trim) %}
-  {% set meta_desc = (meta_desc[:158] + "…") if (meta_desc | length) > 160 else meta_desc %}
-  {% set news_img = "https://picsum.photos/seed/pttnews" ~ item.id ~ "/1200/630" %}
   <meta name="description" content="{{ meta_desc | e }}" />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="{{ request.url_root.rstrip('/') }}{{ url_for('news_detail', news_id=item.id) }}" />
@@ -26,9 +27,9 @@
   {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
-    "headline": {{ item.title|tojson }},
-    "description": {{ (item.summary or "")|tojson }},
-    "image": {{ ("https://picsum.photos/seed/pttnews" ~ item.id ~ "/1200/630")|tojson }},
+    "headline": {{ (item.title or "")|tojson }},
+    "description": {{ _news_summary|tojson }},
+    "image": {{ news_img|tojson }},
     "datePublished": {{ (item.published_at or "")|tojson }}
   }
   </script>
@@ -37,20 +38,7 @@
 {% block body_class %}news-detail-page{% endblock %}
 
 {% block header %}
-<header class="topbar service-subpage-topbar">
-  <div class="container service-subpage-topbar-inner">
-    <a href="{{ url_for('landing') }}" class="logo brand-logo service-subpage-logo" aria-label="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Trang chủ">
-      {{- ras.raster_static_picture('images/ptt-logo.png', '', 60, 60, 'brand-logo-img', loading='eager') -}}
-      <span class="brand-logo-text">{{ settings.brand_name if settings else "PTT Advertising Solutions" }}</span>
-    </a>
-    <nav class="service-subpage-nav" aria-label="Điều hướng">
-      <a class="service-subpage-nav-item" href="{{ url_for('landing') }}#projects">Dự án</a>
-      <a class="service-subpage-nav-item" href="{{ url_for('landing') }}#news">Tin tức</a>
-      <a class="service-subpage-nav-item" href="{{ url_for('career_list') }}">Tuyển dụng</a>
-      <a class="service-subpage-nav-item service-subpage-nav-cta" href="{{ url_for('landing') }}#contact">Liên hệ</a>
-    </nav>
-  </div>
-</header>
+{% include 'partials/public_header.html' %}
 {% endblock %}
 
 {% block content %}
@@ -58,8 +46,8 @@
   <header class="news-detail-hero">
     <img
       class="news-detail-hero-img"
-      src="https://picsum.photos/seed/pttnews{{ item.id }}/1600/640"
-      alt=""
+      src="{{ news_img | e }}"
+      alt="{{ item.title | e }}"
       width="1600"
       height="640"
       decoding="async"
@@ -72,7 +60,7 @@
       <ol class="news-detail-bc-list">
         <li><a href="{{ url_for('landing') }}">Trang chủ</a></li>
         <li aria-hidden="true">/</li>
-        <li><a href="{{ url_for('landing') }}#news">Tin tức</a></li>
+        <li><a href="{{ url_for('landing') }}#news">Tin tức &amp; Kiến thức</a></li>
         <li aria-hidden="true">/</li>
         <li aria-current="page">{{ item.title | e }}</li>
       </ol>
@@ -85,12 +73,7 @@
         {% endif %}
         <h1 class="news-detail-title">{{ item.title | e }}</h1>
       </header>
-      <div class="news-detail-prose"><p>{{ item.summary | e }}</p></div>
-      {% if item.url and item.url | trim %}
-      <p class="news-detail-external">
-        <a class="btn news-detail-external-btn" href="{{ item.url | e }}" target="_blank" rel="noopener noreferrer">Đọc thêm tại nguồn</a>
-      </p>
-      {% endif %}
+      <div class="news-detail-prose">{{ item.summary | safe }}</div>
     </article>
 
     {% if related_news and (related_news | length) > 0 %}
@@ -98,12 +81,13 @@
       <h2 id="news-related-heading" class="news-detail-related-heading">Tin liên quan</h2>
       <ul class="news-detail-related-grid" role="list">
         {% for n in related_news %}
+        {% set rel_thumb = n.image_url or ('https://picsum.photos/seed/pttnews' ~ n.id ~ '/480/280') %}
         <li class="news-detail-related-item">
           <a class="news-detail-related-card" href="{{ url_for('news_detail', news_id=n.id) }}">
             <div class="news-detail-related-thumb">
               <img
-                src="https://picsum.photos/seed/pttnews{{ n.id }}/480/280"
-                alt=""
+                src="{{ rel_thumb | e }}"
+                alt="{{ n.title | e }}"
                 width="480"
                 height="280"
                 loading="lazy"

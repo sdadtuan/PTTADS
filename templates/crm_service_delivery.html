@@ -25,6 +25,186 @@
 {% endblock %}
 
 {% block admin_main %}
+{% if intake_stats %}
+<div class="svc-intake-kpi" style="display:flex; flex-wrap:wrap; gap:1rem; margin-bottom:1.25rem;">
+  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:.85rem 1rem;min-width:180px;">
+    <div style="font-size:.7rem;color:#1d4ed8;font-weight:600;text-transform:uppercase;">
+      Lead Intake coverage
+      {% if intake_stats.dual_intake %}
+      <span style="font-weight:500;color:#64748b;text-transform:none;"> — dual</span>
+      {% endif %}
+    </div>
+    <div style="font-size:1.5rem;font-weight:700;color:#1e3a8a;">{{ intake_stats.intake_coverage_pct }}%</div>
+    <div style="font-size:.75rem;color:#475569;">
+      {% if intake_stats.dual_intake %}
+      {{ intake_stats.lifecycles_with_completed_intake }}/{{ intake_stats.total_lifecycles }} deal có intake
+      (presales + lifecycle legacy)
+      {% else %}
+      {{ intake_stats.lifecycles_with_completed_intake }}/{{ intake_stats.total_lifecycles }} lifecycle có intake hoàn thành
+      {% endif %}
+    </div>
+  </div>
+  {% if intake_stats.dual_intake %}
+  <div style="background:#ecfdf5;border:1px solid #99f6e4;border-radius:10px;padding:.85rem 1rem;min-width:170px;">
+    <div style="font-size:.7rem;color:#0f766e;font-weight:600;text-transform:uppercase;">Presales (Lead)</div>
+    <div style="font-size:1.25rem;font-weight:700;color:#134e4a;">
+      {{ intake_stats.presales_on_lead.presales_with_completed_intake }}/{{ intake_stats.presales_on_lead.total_presales }}
+    </div>
+    <div style="font-size:.75rem;color:#475569;">{{ intake_stats.presales_on_lead.intake_coverage_pct }}% coverage</div>
+  </div>
+  <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;padding:.85rem 1rem;min-width:170px;">
+    <div style="font-size:.7rem;color:#4338ca;font-weight:600;text-transform:uppercase;">Lifecycle legacy</div>
+    <div style="font-size:1.25rem;font-weight:700;color:#312e81;">
+      {{ intake_stats.lifecycle.lifecycles_with_completed_intake }}/{{ intake_stats.lifecycle.total_lifecycles }}
+    </div>
+    <div style="font-size:.75rem;color:#475569;">{{ intake_stats.lifecycle.intake_coverage_pct }}% coverage</div>
+  </div>
+  {% endif %}
+  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:.85rem 1rem;min-width:160px;">
+    <div style="font-size:.7rem;color:#15803d;font-weight:600;text-transform:uppercase;">Phiên intake</div>
+    <div style="font-size:1.5rem;font-weight:700;color:#14532d;">{{ intake_stats.completed_intake_sessions }}</div>
+    <div style="font-size:.75rem;color:#475569;">đã hoàn thành</div>
+  </div>
+  {% if intake_stats.avg_bant_by_slug %}
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:.85rem 1rem;flex:1;min-width:260px;">
+    <div style="font-size:.7rem;color:#64748b;font-weight:600;margin-bottom:.35rem;">BANT trung bình theo dịch vụ</div>
+    <div style="display:flex;flex-wrap:wrap;gap:.35rem .75rem;font-size:.75rem;">
+      {% for row in intake_stats.avg_bant_by_slug[:6] %}
+      <span style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px;padding:.2rem .55rem;">
+        {{ row.service_name }}: <strong>{{ row.avg_bant_total }}</strong>/30 ({{ row.session_count }})
+      </span>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if funnel_stats %}
+{% macro render_funnel_block(stats, prefix, title, subtitle, bar_color) %}
+<div class="svc-funnel-block" style="margin-bottom:1rem;">
+  <div style="font-size:.7rem;color:{{ bar_color }};font-weight:700;text-transform:uppercase;">
+    {{ title }}
+  </div>
+  <div style="font-size:.75rem;color:#64748b;margin:.15rem 0 .75rem;">
+    {{ subtitle }}
+    <span id="svc-funnel-period-{{ prefix }}">{{ stats.period_start }} → {{ stats.period_end }}</span>
+  </div>
+  <div id="svc-funnel-bars-{{ prefix }}" style="display:flex;align-items:flex-end;gap:.5rem;min-height:120px;margin-bottom:.75rem;">
+    {% set max_count = stats.funnel_entered if stats.funnel_entered > 0 else 1 %}
+    {% for st in stats.stages %}
+    {% set h = (st.count / max_count * 100)|round(0)|int %}
+    {% if h < 8 and st.count > 0 %}{% set h = 8 %}{% endif %}
+    <div style="flex:1;min-width:72px;text-align:center;">
+      <div style="font-size:.7rem;font-weight:700;color:#134e4a;margin-bottom:.25rem;">{{ st.count }}</div>
+      <div style="height:80px;display:flex;align-items:flex-end;justify-content:center;">
+        <div style="width:70%;max-width:56px;height:{{ h }}%;min-height:{% if st.count > 0 %}8px{% else %}2px{% endif %};
+             background:linear-gradient(180deg,#5eead4,{{ bar_color }});border-radius:6px 6px 2px 2px;"></div>
+      </div>
+      <div style="font-size:.65rem;color:#64748b;margin-top:.35rem;line-height:1.2;">{{ st.label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div id="svc-funnel-ratios-{{ prefix }}" style="display:flex;flex-wrap:wrap;gap:.75rem;font-size:.75rem;color:#475569;">
+    <span>Go→Consult: <strong id="svc-fr-go-consult-{{ prefix }}">{{ stats.go_to_consult_pct }}%</strong></span>
+    <span>Consult→Proposal ≤7d: <strong id="svc-fr-c2p-{{ prefix }}">{{ stats.consult_to_proposal_7d_pct }}%</strong></span>
+    <span>Proposal→Won: <strong id="svc-fr-p2w-{{ prefix }}">{{ stats.proposal_to_won_pct }}%</strong></span>
+    <span>Gặp trực tiếp trước Consult: <strong id="svc-fr-inperson-{{ prefix }}">{{ stats.in_person_before_consult_pct }}%</strong></span>
+    <span>Chi phí cohort: <strong id="svc-fr-cost-{{ prefix }}">{{ "{:,.0f}".format(stats.presales_cost_total_vnd) }} ₫</strong></span>
+    <span>/ Go: <strong id="svc-fr-cost-go-{{ prefix }}">{{ "{:,.0f}".format(stats.presales_cost_per_go_vnd) }} ₫</strong></span>
+    <span>/ Won: <strong id="svc-fr-cost-won-{{ prefix }}">{{ "{:,.0f}".format(stats.presales_cost_per_won_vnd) }} ₫</strong></span>
+  </div>
+</div>
+{% endmacro %}
+
+<div class="svc-funnel-kpi" style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;
+     padding:1rem 1.15rem;margin-bottom:1.25rem;">
+  <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;
+       gap:.75rem;margin-bottom:1rem;">
+    <div>
+      <div style="font-size:.7rem;color:#0f766e;font-weight:700;text-transform:uppercase;">
+        Funnel Pre-sales
+        {% if funnel_stats.dual_cohort %}
+        <span style="font-weight:500;color:#64748b;text-transform:none;"> — dual cohort</span>
+        {% endif %}
+      </div>
+      <div style="font-size:.75rem;color:#64748b;margin-top:.15rem;">
+        {% if funnel_stats.dual_cohort %}
+        Lead presales + lifecycle legacy (không double-count)
+        {% else %}
+        Cohort lifecycle tạo
+        {% endif %}
+        <span id="svc-funnel-period">{{ funnel_period_start }} → {{ funnel_period_end }}</span>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end;">
+      <div>
+        <label style="display:block;font-size:.65rem;color:#64748b;margin-bottom:.2rem;">AM</label>
+        <select id="svc-funnel-am" style="border:1px solid #cbd5e1;border-radius:6px;padding:.35rem .5rem;font-size:.8rem;">
+          <option value="">Tất cả AM</option>
+          {% for s in am_staff %}
+          <option value="{{ s.id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:.65rem;color:#64748b;margin-bottom:.2rem;">Dịch vụ</label>
+        <select id="svc-funnel-slug" style="border:1px solid #cbd5e1;border-radius:6px;padding:.35rem .5rem;font-size:.8rem;">
+          <option value="">Tất cả</option>
+          {% for slug in valid_slugs %}
+          <option value="{{ slug }}">{{ slug }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label style="display:block;font-size:.65rem;color:#64748b;margin-bottom:.2rem;">Từ</label>
+        <input type="date" id="svc-funnel-from" value="{{ funnel_period_start }}"
+               style="border:1px solid #cbd5e1;border-radius:6px;padding:.3rem .45rem;font-size:.8rem;">
+      </div>
+      <div>
+        <label style="display:block;font-size:.65rem;color:#64748b;margin-bottom:.2rem;">Đến</label>
+        <input type="date" id="svc-funnel-to" value="{{ funnel_period_end }}"
+               style="border:1px solid #cbd5e1;border-radius:6px;padding:.3rem .45rem;font-size:.8rem;">
+      </div>
+      <button type="button" onclick="svcReloadFunnel()"
+              style="background:#0f766e;color:#fff;border:none;border-radius:6px;padding:.4rem .75rem;font-size:.8rem;cursor:pointer;">
+        Áp dụng
+      </button>
+    </div>
+  </div>
+
+  {% if funnel_stats.dual_cohort %}
+  {{ render_funnel_block(funnel_stats.presales_on_lead, 'ps', 'Cohort Lead (presales)', 'Presales tạo', '#0f766e') }}
+  {{ render_funnel_block(funnel_stats.lifecycle, 'lc', 'Cohort Lifecycle (legacy)', 'Lifecycle tạo — loại lead đã có presales', '#6366f1') }}
+  {% else %}
+  <div id="svc-funnel-bars" style="display:flex;align-items:flex-end;gap:.5rem;min-height:120px;margin-bottom:1rem;">
+    {% set max_count = funnel_stats.funnel_entered if funnel_stats.funnel_entered > 0 else 1 %}
+    {% for st in funnel_stats.stages %}
+    {% set h = (st.count / max_count * 100)|round(0)|int %}
+    {% if h < 8 and st.count > 0 %}{% set h = 8 %}{% endif %}
+    <div style="flex:1;min-width:72px;text-align:center;">
+      <div style="font-size:.7rem;font-weight:700;color:#134e4a;margin-bottom:.25rem;">{{ st.count }}</div>
+      <div style="height:80px;display:flex;align-items:flex-end;justify-content:center;">
+        <div style="width:70%;max-width:56px;height:{{ h }}%;min-height:{% if st.count > 0 %}8px{% else %}2px{% endif %};
+             background:linear-gradient(180deg,#5eead4,#0f766e);border-radius:6px 6px 2px 2px;"></div>
+      </div>
+      <div style="font-size:.65rem;color:#64748b;margin-top:.35rem;line-height:1.2;">{{ st.label }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div id="svc-funnel-ratios" style="display:flex;flex-wrap:wrap;gap:.75rem;font-size:.75rem;color:#475569;">
+    <span>Go→Consult: <strong id="svc-fr-go-consult">{{ funnel_stats.go_to_consult_pct }}%</strong></span>
+    <span>Consult→Proposal ≤7d: <strong id="svc-fr-c2p">{{ funnel_stats.consult_to_proposal_7d_pct }}%</strong></span>
+    <span>Proposal→Won: <strong id="svc-fr-p2w">{{ funnel_stats.proposal_to_won_pct }}%</strong></span>
+    <span>Gặp trực tiếp trước Consult: <strong id="svc-fr-inperson">{{ funnel_stats.in_person_before_consult_pct }}%</strong></span>
+    <span>Chi phí cohort: <strong id="svc-fr-cost">{{ "{:,.0f}".format(funnel_stats.presales_cost_total_vnd) }} ₫</strong></span>
+    <span>/ Go: <strong id="svc-fr-cost-go">{{ "{:,.0f}".format(funnel_stats.presales_cost_per_go_vnd) }} ₫</strong></span>
+    <span>/ Won: <strong id="svc-fr-cost-won">{{ "{:,.0f}".format(funnel_stats.presales_cost_per_won_vnd) }} ₫</strong></span>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
 <div class="svc-kanban-wrap" style="overflow-x:auto; padding-bottom:2rem;">
   <div class="svc-kanban" style="display:flex; gap:1rem; min-width:max-content;">
     {% set stage_labels = {
@@ -45,7 +225,7 @@
       <div class="svc-card" data-id="{{ lc.id }}"
            style="background:#fff; border-radius:6px; padding:.625rem; margin-bottom:.5rem;
                   border:1px solid #e2e8f0; cursor:pointer;"
-           onclick="svcOpenCard({{ lc.id }})">
+           onclick="location.href='{{ url_for('crm_service_workflow_page', lifecycle_id=lc.id) }}'">
         <div style="font-size:.7rem; color:#6366f1; font-weight:600; margin-bottom:2px;">
           {{ lc.service_slug }}
         </div>
@@ -75,52 +255,175 @@
   <div style="background:#fff; border-radius:10px; padding:1.5rem; width:340px; max-width:95vw;">
     <h3 style="margin:0 0 1rem; font-size:1rem;">Advance Stage</h3>
     <p id="svc-modal-info" style="font-size:.8rem; color:#555; margin-bottom:1rem;"></p>
-    <label style="font-size:.8rem; font-weight:600;">Stage mới</label>
-    <select id="svc-modal-stage" style="width:100%; margin:.25rem 0 .75rem; padding:.375rem;">
-      {% for stage in stages %}
-      <option value="{{ stage }}">{{ stage_labels.get(stage, stage) }}</option>
-      {% endfor %}
-    </select>
-    <label style="font-size:.8rem; font-weight:600;">Ghi chú</label>
+    <p id="svc-modal-err" style="font-size:.78rem;color:#dc2626;display:none;margin-bottom:.75rem;"></p>
+    <label style="font-size:.8rem; font-weight:600;">Ghi chú (tuỳ chọn)</label>
     <textarea id="svc-modal-notes" rows="2"
               style="width:100%; margin:.25rem 0 .75rem; padding:.375rem; box-sizing:border-box;"></textarea>
-    <div style="display:flex; gap:.5rem; justify-content:flex-end;">
+    <p style="font-size:.75rem;color:#6b7280;margin:0 0 .75rem;">
+      Chỉ chuyển <strong>lùi 1 bước</strong> hoặc <strong>tiến 1 bước</strong> sau khi hoàn thành task giai đoạn hiện tại.
+    </p>
+    <div style="display:flex; gap:.5rem; justify-content:flex-end; flex-wrap:wrap;">
       <button onclick="svcCloseModal()"
               style="padding:.375rem .75rem; border:1px solid #ddd; border-radius:6px; background:#fff; cursor:pointer;">
         Huỷ
       </button>
-      <button onclick="svcSaveStage()"
+      <button id="svc-modal-back-btn" onclick="svcSaveStage('back')"
+              style="padding:.375rem .75rem; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; cursor:pointer;">
+        ← Lùi 1 bước
+      </button>
+      <button id="svc-modal-next-btn" onclick="svcSaveStage('forward')"
               style="padding:.375rem .75rem; background:#6366f1; color:#fff; border:none; border-radius:6px; cursor:pointer;">
-        Lưu
+        Tiến 1 bước →
       </button>
     </div>
   </div>
 </div>
 
 <script>
+function svcFmtVnd(n) {
+  return Number(n || 0).toLocaleString('vi-VN') + ' ₫';
+}
+
+function svcRenderFunnelBlock(data, prefix) {
+  if (!data) return;
+  var p = prefix ? prefix + '-' : '';
+  var period = document.getElementById('svc-funnel-period' + (prefix ? '-' + prefix : ''));
+  if (period) period.textContent = (data.period_start || '') + ' → ' + (data.period_end || '');
+  var maxCount = Math.max(1, data.funnel_entered || 0);
+  var bars = document.getElementById('svc-funnel-bars' + (prefix ? '-' + prefix : ''));
+  if (bars && data.stages) {
+    bars.innerHTML = data.stages.map(function(st) {
+      var h = Math.round((st.count / maxCount) * 100);
+      if (h < 8 && st.count > 0) h = 8;
+      var minH = st.count > 0 ? '8px' : '2px';
+      return '<div style="flex:1;min-width:72px;text-align:center;">'
+        + '<div style="font-size:.7rem;font-weight:700;color:#134e4a;margin-bottom:.25rem;">' + st.count + '</div>'
+        + '<div style="height:80px;display:flex;align-items:flex-end;justify-content:center;">'
+        + '<div style="width:70%;max-width:56px;height:' + h + '%;min-height:' + minH + ';'
+        + 'background:linear-gradient(180deg,#5eead4,#0f766e);border-radius:6px 6px 2px 2px;"></div>'
+        + '</div>'
+        + '<div style="font-size:.65rem;color:#64748b;margin-top:.35rem;line-height:1.2;">' + st.label + '</div>'
+        + '</div>';
+    }).join('');
+  }
+  var set = function(suffix, val) {
+    var el = document.getElementById('svc-fr-' + suffix + p);
+    if (el) el.textContent = val;
+  };
+  set('go-consult', (data.go_to_consult_pct || 0) + '%');
+  set('c2p', (data.consult_to_proposal_7d_pct || 0) + '%');
+  set('p2w', (data.proposal_to_won_pct || 0) + '%');
+  set('inperson', (data.in_person_before_consult_pct || 0) + '%');
+  set('cost', svcFmtVnd(data.presales_cost_total_vnd));
+  set('cost-go', svcFmtVnd(data.presales_cost_per_go_vnd));
+  set('cost-won', svcFmtVnd(data.presales_cost_per_won_vnd));
+}
+
+function svcRenderFunnel(data) {
+  if (!data) return;
+  if (data.dual_cohort) {
+    var mainPeriod = document.getElementById('svc-funnel-period');
+    if (mainPeriod) {
+      mainPeriod.textContent = (data.period_start || '') + ' → ' + (data.period_end || '');
+    }
+    svcRenderFunnelBlock(data.presales_on_lead, 'ps');
+    svcRenderFunnelBlock(data.lifecycle, 'lc');
+    return;
+  }
+  svcRenderFunnelBlock(data, '');
+}
+
+function svcReloadFunnel() {
+  var am = document.getElementById('svc-funnel-am');
+  var slug = document.getElementById('svc-funnel-slug');
+  var from = document.getElementById('svc-funnel-from');
+  var to = document.getElementById('svc-funnel-to');
+  var params = new URLSearchParams();
+  if (am && am.value) params.set('am_id', am.value);
+  if (slug && slug.value) params.set('service_slug', slug.value);
+  if (from && from.value) params.set('from', from.value);
+  if (to && to.value) params.set('to', to.value);
+  fetch('/api/crm/service-lifecycle/funnel-stats?' + params.toString())
+    .then(function(r) { return r.json(); })
+    .then(function(data) { svcRenderFunnel(data); })
+    .catch(function(err) { console.error('funnel reload:', err); });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var q = new URLSearchParams(window.location.search);
+  var am = q.get('am_id');
+  var slug = q.get('service_slug');
+  var from = q.get('from');
+  var to = q.get('to');
+  if (!am && !slug && !from && !to) return;
+  var amEl = document.getElementById('svc-funnel-am');
+  var slugEl = document.getElementById('svc-funnel-slug');
+  var fromEl = document.getElementById('svc-funnel-from');
+  var toEl = document.getElementById('svc-funnel-to');
+  if (am && amEl) amEl.value = am;
+  if (slug && slugEl) slugEl.value = slug;
+  if (from && fromEl) fromEl.value = from;
+  if (to && toEl) toEl.value = to;
+  svcReloadFunnel();
+});
+
 let _svcActiveId = null;
-function svcOpenCard(id) {
+let _svcActiveStage = null;
+const _svcStages = {{ stages | tojson }};
+const _svcStageLabels = {
+  "lead": "Lead", "consult": "Tư vấn", "proposal": "Báo giá",
+  "onboard": "Onboarding", "deliver": "Triển khai",
+  "handover": "Nghiệm thu", "retain": "Chăm sóc"
+};
+
+function svcOpenCard(id, stage) {
   _svcActiveId = id;
-  document.getElementById('svc-modal-info').textContent = 'Lifecycle #' + id;
+  _svcActiveStage = stage || null;
+  const idx = _svcStages.indexOf(_svcActiveStage);
+  const label = _svcStageLabels[_svcActiveStage] || _svcActiveStage;
+  document.getElementById('svc-modal-info').textContent =
+    'Lifecycle #' + id + ' · ' + (label || stage || '');
   document.getElementById('svc-modal-notes').value = '';
+  const err = document.getElementById('svc-modal-err');
+  if (err) { err.style.display = 'none'; err.textContent = ''; }
+  document.getElementById('svc-modal-back-btn').disabled = idx <= 0;
+  document.getElementById('svc-modal-next-btn').disabled = idx < 0 || idx >= _svcStages.length - 1;
   document.getElementById('svc-modal').style.display = 'flex';
 }
 function svcCloseModal() {
   document.getElementById('svc-modal').style.display = 'none';
   _svcActiveId = null;
+  _svcActiveStage = null;
 }
-function svcSaveStage() {
-  if (!_svcActiveId) return;
-  const stage = document.getElementById('svc-modal-stage').value;
+function svcSaveStage(direction) {
+  if (!_svcActiveId || !_svcActiveStage) return;
+  const idx = _svcStages.indexOf(_svcActiveStage);
+  const target = direction === 'back'
+    ? _svcStages[idx - 1]
+    : _svcStages[idx + 1];
+  if (!target) return;
   const notes = document.getElementById('svc-modal-notes').value;
+  const err = document.getElementById('svc-modal-err');
   fetch('/api/crm/service-lifecycle/' + _svcActiveId, {
     method: 'PATCH',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({stage, notes})
-  }).then(r => r.json()).then(() => {
+    body: JSON.stringify({stage: target, notes})
+  }).then(r => r.json().then(d => ({ok: r.ok, d}))).then(({ok, d}) => {
+    if (!ok) {
+      if (err) {
+        err.textContent = d.error || 'Không chuyển được giai đoạn.';
+        err.style.display = 'block';
+      }
+      return;
+    }
     svcCloseModal();
     location.reload();
-  }).catch(err => alert('Lỗi: ' + err));
+  }).catch(() => {
+    if (err) {
+      err.textContent = 'Mất kết nối.';
+      err.style.display = 'block';
+    }
+  });
 }
 </script>
 {% endblock %}

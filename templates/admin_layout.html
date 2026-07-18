@@ -50,5 +50,8 @@
 {% include 'partials/crm_assistant_widget.html' %}
 {% endif %}
 {% block admin_page_scripts %}{% endblock %}
+{% if not (admin_staff_portal | default(crm_staff_portal | default(false))) %}
+{% include 'partials/admin_grants_bootstrap.html' %}
+{% endif %}
 <script src="{{ url_for('static', filename='admin_shell.js') }}?v={{ static_v('admin_shell.js') }}"></script>
 {% endblock %}

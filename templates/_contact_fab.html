@@ -74,8 +74,8 @@
   <div class="cfab-popup-inner">
     <div class="cfab-popup-head">
       <div>
-        <p class="cfab-popup-eyebrow">Miễn phí · Phản hồi trong 2 giờ</p>
-        <h3 class="cfab-popup-title">Nhận tư vấn giải pháp</h3>
+        <p class="cfab-popup-eyebrow">{{ (settings.get('cfab_eyebrow') or 'Miễn phí · Phản hồi trong 2 giờ') | e }}</p>
+        <h3 class="cfab-popup-title">{{ (settings.get('cfab_title') or 'Nhận tư vấn giải pháp') | e }}</h3>
       </div>
       <button type="button" class="cfab-popup-close" id="cfab-popup-close" aria-label="Đóng">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
@@ -174,7 +174,7 @@
       fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ name: name, email: email, phone: phone, message: message }),
+        body: JSON.stringify({ form_type: 'quick', name: name, email: email, phone: phone, message: message }),
         credentials: 'same-origin',
       })
       .then(function (res) { return res.json().then(function (d) { return { ok: res.ok, data: d }; }); })

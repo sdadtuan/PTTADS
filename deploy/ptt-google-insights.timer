@@ -1,0 +1,12 @@
+[Unit]
+Description=PTT — timer Google insights sync hàng ngày 02:30 ICT (Phase 3 G2)
+
+[Timer]
+OnBootSec=15min
+OnCalendar=*-*-* 02:30:00
+Timezone=Asia/Ho_Chi_Minh
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

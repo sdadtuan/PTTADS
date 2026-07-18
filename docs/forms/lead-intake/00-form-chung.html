@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Form tiếp nhận Lead — Chung (mọi dịch vụ) — PTT Lead Intake</title>
+<style>
+:root { --navy:#0F172A; --accent:#2563EB; --gray:#64748B; --light:#F1F5F9; --border:#CBD5E1; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:"Segoe UI",system-ui,-apple-system,sans-serif; color:var(--navy); background:#fff; line-height:1.5; font-size:13px; }
+.page { max-width:920px; margin:0 auto; padding:1.5rem 1.25rem 3rem; }
+header.doc-header { background:var(--navy); color:#fff; padding:1.25rem 1.5rem; border-radius:8px; margin-bottom:1.5rem; position:relative; }
+header.doc-header .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
+header.doc-header .header-brand img { height:52px; width:auto; display:block; }
+header.doc-header h1 { font-size:1.35rem; margin-bottom:.25rem; }
+header.doc-header .meta { font-size:.85rem; opacity:.85; }
+header.doc-header .slug { color:#93C5FD; font-size:.8rem; }
+.meta-grid { display:grid; grid-template-columns:1fr 1fr; gap:.75rem 1.25rem; margin-top:1rem; background:rgba(255,255,255,.08); padding:1rem; border-radius:6px; }
+.form-section { margin-bottom:1.75rem; page-break-inside:avoid; }
+.section-head { display:flex; align-items:center; gap:.75rem; border-bottom:3px solid var(--accent); padding-bottom:.4rem; margin-bottom:1rem; }
+.section-head h2 { font-size:1.05rem; color:var(--navy); }
+.part-badge { background:var(--accent); color:#fff; font-size:.7rem; font-weight:600; padding:.2rem .55rem; border-radius:4px; white-space:nowrap; }
+h3 { font-size:.95rem; color:var(--accent); margin:1rem 0 .5rem; }
+p, li { margin-bottom:.35rem; }
+.hint { color:var(--gray); font-size:.8rem; font-style:italic; }
+.script-box { background:var(--light); border-left:4px solid var(--accent); padding:.75rem 1rem; margin:.5rem 0; border-radius:0 6px 6px 0; }
+.field { margin-bottom:.65rem; }
+.field-wide { grid-column:1/-1; }
+.field label { display:block; font-weight:600; font-size:.8rem; margin-bottom:.2rem; color:var(--gray); }
+.line { border-bottom:1px solid var(--border); height:1.4rem; }
+.lines { border-bottom:1px solid var(--border); height:1.2rem; margin-bottom:.35rem; }
+.lines-sm .lines, .lines-sm { height:1rem; }
+.lines-tall { min-height:3.5rem; border:1px solid var(--border); border-radius:4px; background:#FAFAFA; }
+.cb { display:inline-block; width:1rem; text-align:center; }
+.cb-group { display:grid; gap:.4rem .75rem; }
+.cb-group.cols-2 { grid-template-columns:1fr 1fr; }
+.cb-group.cols-3 { grid-template-columns:1fr 1fr 1fr; }
+.cb-item { display:flex; align-items:flex-start; gap:.35rem; font-size:.85rem; }
+.cb-go { color:#15803D; } .cb-nurture { color:#B45309; } .cb-nogo { color:#B91C1C; }
+.data-table, .q-table { width:100%; border-collapse:collapse; margin:.75rem 0; font-size:.82rem; }
+.data-table th, .q-table th { background:var(--accent); color:#fff; padding:.45rem .6rem; text-align:left; font-weight:600; }
+.data-table td, .q-table td { border:1px solid var(--border); padding:.45rem .6rem; vertical-align:top; }
+.data-table tr:nth-child(even) td { background:var(--light); }
+.q-num { text-align:center; font-weight:700; color:var(--accent); }
+.q-note .lines { min-height:2.4rem; }
+.score { width:2rem; text-align:center; background:#fff !important; }
+.bant-table td, .bant-table th { font-size:.78rem; }
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+.footer-note { margin-top:2rem; padding:1rem; background:var(--light); border-radius:6px; font-size:.8rem; color:var(--gray); }
+@media print {
+  body { font-size:11px; }
+  .page { padding:0; max-width:100%; }
+  header.doc-header { border-radius:0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .form-section { page-break-inside:avoid; }
+  .part-badge, .data-table th, .q-table th { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="doc-header">
+  <div class="header-top">
+    <div>
+      <div class="slug">PTT · Lead Intake · 00-form-chung</div>
+      <h1>Form tiếp nhận Lead — Chung (mọi dịch vụ)</h1>
+      <div class="meta">Form tiếp nhận lead — Gọi điện (15–25 phút) + Gặp trực tiếp (45–60 phút)</div>
+    </div>
+    <div class="header-brand"><img src="/static/images/ptt-logo.png" alt="PTT Advertising Solutions"></div>
+  </div>
+  <div class="meta-grid">
+    <div class="field"><label>Account Manager (AM)</label><div class="line"></div></div>
+    <div class="field"><label>Ngày gọi / gặp</label><div class="line"></div></div>
+    <div class="field"><label>Lead ID / CRM</label><div class="line"></div></div>
+    <div class="field"><label>Nguồn lead (form/referral/ads/...)</label><div class="line"></div></div>
+    <div class="field"><label>Dịch vụ quan tâm</label><div class="line"></div></div>
+    <div class="field"><label>Tên KH / Công ty</label><div class="line"></div></div>
+    <div class="field"><label>SĐT / Email</label><div class="line"></div></div>
+    <div class="field"><label>Chức danh người liên hệ</label><div class="line"></div></div>
+  </div>
+</header>
+<section class="form-section"><div class="section-head"><h2>Script mở đầu cuộc gọi</h2><span class="part-badge">PHẦN A</span></div><div class="script-box"><strong>Biến thể A — Lead inbound (form/chat)</strong><p>"Chào anh/chị [Tên], em [AM] từ PTT — agency digital marketing. Em thấy anh/chị quan tâm [dịch vụ]. Em gọi 15 phút để hiểu nhu cầu và xem PTT có phù hợp không, không ép mua. Anh/chị có 15 phút không ạ?"</p></div><div class="script-box"><strong>Biến thể B — Referral / giới thiệu</strong><p>"Chào anh/chị, em [AM] PTT — [Người giới thiệu] nhờ em liên hệ vì anh/chị đang cần [dịch vụ]. Em muốn hỏi vài câu để chuẩn bị buổi tư vấn phù hợp. 15 phút được không ạ?"</p></div><div class="script-box"><strong>Biến thể C — Outbound / tái kích hoạt</strong><p>"Chào anh/chị, em [AM] PTT. Trước anh/chị từng quan tâm [dịch vụ]. Em gọi cập nhật case mới ngành [X] và xem nhu cầu hiện tại — 15 phút, không bán hàng ép buộc ạ."</p></div></section>
+<section class="form-section"><div class="section-head"><h2>BANT+ Qualification</h2><span class="part-badge">PHẦN A</span></div><h3>BANT+ Scoring</h3>
+<p class="hint">Đánh giá 1–5 mỗi tiêu chí. Tổng ≥24: Go | 18–23: Nurture | &lt;18: No-Go</p>
+<table class="data-table bant-table">
+<thead><tr><th>Tiêu chí</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>Ghi chú</th></tr></thead>
+<tbody><tr><td><strong>Budget</strong><br><span class="hint">Ngân sách thực tế/tháng hoặc dự án? Ai duyệt chi?</span></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td><div class="lines lines-sm"></div></td></tr><tr><td><strong>Authority</strong><br><span class="hint">Ai ký HĐ? Ai quyết định cuối cùng?</span></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td><div class="lines lines-sm"></div></td></tr><tr><td><strong>Need</strong><br><span class="hint">Pain point #1? Hậu quả nếu không giải quyết?</span></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td><div class="lines lines-sm"></div></td></tr><tr><td><strong>Timeline</strong><br><span class="hint">Khi nào cần bắt đầu? Deadline campaign/go-live?</span></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td><div class="lines lines-sm"></div></td></tr><tr><td><strong>Fit</strong><br><span class="hint">Phù hợp ICP PTT? Scope trong năng lực?</span></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td><div class="lines lines-sm"></div></td></tr><tr><td><strong>History</strong><br><span class="hint">Đã thử gì? Agency cũ? Kết quả?</span></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td><div class="lines lines-sm"></div></td></tr></tbody>
+<tfoot><tr><td colspan="6"><strong>Tổng điểm</strong></td><td><div class="line"></div></td></tr></tfoot>
+</table></section>
+<section class="form-section"><div class="section-head"><h2>Stakeholder Map</h2><span class="part-badge">PHẦN A</span></div><table class="data-table"><colgroup><col style="width:18%"><col style="width:22%"><col style="width:22%"><col style="width:12%"><col style="width:26%"></colgroup><thead><tr><th>Vai trò</th><th>Họ tên</th><th>Chức danh</th><th>Ảnh hưởng (1-5)</th><th>Ghi chú</th></tr></thead><tbody><tr><td>Decision Maker</td><td></td><td></td><td></td><td></td></tr><tr><td>Influencer</td><td></td><td></td><td></td><td></td></tr><tr><td>Gatekeeper</td><td></td><td></td><td></td><td></td></tr><tr><td>User</td><td></td><td></td><td></td><td></td></tr></tbody></table></section>
+<section class="form-section"><div class="section-head"><h2>Xử lý phản đối thường gặp</h2><span class="part-badge">PHẦN A</span></div><table class="data-table"><thead><tr><th style="width:28%">Phản đối</th><th>Cách xử lý / ghi chú AM</th></tr></thead><tbody><tr><td><strong>Giá cao / vượt ngân sách</strong></td><td><div class="lines"></div><p class="hint">Hỏi ngân sách thực tế; so sánh chi phí cơ hội; đề xuất gói nhỏ hơn hoặc milestone.</p></td></tr><tr><td><strong>Đang làm với agency khác</strong></td><td><div class="lines"></div><p class="hint">Hỏi điểm không hài lòng; đề xuất audit độc lập hoặc pilot 1–3 tháng.</p></td></tr><tr><td><strong>Cần suy nghĩ / hỏi sếp</strong></td><td><div class="lines"></div><p class="hint">Xác định decision maker; đặt lịch gặp có người quyết định; gửi 1-pager trước.</p></td></tr><tr><td><strong>Chưa có website / chưa sẵn sàng</strong></td><td><div class="lines"></div><p class="hint">Đề xuất lộ trình: web trước → SEO/Ads; nurture với checklist chuẩn bị.</p></td></tr><tr><td><strong>Kỳ vọng kết quả quá nhanh</strong></td><td><div class="lines"></div><p class="hint">Chia sẻ timeline thực tế + case study; cam kết milestone đo được.</p></td></tr><tr><td><strong>Tự làm được / có team nội bộ</strong></td><td><div class="lines"></div><p class="hint">Hỏi bottleneck; đề xuất hybrid (PTT audit + team nội bộ triển khai).</p></td></tr><tr><td><strong>Không tin agency / bị scam trước</strong></td><td><div class="lines"></div><p class="hint">Chia sẻ case, hợp đồng minh bạch, KPI cam kết, báo cáo định kỳ.</p></td></tr><tr><td><strong>Chỉ hỏi giá, không chia sẻ thông tin</strong></td><td><div class="lines"></div><p class="hint">Giải thích cần context để báo giá chính xác; đề xuất call 15p miễn phí.</p></td></tr></tbody></table></section>
+<section class="form-section"><div class="section-head"><h2>Nhiệt độ & Quyết định</h2><span class="part-badge">PHẦN A</span></div><h3>Nhiệt độ lead &amp; quyết định</h3>
+<div class="cb-group cols-3">
+  <label class="cb-item"><span class="cb">☐</span> <strong>Hot</strong> — budget + timeline + DM engaged</label>
+  <label class="cb-item"><span class="cb">☐</span> <strong>Warm</strong> — nhu cầu rõ, thiếu budget/timeline</label>
+  <label class="cb-item"><span class="cb">☐</span> <strong>Cold</strong> — chỉ hỏi giá, không pain point</label>
+</div>
+<div class="cb-group cols-3" style="margin-top:.75rem">
+  <label class="cb-item cb-go"><span class="cb">☐</span> <strong>Go</strong> → Book Tư vấn</label>
+  <label class="cb-item cb-nurture"><span class="cb">☐</span> <strong>Nurture</strong> → Drip + follow-up</label>
+  <label class="cb-item cb-nogo"><span class="cb">☐</span> <strong>No-Go</strong> → Từ chối lịch sự</label>
+</div>
+<div class="field field-wide"><label>Lý do quyết định</label><div class="lines lines-tall"></div></div></section>
+<section class="form-section"><div class="section-head"><h2>Chốt cam kết — "3 cam kết từ KH"</h2><span class="part-badge">PHẦN A</span></div><table class="data-table"><colgroup><col style="width:22%"><col style="width:53%"><col style="width:25%"></colgroup><thead><tr><th>Cam kết</th><th>Chi tiết KH cam kết</th><th>Deadline</th></tr></thead><tbody><tr><td>Cam kết 1 — Thông tin</td><td></td><td></td></tr><tr><td>Cam kết 2 — Thời gian</td><td></td><td></td></tr><tr><td>Cam kết 3 — Ngân sách / quyết định</td><td></td><td></td></tr></tbody></table></section>
+<section class="form-section"><div class="section-head"><h2>CRM Sync Checklist</h2><span class="part-badge">PHẦN A</span></div><div class="cb-group cols-2"><label class="cb-item"><span class="cb">☐</span> Tạo/cập nhật Lead trên CRM</label><label class="cb-item"><span class="cb">☐</span> Gán tag dịch vụ đúng slug</label><label class="cb-item"><span class="cb">☐</span> Ghi BANT+ score + nhiệt độ lead</label><label class="cb-item"><span class="cb">☐</span> Log cuộc gọi + next action</label><label class="cb-item"><span class="cb">☐</span> Đặt lịch Tư vấn (nếu Go)</label><label class="cb-item"><span class="cb">☐</span> Gửi email recap 24h</label><label class="cb-item"><span class="cb">☐</span> Chuyển Lead care → first_contact</label><label class="cb-item"><span class="cb">☐</span> Thông báo SP/team nếu Hot</label></div></section>
+<section class="form-section"><div class="section-head"><h2>Chuẩn bị buổi gặp trực tiếp</h2><span class="part-badge">PHẦN B</span></div><div class="cb-group cols-2"><label class="cb-item"><span class="cb">☐</span> Xem lại ghi chú cuộc gọi</label><label class="cb-item"><span class="cb">☐</span> Research website/social KH</label><label class="cb-item"><span class="cb">☐</span> Chuẩn bị 3 case study ngành</label><label class="cb-item"><span class="cb">☐</span> In form + checklist tài liệu</label><label class="cb-item"><span class="cb">☐</span> Book phòng / link Google Meet</label><label class="cb-item"><span class="cb">☐</span> Mời decision maker (nếu thiếu)</label><label class="cb-item"><span class="cb">☐</span> Chuẩn bị demo/audit slot 15p</label><label class="cb-item"><span class="cb">☐</span> Xác nhận SMS/email trước 24h</label></div><div class="field field-wide"><label>Ghi chú chuẩn bị thêm</label><div class="lines lines-tall"></div></div></section>
+<section class="form-section"><div class="section-head"><h2>Recap cuộc gọi & xác nhận mục tiêu</h2><span class="part-badge">PHẦN B</span></div><div class="field field-wide"><label>Tóm tắt pain point đã xác nhận</label><div class="lines lines-tall"></div></div><div class="field field-wide"><label>Mục tiêu buổi gặp hôm nay</label><div class="lines lines-tall"></div></div></section>
+<section class="form-section"><div class="section-head"><h2>Deep Discovery (10 câu)</h2><span class="part-badge">PHẦN B</span></div><table class="q-table"><thead><tr><th style="width:3rem">#</th><th>Câu hỏi</th><th style="width:35%">Ghi chú / trả lời</th></tr></thead><tbody><tr><td class="q-num">Q1</td><td class="q-text">Mục tiêu kinh doanh 6–12 tháng tới? KPI đo thành công?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">Q2</td><td class="q-text">Khách hàng lý tưởng (ICP) của anh/chị là ai?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">Q3</td><td class="q-text">Điểm đau lớn nhất hiện tại? Đã thử giải pháp nào?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">Q4</td><td class="q-text">Quy trình duyệt chi / ký HĐ nội bộ như thế nào?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">Q5</td><td class="q-text">Đối thủ chính? Anh/chị muốn khác biệt ở đâu?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">Q6</td><td class="q-text">Team marketing hiện tại: ai làm gì? Thiếu gì?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">Q7</td><td class="q-text">Ngân sách đã duyệt hay đang xin duyệt?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">Q8</td><td class="q-text">Timeline bắt buộc (campaign, mùa vụ, board meeting)?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">Q9</td><td class="q-text">Rủi ro lớn nhất nếu chọn sai đối tác?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">Q10</td><td class="q-text">Tiêu chí chọn agency (giá, case, SLA, báo cáo)?</td><td class="q-note"><div class="lines"></div></td></tr></tbody></table></section>
+<section class="form-section"><div class="section-head"><h2>Trust Building</h2><span class="part-badge">PHẦN B</span></div><p>Chia sẻ 1 case study ngành tương tự · Demo quy trình PTT · Giới thiệu team SP phụ trách</p><div class="cb-group cols-2"><label class="cb-item"><span class="cb">☐</span> Case study đã trình bày</label><label class="cb-item"><span class="cb">☐</span> Quy trình 7 giai đoạn đã giải thích</label><label class="cb-item"><span class="cb">☐</span> SP intro (nếu có)</label><label class="cb-item"><span class="cb">☐</span> Reference KH (nếu được phép)</label></div><div class="field field-wide"><label>Phản ứng KH / câu hỏi thêm</label><div class="lines lines-tall"></div></div></section>
+<section class="form-section"><div class="section-head"><h2>Demo / Audit slot (15 phút live)</h2><span class="part-badge">PHẦN B</span></div><div class="cb-group cols-2"><label class="cb-item"><span class="cb">☐</span> Crawl website sơ bộ</label><label class="cb-item"><span class="cb">☐</span> Check PageSpeed/CWV</label><label class="cb-item"><span class="cb">☐</span> Xem GBP/Ads account</label><label class="cb-item"><span class="cb">☐</span> Phân tích 1 competitor</label><label class="cb-item"><span class="cb">☐</span> Show dashboard mẫu</label></div><div class="field field-wide"><label>Insight chính từ demo</label><div class="lines lines-tall"></div></div></section>
+<section class="form-section"><div class="section-head"><h2>Thu thập tài liệu</h2><span class="part-badge">PHẦN B</span></div><table class="data-table"><colgroup><col style="width:40%"><col style="width:30%"><col style="width:30%"></colgroup><thead><tr><th>Tài liệu</th><th>Lead (có/sẽ gửi)</th><th>Onboard (sau ký)</th></tr></thead><tbody><tr><td>Website URL / domain</td><td>☐</td><td>☐</td></tr><tr><td>Screenshot analytics (GSC/GA4/Ads)</td><td>☐</td><td>☐</td></tr><tr><td>Brand guideline / logo</td><td>☐</td><td>☐</td></tr><tr><td>Brief nhu cầu / pain point</td><td>☐</td><td>☐</td></tr><tr><td>Ngân sách & timeline xác nhận</td><td>☐</td><td>☐</td></tr></tbody></table></section>
+<section class="form-section"><div class="section-head"><h2>Budget Close & Next Steps</h2><span class="part-badge">PHẦN B</span></div><div class="field"><label>Ngân sách xác nhận (VND)</label><div class="line"></div></div><div class="field"><label>Timeline bắt đầu mong muốn</label><div class="line"></div></div><div class="field"><label>Ngày họp Proposal / gửi báo giá</label><div class="line"></div></div><div class="field"><label>Người tham dự buổi Proposal</label><div class="line"></div></div></section>
+<div class="footer-note">
+  PTT Agency · Service Delivery · Sau buổi gọi/gặp: cập nhật CRM task <strong>Lead</strong> + Lead care <strong>first_contact</strong>.
+  In form: Ctrl/Cmd+P · Tạo lại: <code>python3 scripts/generate_lead_intake_forms.py</code>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,72 @@
+# PTT Agency — local infrastructure (Phase 1)
+# Usage: docker compose up -d
+# Apply DDL automatically on first postgres start via initdb mount.
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: ptt-postgres
+    environment:
+      POSTGRES_USER: ptt
+      POSTGRES_PASSWORD: ptt_dev
+      POSTGRES_DB: ptt_agency
+    ports:
+      - "5432:5432"
+    volumes:
+      - ptt_pg_data:/var/lib/postgresql/data
+      - ./docs/specs/2026-07-17-postgresql-ddl-v1.sql:/docker-entrypoint-initdb.d/01-ddl.sql:ro
+      - ./docs/specs/2026-07-17-postgresql-ddl-v2-leads.sql:/docker-entrypoint-initdb.d/02-ddl-v2-leads.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ptt -d ptt_agency"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ptt-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ptt-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ptt
+      RABBITMQ_DEFAULT_PASS: ptt_dev
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  crm-api:
+    build:
+      context: ./services/ptt-crm-api
+    container_name: ptt-crm-api
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgresql://ptt:ptt_dev@postgres:5432/ptt_agency
+      PTT_LEADS_READ_SOURCE: pg
+      PTT_LEADS_WRITE_ENABLED: "0"
+      PTT_SQLITE_PATH: /data/ptt.db
+      PTT_CRM_API_AUTH_DISABLED: "1"
+    volumes:
+      - ./ptt.db:/data/ptt.db:ro
+    restart: unless-stopped
+
+volumes:
+  ptt_pg_data:

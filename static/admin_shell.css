@@ -211,6 +211,16 @@ a.cms-nav-hidden,
   display: none !important;
 }
 
+.admin-nav-link--always,
+a.admin-nav-link--always,
+.admin-topbar-link--hdsd {
+  display: inline-flex !important;
+}
+
+.admin-nav-group--always {
+  display: block !important;
+}
+
 .admin-nav-label {
   margin: 0.5rem 0.65rem 0.35rem;
   font-size: 0.68rem;

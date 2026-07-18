@@ -33,18 +33,7 @@
 {% block body_class %}legal-page{% endblock %}
 
 {% block header %}
-<header class="topbar legal-topbar">
-  <div class="container nav-wrap">
-    <a href="/" class="logo brand-logo" aria-label="{{ brand_name | e }} — Trang chủ">
-      <img src="{{ url_for('static', filename='images/ptt-logo.png') }}" alt="" class="brand-logo-img" width="40" height="40" />
-      <span class="brand-logo-text">{{ brand_name }}</span>
-    </a>
-    <nav class="legal-topbar-nav" aria-label="Điều hướng">
-      <a href="{{ url_for('landing') }}">Trang chủ</a>
-      <a href="{{ url_for('privacy_policy') }}" class="is-active" aria-current="page">Chính sách bảo mật</a>
-    </nav>
-  </div>
-</header>
+{% include 'partials/public_header.html' %}
 {% endblock %}
 
 {% block content %}
@@ -178,13 +167,5 @@
 {% endblock %}
 
 {% block footer %}
-<footer class="footer">
-  <div class="container footer-default-grid">
-    <nav class="footer-default-links" aria-label="Pháp lý">
-      <a href="{{ url_for('landing') }}">Trang chủ</a>
-      <a href="{{ url_for('privacy_policy') }}" aria-current="page">Chính sách bảo mật</a>
-    </nav>
-    <p class="footer-default-copy">© {{ brand_name }} {{ legal_years }}</p>
-  </div>
-</footer>
+{% include 'partials/site_footer.html' %}
 {% endblock %}

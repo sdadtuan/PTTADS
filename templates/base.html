@@ -3,6 +3,13 @@
 {% from '_partials/crm_nav_menu.html' import crm_nav_items %}
 <html lang="vi">
 <head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+  new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+  j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+  'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+  })(window,document,'script','dataLayer','GTM-P4VC7WNL');</script>
+  <!-- End Google Tag Manager -->
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#398b43" />
@@ -13,61 +20,29 @@
   {% block head %}{% endblock %}
   <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/ptt-logo.png') }}" sizes="any" />
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/ptt-logo.png') }}" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&family=Noto+Serif:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='fonts/fonts.css') }}?v={{ static_v('fonts/fonts.css') }}" />
   {% set _css_name = static_css_file() %}
   <link rel="stylesheet" href="{{ url_for('static', filename=_css_name) }}?v={{ static_v(_css_name) }}" />
   {% block structured_data %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-P4VC7WNL"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
   <a class="visually-hidden skip-to-main" href="#main">Bỏ qua menu, tới nội dung chính</a>
   {% block header %}
-  <header class="topbar">
-    <div class="container nav-wrap">
-      <a href="/" class="logo brand-logo" aria-label="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Trang chủ">
-        {{- ras.raster_static_picture('images/ptt-logo.png', (settings.brand_name if settings else 'PTT Advertising Solutions') ~ ' — logo', 40, 40, 'brand-logo-img', loading='eager') -}}
-        <span class="brand-logo-text">{{ settings.brand_name if settings else "PTT Advertising Solutions" }}</span>
-      </a>
-      <nav class="default-nav" aria-label="Menu chính">
-        <a href="/">Landing</a>
-        <div class="nav-crm-dd{% if request.path.startswith('/crm') %} is-open-section{% endif %}">
-          <a href="{{ url_for('crm_board') }}" class="nav-crm-dd-trigger{% if request.path.startswith('/crm') %} is-active{% endif %}">
-            CRM
-            <span class="nav-crm-dd-caret" aria-hidden="true">▾</span>
-          </a>
-          <div class="nav-crm-dd-panel" role="menu" aria-label="Menu CRM">
-            {{ crm_nav_items('nav-crm-dd-link') }}
-          </div>
-        </div>
-        <a href="/admin">Admin</a>
-        <a href="/cms">CMS</a>
-      </nav>
-    </div>
-  </header>
+  {% include 'partials/public_header.html' %}
   {% endblock %}
 
   {% block content %}{% endblock %}
 
   {% block footer %}
-  <footer class="footer">
-    <div class="container footer-default-grid">
-      <a href="/" class="footer-default-brand" aria-label="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Trang chủ">
-        {{- ras.raster_static_picture(
-          'images/ptt-logo.png',
-          'PTT Advertising Solutions Logo',
-          120,
-          120,
-          'footer-default-logo',
-          loading='lazy') -}}
-      </a>
-      <p class="footer-default-copy">© {{ settings.brand_name if settings else "PTT Advertising Solutions" }} 2026</p>
-      <nav class="footer-default-links" aria-label="Pháp lý">
-        <a href="{{ url_for('privacy_policy') }}">Chính sách bảo mật</a>
-      </nav>
-    </div>
-  </footer>
+  {% include 'partials/site_footer.html' %}
   {% endblock %}
   {% block floating_contact %}{% endblock %}
+  {% block page_scripts %}{% endblock %}
+  {% set _js_land = static_js_file('landing.js') %}
+  <script defer src="{{ url_for('static', filename=_js_land) }}?v={{ static_v(_js_land) }}"></script>
 </body>
 </html>

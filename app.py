@@ -13,7 +13,7 @@ import threading
 import uuid
 from calendar import monthrange
 from copy import deepcopy
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from email.message import EmailMessage
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -308,6 +308,7 @@ from admin_page_permissions import (
     default_grants_for_position,
     ensure_position_grants_customized_column,
     migrate_kd01_leads_only_permissions,
+    migrate_hdsd_position_permissions,
     mark_position_grants_customized,
     parse_position_grants_payload,
     position_can,
@@ -329,6 +330,15 @@ from crm_service_lifecycle import (
     VALID_STAGES as SVC_LIFECYCLE_STAGES,
     VALID_SLUGS as SVC_LIFECYCLE_SLUGS,
 )
+from crm_svc_tasks import ensure_schema as _ensure_svc_tasks_schema
+from crm_lead_intake import ensure_schema as _ensure_lead_intake_schema
+from crm_svc_risk import ensure_schema as _ensure_svc_risk_schema
+from crm_svc_finance import ensure_schema as _ensure_svc_finance_schema
+from crm_svc_finance import migrate_contract_billing_type as _migrate_contract_billing
+from crm_svc_kpi import ensure_schema as _ensure_svc_kpi_schema
+from crm_customer_brief import ensure_schema as _ensure_customer_brief_schema
+from crm_aeo import ensure_schema as _ensure_aeo_schema
+from crm_proposal import ensure_schema as _ensure_proposal_schema
 from cms_permissions import (
     CMS_ACTIONS,
     CMS_ACTION_LABELS_VI,
@@ -470,8 +480,10 @@ BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "ptt.db"
 UPLOAD_DIR = BASE_DIR / "static" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-ALLOWED_UPLOAD_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif", "svg"}
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+ALLOWED_UPLOAD_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif", "svg", "mp4", "webm", "mov"}
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB — ảnh CMS
+MAX_VIDEO_UPLOAD_BYTES = 80 * 1024 * 1024  # 80 MB — video hero / media
+MAX_CV_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB — CV tuyển dụng
 EXCEL_PATH = BASE_DIR.parent / "data.xlsx"
 CONSULT_SHEET_NAME = "consultations"
 CONSULT_EMAIL_TO = "kosoo81@gmail.com"
@@ -494,13 +506,35 @@ DEFAULT_SETTINGS_FOOTER: dict[str, str] = {
     ),
     "footer_contact_label": "Liên hệ tư vấn",
     "footer_cta_button_label": "Nhận 1 đề xuất",
-    "footer_tagline_intro": "Cung cấp các giải pháp về Marketing",
-    "footer_tagline_body": "Creative Martech Platform — tích hợp sáng tạo, dữ liệu và công nghệ.",
+    "footer_tagline_intro": "Creative Martech Platform",
+    "footer_tagline_body": (
+        "Tích hợp sáng tạo, dữ liệu và công nghệ — giải pháp marketing tăng trưởng bền vững cho doanh nghiệp Việt Nam."
+    ),
     "footer_facebook_url": "https://www.facebook.com",
     "footer_linkedin_url": "https://www.linkedin.com",
     "footer_phones_lines": "+84 (24) 7307 7979 (HN)\n+84 (28) 7307 7979 (HCM)",
     "footer_legal_years": "2020 – 2026",
     "footer_legal_rights": ". All rights reserved.",
+    "capabilities_intro": (
+        "PTT là nền tảng Creative Martech đa ngành — tích hợp tự động hóa, AI và dữ liệu "
+        "vào toàn bộ quy trình marketing: từ sáng tạo nội dung, cá nhân hóa trải nghiệm khách hàng "
+        "đến tối ưu hóa hiệu suất chiến dịch theo thời gian thực."
+    ),
+    "capabilities_items_lines": (
+        "Marketing Automation\n"
+        "AI Content & Personalization\n"
+        "Data Analytics & Business Intelligence\n"
+        "CRM & Lead Intelligence\n"
+        "Paid Media đa kênh & Tối ưu ROI\n"
+        "AI Agent & Customer Experience"
+    ),
+    "capabilities_items_json": "",
+    "partner_logos_json": "",
+    "cfab_eyebrow": "Miễn phí · Phản hồi trong 2 giờ",
+    "cfab_title": "Nhận tư vấn giải pháp",
+    "service_aside_eyebrow": "Tư vấn nhanh",
+    "service_aside_title": "Nhận lộ trình theo mục tiêu & ngân sách",
+    "service_aside_btn_label": "Đăng ký nhận đề xuất",
 }
 
 DEFAULT_HERO_SLIDES: list[dict[str, str]] = [
@@ -661,8 +695,21 @@ def _settings_for_public_pages() -> dict[str, str]:
 load_dotenv(BASE_DIR / ".env")
 load_dotenv(BASE_DIR.parent / ".env")
 
+from ptt_observability import bind_correlation_id, init_observability
+
 app = Flask(__name__)
-app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 MB — CV đính kèm
+init_observability(component="flask", app=app)
+app.config["MAX_CONTENT_LENGTH"] = MAX_VIDEO_UPLOAD_BYTES
+
+
+@app.before_request
+def _ptt_bind_correlation_id() -> None:
+    cid = (
+        request.headers.get("X-Correlation-Id")
+        or request.headers.get("X-Request-Id")
+        or str(uuid.uuid4())
+    )
+    bind_correlation_id(cid)
 
 
 def _flask_secret_key() -> str:
@@ -846,6 +893,30 @@ def inject_admin_ui_context() -> dict[str, str]:
     return {"admin_ui_user": user, "admin_ui_role": role}
 
 
+@app.context_processor
+def inject_service_categories() -> dict:
+    try:
+        return {"service_categories": fetch_service_categories()}
+    except Exception:
+        return {"service_categories": []}
+
+
+@app.context_processor
+def inject_public_site_settings() -> dict:
+    """Settings + tel href cho footer / header trên trang công khai."""
+    path = (request.path or "").split("?")[0]
+    if path.startswith(("/crm", "/admin", "/cms", "/api")):
+        return {}
+    try:
+        settings = _settings_for_public_pages()
+        return {
+            "settings": settings,
+            "contact_tel_href": _tel_href_from_display(settings.get("contact_phone", "")),
+        }
+    except Exception:
+        return {}
+
+
 def _admin_full_access() -> bool:
     """super_admin / cms_admin — bỏ qua giới hạn menu CMS và section CRM."""
     if not _admin_logged_in():
@@ -958,6 +1029,15 @@ def _cms_current_position_grants(conn: sqlite3.Connection | None = None) -> dict
         return _cms_load_position_grants(c, pid)
 
 
+def _patch_position_grants_hdsd(grants: dict[str, list[str]]) -> dict[str, list[str]]:
+    """HDSD — ai đăng nhập admin đều thấy menu & đọc tài liệu (export vẫn theo ma trận)."""
+    out = {k: list(v) for k, v in grants.items()}
+    acts = set(out.get("crm_hdsd") or [])
+    acts.add("view")
+    out["crm_hdsd"] = sorted(acts)
+    return out
+
+
 def _admin_section_can(section_id: str, action: str, conn: sqlite3.Connection | None = None) -> bool:
     """Quyền section Admin/CRM: admin → full; super_admin → full; chức vụ (staff portal)."""
     if _admin_full_access():
@@ -966,6 +1046,8 @@ def _admin_section_can(section_id: str, action: str, conn: sqlite3.Connection | 
         return True
     sid = str(section_id or "").strip()
     act = str(action or "").strip().lower()
+    if sid == "crm_hdsd" and act == "view" and _admin_logged_in():
+        return True
     if sid in CMS_MODULE_IDS:
         if not _cms_can(sid, act, conn):
             return False
@@ -1063,7 +1145,7 @@ def _admin_grants_bootstrap_json(conn: sqlite3.Connection | None = None) -> str:
         return json.dumps(payload, ensure_ascii=False)
     if _admin_logged_in():
         cms_g = _cms_load_role_grants(conn, role)
-        pos_g = _cms_current_position_grants(conn)
+        pos_g = _patch_position_grants_hdsd(_cms_current_position_grants(conn))
         payload = {
             "cms_grants": cms_g,
             "position_grants": pos_g,
@@ -1076,7 +1158,7 @@ def _admin_grants_bootstrap_json(conn: sqlite3.Connection | None = None) -> str:
         }
         return json.dumps(payload, ensure_ascii=False)
     cms_g = _cms_load_role_grants(conn, role)
-    pos_g = _cms_current_position_grants(conn)
+    pos_g = _patch_position_grants_hdsd(_cms_current_position_grants(conn))
     payload = {
         "cms_grants": cms_g,
         "position_grants": pos_g,
@@ -1184,9 +1266,17 @@ def admin_auth_guard():
         return None
     if path.startswith("/api/crm/integration/webhooks/"):
         return None
+    if path.startswith("/api/v1/webhooks/") or path == "/api/v1/channels":
+        return None
+    if path == "/api/crm/agency/sla-sync-cron":
+        return None
     if path == "/api/crm/integration/marketing/ingest":
         return None
     if path == "/api/crm/integration/facebook/sync-cron":
+        return None
+    if path == "/api/crm/finance/kpi-alert-cron":
+        return None
+    if path == "/api/crm/owner-weekly/alert-cron":
         return None
     if path.startswith("/iclock/"):
         return None
@@ -1201,6 +1291,11 @@ def admin_auth_guard():
     elif path == "/crm" or path.startswith("/crm/"):
         need_wall = True
     elif path.startswith("/api/crm"):
+        need_wall = True
+        respond_json = True
+    elif path.startswith("/api/v1/clients") or path.startswith("/api/v1/jobs") or path.startswith(
+        "/api/v1/notifications"
+    ) or path.startswith("/api/v1/kpi-definitions") or path == "/health/worker":
         need_wall = True
         respond_json = True
     elif path.startswith("/api/projects") or path.startswith("/api/news"):
@@ -1303,22 +1398,10 @@ def _no_store_internal_pages(resp: Any) -> Any:
     return resp
 
 
-def _env_flag_enabled(var: str, *, default_when_unset: bool) -> bool:
-    raw = (os.getenv(var) or "").strip().lower()
-    if raw in {"1", "true", "yes", "on"}:
-        return True
-    if raw in {"0", "false", "no", "off"}:
-        return False
-    return default_when_unset
-
-
-def _prefer_min_static_name(original: str, min_name: str) -> str:
-    """Khi không phải chế độ dev — dùng bản *.min.* nếu đã có (sau build_ptt_assets.py)."""
-    use_min = _env_flag_enabled("PTT_USE_MIN_STATIC", default_when_unset=not app.debug)
-    if not use_min:
-        return original
-    p = BASE_DIR / "static" / min_name.replace("\\", "/").lstrip("/")
-    return min_name if p.is_file() else original
+@app.template_global()
+def static_css_file() -> str:
+    """Luôn phục vụ styles.css — deploy sửa CSS rồi restart, không cần build styles.min.css."""
+    return "styles.css"
 
 
 @app.template_global()
@@ -1345,17 +1428,12 @@ def webp_static_file(path_under_static: str) -> str | None:
 
 
 @app.template_global()
-def static_css_file() -> str:
-    return _prefer_min_static_name("styles.css", "styles.min.css")
-
-
-@app.template_global()
 def static_js_file(name: str) -> str:
-    """Chọn *.min.js tương ứng nếu đã có (chỉ hỗ trợ một tệp .js trong thư mục static gốc)."""
+    """Luôn phục vụ file .js nguồn — deploy sửa static/*.js rồi restart, không cần build *.min.js."""
     norm = name.replace("\\", "/").lstrip("/")
-    if not norm.endswith(".js") or "/" in norm or norm.endswith(".min.js"):
+    if not norm.endswith(".js") or "/" in norm:
         return norm
-    return _prefer_min_static_name(norm, f"{Path(norm).stem}.min.js")
+    return norm
 
 
 ALLOWED_CV_EXTENSIONS = frozenset({".pdf", ".doc", ".docx"})
@@ -1534,6 +1612,9 @@ _OPTIONAL_SVC_LANDING: frozenset[str] = frozenset(
         "cta_wide_lead",
         "meta_description",
         "image_url",
+        "hero_eyebrow",
+        "hero_cta_primary_label",
+        "hero_cta_phone_label",
         "price_label",
         "price_note",
     }
@@ -1627,6 +1708,9 @@ def _finalize_landing(merged: dict[str, Any], summary: str) -> dict[str, Any]:
         "cta_wide_lead",
         "meta_description",
         "image_url",
+        "hero_eyebrow",
+        "hero_cta_primary_label",
+        "hero_cta_phone_label",
         "price_label",
         "price_note",
     ):
@@ -1655,6 +1739,156 @@ PARTNER_LOGOS: list[dict[str, str]] = [
     {"name": "Sunshine Group", "site": "https://sunshinegroup.vn", "logo_file": "partner-logos/admicro-dnhh/sunshine.png"},
     {"name": "SYS", "site": "https://sysvietnam.vn", "logo_file": "partner-logos/admicro-dnhh/sys.png"},
 ]
+
+DEFAULT_CAPABILITIES_ITEMS: list[str] = [
+    "Marketing Automation",
+    "AI Content & Personalization",
+    "Data Analytics & Business Intelligence",
+    "CRM & Lead Intelligence",
+    "Paid Media đa kênh & Tối ưu ROI",
+    "AI Agent & Customer Experience",
+]
+
+
+def _default_capabilities_items() -> list[dict[str, str]]:
+    return [
+        {"title": title, "icon": str(i % 6), "icon_url": ""}
+        for i, title in enumerate(DEFAULT_CAPABILITIES_ITEMS)
+    ]
+
+
+def _normalize_capability_icon(icon_raw: str, index: int) -> str:
+    icon = str(icon_raw or "").strip()
+    if icon.isdigit() and 0 <= int(icon) <= 5:
+        return icon
+    return str(index % 6)
+
+
+def _capabilities_items_for_landing(settings: dict[str, str]) -> list[dict[str, str]]:
+    raw_json = (settings.get("capabilities_items_json") or "").strip()
+    if raw_json:
+        try:
+            data = json.loads(raw_json)
+            if isinstance(data, list) and data:
+                out: list[dict[str, str]] = []
+                for i, entry in enumerate(data):
+                    if isinstance(entry, dict):
+                        title = str(entry.get("title") or entry.get("text") or "").strip()
+                        icon_url = str(entry.get("icon_url") or "").strip()
+                        if icon_url and not (
+                            icon_url.startswith("http") or icon_url.startswith("/")
+                        ):
+                            icon_url = ""
+                        icon = _normalize_capability_icon(
+                            str(entry.get("icon") or entry.get("icon_preset") or ""),
+                            i,
+                        )
+                    elif isinstance(entry, str):
+                        title = entry.strip()
+                        icon = str(i % 6)
+                        icon_url = ""
+                    else:
+                        continue
+                    if title:
+                        out.append({"title": title, "icon": icon, "icon_url": icon_url})
+                if out:
+                    return out
+        except (json.JSONDecodeError, TypeError):
+            pass
+    lines_raw = (settings.get("capabilities_items_lines") or "").strip()
+    if lines_raw:
+        items = [ln.strip() for ln in lines_raw.splitlines() if ln.strip()]
+        if items:
+            return [
+                {"title": title, "icon": str(i % 6), "icon_url": ""}
+                for i, title in enumerate(items)
+            ]
+    return _default_capabilities_items()
+
+
+def _partner_logos_for_landing(settings: dict[str, str]) -> list[dict[str, str]]:
+    raw = (settings.get("partner_logos_json") or "").strip()
+    if raw:
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list) and data:
+                out: list[dict[str, str]] = []
+                for item in data:
+                    if not isinstance(item, dict):
+                        continue
+                    name = str(item.get("name") or "").strip()
+                    site = str(item.get("site") or "#").strip() or "#"
+                    logo_url = str(item.get("logo_url") or "").strip()
+                    logo_file = str(item.get("logo_file") or "").strip()
+                    if not name or (not logo_url and not logo_file):
+                        continue
+                    out.append(
+                        {
+                            "name": name,
+                            "site": site,
+                            "logo_url": logo_url,
+                            "logo_file": logo_file,
+                        }
+                    )
+                if out:
+                    return out
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return PARTNER_LOGOS
+
+
+def _partner_logos_to_editor_rows(logos: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Chuyển logo đang hiển thị (PARTNER_LOGOS hoặc JSON đã lưu) → hàng editor CMS."""
+    rows: list[dict[str, str]] = []
+    for item in logos:
+        name = str(item.get("name") or "").strip()
+        site = str(item.get("site") or "#").strip() or "#"
+        logo_url = str(item.get("logo_url") or "").strip()
+        if not logo_url:
+            logo_file = str(item.get("logo_file") or "").strip().lstrip("/")
+            if logo_file:
+                logo_url = f"/static/{logo_file}"
+        if name and logo_url:
+            rows.append({"name": name, "site": site, "logo_url": logo_url})
+    return rows
+
+
+def _partner_logos_seed_for_cms(settings: dict[str, str]) -> list[dict[str, str]]:
+    """Logo đối tác đang hiển thị trên web — dùng làm dữ liệu khởi tạo editor CMS."""
+    merged = {**DEFAULT_SETTINGS_NAV_MEGA_BANNER, **DEFAULT_SETTINGS_FOOTER, **settings}
+    return _partner_logos_to_editor_rows(_partner_logos_for_landing(merged))
+
+
+def _merged_landing_settings() -> dict[str, str]:
+    return {**DEFAULT_SETTINGS_NAV_MEGA_BANNER, **DEFAULT_SETTINGS_FOOTER, **fetch_settings()}
+
+
+def _partner_logos_effective_json(settings: dict[str, str] | None = None) -> str:
+    """JSON logo đối tác đang hiển thị trên landing — dùng khởi tạo editor CMS."""
+    merged = settings if settings is not None else _merged_landing_settings()
+    rows = _partner_logos_to_editor_rows(_partner_logos_for_landing(merged))
+    return json.dumps(rows, ensure_ascii=False)
+
+
+def _capabilities_items_seed_for_cms(settings: dict[str, str]) -> list[dict[str, str]]:
+    """Mục capabilities đang hiển thị trên web — dùng khởi tạo editor CMS."""
+    merged = {**DEFAULT_SETTINGS_NAV_MEGA_BANNER, **DEFAULT_SETTINGS_FOOTER, **settings}
+    return _capabilities_items_for_landing(merged)
+
+
+def _capabilities_items_effective_json(settings: dict[str, str] | None = None) -> str:
+    """JSON capabilities đang hiển thị trên landing — dùng khởi tạo editor CMS."""
+    merged = settings if settings is not None else _merged_landing_settings()
+    items = _capabilities_items_for_landing(merged)
+    return json.dumps(items, ensure_ascii=False)
+
+
+# Chỉ đọc từ GET /api/settings — không ghi vào DB khi PUT.
+READONLY_SETTINGS_KEYS = frozenset({
+    "partner_logos_effective_json",
+    "capabilities_items_effective_json",
+})
+
 
 RECRUITMENT_EMAIL = "tuyendung@pttadvertising.vn"
 
@@ -1774,11 +2008,41 @@ def _build_recruitment_positions() -> list[dict[str, Any]]:
 RECRUITMENT_POSITIONS: list[dict[str, Any]] = _build_recruitment_positions()
 
 
+def _job_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    d = dict(row)
+    for k in ("responsibilities", "requirements", "benefits"):
+        try:
+            d[k] = json.loads(d.get(k) or "[]")
+        except (json.JSONDecodeError, TypeError):
+            d[k] = []
+    subj = f"[Ứng tuyển] {d['title']}"
+    body = (
+        "Kính gửi bộ phận nhân sự,\n\n"
+        f"Tôi muốn nộp hồ sơ ứng tuyển vị trí: {d['title']}.\n"
+        f"Địa điểm làm việc: {d['location']} · {d['employment_type']}.\n\n"
+        "Vui lòng xem CV / portfolio đính kèm email này.\n\n"
+        "Trân trọng,"
+    )
+    d["apply_href"] = f"mailto:{RECRUITMENT_EMAIL}?subject={quote(subj)}&body={quote(body)}"
+    return d
+
+
+def get_recruitment_jobs(active_only: bool = True) -> list[dict[str, Any]]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM recruitment_jobs"
+            + (" WHERE is_active=1" if active_only else "")
+            + " ORDER BY sort_order, id",
+        ).fetchall()
+    return [_job_row_to_dict(r) for r in rows]
+
+
 def get_recruitment_job(slug: str) -> dict[str, Any] | None:
-    for p in RECRUITMENT_POSITIONS:
-        if p.get("slug") == slug:
-            return p
-    return None
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM recruitment_jobs WHERE slug=? AND is_active=1", (slug,)
+        ).fetchone()
+    return _job_row_to_dict(row) if row else None
 
 
 def get_connection() -> sqlite3.Connection:
@@ -1797,6 +2061,7 @@ def init_db() -> None:
                 title TEXT NOT NULL,
                 category TEXT NOT NULL,
                 image_url TEXT NOT NULL,
+                intro TEXT NOT NULL DEFAULT '',
                 description TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
@@ -1815,6 +2080,9 @@ def init_db() -> None:
             );
             """
         )
+
+        _migrate_projects_schema(conn)
+        _migrate_news_schema(conn)
 
         seed_projects = [
             (
@@ -1861,13 +2129,14 @@ def init_db() -> None:
             if title not in existing_project_titles:
                 conn.execute(
                     """
-                    INSERT INTO projects (title, category, image_url, description, created_at)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO projects (title, category, image_url, intro, description, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
                         title,
                         category,
                         image_url,
+                        description,
                         description,
                         datetime.now().strftime("%Y-%m-%d"),
                     ),
@@ -2016,7 +2285,6 @@ def init_db() -> None:
 
         _migrate_crm_staff_schema(conn)
         _ensure_crm_customers_extended_columns(conn)
-        _migrate_news_schema(conn)
         _migrate_live_chat_schema(conn)
 
 
@@ -2024,6 +2292,15 @@ def _migrate_news_schema(conn: sqlite3.Connection) -> None:
     cols = {r[1] for r in conn.execute("PRAGMA table_info(news)")}
     if "image_url" not in cols:
         conn.execute("ALTER TABLE news ADD COLUMN image_url TEXT NOT NULL DEFAULT ''")
+
+
+def _migrate_projects_schema(conn: sqlite3.Connection) -> None:
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(projects)")}
+    if "intro" not in cols:
+        conn.execute("ALTER TABLE projects ADD COLUMN intro TEXT NOT NULL DEFAULT ''")
+        conn.execute(
+            "UPDATE projects SET intro = description WHERE TRIM(intro) = '' AND TRIM(description) != ''"
+        )
 
 
 def _migrate_live_chat_schema(conn: sqlite3.Connection) -> None:
@@ -2263,12 +2540,76 @@ def _ensure_enterprise_crm_schema(conn: sqlite3.Connection) -> None:
     ensure_care_schema(conn)
     ensure_daily_work_report_schema(conn)
     ensure_lead_schema(conn)
+    from crm_lead_catalog import ensure_lead_catalog_schema
+
+    ensure_lead_catalog_schema(conn)
     ensure_staff_login_schema(conn)
+    from crm_lead_assign_scope import bootstrap_staff_assign_scopes_if_empty
+
+    bootstrap_staff_assign_scopes_if_empty(conn)
     migrate_unified_passwords(conn, updated_at=_crm_ts())
     from crm_cross_module import ensure_cross_module_schema
 
     ensure_cross_module_schema(conn)
     _ensure_service_lifecycle_schema(conn)
+    _ensure_svc_tasks_schema(conn)
+    _ensure_lead_intake_schema(conn)
+    _ensure_svc_risk_schema(conn)
+    _ensure_svc_finance_schema(conn)
+    _migrate_contract_billing(conn)
+    _ensure_svc_kpi_schema(conn)
+    _ensure_customer_brief_schema(conn)
+    _ensure_aeo_schema(conn)
+    _ensure_proposal_schema(conn)
+    from crm_lead_presales import ensure_schema as _ensure_lead_presales_schema
+
+    _ensure_lead_presales_schema(conn)
+    from crm_lead_presales_marketing_plan import ensure_r5_schema
+
+    ensure_r5_schema(conn)
+    from crm_lead_industry_addon import ensure_r6_schema
+
+    ensure_r6_schema(conn)
+    from crm_lead_product_model_p3 import ensure_p3_schema
+
+    ensure_p3_schema(conn)
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS recruitment_jobs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            slug TEXT UNIQUE NOT NULL,
+            title TEXT NOT NULL,
+            location TEXT NOT NULL DEFAULT '',
+            employment_type TEXT NOT NULL DEFAULT 'Toàn thời gian',
+            description TEXT NOT NULL DEFAULT '',
+            intro TEXT NOT NULL DEFAULT '',
+            responsibilities TEXT NOT NULL DEFAULT '[]',
+            requirements TEXT NOT NULL DEFAULT '[]',
+            benefits TEXT NOT NULL DEFAULT '[]',
+            is_active INTEGER NOT NULL DEFAULT 1,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+        )
+        """
+    )
+    # Seed hardcoded positions if table empty
+    if conn.execute("SELECT COUNT(*) FROM recruitment_jobs").fetchone()[0] == 0:
+        for i, r in enumerate(_RAW_RECRUITMENT_POSITIONS):
+            conn.execute(
+                """INSERT OR IGNORE INTO recruitment_jobs
+                   (slug, title, location, employment_type, description, intro,
+                    responsibilities, requirements, benefits, sort_order)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    r["slug"], r["title"], r.get("location", ""),
+                    r.get("employment_type", "Toàn thời gian"),
+                    r.get("description", ""), r.get("intro", ""),
+                    json.dumps(r.get("responsibilities", []), ensure_ascii=False),
+                    json.dumps(r.get("requirements", []), ensure_ascii=False),
+                    json.dumps(r.get("benefits", []), ensure_ascii=False),
+                    i,
+                ),
+            )
 
 
 def _ensure_cms_permissions_schema(conn: sqlite3.Connection) -> None:
@@ -2411,6 +2752,7 @@ def _ensure_cms_permissions_schema(conn: sqlite3.Connection) -> None:
                     )
     seed_marketing_positions(conn)
     migrate_kd01_leads_only_permissions(conn)
+    migrate_hdsd_position_permissions(conn)
 
 
 def _ensure_system_admin_access(conn: sqlite3.Connection) -> None:
@@ -2647,6 +2989,7 @@ def _ensure_crm_hub_schema(conn: sqlite3.Connection) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_crm_campaigns_active ON crm_campaigns(active, name)"
     )
+    _ensure_crm_campaigns_hub_columns(conn)
 
     conn.execute(
         """
@@ -2707,6 +3050,42 @@ def _ensure_crm_hub_schema(conn: sqlite3.Connection) -> None:
             )
         except sqlite3.Error:
             pass
+
+
+def _ensure_crm_campaigns_hub_columns(conn: sqlite3.Connection) -> None:
+    """Phase 2 — agency client + Meta map sync metadata on Hub campaigns."""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(crm_campaigns)").fetchall()}
+    migrations = [
+        ("agency_client_id", "ALTER TABLE crm_campaigns ADD COLUMN agency_client_id TEXT NOT NULL DEFAULT ''"),
+        ("target_cpl_vnd", "ALTER TABLE crm_campaigns ADD COLUMN target_cpl_vnd INTEGER NOT NULL DEFAULT 0"),
+        ("hub_map_synced_at", "ALTER TABLE crm_campaigns ADD COLUMN hub_map_synced_at TEXT NOT NULL DEFAULT ''"),
+        ("hub_map_last_error", "ALTER TABLE crm_campaigns ADD COLUMN hub_map_last_error TEXT NOT NULL DEFAULT ''"),
+    ]
+    for name, sql in migrations:
+        if name not in cols:
+            conn.execute(sql)
+
+
+def _crm_apply_campaign_hub_fields(merged: dict[str, Any], payload: dict[str, Any]) -> None:
+    if "agency_client_id" in payload:
+        merged["agency_client_id"] = str(payload.get("agency_client_id") or "").strip()[:64]
+    if "target_cpl_vnd" in payload:
+        try:
+            merged["target_cpl_vnd"] = max(0, int(payload.get("target_cpl_vnd") or 0))
+        except (TypeError, ValueError):
+            merged["target_cpl_vnd"] = 0
+
+
+def _crm_sync_hub_campaign_to_pg(campaign_id: int, conn: sqlite3.Connection) -> None:
+    try:
+        from ptt_agency.hub_campaign_sync import sync_campaign_row
+
+        row = conn.execute("SELECT * FROM crm_campaigns WHERE id = ?", (campaign_id,)).fetchone()
+        if row:
+            sync_campaign_row(dict(row), sqlite_conn=conn)
+            conn.commit()
+    except Exception as exc:
+        logger.debug("hub_campaign_map sync skipped campaign_id=%s: %s", campaign_id, exc)
 
 
 def _ensure_crm_sop_schema(conn: sqlite3.Connection) -> None:
@@ -3083,6 +3462,7 @@ CRM_PRIORITY_LABELS_VI: dict[str, str] = {
     "cao": "Cao",
 }
 CRM_CAMPAIGN_CHANNELS: tuple[str, ...] = (
+    "meta",
     "email",
     "social",
     "ads",
@@ -3092,6 +3472,7 @@ CRM_CAMPAIGN_CHANNELS: tuple[str, ...] = (
     "other",
 )
 CRM_CAMPAIGN_CHANNEL_LABELS_VI: dict[str, str] = {
+    "meta": "Meta Ads",
     "email": "Email",
     "social": "Mạng xã hội",
     "ads": "Quảng cáo trả phí",
@@ -3124,19 +3505,36 @@ CRM_CONTRACT_STATUS_LABELS_VI: dict[str, str] = {
     "lost": "Mất cơ hội",
     "cancelled": "Huỷ",
 }
-CRM_REMINDER_SCOPES: tuple[str, ...] = ("case", "contract", "customer", "general")
-CRM_REMINDER_KINDS: tuple[str, ...] = ("manual", "contract_renewal", "status_followup")
+CRM_REMINDER_SCOPES: tuple[str, ...] = (
+    "case",
+    "contract",
+    "customer",
+    "finance_kpi",
+    "owner_weekly",
+    "general",
+)
+CRM_REMINDER_KINDS: tuple[str, ...] = (
+    "manual",
+    "contract_renewal",
+    "status_followup",
+    "kpi_alert",
+    "owner_weekly_alert",
+)
 CRM_REMINDER_STATUSES: tuple[str, ...] = ("pending", "done", "dismissed")
 CRM_REMINDER_SCOPE_LABELS_VI: dict[str, str] = {
     "case": "Yêu cầu CRM",
     "contract": "Hợp đồng",
     "customer": "Khách hàng",
+    "finance_kpi": "KPI tài chính",
+    "owner_weekly": "Dashboard tuần (Chủ DN)",
     "general": "Chung",
 }
 CRM_REMINDER_KIND_LABELS_VI: dict[str, str] = {
     "manual": "Thủ công",
     "contract_renewal": "Gia hạn hợp đồng",
     "status_followup": "Theo dõi trạng thái",
+    "kpi_alert": "Cảnh báo KPI",
+    "owner_weekly_alert": "Cảnh báo tuần (RAG)",
 }
 CRM_REMINDER_STATUS_LABELS_VI: dict[str, str] = {
     "pending": "Chờ xử lý",
@@ -3936,6 +4334,42 @@ def _crm_facebook_sync_cron_allowed() -> bool:
     return False
 
 
+def _crm_finance_kpi_cron_secret_ok() -> bool:
+    auth = request.headers.get("Authorization") or ""
+    if auth.lower().startswith("bearer "):
+        got = auth[7:].strip()
+        for env_key in (
+            "CRM_FINANCE_KPI_CRON_SECRET",
+            "CRM_FACEBOOK_SYNC_SECRET",
+            "CRM_MARKETING_INGEST_SECRET",
+        ):
+            exp = (os.getenv(env_key) or "").strip()
+            if exp and secrets.compare_digest(got.encode(), exp.encode()):
+                return True
+    return False
+
+
+def _crm_finance_kpi_cron_allowed() -> bool:
+    if _crm_finance_kpi_cron_secret_ok():
+        return True
+    if os.getenv("CRM_FINANCE_KPI_CRON_ALLOW_LOCAL", "1").strip().lower() in (
+        "0",
+        "false",
+        "no",
+        "off",
+    ):
+        return False
+    remote = (request.remote_addr or "").strip().lower()
+    if remote in ("127.0.0.1", "::1", "localhost"):
+        return True
+    if remote.startswith("::ffff:127.0.0.1"):
+        return True
+    host = (request.host or "").split(":")[0].strip().lower()
+    if host in ("127.0.0.1", "localhost"):
+        return True
+    return False
+
+
 def _facebook_sync_json_response(result: dict[str, Any]) -> Any:
     """JSON cho sync Facebook — luôn có error/message rõ ràng cho UI."""
     payload = dict(result)
@@ -4382,6 +4816,9 @@ def _career_request_wants_json() -> bool:
 
 @app.errorhandler(RequestEntityTooLarge)
 def handle_request_entity_too_large(_e: RequestEntityTooLarge):
+    if request.path.startswith("/api/"):
+        max_mb = MAX_VIDEO_UPLOAD_BYTES // (1024 * 1024)
+        return jsonify({"error": f"File quá lớn (tối đa {max_mb} MB)"}), 413
     msg = "Tệp CV quá lớn (tối đa 5MB). Vui lòng chọn bản nhẹ hơn."
     if _career_request_wants_json():
         return jsonify({"ok": False, "error": msg}), 413
@@ -4411,6 +4848,9 @@ def landing() -> str:
             hero_slides = DEFAULT_HERO_SLIDES
     except (json.JSONDecodeError, TypeError):
         hero_slides = DEFAULT_HERO_SLIDES
+    from cms_media_images import normalize_hero_slides
+
+    hero_slides = normalize_hero_slides(hero_slides, UPLOAD_DIR)
     return render_template(
         "landing.html",
         settings=settings,
@@ -4419,8 +4859,9 @@ def landing() -> str:
         news=news,
         hero_slides=hero_slides,
         service_categories=service_categories,
-        partner_logos=PARTNER_LOGOS,
-        recruitment_positions=RECRUITMENT_POSITIONS,
+        partner_logos=_partner_logos_for_landing(settings),
+        capabilities_items=_capabilities_items_for_landing(settings),
+        recruitment_positions=get_recruitment_jobs(active_only=True),
     )
 
 
@@ -4508,7 +4949,7 @@ def career_list() -> str:
         "career_list.html",
         settings=settings,
         contact_tel_href=_tel_href_from_display(settings.get("contact_phone", "")),
-        jobs=RECRUITMENT_POSITIONS,
+        jobs=get_recruitment_jobs(active_only=True),
     )
 
 
@@ -4583,6 +5024,8 @@ def career_apply(slug: str):
     cv_data = file.read()
     if not cv_data:
         return respond_error("File CV rỗng hoặc không đọc được.")
+    if len(cv_data) > MAX_CV_UPLOAD_BYTES:
+        return respond_error("File CV quá lớn (tối đa 5 MB). Vui lòng chọn bản nhẹ hơn.")
 
     try:
         send_job_application_email(
@@ -4783,7 +5226,10 @@ def _admin_page_template_kwargs() -> dict[str, Any]:
 
 _LEADS_ONLY_ADMIN_PATHS = (
     "/crm/leads",
+    "/crm/hdsd",
+    "/crm/test-cases",
     "/api/crm/leads",
+    "/api/crm/hdsd",
     "/admin/logout",
     "/account/password",
     "/api/account/change-password",
@@ -4898,6 +5344,248 @@ def crm_customers_page() -> str:
     )
 
 
+@app.get("/crm/customer/<int:customer_id>/meeting-brief")
+def crm_customer_meeting_brief_page(customer_id: int) -> str:
+    redir = _ensure_crm_session_html()
+    if redir is not None:
+        return redir
+    with get_connection() as conn:
+        from crm_customer_brief import get_customer_snapshot as _snap, get_latest_brief as _latest
+        customer = conn.execute(
+            "SELECT id, name, company FROM crm_customers WHERE id = ?",
+            (customer_id,),
+        ).fetchone()
+        if customer is None:
+            return "Không tìm thấy khách hàng", 404
+        latest = _latest(conn, customer_id)
+    return render_template(
+        "crm_customer_meeting_brief.html",
+        customer=dict(customer),
+        latest_brief=latest,
+        **_admin_page_template_kwargs(),
+    )
+
+
+@app.post("/api/crm/customers/<int:customer_id>/brief/generate")
+def api_crm_customer_brief_generate(customer_id: int):
+    from flask import request as req
+    with get_connection() as conn:
+        from crm_customer_brief import get_customer_snapshot as _snap, run_brief_ai as _run
+        body = req.get_json(silent=True) or {}
+        meeting_purpose = str(body.get("meeting_purpose", ""))[:500]
+        snapshot = _snap(conn, customer_id)
+        output = _run(conn, customer_id, meeting_purpose, snapshot)
+    from datetime import datetime
+    return jsonify({"ai_output": output, "created_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")})
+
+
+@app.get("/api/crm/customers/<int:customer_id>/brief/latest")
+def api_crm_customer_brief_latest(customer_id: int):
+    with get_connection() as conn:
+        from crm_customer_brief import get_latest_brief as _latest
+        brief = _latest(conn, customer_id)
+    return jsonify(brief or {})
+
+
+@app.get("/crm/aeo")
+def crm_aeo_page() -> Any:
+    redir = _ensure_crm_session_html()
+    if redir is not None:
+        return redir
+    from crm_aeo import list_queries as _aeo_list
+    customer_id = _opt_pos_int(request.args.get("customer_id"))
+    with get_connection() as conn:
+        all_customers = [
+            dict(r) for r in conn.execute(
+                "SELECT id, name, company FROM crm_customers ORDER BY name"
+            ).fetchall()
+        ]
+        queries = []
+        selected_customer = None
+        if customer_id:
+            row = conn.execute(
+                "SELECT id, name, company FROM crm_customers WHERE id = ?",
+                (customer_id,),
+            ).fetchone()
+            selected_customer = dict(row) if row else None
+            if selected_customer:
+                queries = _aeo_list(conn, customer_id)
+    return render_template(
+        "crm_aeo.html",
+        all_customers=all_customers,
+        selected_customer=selected_customer,
+        queries=queries,
+        customer_id=customer_id,
+        **_admin_page_template_kwargs(),
+    )
+
+
+@app.post("/api/crm/aeo/queries")
+def api_crm_aeo_add_query() -> Any:
+    from crm_aeo import add_query as _aeo_add
+    body = request.get_json(silent=True) or {}
+    customer_id = _opt_pos_int(body.get("customer_id"))
+    query_text = str(body.get("query_text", "")).strip()[:500]
+    brand_name = str(body.get("brand_name", "")).strip()[:200]
+    lifecycle_id = _opt_pos_int(body.get("lifecycle_id"))
+    notes = str(body.get("notes", "")).strip()[:1000]
+    if not customer_id or not query_text or not brand_name:
+        return jsonify({"error": "Thiếu customer_id, query_text hoặc brand_name"}), 400
+    with get_connection() as conn:
+        qid = _aeo_add(conn, customer_id, query_text, brand_name, lifecycle_id=lifecycle_id, notes=notes)
+    return jsonify({"id": qid})
+
+
+@app.delete("/api/crm/aeo/queries/<int:query_id>")
+def api_crm_aeo_delete_query(query_id: int) -> Any:
+    from crm_aeo import delete_query as _aeo_del
+    with get_connection() as conn:
+        _aeo_del(conn, query_id)
+    return jsonify({})
+
+
+@app.post("/api/crm/aeo/queries/<int:query_id>/scan")
+def api_crm_aeo_scan(query_id: int) -> Any:
+    from crm_aeo import run_scan as _aeo_scan, get_scan_history as _aeo_history
+    with get_connection() as conn:
+        output = _aeo_scan(conn, query_id)
+        history = _aeo_history(conn, query_id)
+    latest = history[0] if history else {}
+    return jsonify({
+        "ai_response": output,
+        "brand_visible": latest.get("brand_visible", 0),
+        "gap_notes": latest.get("gap_notes", ""),
+        "created_at": latest.get("created_at", ""),
+    })
+
+
+@app.post("/api/crm/aeo/queries/<int:query_id>/content")
+def api_crm_aeo_content(query_id: int) -> Any:
+    from crm_aeo import generate_content as _aeo_gen
+    with get_connection() as conn:
+        result = _aeo_gen(conn, query_id)
+    return jsonify(result)
+
+
+@app.get("/crm/proposals")
+def crm_proposals_page() -> Any:
+    redir = _ensure_crm_session_html()
+    if redir is not None:
+        return redir
+    from crm_proposal import list_proposals as _prop_list, SERVICE_NAMES as _svc_names
+    customer_id = _opt_pos_int(request.args.get("customer_id"))
+    lifecycle_id = _opt_pos_int(request.args.get("lifecycle_id"))
+    prefill_service_slug = str(request.args.get("service_slug") or "").strip()
+    from_consult = bool(request.args.get("from_consult"))
+    with get_connection() as conn:
+        all_customers = [
+            dict(r) for r in conn.execute(
+                "SELECT id, name, company FROM crm_customers ORDER BY name"
+            ).fetchall()
+        ]
+        proposals = []
+        selected_customer = None
+        proposal_prefill_notes = ""
+        if customer_id:
+            row = conn.execute(
+                "SELECT id, name, company FROM crm_customers WHERE id = ?",
+                (customer_id,),
+            ).fetchone()
+            selected_customer = dict(row) if row else None
+            if selected_customer:
+                proposals = _prop_list(conn, customer_id)
+            if lifecycle_id and from_consult:
+                from crm_proposal import get_customer_context as _prop_ctx
+
+                pctx = _prop_ctx(conn, customer_id, lifecycle_id=lifecycle_id)
+                consult = pctx.get("consult") or {}
+                note_parts: list[str] = []
+                if consult.get("notes"):
+                    note_parts.append(str(consult["notes"]))
+                if consult.get("ai_output"):
+                    note_parts.append(
+                        "Consult AI:\n" + str(consult["ai_output"])[:1500]
+                    )
+                if note_parts:
+                    proposal_prefill_notes = "\n\n".join(note_parts)[:2000]
+    return render_template(
+        "crm_proposals.html",
+        all_customers=all_customers,
+        selected_customer=selected_customer,
+        proposals=proposals,
+        customer_id=customer_id,
+        lifecycle_id=lifecycle_id,
+        prefill_service_slug=prefill_service_slug,
+        proposal_prefill_notes=proposal_prefill_notes,
+        from_consult=from_consult,
+        service_names=_svc_names,
+        **_admin_page_template_kwargs(),
+    )
+
+
+@app.get("/crm/proposals/<int:proposal_id>/preview")
+def crm_proposal_preview_page(proposal_id: int) -> Any:
+    redir = _ensure_crm_session_html()
+    if redir is not None:
+        return redir
+    from crm_proposal import get_proposal as _prop_get, get_customer_context as _prop_ctx, SERVICE_NAMES as _svc_names
+    with get_connection() as conn:
+        proposal = _prop_get(conn, proposal_id)
+        if proposal is None:
+            return "Không tìm thấy đề xuất.", 404
+        ctx = _prop_ctx(
+            conn,
+            proposal["customer_id"],
+            lifecycle_id=proposal.get("lifecycle_id"),
+        )
+    return render_template(
+        "crm_proposal_preview.html",
+        proposal=proposal,
+        customer=ctx["customer"],
+        service_names=_svc_names,
+        **_admin_page_template_kwargs(),
+    )
+
+
+@app.post("/api/crm/proposals")
+def api_crm_proposals_create() -> Any:
+    from crm_proposal import create_proposal as _prop_create
+    body = request.get_json(silent=True) or {}
+    customer_id = _opt_pos_int(body.get("customer_id"))
+    service_slugs = [str(s).strip() for s in body.get("service_slugs", []) if str(s).strip()]
+    total_vnd = _opt_pos_int(body.get("total_vnd")) or 0
+    timeline_months = _opt_pos_int(body.get("timeline_months")) or 1
+    notes = str(body.get("notes", "")).strip()[:2000]
+    lifecycle_id = _opt_pos_int(body.get("lifecycle_id"))
+    if not customer_id or not service_slugs:
+        return jsonify({"error": "Thiếu customer_id hoặc service_slugs"}), 400
+    with get_connection() as conn:
+        pid = _prop_create(
+            conn, customer_id, service_slugs, total_vnd, timeline_months, notes,
+            lifecycle_id=lifecycle_id,
+        )
+    return jsonify({"id": pid})
+
+
+@app.post("/api/crm/proposals/<int:proposal_id>/generate")
+def api_crm_proposals_generate(proposal_id: int) -> Any:
+    from crm_proposal import run_proposal_ai as _prop_ai, get_proposal as _prop_get
+    with get_connection() as conn:
+        sections = _prop_ai(conn, proposal_id)
+        if not sections or not any(sections.values()):
+            return jsonify({"error": "Không thể tạo nội dung AI"}), 500
+        proposal = _prop_get(conn, proposal_id)
+    return jsonify({**sections, "updated_at": proposal["updated_at"] if proposal else ""})
+
+
+@app.delete("/api/crm/proposals/<int:proposal_id>")
+def api_crm_proposals_delete(proposal_id: int) -> Any:
+    from crm_proposal import delete_proposal as _prop_del
+    with get_connection() as conn:
+        _prop_del(conn, proposal_id)
+    return jsonify({})
+
+
 @app.get("/crm/staff")
 def crm_staff_page() -> str:
     redir = _ensure_admin_session_html()
@@ -4946,23 +5634,23 @@ def create_project():
     if not _cms_can("projects", "create"):
         return _cms_forbidden_json("projects", "create")
     payload = request.get_json(force=True)
-    required = ["title", "category", "image_url", "description"]
-    missing = [field for field in required if not payload.get(field)]
-    if missing:
-        return jsonify({"error": f"Missing fields: {', '.join(missing)}"}), 400
+    title = str(payload.get("title") or "").strip()
+    if not title:
+        return jsonify({"error": "Missing fields: title"}), 400
 
     created_at = payload.get("created_at") or datetime.now().strftime("%Y-%m-%d")
     with get_connection() as conn:
         cursor = conn.execute(
             """
-            INSERT INTO projects (title, category, image_url, description, created_at)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO projects (title, category, image_url, intro, description, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
             """,
             (
-                payload["title"],
-                payload["category"],
-                payload["image_url"],
-                payload["description"],
+                title,
+                str(payload.get("category") or "").strip(),
+                str(payload.get("image_url") or "").strip(),
+                str(payload.get("intro") or "").strip(),
+                str(payload.get("description") or "").strip(),
                 created_at,
             ),
         )
@@ -4989,13 +5677,14 @@ def update_project(project_id: int):
         conn.execute(
             """
             UPDATE projects
-            SET title = ?, category = ?, image_url = ?, description = ?, created_at = ?
+            SET title = ?, category = ?, image_url = ?, intro = ?, description = ?, created_at = ?
             WHERE id = ?
             """,
             (
                 merged["title"],
                 merged["category"],
                 merged["image_url"],
+                merged.get("intro") or "",
                 merged["description"],
                 merged["created_at"],
                 project_id,
@@ -6159,6 +6848,16 @@ def _crm_lead_owner_filter() -> int | None:
     return _crm_lead_session_staff_id()
 
 
+def _crm_presales_on_lead_enabled() -> bool:
+    from crm_lead_presales import presales_on_lead_enabled
+
+    return presales_on_lead_enabled()
+
+
+def _crm_presales_stage_labels() -> dict[str, str]:
+    return {"lead": "Lead", "consult": "Tư vấn", "proposal": "Báo giá"}
+
+
 def _crm_lead_staff_portal_id(conn: sqlite3.Connection) -> int | None:
     """ID NV có scope lead (portal hoặc KD admin) + kiểm tra dự án tham gia."""
     sid = _crm_lead_session_staff_id(conn)
@@ -6207,6 +6906,7 @@ def _crm_lead_ui_filters_from_request(*, owner_id: int | None) -> dict[str, Any]
         except ValueError:
             owner_id = None
     sla_only = str(request.args.get("sla_overdue") or "").strip() in ("1", "true", "yes")
+    review_only = str(request.args.get("review_queue") or "").strip() in ("1", "true", "yes")
     return {
         "owner_id": owner_id,
         "status": request.args.get("status") or None,
@@ -6216,6 +6916,8 @@ def _crm_lead_ui_filters_from_request(*, owner_id: int | None) -> dict[str, Any]
         "product_line": str(request.args.get("product_line") or "").strip() or None,
         "zone": str(request.args.get("zone") or "").strip() or None,
         "sla_overdue_only": sla_only,
+        "review_queue_only": review_only,
+        "hide_review_queue": not review_only,
     }
 
 
@@ -6234,6 +6936,7 @@ def _crm_ingest_lead_from_form(
     re_project_code: str | None = None,
     ingest_site: str = "",
     ts: str,
+    _from_worker: bool = False,
 ) -> int | None:
     """Tạo lead CRM từ form/API ngoài — bỏ qua nếu trùng policy reject."""
     from crm_project_webhooks import resolve_project_for_lead_ingest
@@ -6246,6 +6949,9 @@ def _crm_ingest_lead_from_form(
             utm_campaign=utm_campaign,
             ingest_site=ingest_site,
         )
+        ingest_meta: dict[str, Any] = {"ingest_channel": "website_form"}
+        if ingest_site:
+            ingest_meta["ingest_site"] = str(ingest_site).strip()[:120]
         row, _dups, _dup_matches = create_lead(
             conn,
             full_name=full_name,
@@ -6257,6 +6963,7 @@ def _crm_ingest_lead_from_form(
             need=need,
             utm_campaign=utm_campaign,
             re_project_id=pid,
+            meta=ingest_meta,
             auto_assign=True,
             duplicate_policy=None,
             created_by="system:ingest",
@@ -6289,7 +6996,101 @@ def _crm_ingest_lead_from_form(
         return lead_id
     except ValueError as exc:
         app.logger.warning("CRM ingest lead from form failed: %s", exc)
+        if not _from_worker:
+            _enqueue_form_ingest_failure(
+                full_name=full_name,
+                phone=phone,
+                email=email,
+                need=need,
+                source=source,
+                error=str(exc),
+            )
         return None
+    except Exception as exc:
+        app.logger.exception("CRM ingest lead from form error: %s", exc)
+        if not _from_worker:
+            _enqueue_form_ingest_failure(
+                full_name=full_name,
+                phone=phone,
+                email=email,
+                need=need,
+                source=source,
+                error=str(exc),
+            )
+        return None
+
+
+def _enqueue_form_ingest_failure(**fields: Any) -> None:
+    """Queue form ingest retry / spillover — không nuốt lỗi im lặng (P0-08)."""
+    from ptt_jobs.form_ingest_failure import enqueue_form_ingest_failure
+
+    enqueue_form_ingest_failure(**fields)
+
+
+def _crm_leads_template_kwargs(
+    conn: sqlite3.Connection,
+    *,
+    staff_portal: bool,
+    leads_only: bool,
+    lead_id: int | None = None,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    tiers = fetch_level_tiers(conn)
+    tier_ids = [str(t["id"]) for t in tiers if t.get("enabled", True)]
+    page_levels = list(dict.fromkeys([*tier_ids, UNCLASSIFIED_TIER_ID, *LEAD_LEVELS]))
+    page_level_labels = {**LEAD_LEVEL_LABELS, **level_labels_map(conn, tiers)}
+    from crm_lead_catalog import catalog_public_payload
+
+    catalog = catalog_public_payload(conn)
+    kw: dict[str, Any] = {
+        "crm_staff_portal": staff_portal,
+        "crm_leads_only_ui": leads_only,
+        "crm_staff_id": _staff_session_id() if staff_portal else (_crm_lead_session_staff_id() if leads_only else None),
+        "crm_lead_id": lead_id,
+        "crm_lead_statuses": list(LEAD_STATUSES),
+        "crm_lead_status_labels": LEAD_STATUS_LABELS,
+        "crm_lead_levels": page_levels,
+        "crm_lead_level_labels": page_level_labels,
+        "crm_lead_sources": list(LEAD_SOURCES),
+        "crm_lead_source_labels": LEAD_SOURCE_LABELS,
+        "crm_lead_activity_types": list(ACTIVITY_TYPES),
+        "crm_lead_activity_labels": ACTIVITY_TYPE_LABELS,
+        "crm_scoring_rule_defaults": DEFAULT_SCORING_RULES,
+        "crm_scoring_rubric_defaults": DEFAULT_LEAD_SCORING_RUBRIC,
+        "crm_level_tier_defaults": DEFAULT_LEVEL_TIERS,
+        "crm_assign_strategy_defaults": STRATEGY_DEFS,
+        "crm_assign_tier_level_map_defaults": DEFAULT_TIER_LEVEL_MAP,
+        "crm_scoring_evaluators": EVALUATOR_OPTIONS,
+        "crm_scoring_conditions": SCORING_CONDITIONS,
+        "crm_scoring_field_options": list(SCORING_FIELD_OPTIONS),
+        "crm_leads_can_configure": (
+            False if staff_portal else _admin_section_can("crm_leads", "configure")
+        ),
+        "crm_leads_can_delete": (
+            False if staff_portal else _admin_section_can("crm_leads", "delete")
+        ),
+        "crm_product_line_labels": PRODUCT_LINE_LABELS,
+        "crm_care_contact_types": list(CRM_CARE_CONTACT_TYPES),
+        "crm_care_contact_labels": CRM_CARE_CONTACT_LABELS_VI,
+        "crm_care_status_types": list(CRM_CARE_STATUS_TYPES),
+        "crm_care_status_labels": CRM_CARE_STATUS_LABELS_VI,
+        "crm_care_pipeline_stages": CARE_PIPELINE_STAGES_PUBLIC,
+        "crm_presales_on_lead": _crm_presales_on_lead_enabled(),
+        "crm_presales_stage_labels": _crm_presales_stage_labels(),
+        "crm_service_slugs": catalog.get("service_slugs") or sorted(SVC_LIFECYCLE_SLUGS),
+        "crm_service_labels": catalog.get("service_labels") or {},
+        "crm_industry_slugs": catalog.get("industry_slugs") or [],
+        "crm_industry_labels": catalog.get("industry_labels") or {},
+        "crm_catalog_services": catalog.get("services") or [],
+        "crm_catalog_industries": catalog.get("industries") or [],
+        "crm_hide_re_lead_fields": True,
+        "crm_leads_can_manage_review_queue": (
+            False if staff_portal else _admin_section_can("crm_leads", "configure")
+        ),
+    }
+    if extra:
+        kw.update(extra)
+    return kw
 
 
 @app.get("/crm/leads")
@@ -6299,76 +7100,58 @@ def crm_leads_page() -> str:
         return redir
     staff_portal = _crm_staff_portal_active()
     with get_connection() as conn:
-        tiers = fetch_level_tiers(conn)
-        tier_ids = [str(t["id"]) for t in tiers if t.get("enabled", True)]
-        page_levels = list(dict.fromkeys([*tier_ids, UNCLASSIFIED_TIER_ID, *LEAD_LEVELS]))
-        page_level_labels = {**LEAD_LEVEL_LABELS, **level_labels_map(conn, tiers)}
-    if staff_portal:
+        if staff_portal:
+            if not _admin_section_can("crm_leads", "view"):
+                return redirect(url_for("crm_board"))
+            return render_template(
+                "crm_leads.html",
+                **_crm_leads_template_kwargs(conn, staff_portal=True, leads_only=False),
+            )
+        if not _admin_section_can("crm_leads", "view"):
+            return redirect(url_for("crm_board"))
+        leads_only = _crm_leads_only_ui()
+        return render_template(
+            "crm_leads.html",
+            **{
+                **_admin_page_template_kwargs(),
+                **_crm_leads_template_kwargs(conn, staff_portal=False, leads_only=leads_only),
+            },
+        )
+
+
+@app.get("/crm/leads/<int:lead_id>")
+def crm_lead_detail_page(lead_id: int) -> str:
+    redir = _ensure_crm_session_html()
+    if redir is not None:
+        return redir
+    staff_portal = _crm_staff_portal_active()
+    with get_connection() as conn:
+        row = fetch_lead_by_id(conn, lead_id)
+        if row is None:
+            abort(404)
+        if not _crm_lead_can_access(conn, row):
+            abort(403)
+        leads_only = _crm_leads_only_ui() and not staff_portal
+        if staff_portal:
+            if not _admin_section_can("crm_leads", "view"):
+                return redirect(url_for("crm_board"))
+            return render_template(
+                "crm_lead_detail.html",
+                **_crm_leads_template_kwargs(
+                    conn, staff_portal=True, leads_only=False, lead_id=lead_id
+                ),
+            )
         if not _admin_section_can("crm_leads", "view"):
             return redirect(url_for("crm_board"))
         return render_template(
-            "crm_leads.html",
-            crm_staff_portal=True,
-            crm_leads_only_ui=False,
-            crm_staff_id=_staff_session_id(),
-            crm_lead_statuses=list(LEAD_STATUSES),
-            crm_lead_status_labels=LEAD_STATUS_LABELS,
-            crm_lead_levels=page_levels,
-            crm_lead_level_labels=page_level_labels,
-            crm_lead_sources=list(LEAD_SOURCES),
-            crm_lead_source_labels=LEAD_SOURCE_LABELS,
-            crm_lead_activity_types=list(ACTIVITY_TYPES),
-            crm_lead_activity_labels=ACTIVITY_TYPE_LABELS,
-            crm_scoring_rule_defaults=DEFAULT_SCORING_RULES,
-            crm_scoring_rubric_defaults=DEFAULT_LEAD_SCORING_RUBRIC,
-            crm_level_tier_defaults=DEFAULT_LEVEL_TIERS,
-            crm_assign_strategy_defaults=STRATEGY_DEFS,
-            crm_assign_tier_level_map_defaults=DEFAULT_TIER_LEVEL_MAP,
-            crm_scoring_evaluators=EVALUATOR_OPTIONS,
-            crm_scoring_conditions=SCORING_CONDITIONS,
-            crm_scoring_field_options=list(SCORING_FIELD_OPTIONS),
-            crm_leads_can_configure=False,
-            crm_leads_can_delete=False,
-            crm_product_line_labels=PRODUCT_LINE_LABELS,
-            crm_care_contact_types=list(CRM_CARE_CONTACT_TYPES),
-            crm_care_contact_labels=CRM_CARE_CONTACT_LABELS_VI,
-            crm_care_status_types=list(CRM_CARE_STATUS_TYPES),
-            crm_care_status_labels=CRM_CARE_STATUS_LABELS_VI,
-            crm_care_pipeline_stages=CARE_PIPELINE_STAGES_PUBLIC,
+            "crm_lead_detail.html",
+            **{
+                **_admin_page_template_kwargs(),
+                **_crm_leads_template_kwargs(
+                    conn, staff_portal=False, leads_only=leads_only, lead_id=lead_id
+                ),
+            },
         )
-    if not _admin_section_can("crm_leads", "view"):
-        return redirect(url_for("crm_board"))
-    leads_only = _crm_leads_only_ui()
-    return render_template(
-        "crm_leads.html",
-        crm_staff_portal=False,
-        crm_staff_id=_crm_lead_session_staff_id() if leads_only else None,
-        crm_lead_statuses=list(LEAD_STATUSES),
-        crm_lead_status_labels=LEAD_STATUS_LABELS,
-        crm_lead_levels=page_levels,
-        crm_lead_level_labels=page_level_labels,
-        crm_lead_sources=list(LEAD_SOURCES),
-        crm_lead_source_labels=LEAD_SOURCE_LABELS,
-        crm_lead_activity_types=list(ACTIVITY_TYPES),
-        crm_lead_activity_labels=ACTIVITY_TYPE_LABELS,
-        crm_scoring_rule_defaults=DEFAULT_SCORING_RULES,
-        crm_scoring_rubric_defaults=DEFAULT_LEAD_SCORING_RUBRIC,
-        crm_level_tier_defaults=DEFAULT_LEVEL_TIERS,
-        crm_assign_strategy_defaults=STRATEGY_DEFS,
-        crm_assign_tier_level_map_defaults=DEFAULT_TIER_LEVEL_MAP,
-        crm_scoring_evaluators=EVALUATOR_OPTIONS,
-        crm_scoring_conditions=SCORING_CONDITIONS,
-        crm_scoring_field_options=list(SCORING_FIELD_OPTIONS),
-        crm_leads_can_configure=_admin_section_can("crm_leads", "configure"),
-        crm_leads_can_delete=_admin_section_can("crm_leads", "delete"),
-        crm_product_line_labels=PRODUCT_LINE_LABELS,
-        crm_care_contact_types=list(CRM_CARE_CONTACT_TYPES),
-        crm_care_contact_labels=CRM_CARE_CONTACT_LABELS_VI,
-        crm_care_status_types=list(CRM_CARE_STATUS_TYPES),
-        crm_care_status_labels=CRM_CARE_STATUS_LABELS_VI,
-        crm_care_pipeline_stages=CARE_PIPELINE_STAGES_PUBLIC,
-        **_admin_page_template_kwargs(),
-    )
 
 
 @app.get("/api/crm/leads/stats")
@@ -6393,6 +7176,8 @@ def api_crm_leads_stats() -> Any:
             product_line=ui_filters["product_line"],
             zone=ui_filters["zone"],
             sla_overdue_only=ui_filters["sla_overdue_only"],
+            hide_review_queue=ui_filters["hide_review_queue"],
+            review_queue_only=ui_filters["review_queue_only"],
             ts=_crm_ts(),
         )
     return jsonify({"stats": stats})
@@ -6439,6 +7224,7 @@ def api_crm_list_leads() -> Any:
             except ValueError:
                 return jsonify({"error": "owner_id không hợp lệ"}), 400
     sla_only = str(request.args.get("sla_overdue") or "").strip() in ("1", "true", "yes")
+    review_only = str(request.args.get("review_queue") or "").strip() in ("1", "true", "yes")
     try:
         lim = max(1, min(int(request.args.get("limit") or 500), 1000))
     except ValueError:
@@ -6451,23 +7237,28 @@ def api_crm_list_leads() -> Any:
         re_project_id = _crm_lead_project_filter_from_request()
     except ValueError:
         return jsonify({"error": "re_project_id không hợp lệ"}), 400
+    ui_filters = _crm_lead_ui_filters_from_request(owner_id=owner_id)
     filt = {
-        "status": request.args.get("status"),
-        "level": request.args.get("level"),
-        "source": request.args.get("source"),
-        "q": request.args.get("q"),
-        "product_line": str(request.args.get("product_line") or "").strip() or None,
-        "zone": str(request.args.get("zone") or "").strip() or None,
+        "status": ui_filters["status"],
+        "level": ui_filters["level"],
+        "source": ui_filters["source"],
+        "q": ui_filters["q"],
+        "product_line": ui_filters["product_line"],
+        "zone": ui_filters["zone"],
+        "hide_review_queue": ui_filters["hide_review_queue"],
+        "review_queue_only": ui_filters["review_queue_only"],
     }
     if re_project_id is not _UNSET:
         filt["re_project_id"] = re_project_id
     with get_connection() as conn:
-        filt.update(_crm_lead_list_kwargs(conn, owner_id=owner_id))
+        if ui_filters["review_queue_only"] and _crm_lead_session_staff_id(conn) is not None:
+            return jsonify({"error": "Không có quyền xem Lead Phải tra soát."}), 403
+        filt.update(_crm_lead_list_kwargs(conn, owner_id=ui_filters["owner_id"]))
         total = count_leads(conn, **filt)
         rows = fetch_leads(
             conn,
             **filt,
-            sla_overdue_only=sla_only,
+            sla_overdue_only=ui_filters["sla_overdue_only"],
             limit=lim,
             offset=off,
         )
@@ -6587,6 +7378,9 @@ def api_crm_create_lead() -> Any:
     if not _admin_section_can("crm_leads", "create"):
         return _admin_section_forbidden_json("crm_leads", "create")
     payload = request.get_json(force=True) or {}
+    industry_raw = str(payload.get("industry_slug") or "").strip()
+    if not industry_raw:
+        return jsonify({"error": "Ngành khách hàng bắt buộc — chọn từ danh mục."}), 400
     ts = _crm_ts()
     actor = _crm_audit_user()
     portal_sid = _crm_effective_staff_id()
@@ -6600,6 +7394,8 @@ def api_crm_create_lead() -> Any:
     with get_connection() as conn:
         try:
             re_project_id = parse_re_project_id(payload.get("re_project_id"))
+            if re_project_id is not None:
+                re_project_id = None  # P3 — bỏ gán dự án RE trên funnel lead
             if portal_sid is not None:
                 assert_staff_portal_project(conn, int(portal_sid), re_project_id)
             row, dups, dup_matches = create_lead(
@@ -6610,6 +7406,7 @@ def api_crm_create_lead() -> Any:
                 source=str(payload.get("source") or "manual"),
                 region=str(payload.get("region") or ""),
                 product_interest=str(payload.get("product_interest") or ""),
+                industry_slug=str(payload.get("industry_slug") or ""),
                 need=str(payload.get("need") or ""),
                 status=str(payload.get("status") or "new"),
                 owner_id=owner_id,
@@ -6745,6 +7542,7 @@ def api_crm_update_lead(lead_id: int) -> Any:
                 source=payload.get("source"),
                 region=payload.get("region"),
                 product_interest=payload.get("product_interest"),
+                industry_slug=payload.get("industry_slug"),
                 need=payload.get("need"),
                 status=payload.get("status"),
                 owner_id=int(owner_id) if owner_id not in (None, "", 0, "0") else None,
@@ -6813,7 +7611,7 @@ def api_crm_create_lead_activity(lead_id: int) -> Any:
         if is_care_report and activity_type != "note":
             from crm_lead_care_pipeline import CARE_STAGE_KEYS, care_stage_label
 
-            current_stage = str(prev["care_stage_current"] or "intake").strip()
+            current_stage = str(prev["care_stage_current"] or "first_contact").strip()
             if not care_stage_key:
                 care_stage_key = current_stage
             if care_stage_key not in CARE_STAGE_KEYS:
@@ -6983,6 +7781,20 @@ def api_crm_assign_lead(lead_id: int) -> Any:
     if not reason:
         return jsonify({"error": "Cần ghi lý do phân lại."}), 400
     ts = _crm_ts()
+    assigned_by = _crm_audit_user()
+
+    from ptt_crm.leads_write_upstream import nest_write_upstream_enabled, proxy_assign_lead
+
+    if nest_write_upstream_enabled():
+        body, status = proxy_assign_lead(
+            lead_id,
+            to_user_id=to_id,
+            reason=reason,
+            assigned_by=assigned_by,
+            ts=ts,
+        )
+        return jsonify(body), status
+
     with get_connection() as conn:
         try:
             row = assign_lead(
@@ -6990,7 +7802,7 @@ def api_crm_assign_lead(lead_id: int) -> Any:
                 lead_id,
                 to_user_id=to_id,
                 reason=reason,
-                assigned_by=_crm_audit_user(),
+                assigned_by=assigned_by,
                 ts=ts,
             )
         except ValueError as exc:
@@ -7317,6 +8129,303 @@ def api_crm_convert_lead(lead_id: int) -> Any:
         row = fetch_lead_by_id(conn, lead_id)
         out = lead_row_to_dict(row, conn) if row else {}
     return jsonify({"result": result, "lead": out})
+
+
+@app.get("/api/crm/leads/<int:lead_id>/presales")
+def api_crm_lead_presales_get(lead_id: int) -> Any:
+    if not _admin_section_can("crm_leads", "view"):
+        return _admin_section_forbidden_json("crm_leads", "view")
+    if not _crm_presales_on_lead_enabled():
+        return jsonify({"enabled": False, "presales": None}), 200
+    with get_connection() as conn:
+        prev = fetch_lead_by_id(conn, lead_id)
+        if not _crm_lead_can_access(conn, prev):
+            return jsonify({"error": "Không có quyền."}), 403
+        if prev is None:
+            return jsonify({"error": "Không tìm thấy lead."}), 404
+        from crm_lead_presales import presales_payload as _presales_payload
+        from crm_lead_catalog import catalog_public_payload
+
+        payload = _presales_payload(conn, lead_id)
+        lead_out = lead_row_to_dict(prev, conn)
+        care_gate = lead_out.get("presales_care_gate")
+        catalog = catalog_public_payload(conn)
+    return jsonify({
+        "enabled": True,
+        "presales": payload,
+        "presales_care_gate": care_gate,
+        "service_labels": catalog.get("service_labels") or {},
+        "service_slugs": catalog.get("service_slugs") or [],
+    })
+
+
+@app.post("/api/crm/leads/<int:lead_id>/presales")
+def api_crm_lead_presales_create(lead_id: int) -> Any:
+    if not _admin_section_can("crm_leads", "edit"):
+        return _admin_section_forbidden_json("crm_leads", "edit")
+    if not _crm_presales_on_lead_enabled():
+        return jsonify({"error": "PTT_PRESALES_ON_LEAD chưa bật"}), 400
+    body = request.get_json(silent=True) or {}
+    slug = str(body.get("service_slug") or "").strip()
+    with get_connection() as conn:
+        prev = fetch_lead_by_id(conn, lead_id)
+        if not _crm_lead_can_access(conn, prev):
+            return jsonify({"error": "Không có quyền."}), 403
+        if prev is None:
+            return jsonify({"error": "Không tìm thấy lead."}), 404
+        from crm_lead_presales import ensure_presales as _ensure_ps
+        from crm_lead_presales import presales_payload as _presales_payload
+
+        try:
+            _ensure_ps(conn, lead_id, slug, suggested_by=_crm_audit_user())
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        payload = _presales_payload(conn, lead_id)
+    return jsonify({"presales": payload}), 201
+
+
+@app.patch("/api/crm/leads/<int:lead_id>/presales")
+def api_crm_lead_presales_patch(lead_id: int) -> Any:
+    if not _admin_section_can("crm_leads", "edit"):
+        return _admin_section_forbidden_json("crm_leads", "edit")
+    if not _crm_presales_on_lead_enabled():
+        return jsonify({"error": "PTT_PRESALES_ON_LEAD chưa bật"}), 400
+    body = request.get_json(silent=True) or {}
+    to_stage = str(body.get("stage") or "").strip()
+    notes = str(body.get("notes") or "").strip()[:2000]
+    override_reason = str(body.get("override_reason") or "").strip()[:500]
+    confirm = bool(body.get("confirm"))
+    with get_connection() as conn:
+        prev = fetch_lead_by_id(conn, lead_id)
+        if not _crm_lead_can_access(conn, prev):
+            return jsonify({"error": "Không có quyền."}), 403
+        if prev is None:
+            return jsonify({"error": "Không tìm thấy lead."}), 404
+        from crm_lead_presales import require_presales_care_gate
+
+        try:
+            require_presales_care_gate(conn, lead_id)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        from crm_lead_presales import (
+            PresalesAdvanceError,
+            advance_presales_stage,
+            get_by_lead,
+            presales_payload as _presales_payload,
+        )
+
+        ps = get_by_lead(conn, lead_id)
+        if ps is None:
+            return jsonify({"error": "Chưa có pre-sales — chọn dịch vụ trước"}), 404
+        if not to_stage:
+            return jsonify({"error": "Thiếu stage"}), 400
+        try:
+            advance_presales_stage(
+                conn,
+                int(ps["id"]),
+                to_stage,
+                notes=notes,
+                override_reason=override_reason,
+                allow_override=_admin_full_access(),
+                confirm=confirm,
+            )
+        except PresalesAdvanceError as exc:
+            err_msg = str(exc)
+            if ps.get("stage") == "lead" and to_stage == "consult":
+                from crm_lead_presales_bridge import validate_presales_consult_advance
+
+                gate = validate_presales_consult_advance(
+                    conn,
+                    int(ps["id"]),
+                    override_reason=override_reason,
+                    allow_override=_admin_full_access(),
+                )
+                return jsonify({
+                    "error": err_msg,
+                    "gate": gate,
+                    "requires_confirm": bool(gate.get("requires_confirm")),
+                    "requires_override": bool(gate.get("requires_override")),
+                }), 400
+            return jsonify({"error": err_msg}), 400
+        payload = _presales_payload(conn, lead_id)
+    return jsonify({"presales": payload})
+
+
+@app.get("/api/crm/leads/<int:lead_id>/presales-cost-summary")
+def api_crm_lead_presales_cost_summary(lead_id: int) -> Any:
+    if not _admin_section_can("crm_leads", "view"):
+        return _admin_section_forbidden_json("crm_leads", "view")
+    if not _crm_presales_on_lead_enabled():
+        return jsonify({"enabled": False}), 200
+    with get_connection() as conn:
+        prev = fetch_lead_by_id(conn, lead_id)
+        if not _crm_lead_can_access(conn, prev):
+            return jsonify({"error": "Không có quyền."}), 403
+        if prev is None:
+            return jsonify({"error": "Không tìm thấy lead."}), 404
+        from crm_lead_presales import get_by_lead
+        from crm_svc_presales import get_presales_cost_summary_by_presales
+
+        ps = get_by_lead(conn, lead_id)
+        if ps is None:
+            return jsonify({"error": "Chưa có pre-sales"}), 404
+        summary = get_presales_cost_summary_by_presales(conn, int(ps["id"]))
+    return jsonify(summary)
+
+
+@app.patch("/api/crm/leads/<int:lead_id>/presales-cost-cap")
+def api_crm_lead_presales_cost_cap(lead_id: int) -> Any:
+    if not _admin_section_can("crm_leads", "edit"):
+        return _admin_section_forbidden_json("crm_leads", "edit")
+    if not _crm_presales_on_lead_enabled():
+        return jsonify({"error": "PTT_PRESALES_ON_LEAD chưa bật"}), 400
+    body = request.get_json(silent=True) or {}
+    cap_val = _opt_pos_int(body.get("presales_cost_cap_vnd"))
+    with get_connection() as conn:
+        prev = fetch_lead_by_id(conn, lead_id)
+        if not _crm_lead_can_access(conn, prev):
+            return jsonify({"error": "Không có quyền."}), 403
+        if prev is None:
+            return jsonify({"error": "Không tìm thấy lead."}), 404
+        from crm_lead_presales import get_by_lead
+        from crm_svc_presales import (
+            get_presales_cost_summary_by_presales,
+            set_presales_cost_cap_for_presales,
+        )
+
+        ps = get_by_lead(conn, lead_id)
+        if ps is None:
+            return jsonify({"error": "Chưa có pre-sales"}), 404
+        set_presales_cost_cap_for_presales(conn, int(ps["id"]), cap_val)
+        summary = get_presales_cost_summary_by_presales(conn, int(ps["id"]))
+    return jsonify(summary)
+
+
+@app.post("/api/crm/leads/<int:lead_id>/presales/consult-prefill")
+def api_crm_lead_presales_consult_prefill(lead_id: int) -> Any:
+    if not _admin_section_can("crm_leads", "edit"):
+        return _admin_section_forbidden_json("crm_leads", "edit")
+    if not _crm_presales_on_lead_enabled():
+        return jsonify({"error": "PTT_PRESALES_ON_LEAD chưa bật"}), 400
+    body = request.get_json(silent=True) or {}
+    overwrite = bool(body.get("overwrite"))
+    with get_connection() as conn:
+        prev = fetch_lead_by_id(conn, lead_id)
+        if not _crm_lead_can_access(conn, prev):
+            return jsonify({"error": "Không có quyền."}), 403
+        if prev is None:
+            return jsonify({"error": "Không tìm thấy lead."}), 404
+        from crm_lead_presales import require_presales_care_gate
+
+        try:
+            require_presales_care_gate(conn, lead_id)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        from crm_lead_presales_bridge import prefill_presales_consult_task
+        from crm_lead_presales import presales_payload as _presales_payload
+
+        try:
+            stats = prefill_presales_consult_task(
+                conn, lead_id, overwrite=overwrite
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        payload = _presales_payload(conn, lead_id)
+    return jsonify({"stats": stats, "presales": payload})
+
+
+@app.post("/api/crm/leads/<int:lead_id>/presales/draft-contract")
+def api_crm_lead_presales_draft_contract(lead_id: int) -> Any:
+    if not _admin_section_can("crm_leads", "edit"):
+        return _admin_section_forbidden_json("crm_leads", "edit")
+    if not _crm_presales_on_lead_enabled():
+        return jsonify({"error": "PTT_PRESALES_ON_LEAD chưa bật"}), 400
+    body = request.get_json(silent=True) or {}
+    title = str(body.get("title") or "").strip()[:500] or None
+    notes = str(body.get("notes") or "").strip()[:8000]
+    try:
+        amount_vnd = int(body.get("amount_vnd") or 0)
+    except (TypeError, ValueError):
+        amount_vnd = 0
+    ts = _crm_ts()
+    with get_connection() as conn:
+        prev = fetch_lead_by_id(conn, lead_id)
+        if not _crm_lead_can_access(conn, prev):
+            return jsonify({"error": "Không có quyền."}), 403
+        if prev is None:
+            return jsonify({"error": "Không tìm thấy lead."}), 404
+        from crm_lead_presales import require_presales_care_gate
+
+        try:
+            require_presales_care_gate(conn, lead_id)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        from crm_lead_presales_contract import (
+            PresalesContractError,
+            create_draft_contract_from_lead,
+        )
+        from crm_lead_presales import presales_payload as _presales_payload
+
+        try:
+            contract = create_draft_contract_from_lead(
+                conn,
+                lead_id,
+                title=title,
+                amount_vnd=amount_vnd,
+                notes=notes,
+                actor=_crm_audit_user(),
+                ts=ts,
+            )
+        except PresalesContractError as exc:
+            return jsonify({"error": str(exc)}), 400
+        payload = _presales_payload(conn, lead_id)
+    return jsonify({"contract": contract, "presales": payload}), 201
+
+
+@app.patch("/api/crm/leads/<int:lead_id>/presales/tasks/<int:task_id>")
+def api_crm_lead_presales_task_patch(lead_id: int, task_id: int) -> Any:
+    if not _admin_section_can("crm_leads", "edit"):
+        return _admin_section_forbidden_json("crm_leads", "edit")
+    if not _crm_presales_on_lead_enabled():
+        return jsonify({"error": "PTT_PRESALES_ON_LEAD chưa bật"}), 400
+    body = request.get_json(silent=True) or {}
+    with get_connection() as conn:
+        prev = fetch_lead_by_id(conn, lead_id)
+        if not _crm_lead_can_access(conn, prev):
+            return jsonify({"error": "Không có quyền."}), 403
+        if prev is None:
+            return jsonify({"error": "Không tìm thấy lead."}), 404
+        row = conn.execute(
+            """
+            SELECT t.id FROM crm_lead_presales_tasks t
+            INNER JOIN crm_lead_presales p ON p.id = t.presales_id
+            WHERE t.id = ? AND p.lead_id = ?
+            """,
+            (task_id, lead_id),
+        ).fetchone()
+        if row is None:
+            return jsonify({"error": "Không tìm thấy task"}), 404
+        from crm_lead_presales import require_presales_care_gate
+
+        try:
+            require_presales_care_gate(conn, lead_id)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        from crm_lead_presales import presales_payload as _presales_payload
+        from crm_lead_presales import update_presales_task as _upd_ps_task
+
+        form_data = body.get("form_data")
+        kwargs: dict[str, Any] = {}
+        if "is_done" in body:
+            kwargs["is_done"] = bool(body.get("is_done"))
+        if "notes" in body:
+            kwargs["notes"] = str(body.get("notes") or "")
+        if isinstance(form_data, dict):
+            kwargs["form_data"] = form_data
+        if kwargs:
+            _upd_ps_task(conn, task_id, **kwargs)
+        payload = _presales_payload(conn, lead_id)
+    return jsonify({"presales": payload})
 
 
 @app.get("/api/crm/leads/export")
@@ -7834,10 +8943,50 @@ def api_crm_staff_competency_score() -> Any:
             parsed[key] = float(v)
         except (TypeError, ValueError):
             return jsonify({"error": f"Giá trị metric «{key}» không hợp lệ."}), 400
+    staff_id = _opt_pos_int(payload.get("staff_id"))
+    year = _opt_pos_int(payload.get("year"))
+    month = _opt_pos_int(payload.get("month"))
+    if staff_id and "close_rate_pct" not in parsed:
+        from crm_lead_kpi_metrics import get_staff_close_rate_pct
+
+        with get_connection() as conn:
+            parsed["close_rate_pct"] = get_staff_close_rate_pct(conn, staff_id)
     with get_connection() as conn:
         comp = fetch_staff_competency(conn)
     out = score_staff_competency(parsed, comp)
     return jsonify(out)
+
+
+@app.get("/api/crm/staff/competency/metrics")
+def api_crm_staff_competency_metrics() -> Any:
+    if not _admin_section_can("crm_staff_roster", "view"):
+        return _admin_section_forbidden_json("crm_staff_roster", "view")
+    staff_id = _opt_pos_int(request.args.get("staff_id"))
+    if staff_id is None:
+        return jsonify({"error": "Thiếu staff_id."}), 400
+    now = datetime.utcnow()
+    year = _opt_pos_int(request.args.get("year")) or now.year
+    month = _opt_pos_int(request.args.get("month")) or now.month
+    from crm_lead_kpi_metrics import get_staff_close_rate_pct, get_unified_lead_kpi_summary
+
+    with get_connection() as conn:
+        monthly = get_unified_lead_kpi_summary(
+            conn, year=year, month=month, staff_id=staff_id, period_cohort=True
+        )
+        all_time = get_unified_lead_kpi_summary(
+            conn, staff_id=staff_id, period_cohort=False
+        )
+        close_rate_pct = get_staff_close_rate_pct(conn, staff_id)
+    return jsonify(
+        {
+            "staff_id": staff_id,
+            "year": year,
+            "month": month,
+            "close_rate_pct": close_rate_pct,
+            "monthly": monthly,
+            "all_time": all_time,
+        }
+    )
 
 
 @app.post("/api/crm/staff")
@@ -9615,6 +10764,7 @@ def crm_hub_page() -> str:
         reminder_scopes=list(CRM_REMINDER_SCOPES),
         reminder_kinds=list(CRM_REMINDER_KINDS),
         reminder_statuses_edit=list(CRM_REMINDER_STATUSES),
+        crm_presales_on_lead=_crm_presales_on_lead_enabled(),
         **_admin_page_template_kwargs(),
     )
 
@@ -11872,17 +13022,21 @@ def api_crm_list_customers() -> Any:
         }
         return jsonify({"customers": customers, "stats": stats, "staff_id": portal_sid})
     with get_connection() as conn:
+        hide_placeholder = _crm_presales_on_lead_enabled()
+        ph_clause = " AND COALESCE(is_placeholder, 0) = 0" if hide_placeholder else ""
         if q_raw:
             like = f"%{q_raw}%"
             rows = conn.execute(
-                """
+                f"""
                 SELECT id, name, phone, email, address, company, created_at
                 FROM crm_customers
-                WHERE lower(coalesce(trim(name), '')) LIKE ?
+                WHERE (
+                    lower(coalesce(trim(name), '')) LIKE ?
                    OR lower(coalesce(trim(phone), '')) LIKE ?
                    OR lower(coalesce(trim(email), '')) LIKE ?
                    OR lower(coalesce(trim(address), '')) LIKE ?
                    OR lower(coalesce(trim(company), '')) LIKE ?
+                ){ph_clause}
                 ORDER BY id DESC
                 LIMIT ?
                 """,
@@ -11890,9 +13044,10 @@ def api_crm_list_customers() -> Any:
             ).fetchall()
         else:
             rows = conn.execute(
-                """
+                f"""
                 SELECT id, name, phone, email, address, company, created_at
                 FROM crm_customers
+                WHERE 1=1{ph_clause}
                 ORDER BY id DESC
                 LIMIT ?
                 """,
@@ -12509,7 +13664,24 @@ def api_crm_customer_issue_patch(customer_id: int, issue_id: int) -> Any:
 def api_crm_list_campaigns() -> Any:
     raw = (request.args.get("include_inactive") or "").strip().lower()
     incl = raw in ("1", "true", "yes", "all")
+    try:
+        from ptt_crm.config import hub_read_source_pg
+        from ptt_crm.hub_pg_read import list_hub_campaigns
+
+        if hub_read_source_pg():
+            campaigns = list_hub_campaigns(active_only=not incl)
+            if campaigns:
+                try:
+                    from ptt_agency.hub_campaign_sync import enrich_campaigns_with_client_codes
+
+                    campaigns = enrich_campaigns_with_client_codes(campaigns)
+                except Exception:
+                    pass
+                return jsonify({"campaigns": campaigns, "read_source": "pg"})
+    except Exception:
+        pass
     with get_connection() as conn:
+        _ensure_crm_hub_schema(conn)
         if incl:
             rows = conn.execute(
                 """
@@ -12524,7 +13696,14 @@ def api_crm_list_campaigns() -> Any:
                 ORDER BY name COLLATE NOCASE ASC
                 """
             ).fetchall()
-    return jsonify({"campaigns": rows_to_dict(rows)})
+    campaigns = rows_to_dict(rows)
+    try:
+        from ptt_agency.hub_campaign_sync import enrich_campaigns_with_client_codes
+
+        campaigns = enrich_campaigns_with_client_codes(campaigns)
+    except Exception:
+        pass
+    return jsonify({"campaigns": campaigns})
 
 
 @app.post("/api/crm/campaigns")
@@ -12540,9 +13719,15 @@ def api_crm_create_campaign() -> Any:
     ext = str(payload.get("external_ref", "")).strip()[:240]
     utm = str(payload.get("utm_campaign", "")).strip()[:240]
     notes = str(payload.get("notes", "")).strip()[:4000]
+    agency_client_id = str(payload.get("agency_client_id") or "").strip()[:64]
+    try:
+        target_cpl_vnd = max(0, int(payload.get("target_cpl_vnd") or 0))
+    except (TypeError, ValueError):
+        target_cpl_vnd = 0
     ts_d = datetime.now().strftime("%Y-%m-%d")
     ts = _crm_ts()
     with get_connection() as conn:
+        _ensure_crm_hub_schema(conn)
         if code and conn.execute(
             """
             SELECT 1 FROM crm_campaigns WHERE trim(code) != '' AND lower(trim(code)) = lower(?)
@@ -12553,21 +13738,38 @@ def api_crm_create_campaign() -> Any:
         cur = conn.execute(
             """
             INSERT INTO crm_campaigns (
-                code, name, channel, external_ref, utm_campaign, notes, active, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+                code, name, channel, external_ref, utm_campaign, notes, active,
+                agency_client_id, target_cpl_vnd, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
             """,
-            (code, name, ch, ext, utm, notes, ts_d, ts),
+            (code, name, ch, ext, utm, notes, agency_client_id, target_cpl_vnd, ts_d, ts),
         )
         mid = int(cur.lastrowid)
+        _crm_sync_hub_campaign_to_pg(mid, conn)
         row = conn.execute("SELECT * FROM crm_campaigns WHERE id = ?", (mid,)).fetchone()
     assert row is not None
-    return jsonify(dict(row)), 201
+    out = dict(row)
+    try:
+        from ptt_crm.hub_pg_write import upsert_hub_campaign_from_sqlite
+
+        upsert_hub_campaign_from_sqlite(out)
+    except Exception:
+        pass
+    try:
+        from ptt_agency.hub_campaign_sync import enrich_campaigns_with_client_codes
+
+        enriched = enrich_campaigns_with_client_codes([out])
+        out = enriched[0] if enriched else out
+    except Exception:
+        pass
+    return jsonify(out), 201
 
 
 @app.patch("/api/crm/campaigns/<int:campaign_id>")
 def api_crm_patch_campaign(campaign_id: int) -> Any:
     payload = request.get_json(force=True) or {}
     with get_connection() as conn:
+        _ensure_crm_hub_schema(conn)
         row = conn.execute("SELECT * FROM crm_campaigns WHERE id = ?", (campaign_id,)).fetchone()
         if row is None:
             return jsonify({"error": "Không tìm thấy chiến dịch"}), 404
@@ -12589,6 +13791,7 @@ def api_crm_patch_campaign(campaign_id: int) -> Any:
             merged["notes"] = payload["notes"].strip()[:4000]
         if "active" in payload:
             merged["active"] = 1 if payload["active"] in (True, 1, "1", "true") else 0
+        _crm_apply_campaign_hub_fields(merged, payload)
         cc = str(merged.get("code") or "").strip()
         if cc and conn.execute(
             """
@@ -12603,7 +13806,8 @@ def api_crm_patch_campaign(campaign_id: int) -> Any:
             """
             UPDATE crm_campaigns
             SET code = ?, name = ?, channel = ?, external_ref = ?, utm_campaign = ?,
-                notes = ?, active = ?, updated_at = ?
+                notes = ?, active = ?, agency_client_id = ?, target_cpl_vnd = ?,
+                updated_at = ?
             WHERE id = ?
             """,
             (
@@ -12614,13 +13818,75 @@ def api_crm_patch_campaign(campaign_id: int) -> Any:
                 merged["utm_campaign"],
                 merged["notes"],
                 int(merged.get("active") or 0),
+                str(merged.get("agency_client_id") or ""),
+                int(merged.get("target_cpl_vnd") or 0),
                 ts,
                 campaign_id,
             ),
         )
+        _crm_sync_hub_campaign_to_pg(campaign_id, conn)
         row2 = conn.execute("SELECT * FROM crm_campaigns WHERE id = ?", (campaign_id,)).fetchone()
     assert row2 is not None
-    return jsonify(dict(row2))
+    out = dict(row2)
+    try:
+        from ptt_crm.hub_pg_write import upsert_hub_campaign_from_sqlite
+
+        upsert_hub_campaign_from_sqlite(out)
+    except Exception:
+        pass
+    try:
+        from ptt_agency.hub_campaign_sync import enrich_campaigns_with_client_codes
+
+        enriched = enrich_campaigns_with_client_codes([out])
+        out = enriched[0] if enriched else out
+    except Exception:
+        pass
+    return jsonify(out)
+
+
+@app.post("/api/crm/campaigns/<int:campaign_id>/sync-hub-map")
+def api_crm_sync_campaign_hub_map(campaign_id: int) -> Any:
+    if not _admin_section_can("crm_hub_campaigns", "edit"):
+        return _admin_section_forbidden_json("crm_hub_campaigns", "edit")
+    with get_connection() as conn:
+        _ensure_crm_hub_schema(conn)
+        row = conn.execute("SELECT * FROM crm_campaigns WHERE id = ?", (campaign_id,)).fetchone()
+        if row is None:
+            return jsonify({"error": "Không tìm thấy chiến dịch"}), 404
+        from ptt_agency.hub_campaign_sync import sync_campaign_row
+
+        out = sync_campaign_row(dict(row), sqlite_conn=conn)
+        conn.commit()
+        refreshed = conn.execute("SELECT * FROM crm_campaigns WHERE id = ?", (campaign_id,)).fetchone()
+    payload = dict(refreshed) if refreshed else {}
+    try:
+        from ptt_agency.hub_campaign_sync import enrich_campaigns_with_client_codes
+
+        enriched = enrich_campaigns_with_client_codes([payload])
+        payload = enriched[0] if enriched else payload
+    except Exception:
+        pass
+    status = 200 if out.get("ok") or out.get("skipped") else 503
+    return jsonify({"sync": out, "campaign": payload}), status
+
+
+@app.post("/api/crm/campaigns/sync-hub-map-all")
+def api_crm_sync_all_campaign_hub_maps() -> Any:
+    if not _admin_section_can("crm_hub_campaigns", "edit"):
+        return _admin_section_forbidden_json("crm_hub_campaigns", "edit")
+    secret = (request.headers.get("X-Cron-Secret") or request.args.get("secret") or "").strip()
+    expected = os.environ.get("CRM_AGENCY_HUB_MAP_CRON_SECRET", "").strip()
+    if expected and secret != expected:
+        return jsonify({"error": "Unauthorized"}), 401
+    incl = (request.args.get("include_inactive") or "").strip().lower() in ("1", "true", "yes")
+    try:
+        from ptt_agency.hub_campaign_sync import sync_all_from_sqlite
+        from ptt_jobs.config import sqlite_db_path
+
+        out = sync_all_from_sqlite(sqlite_path=sqlite_db_path(), include_inactive=incl)
+        return jsonify(out), 200 if out.get("ok", True) else 503
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 500
 
 
 @app.get("/api/crm/contracts")
@@ -12642,11 +13908,13 @@ def api_crm_list_contracts() -> Any:
             SELECT ct.*,
                    cu.name AS customer_name, cu.company AS customer_company,
                    cs.title AS case_title,
-                   camp.name AS campaign_name, camp.code AS campaign_code
+                   camp.name AS campaign_name, camp.code AS campaign_code,
+                   l.full_name AS lead_name
             FROM crm_contracts ct
             JOIN crm_customers cu ON cu.id = ct.customer_id
             LEFT JOIN crm_cases cs ON cs.id = ct.case_id
             LEFT JOIN crm_campaigns camp ON camp.id = ct.campaign_id
+            LEFT JOIN crm_leads l ON l.id = ct.lead_id
             {where_sql}
             ORDER BY datetime(ct.updated_at) DESC, ct.id DESC
             """,
@@ -12658,12 +13926,9 @@ def api_crm_list_contracts() -> Any:
 @app.post("/api/crm/contracts")
 def api_crm_create_contract() -> Any:
     payload = request.get_json(force=True) or {}
+    lead_id = _opt_pos_int(payload.get("lead_id"))
     cust_id = _opt_pos_int(payload.get("customer_id"))
-    if cust_id is None:
-        return jsonify({"error": "Cần customer_id"}), 400
     title = str(payload.get("title", "")).strip()[:500]
-    if not title:
-        return jsonify({"error": "Thiếu tiêu đề hợp đồng"}), 400
     case_id = _opt_pos_int(payload.get("case_id"))
     camp_id = _opt_pos_int(payload.get("campaign_id"))
     ref = str(payload.get("reference_code", "")).strip()[:120]
@@ -12685,8 +13950,63 @@ def api_crm_create_contract() -> Any:
         rdays = 30
     rdays = max(0, min(366, rdays))
     notes = str(payload.get("notes", "")).strip()[:8000]
+    from crm_svc_finance import infer_billing_type_from_service_slug, normalize_billing_type
+    from crm_svc_finance import normalize_billing_cycle
+
+    billing_type = normalize_billing_type(payload.get("billing_type"))
+    billing_cycle = normalize_billing_cycle(payload.get("billing_cycle"))
+    service_slug_for_billing = str(payload.get("service_slug") or "").strip()
+    if not payload.get("billing_type") and service_slug_for_billing:
+        billing_type = infer_billing_type_from_service_slug(service_slug_for_billing)
     ts_d = datetime.now().strftime("%Y-%m-%d")
     ts = _crm_ts()
+
+    if lead_id and _crm_presales_on_lead_enabled():
+        if status != "draft":
+            return jsonify({"error": "HĐ từ Lead pre-sales chỉ tạo ở trạng thái draft"}), 400
+        with get_connection() as conn:
+            from crm_lead_presales_contract import (
+                PresalesContractError,
+                create_draft_contract_from_lead,
+            )
+
+            try:
+                ct = create_draft_contract_from_lead(
+                    conn,
+                    lead_id,
+                    title=title or None,
+                    amount_vnd=amount_vnd,
+                    notes=notes,
+                    actor=_crm_audit_user(),
+                    ts=ts,
+                )
+            except PresalesContractError as exc:
+                return jsonify({"error": str(exc)}), 400
+            nid = int(ct["id"])
+            _crm_hub_sync_contract_renewal_reminder(conn, nid)
+            row = conn.execute(
+                """
+                SELECT ct.*,
+                       cu.name AS customer_name, cu.company AS customer_company,
+                       cs.title AS case_title,
+                       camp.name AS campaign_name, camp.code AS campaign_code,
+                       l.full_name AS lead_name
+                FROM crm_contracts ct
+                JOIN crm_customers cu ON cu.id = ct.customer_id
+                LEFT JOIN crm_cases cs ON cs.id = ct.case_id
+                LEFT JOIN crm_campaigns camp ON camp.id = ct.campaign_id
+                LEFT JOIN crm_leads l ON l.id = ct.lead_id
+                WHERE ct.id = ?
+                """,
+                (nid,),
+            ).fetchone()
+        assert row is not None
+        return jsonify(dict(row)), 201
+
+    if cust_id is None:
+        return jsonify({"error": "Cần customer_id hoặc lead_id (pre-sales)"}), 400
+    if not title:
+        return jsonify({"error": "Thiếu tiêu đề hợp đồng"}), 400
     with get_connection() as conn:
         if conn.execute("SELECT id FROM crm_customers WHERE id = ?", (cust_id,)).fetchone() is None:
             return jsonify({"error": "Khách hàng không tồn tại"}), 404
@@ -12699,9 +14019,9 @@ def api_crm_create_contract() -> Any:
             INSERT INTO crm_contracts (
                 customer_id, case_id, campaign_id, reference_code, title, status,
                 signed_on, starts_on, ends_on, amount_vnd, renewal_reminder_days, notes,
-                created_at, updated_at
+                billing_type, billing_cycle, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 cust_id,
@@ -12716,6 +14036,8 @@ def api_crm_create_contract() -> Any:
                 amount_vnd,
                 rdays,
                 notes,
+                billing_type,
+                billing_cycle,
                 ts_d,
                 ts,
             ),
@@ -12727,11 +14049,13 @@ def api_crm_create_contract() -> Any:
             SELECT ct.*,
                    cu.name AS customer_name, cu.company AS customer_company,
                    cs.title AS case_title,
-                   camp.name AS campaign_name, camp.code AS campaign_code
+                   camp.name AS campaign_name, camp.code AS campaign_code,
+                   l.full_name AS lead_name
             FROM crm_contracts ct
             JOIN crm_customers cu ON cu.id = ct.customer_id
             LEFT JOIN crm_cases cs ON cs.id = ct.case_id
             LEFT JOIN crm_campaigns camp ON camp.id = ct.campaign_id
+            LEFT JOIN crm_leads l ON l.id = ct.lead_id
             WHERE ct.id = ?
             """,
             (nid,),
@@ -12747,6 +14071,7 @@ def api_crm_patch_contract(contract_id: int) -> Any:
         row = conn.execute("SELECT * FROM crm_contracts WHERE id = ?", (contract_id,)).fetchone()
         if row is None:
             return jsonify({"error": "Không tìm thấy hợp đồng"}), 404
+        old_status = str(row["status"] or "")
         merged = dict(row)
         if "title" in payload and isinstance(payload["title"], str):
             tl = payload["title"].strip()[:500]
@@ -12794,13 +14119,55 @@ def api_crm_patch_contract(contract_id: int) -> Any:
                 pass
         if "notes" in payload and isinstance(payload["notes"], str):
             merged["notes"] = payload["notes"].strip()[:8000]
+        if "billing_type" in payload:
+            from crm_svc_finance import normalize_billing_type
+
+            merged["billing_type"] = normalize_billing_type(payload.get("billing_type"))
+        if "billing_cycle" in payload:
+            from crm_svc_finance import normalize_billing_cycle
+
+            merged["billing_cycle"] = normalize_billing_cycle(payload.get("billing_cycle"))
         ts = _crm_ts()
+        lead_id_val = merged.get("lead_id")
+        signing = merged.get("status") == "active" and old_status != "active"
+        presales_sign = (
+            signing
+            and _crm_presales_on_lead_enabled()
+            and lead_id_val
+        )
+        sign_result: dict[str, Any] | None = None
+        if presales_sign:
+            from crm_lead_presales_contract import (
+                PresalesContractError,
+                on_presales_contract_signed,
+            )
+
+            try:
+                sign_result = on_presales_contract_signed(
+                    conn,
+                    contract_id,
+                    actor=_crm_audit_user(),
+                    ts=ts,
+                )
+            except PresalesContractError as exc:
+                return jsonify({"error": str(exc)}), 400
+            except Exception as exc:
+                logger.warning(
+                    "on_presales_contract_signed lỗi contract=%s: %s",
+                    contract_id,
+                    exc,
+                )
+                return jsonify({"error": "Không kích hoạt lifecycle từ pre-sales"}), 500
+            merged["customer_id"] = sign_result["customer_id"]
+            if sign_result.get("case_id"):
+                merged["case_id"] = sign_result["case_id"]
         conn.execute(
             """
             UPDATE crm_contracts
             SET customer_id = ?, case_id = ?, campaign_id = ?, reference_code = ?, title = ?,
                 status = ?, signed_on = ?, starts_on = ?, ends_on = ?, amount_vnd = ?,
-                renewal_reminder_days = ?, notes = ?, updated_at = ?
+                renewal_reminder_days = ?, notes = ?, billing_type = ?, billing_cycle = ?,
+                updated_at = ?
             WHERE id = ?
             """,
             (
@@ -12816,13 +14183,14 @@ def api_crm_patch_contract(contract_id: int) -> Any:
                 int(merged.get("amount_vnd") or 0),
                 int(merged.get("renewal_reminder_days") or 0),
                 merged.get("notes") or "",
+                str(merged.get("billing_type") or "one_off"),
+                str(merged.get("billing_cycle") or "monthly"),
                 ts,
                 contract_id,
             ),
         )
         _crm_hub_sync_contract_renewal_reminder(conn, contract_id)
-        # Wire: khi contract active → activate lifecycle
-        if merged.get("status") == "active":
+        if signing and not presales_sign:
             try:
                 activate_lifecycle(conn, contract_id)
             except Exception as _lc_exc:
@@ -12832,11 +14200,13 @@ def api_crm_patch_contract(contract_id: int) -> Any:
             SELECT ct.*,
                    cu.name AS customer_name, cu.company AS customer_company,
                    cs.title AS case_title,
-                   camp.name AS campaign_name, camp.code AS campaign_code
+                   camp.name AS campaign_name, camp.code AS campaign_code,
+                   l.full_name AS lead_name
             FROM crm_contracts ct
             JOIN crm_customers cu ON cu.id = ct.customer_id
             LEFT JOIN crm_cases cs ON cs.id = ct.case_id
             LEFT JOIN crm_campaigns camp ON camp.id = ct.campaign_id
+            LEFT JOIN crm_leads l ON l.id = ct.lead_id
             WHERE ct.id = ?
             """,
             (contract_id,),
@@ -12863,11 +14233,15 @@ def api_crm_list_reminders() -> Any:
     st = (request.args.get("status") or "pending").strip().lower()
     if st not in CRM_REMINDER_STATUSES and st != "all":
         st = "pending"
+    scope = str(request.args.get("scope") or "").strip().lower()
     clauses: list[str] = []
     params: list[Any] = []
     if st != "all":
         clauses.append("r.status = ?")
         params.append(st)
+    if scope and scope in CRM_REMINDER_SCOPES:
+        clauses.append("r.scope = ?")
+        params.append(scope)
     where_sql = (" WHERE " + " AND ".join(clauses)) if clauses else ""
     with get_connection() as conn:
         rows = conn.execute(
@@ -13949,6 +15323,129 @@ def crm_sop_page() -> str:
     )
 
 
+@app.get("/crm/hdsd")
+@app.get("/crm/hdsd/<section>/<slug>")
+def crm_hdsd_page(section: str | None = None, slug: str | None = None) -> Any:
+    """HDSD — đọc tài liệu Markdown từ docs/ trên hệ thống."""
+    redir = _ensure_admin_session_html()
+    if redir is not None:
+        return redir
+    if not _admin_section_can("crm_hdsd", "view"):
+        return redirect(url_for("crm_board"))
+    from crm_hdsd_docs import list_hdsd_catalog, read_hdsd_doc
+
+    catalog = list_hdsd_catalog()
+    view_doc = None
+    doc_markdown = ""
+    if section and slug:
+        loaded = read_hdsd_doc(section, slug)
+        if loaded is None:
+            abort(404)
+        doc_markdown, view_doc = loaded
+    return render_template(
+        "crm_hdsd.html",
+        catalog=catalog,
+        view_doc=view_doc,
+        doc_markdown=doc_markdown,
+        can_export=_admin_section_can("crm_hdsd", "export"),
+        **_admin_page_template_kwargs(),
+    )
+
+
+@app.get("/crm/hdsd/<section>/<slug>/download")
+def crm_hdsd_doc_download(section: str, slug: str) -> Any:
+    if not _admin_section_can("crm_hdsd", "export"):
+        return _admin_section_forbidden_json("crm_hdsd", "export")
+    from crm_hdsd_docs import resolve_hdsd_doc
+
+    resolved = resolve_hdsd_doc(section, slug)
+    if resolved is None:
+        abort(404)
+    path, meta = resolved
+    return send_file(
+        path,
+        mimetype="text/markdown; charset=utf-8",
+        as_attachment=True,
+        download_name=meta["filename"],
+    )
+
+
+@app.get("/crm/hdsd/<section>/<slug>/download.xlsx")
+def crm_hdsd_doc_download_xlsx(section: str, slug: str) -> Any:
+    if not _admin_section_can("crm_hdsd", "export"):
+        return _admin_section_forbidden_json("crm_hdsd", "export")
+    from crm_hdsd_docs import read_hdsd_doc
+    from crm_hdsd_excel import build_hdsd_doc_xlsx
+
+    loaded = read_hdsd_doc(section, slug)
+    if loaded is None:
+        abort(404)
+    text, meta = loaded
+    buf = build_hdsd_doc_xlsx(text, meta)
+    stem = str(meta.get("filename") or slug).rsplit(".", 1)[0]
+    return send_file(
+        buf,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=f"{stem}.xlsx",
+        etag=False,
+        max_age=0,
+        conditional=False,
+    )
+
+
+@app.get("/crm/hdsd/export-all.zip")
+def crm_hdsd_export_all_zip() -> Any:
+    if not _admin_section_can("crm_hdsd", "export"):
+        return _admin_section_forbidden_json("crm_hdsd", "export")
+    from crm_hdsd_docs import list_hdsd_catalog, read_hdsd_doc
+    from crm_hdsd_excel import build_hdsd_all_zip
+
+    catalog = list_hdsd_catalog()
+    buf = build_hdsd_all_zip(catalog, read_hdsd_doc)
+    return send_file(
+        buf,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name="hdsd-tai-lieu-excel.zip",
+        etag=False,
+        max_age=0,
+        conditional=False,
+    )
+
+
+@app.get("/crm/test-cases/download.xlsx")
+def crm_test_cases_download_xlsx() -> Any:
+    """Bộ test case CRM — Excel đầy đủ cột + sơ đồ cho tester."""
+    redir = _ensure_admin_session_html()
+    if redir is not None:
+        return redir
+    if not _admin_section_can("crm_hdsd", "view"):
+        return _admin_section_forbidden_json("crm_hdsd", "view")
+    from crm_test_cases_workbook import build_crm_test_cases_workbook
+
+    buf = build_crm_test_cases_workbook()
+    stamp = date.today().strftime("%Y%m%d")
+    return send_file(
+        buf,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=f"CRM-test-cases-{stamp}.xlsx",
+        etag=False,
+        max_age=0,
+        conditional=False,
+    )
+
+
+@app.get("/api/crm/hdsd/catalog")
+def api_crm_hdsd_catalog() -> Any:
+    if not _admin_section_can("crm_hdsd", "view"):
+        return _admin_section_forbidden_json("crm_hdsd", "view")
+    from crm_hdsd_docs import list_hdsd_catalog
+
+    return jsonify({"catalog": list_hdsd_catalog()})
+
+
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 def _sop_normalize_role(raw: str | None) -> str:
@@ -14054,6 +15551,16 @@ def _sop_generate_tasks(
 def api_crm_sop_list_templates() -> Any:
     raw = (request.args.get("include_inactive") or "").strip().lower()
     incl = raw in ("1", "true", "yes", "all")
+    try:
+        from ptt_crm.config import sop_read_source_pg
+        from ptt_crm.sop_pg_read import list_sop_templates
+
+        if sop_read_source_pg():
+            templates = list_sop_templates(active_only=not incl)
+            if templates:
+                return jsonify({"templates": templates, "read_source": "pg"})
+    except Exception:
+        pass
     with get_connection() as conn:
         if incl:
             rows = conn.execute(
@@ -14317,6 +15824,17 @@ def api_crm_sop_list_runs() -> Any:
     status_filter = (request.args.get("status") or "active").strip().lower()
     if status_filter not in CRM_SOP_RUN_STATUSES and status_filter != "all":
         status_filter = "active"
+    try:
+        from ptt_crm.config import sop_read_source_pg
+        from ptt_crm.sop_pg_read import list_sop_runs
+
+        if sop_read_source_pg():
+            st = None if status_filter == "all" else status_filter
+            runs = list_sop_runs(status=st)
+            if runs:
+                return jsonify({"runs": runs, "read_source": "pg"})
+    except Exception:
+        pass
     with get_connection() as conn:
         if status_filter == "all":
             rows = conn.execute(
@@ -15598,37 +17116,95 @@ def api_crm_add_event(case_id: int) -> Any:
 def landing_contact() -> Any:
     """Gửi form liên hệ từ trang landing — lưu Excel + email (cùng pipeline tư vấn)."""
     data = request.get_json(silent=True) or {}
+    form_type = str(data.get("form_type") or "").strip().lower()
     full_name = (data.get("name") or data.get("full_name") or "").strip()
     email = (data.get("email") or "").strip()
     phone = (data.get("phone") or "").strip()
+    budget = (data.get("budget") or "").strip()
+    company = (data.get("company") or "").strip()
+    goal = (data.get("goal") or "").strip()
+    help_request = (data.get("help_request") or "").strip()
+    additional_info = (data.get("additional_info") or "").strip()
     message = (data.get("message") or "").strip()
 
-    if not full_name or not email:
-        return jsonify({"ok": False, "error": "Vui lòng điền họ tên và email."}), 400
     if len(full_name) > 200:
         return jsonify({"ok": False, "error": "Họ tên quá dài."}), 400
-    if not _EMAIL_RE.match(email):
+    if email and not _EMAIL_RE.match(email):
         return jsonify({"ok": False, "error": "Email không hợp lệ."}), 400
-    if len(message) > 2000:
-        return jsonify({"ok": False, "error": "Nội dung không quá 2000 ký tự."}), 400
 
-    if message:
-        short_goal = (message[:200] + "…") if len(message) > 200 else message
+    is_quick = form_type == "quick" or (
+        form_type != "full"
+        and not budget
+        and not company
+        and not goal
+        and not help_request
+        and not additional_info
+    )
+    if is_quick:
+        if not full_name or not email:
+            return jsonify({"ok": False, "error": "Vui lòng điền họ tên và email."}), 400
+        if len(message) > 2000:
+            return jsonify({"ok": False, "error": "Nội dung không quá 2000 ký tự."}), 400
+        short_goal = (message[:200] + "…") if len(message) > 200 else (message or "—")
+        payload = {
+            "service_slug": "landing",
+            "service_name": "Form liên hệ nhanh (FAB)",
+            "full_name": full_name,
+            "email": email,
+            "phone": phone or "—",
+            "budget": "—",
+            "company": "—",
+            "goal": short_goal,
+            "help_request": message or "—",
+            "additional_info": "",
+        }
+        crm_need = message or short_goal
     else:
-        short_goal = "—"
-
-    payload = {
-        "service_slug": "landing",
-        "service_name": "Form liên hệ (Landing)",
-        "full_name": full_name,
-        "email": email,
-        "phone": phone or "—",
-        "budget": "—",
-        "company": "—",
-        "goal": short_goal,
-        "help_request": message or "—",
-        "additional_info": "",
-    }
+        missing = [
+            label
+            for label, val in (
+                ("họ tên", full_name),
+                ("email", email),
+                ("số điện thoại", phone),
+                ("ngân sách", budget),
+                ("tên công ty", company),
+            )
+            if not val
+        ]
+        if missing:
+            return jsonify(
+                {"ok": False, "error": f"Vui lòng điền đủ: {', '.join(missing)}."}
+            ), 400
+        for field_name, field_val, limit in (
+            ("goal", goal, 500),
+            ("help_request", help_request, 500),
+            ("additional_info", additional_info, 2000),
+        ):
+            if len(field_val) > limit:
+                return jsonify(
+                    {"ok": False, "error": f"{field_name} không quá {limit} ký tự."}
+                ), 400
+        payload = {
+            "service_slug": "landing",
+            "service_name": "Form liên hệ (Landing)",
+            "full_name": full_name,
+            "email": email,
+            "phone": phone,
+            "budget": budget,
+            "company": company,
+            "goal": goal or "—",
+            "help_request": help_request or "—",
+            "additional_info": additional_info,
+        }
+        crm_need = " | ".join(
+            part
+            for part in (
+                f"Mục tiêu: {goal}" if goal else "",
+                f"Hỗ trợ: {help_request}" if help_request else "",
+                f"Thêm: {additional_info}" if additional_info else "",
+            )
+            if part
+        ) or "—"
     try:
         append_consultation_to_excel(payload)
     except OSError as exc:
@@ -15651,7 +17227,7 @@ def landing_contact() -> Any:
                 full_name=full_name,
                 phone=phone,
                 email=email,
-                need=message or short_goal,
+                need=crm_need,
                 source="website",
                 utm_campaign=utm,
                 re_project_id=re_project_id,
@@ -16349,9 +17925,10 @@ def cms_marketing_chat_weekly_plan_xlsx():
 @app.get("/api/settings")
 def get_settings():
     # Gộp default (nav, footer) + DB để form CMS luôn có giá trị ban đầu cho key mới.
-    return jsonify(
-        {**DEFAULT_SETTINGS_NAV_MEGA_BANNER, **DEFAULT_SETTINGS_FOOTER, **fetch_settings()}
-    )
+    merged = _merged_landing_settings()
+    merged["partner_logos_effective_json"] = _partner_logos_effective_json(merged)
+    merged["capabilities_items_effective_json"] = _capabilities_items_effective_json(merged)
+    return jsonify(merged)
 
 
 @app.get("/api/services")
@@ -16394,6 +17971,8 @@ def update_settings():
 
     with get_connection() as conn:
         for key, value in payload.items():
+            if str(key) in READONLY_SETTINGS_KEYS:
+                continue
             conn.execute(
                 """
                 INSERT INTO settings (key, value) VALUES (?, ?)
@@ -16402,10 +17981,10 @@ def update_settings():
                 (str(key), json.dumps(value) if isinstance(value, (dict, list)) else str(value)),
             )
 
-    return jsonify(fetch_settings())
-
-
-# ── Media upload & library ────────────────────────────────────────────────────
+    merged = _merged_landing_settings()
+    merged["partner_logos_effective_json"] = _partner_logos_effective_json(merged)
+    merged["capabilities_items_effective_json"] = _capabilities_items_effective_json(merged)
+    return jsonify(merged)
 
 def _allowed_upload(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_UPLOAD_EXTENSIONS
@@ -16421,16 +18000,56 @@ def cms_media_upload():
     if not f.filename:
         return jsonify({"error": "Tên file rỗng"}), 400
     if not _allowed_upload(f.filename):
-        return jsonify({"error": "Định dạng không hỗ trợ. Dùng: jpg, png, webp, gif, svg"}), 400
-    data = f.read()
-    if len(data) > MAX_UPLOAD_BYTES:
-        return jsonify({"error": "File quá lớn (tối đa 10 MB)"}), 413
+        return jsonify({"error": "Định dạng không hỗ trợ. Dùng: jpg, png, webp, gif, svg, mp4, webm, mov"}), 400
     ext = f.filename.rsplit(".", 1)[1].lower()
+    data = f.read()
+    max_bytes = MAX_VIDEO_UPLOAD_BYTES if ext in ("mp4", "webm", "mov") else MAX_UPLOAD_BYTES
+    if len(data) > max_bytes:
+        cap_mb = max_bytes // (1024 * 1024)
+        kind = "Video" if ext in ("mp4", "webm", "mov") else "File"
+        return jsonify({"error": f"{kind} quá lớn (tối đa {cap_mb} MB)"}), 413
+    purpose = (request.form.get("purpose") or request.args.get("purpose") or "").strip().lower()
+    img_meta: dict = {}
+
+    if purpose == "hero" and ext in ("jpg", "jpeg", "png", "webp"):
+        from cms_media_images import process_hero_variants
+
+        hero_result = process_hero_variants(data, ext)
+        if hero_result is not None:
+            desktop_bytes, mobile_bytes, img_meta = hero_result
+            from cms_media_images import write_hero_upload_files
+
+            paths = write_hero_upload_files(UPLOAD_DIR, desktop_bytes, mobile_bytes)
+            payload = {
+                **paths,
+                "size": len(desktop_bytes),
+                "size_mobile": len(mobile_bytes),
+                "ext": "webp",
+            }
+            payload.update(img_meta)
+            return jsonify(payload), 201
+
+    if ext in ("jpg", "jpeg", "png", "webp"):
+        from cms_media_images import process_image_upload
+
+        data, ext, img_meta = process_image_upload(data, ext, purpose or None)
+
+    if ext in ("mp4", "webm", "mov"):
+        from cms_media_video import process_video_upload
+
+        video_result = process_video_upload(data, ext, purpose or None)
+        if video_result is not None:
+            data, ext, video_meta = video_result
+            img_meta.update(video_meta)
+
     filename = f"{uuid.uuid4().hex}.{ext}"
     dest = UPLOAD_DIR / filename
     dest.write_bytes(data)
     url = f"/static/uploads/{filename}"
-    return jsonify({"url": url, "filename": filename, "size": len(data), "ext": ext}), 201
+    payload = {"url": url, "filename": filename, "size": len(data), "ext": ext}
+    if img_meta:
+        payload.update(img_meta)
+    return jsonify(payload), 201
 
 
 @app.get("/api/cms/media")
@@ -16479,8 +18098,132 @@ def cms_landing() -> str:
     if _admin_full_access():
         grants = {mid: list(CMS_ACTIONS) for mid in CMS_MODULE_IDS}
     role_name = str(role_row["name"]) if role_row else _cms_session_role()
+    cms_settings = fetch_settings()
+    partner_seed = _partner_logos_seed_for_cms(cms_settings)
+    capabilities_seed = _capabilities_items_seed_for_cms(cms_settings)
     return render_template(
         "cms_landing.html",
+        cms_role_code=_cms_session_role(),
+        cms_role_name=role_name,
+        cms_username=_cms_session_username(),
+        cms_grants_json=json.dumps(grants, ensure_ascii=False),
+        partner_logos_seed_json=json.dumps(partner_seed, ensure_ascii=False),
+        capabilities_items_seed_json=json.dumps(capabilities_seed, ensure_ascii=False),
+        **_admin_page_template_kwargs(),
+    )
+
+
+# ── CMS Recruitment ──────────────────────────────────────────────────────────
+
+@app.get("/api/cms/recruitment")
+def api_recruitment_list():
+    if not _cms_can("recruitment_jobs", "view"):
+        return _cms_forbidden_json("recruitment_jobs", "view")
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM recruitment_jobs ORDER BY sort_order, id"
+        ).fetchall()
+    return jsonify([_job_row_to_dict(r) for r in rows])
+
+
+@app.post("/api/cms/recruitment")
+def api_recruitment_create():
+    if not _cms_can("recruitment_jobs", "create"):
+        return _cms_forbidden_json("recruitment_jobs", "create")
+    data = request.get_json(force=True) or {}
+    slug = str(data.get("slug", "")).strip()
+    title = str(data.get("title", "")).strip()
+    if not slug or not title:
+        return jsonify({"error": "slug và title là bắt buộc"}), 400
+    with get_connection() as conn:
+        try:
+            conn.execute(
+                """INSERT INTO recruitment_jobs
+                   (slug, title, location, employment_type, description, intro,
+                    responsibilities, requirements, benefits, is_active, sort_order)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,
+                     COALESCE((SELECT MAX(sort_order)+1 FROM recruitment_jobs),0))""",
+                (
+                    slug, title,
+                    str(data.get("location", "")),
+                    str(data.get("employment_type", "Toàn thời gian")),
+                    str(data.get("description", "")),
+                    str(data.get("intro", "")),
+                    json.dumps(data.get("responsibilities", []), ensure_ascii=False),
+                    json.dumps(data.get("requirements", []), ensure_ascii=False),
+                    json.dumps(data.get("benefits", []), ensure_ascii=False),
+                    1 if data.get("is_active", True) else 0,
+                ),
+            )
+            row = conn.execute(
+                "SELECT * FROM recruitment_jobs WHERE slug=?", (slug,)
+            ).fetchone()
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 409
+    return jsonify(_job_row_to_dict(row)), 201
+
+
+@app.put("/api/cms/recruitment/<int:job_id>")
+def api_recruitment_update(job_id: int):
+    if not _cms_can("recruitment_jobs", "edit"):
+        return _cms_forbidden_json("recruitment_jobs", "edit")
+    data = request.get_json(force=True) or {}
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM recruitment_jobs WHERE id=?", (job_id,)
+        ).fetchone()
+        if row is None:
+            return jsonify({"error": "Không tìm thấy"}), 404
+        fields: list[str] = []
+        values: list[Any] = []
+        str_fields = ("slug", "title", "location", "employment_type", "description", "intro")
+        for f in str_fields:
+            if f in data:
+                fields.append(f"{f}=?")
+                values.append(str(data[f]))
+        for f in ("responsibilities", "requirements", "benefits"):
+            if f in data:
+                fields.append(f"{f}=?")
+                values.append(json.dumps(data[f], ensure_ascii=False))
+        if "is_active" in data:
+            fields.append("is_active=?")
+            values.append(1 if data["is_active"] else 0)
+        if "sort_order" in data:
+            fields.append("sort_order=?")
+            values.append(int(data["sort_order"]))
+        if not fields:
+            return jsonify({"error": "Không có trường nào để cập nhật"}), 400
+        values.append(job_id)
+        conn.execute(f"UPDATE recruitment_jobs SET {', '.join(fields)} WHERE id=?", values)
+        row = conn.execute("SELECT * FROM recruitment_jobs WHERE id=?", (job_id,)).fetchone()
+    return jsonify(_job_row_to_dict(row))
+
+
+@app.delete("/api/cms/recruitment/<int:job_id>")
+def api_recruitment_delete(job_id: int):
+    if not _cms_can("recruitment_jobs", "delete"):
+        return _cms_forbidden_json("recruitment_jobs", "delete")
+    with get_connection() as conn:
+        conn.execute("DELETE FROM recruitment_jobs WHERE id=?", (job_id,))
+    return "", 204
+
+
+@app.get("/cms/recruitment")
+def cms_recruitment() -> str:
+    redir = _ensure_admin_session_html()
+    if redir is not None:
+        return redir
+    with get_connection() as conn:
+        grants = _cms_load_role_grants(conn, _cms_session_role())
+        role_row = conn.execute(
+            "SELECT name FROM cms_roles WHERE code = ?",
+            (_cms_session_role(),),
+        ).fetchone()
+    if _admin_full_access():
+        grants = {mid: list(CMS_ACTIONS) for mid in CMS_MODULE_IDS}
+    role_name = str(role_row["name"]) if role_row else _cms_session_role()
+    return render_template(
+        "cms_recruitment.html",
         cms_role_code=_cms_session_role(),
         cms_role_name=role_name,
         cms_username=_cms_session_username(),
@@ -16674,6 +18417,7 @@ def cms_live_chat() -> Any:
         "cms_live_chat.html",
         settings=fetch_settings(),
         cms_grants_json=json.dumps(grants, ensure_ascii=False),
+        can_reply_live_chat=_cms_can("live_chat", "create"),
         **_admin_page_template_kwargs(),
     )
 
@@ -16778,6 +18522,373 @@ def cms_live_chat_save_settings() -> Any:
     return jsonify({"ok": True})
 
 
+# ── Lead intake forms (HTML in docs/forms/lead-intake) ─────────────────────
+
+_LEAD_INTAKE_FORMS_DIR = Path(__file__).resolve().parent / "docs" / "forms" / "lead-intake"
+_LEAD_INTAKE_FORM_FILES = frozenset({
+    "00-form-chung.html",
+    "dich-vu-aeo.html",
+    "dich-vu-quan-tri-website.html",
+    "dich-vu-seo-audit.html",
+    "dich-vu-seo-local.html",
+    "dich-vu-seo-tong-the.html",
+    "quang-cao-facebook.html",
+    "quang-cao-google.html",
+    "thiet-ke-landing-page.html",
+    "thiet-ke-website-tron-goi.html",
+    "thiet-ke-website.html",
+    "thue-tai-khoan-quang-cao.html",
+    "tiep-thi-noi-dung.html",
+})
+
+
+@app.get("/crm/forms/lead-intake/<filename>")
+def crm_lead_intake_form_file(filename: str) -> Any:
+    """Phục vụ form HTML tiếp nhận lead (in / điền offline)."""
+    redir = _ensure_admin_session_html()
+    if redir is not None:
+        return redir
+    safe = (filename or "").strip()
+    if safe not in _LEAD_INTAKE_FORM_FILES:
+        abort(404)
+    path = _LEAD_INTAKE_FORMS_DIR / safe
+    if not path.is_file():
+        abort(404)
+    return send_file(path, mimetype="text/html; charset=utf-8")
+
+
+# ── Lead intake CRM sessions (form nhập & chỉnh sửa trên hệ thống) ─────────
+
+@app.get("/crm/intake")
+def crm_lead_intake_page() -> Any:
+    """Trang nhập/chỉnh sửa form Lead Intake khi gặp KH."""
+    redir = _ensure_admin_session_html()
+    if redir is not None:
+        return redir
+    from crm_lead_intake import get_session as _intake_get, list_sessions as _intake_list
+    from crm_lead_intake_definitions import (
+        COMMON_FORM_SLUG,
+        get_crm_fields_for_slug,
+        get_ui_definition,
+        resolve_definition_slug,
+    )
+    from crm_svc_tasks import SERVICE_LABELS as _svc_labels
+
+    lifecycle_id = _opt_pos_int(request.args.get("lifecycle_id"))
+    lead_id = _opt_pos_int(request.args.get("lead_id"))
+    session_id = _opt_pos_int(request.args.get("session_id"))
+    auto_create_mode = str(request.args.get("mode") or "").strip()
+    if auto_create_mode not in ("phone", "in_person"):
+        auto_create_mode = ""
+    auto_create = str(request.args.get("auto_create") or "").strip() in ("1", "true", "yes")
+    lifecycle = None
+    customer = None
+    lead = None
+    service_slug = str(request.args.get("service_slug") or "").strip()
+    sessions: list[dict] = []
+    active_session = None
+    _intake_print_file = "00-form-chung.html"
+
+    with get_connection() as conn:
+        if lifecycle_id:
+            row = conn.execute(
+                "SELECT * FROM crm_service_lifecycle WHERE id = ?", (lifecycle_id,)
+            ).fetchone()
+            if row is None:
+                return "Không tìm thấy lifecycle", 404
+            lifecycle = dict(row)
+            service_slug = lifecycle.get("service_slug") or service_slug
+            if not lead_id and lifecycle.get("lead_id"):
+                lead_id = int(lifecycle["lead_id"])
+            if lifecycle.get("customer_id"):
+                crow = conn.execute(
+                    "SELECT * FROM crm_customers WHERE id = ?",
+                    (lifecycle["customer_id"],),
+                ).fetchone()
+                customer = dict(crow) if crow else None
+            sessions = _intake_list(conn, lifecycle_id=lifecycle_id)
+            def_slug = resolve_definition_slug(service_slug)
+            _intake_print_file = (
+                "00-form-chung.html"
+                if def_slug == COMMON_FORM_SLUG
+                else f"{service_slug}.html"
+                if f"{service_slug}.html" in _LEAD_INTAKE_FORM_FILES
+                else "00-form-chung.html"
+            )
+        elif lead_id:
+            lrow = conn.execute(
+                "SELECT id, full_name FROM crm_leads WHERE id = ?", (lead_id,)
+            ).fetchone()
+            if lrow is None:
+                return "Không tìm thấy lead", 404
+            lead = dict(lrow)
+            if not service_slug:
+                service_slug = COMMON_FORM_SLUG
+            sessions = _intake_list(conn, lead_id=lead_id)
+            _intake_print_file = "00-form-chung.html"
+
+        if session_id:
+            active_session = _intake_get(conn, session_id)
+            if active_session is None:
+                return "Không tìm thấy phiên intake", 404
+            if lifecycle_id and active_session.get("lifecycle_id") not in (None, lifecycle_id):
+                return "Phiên không thuộc lifecycle này", 400
+            if lead_id and active_session.get("lead_id") not in (None, lead_id):
+                if not lifecycle_id:
+                    return "Phiên không thuộc lead này", 400
+            if not lifecycle_id and active_session.get("lifecycle_id"):
+                lifecycle_id = int(active_session["lifecycle_id"])
+                row = conn.execute(
+                    "SELECT * FROM crm_service_lifecycle WHERE id = ?", (lifecycle_id,)
+                ).fetchone()
+                lifecycle = dict(row) if row else None
+                service_slug = (lifecycle or {}).get("service_slug") or service_slug
+                sessions = _intake_list(conn, lifecycle_id=lifecycle_id)
+            if not lead_id and active_session.get("lead_id"):
+                lead_id = int(active_session["lead_id"])
+                if not sessions:
+                    sessions = _intake_list(conn, lead_id=lead_id)
+            service_slug = active_session.get("service_slug") or service_slug
+
+    def_slug = resolve_definition_slug(service_slug)
+    is_common_form = def_slug == COMMON_FORM_SLUG
+    definition = get_ui_definition(service_slug)
+    form_fields = get_crm_fields_for_slug(service_slug)
+
+    recap_info: dict[str, Any] | None = None
+    if active_session and active_session.get("mode") == "in_person":
+        ans = active_session.get("answers_json") or {}
+        meta = ans.get("meta") if isinstance(ans.get("meta"), dict) else {}
+        if meta.get("recap") or meta.get("phone_completed_at"):
+            recap_info = {
+                "text": meta.get("recap") or ans.get("recap") or "",
+                "phone_session_id": meta.get("phone_session_id"),
+                "phone_completed_at": meta.get("phone_completed_at") or "",
+            }
+
+    service_label = _svc_labels.get(def_slug, definition.get("title") or service_slug)
+    can_auto_create = auto_create and not active_session and bool(lifecycle_id or lead_id)
+
+    page_meta = {
+        "lifecycle_id": lifecycle_id,
+        "lead_id": lead_id,
+        "service_slug": def_slug if is_common_form else service_slug,
+        "is_common_form": is_common_form,
+        "service_label": service_label,
+        "customer_name": (customer or {}).get("name") or "",
+        "lead_name": (lead or {}).get("full_name") or "",
+        "definition": definition,
+        "form_fields": form_fields,
+        "sessions": sessions,
+        "active_session": active_session,
+        "auto_create": can_auto_create,
+        "auto_create_mode": auto_create_mode or "phone",
+        "workflow_url": (
+            url_for("crm_service_workflow_page", lifecycle_id=lifecycle_id)
+            if lifecycle_id else ""
+        ),
+        "leads_url": url_for("crm_leads_page") if lead_id and not lifecycle_id else "",
+        "print_form_url": url_for(
+            "crm_lead_intake_form_file", filename=_intake_print_file
+        ),
+        "recap": recap_info,
+        "go_thresholds": {"go": 24, "nurture_min": 18},
+    }
+    return render_template(
+        "crm_lead_intake.html",
+        lifecycle=lifecycle,
+        customer=customer,
+        lead=lead,
+        service_label=service_label,
+        is_common_form=is_common_form,
+        page_meta=page_meta,
+        active_session=active_session,
+        **_admin_page_template_kwargs(),
+    )
+
+
+@app.get("/api/crm/intake/definitions")
+def api_intake_definitions() -> Any:
+    from crm_lead_intake_definitions import (
+        COMMON_FORM_SLUG,
+        bant_rows,
+        get_common_form_definition,
+        service_slugs,
+    )
+    common = get_common_form_definition()
+    return jsonify({
+        "slugs": list(service_slugs()),
+        "common_slug": COMMON_FORM_SLUG,
+        "common": {
+            "title": common.get("title"),
+            "phone_questions_count": len(common.get("phone_qs") or []),
+            "inperson_questions_count": len(common.get("inperson_qs") or []),
+        },
+        "bant_rows": [{"label": l, "hint": h} for l, h in bant_rows()],
+    })
+
+
+@app.get("/api/crm/intake/definitions/<slug>")
+def api_intake_definition(slug: str) -> Any:
+    from crm_lead_intake_definitions import get_ui_definition
+    return jsonify(get_ui_definition(slug))
+
+
+@app.get("/api/crm/intake/sessions")
+def api_intake_sessions_list() -> Any:
+    from crm_lead_intake import list_sessions as _intake_list
+    lifecycle_id = _opt_pos_int(request.args.get("lifecycle_id"))
+    lead_id = _opt_pos_int(request.args.get("lead_id"))
+    if not lifecycle_id and not lead_id:
+        return jsonify({"error": "Cần lifecycle_id hoặc lead_id"}), 400
+    with get_connection() as conn:
+        sessions = _intake_list(
+            conn, lifecycle_id=lifecycle_id, lead_id=lead_id
+        )
+    return jsonify({"sessions": sessions})
+
+
+@app.post("/api/crm/intake/sessions")
+def api_intake_session_create() -> Any:
+    from crm_lead_intake import create_session as _intake_create
+    payload = request.get_json(force=True) or {}
+    lifecycle_id = _opt_pos_int(payload.get("lifecycle_id"))
+    lead_id = _opt_pos_int(payload.get("lead_id"))
+    service_slug = str(payload.get("service_slug") or "").strip()
+    mode = str(payload.get("mode") or "phone").strip()
+    if not lifecycle_id and not lead_id:
+        return jsonify({"error": "Cần lifecycle_id hoặc lead_id"}), 400
+    from crm_lead_intake_definitions import COMMON_FORM_SLUG, normalize_intake_slug
+    if not service_slug and lifecycle_id:
+        with get_connection() as conn:
+            row = conn.execute(
+                "SELECT service_slug FROM crm_service_lifecycle WHERE id = ?",
+                (lifecycle_id,),
+            ).fetchone()
+            if row:
+                service_slug = str(row["service_slug"] or "")
+    if not service_slug:
+        service_slug = COMMON_FORM_SLUG
+    service_slug = normalize_intake_slug(service_slug) or COMMON_FORM_SLUG
+    with get_connection() as conn:
+        try:
+            sid = _intake_create(
+                conn,
+                lifecycle_id=lifecycle_id,
+                lead_id=lead_id,
+                service_slug=service_slug,
+                mode=mode,
+                am_id=_opt_pos_int(session.get("admin_id")),
+                contact_name=str(payload.get("contact_name") or "")[:500],
+                contact_role=str(payload.get("contact_role") or "")[:200],
+                company_name=str(payload.get("company_name") or "")[:500],
+                source=str(payload.get("source") or "")[:200],
+            )
+            from crm_lead_intake import get_session as _intake_get
+            created = _intake_get(conn, sid)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+    return jsonify(created), 201
+
+
+@app.get("/api/crm/intake/sessions/<int:session_id>")
+def api_intake_session_get(session_id: int) -> Any:
+    from crm_lead_intake import get_session as _intake_get
+    with get_connection() as conn:
+        row = _intake_get(conn, session_id)
+    if row is None:
+        return jsonify({"error": "Không tìm thấy phiên"}), 404
+    return jsonify(row)
+
+
+@app.patch("/api/crm/intake/sessions/<int:session_id>")
+def api_intake_session_patch(session_id: int) -> Any:
+    from crm_lead_intake import update_session as _intake_update
+    payload = request.get_json(force=True) or {}
+    with get_connection() as conn:
+        updated = _intake_update(conn, session_id, payload)
+    if updated is None:
+        return jsonify({"error": "Không tìm thấy phiên"}), 404
+    return jsonify(updated)
+
+
+@app.post("/api/crm/intake/sessions/<int:session_id>/complete")
+def api_intake_session_complete(session_id: int) -> Any:
+    from crm_lead_intake import complete_session as _intake_complete
+    from crm_lead_intake import trigger_intake_summary_async as _intake_ai_async
+    with get_connection() as conn:
+        try:
+            updated = _intake_complete(
+                conn, session_id, actor_id=_opt_pos_int(session.get("admin_id"))
+            )
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+    if updated is None:
+        return jsonify({"error": "Không tìm thấy phiên"}), 404
+    try:
+        _intake_ai_async(session_id, db_path=str(DB_PATH))
+    except Exception as _ai_exc:
+        app.logger.debug("Intake AI summary trigger skipped: %s", _ai_exc)
+    return jsonify(updated)
+
+
+@app.post("/api/crm/intake/sessions/<int:session_id>/ai-summary")
+def api_intake_session_ai_summary(session_id: int) -> Any:
+    """Tạo lại AI summary cho phiên intake (sync — dùng khi cần refresh)."""
+    from crm_lead_intake import (
+        generate_intake_summary as _gen_summary,
+        get_session as _intake_get,
+        save_intake_ai_result as _save_ai,
+    )
+    with get_connection() as conn:
+        session = _intake_get(conn, session_id)
+        if session is None:
+            return jsonify({"error": "Không tìm thấy phiên"}), 404
+        result = _gen_summary(session)
+        if result is None:
+            return jsonify({
+                "error": "Không tạo được AI summary (thiếu API key hoặc lỗi model)",
+            }), 503
+        updated = _save_ai(conn, session_id, result)
+    return jsonify(updated)
+
+
+@app.get("/api/crm/intake/stats")
+def api_intake_stats() -> Any:
+    from crm_lead_intake import get_intake_stats as _intake_stats
+    am_id = _opt_pos_int(request.args.get("am_id"))
+    by_am = str(request.args.get("by_am", "")).lower() in ("1", "true", "yes")
+    with get_connection() as conn:
+        stats = _intake_stats(conn, am_id=am_id, by_am=by_am)
+    return jsonify(stats)
+
+
+@app.get("/api/crm/intake/entry")
+def api_intake_entry() -> Any:
+    """Resolve lifecycle + redirect URL cho entry từ Lead UI."""
+    from crm_lead_intake import resolve_intake_entry as _intake_entry
+    lead_id = _opt_pos_int(request.args.get("lead_id"))
+    mode = str(request.args.get("mode") or "phone").strip()
+    form = str(request.args.get("form") or "").strip()
+    if not lead_id:
+        return jsonify({"ok": False, "error": "Cần lead_id"}), 400
+    with get_connection() as conn:
+        result = _intake_entry(conn, lead_id=lead_id, mode=mode, form=form)
+    if not result.get("ok"):
+        return jsonify(result), 404
+    return jsonify(result)
+
+
+@app.post("/api/crm/intake/sessions/<int:session_id>/reopen")
+def api_intake_session_reopen(session_id: int) -> Any:
+    from crm_lead_intake import reopen_session as _intake_reopen
+    with get_connection() as conn:
+        updated = _intake_reopen(conn, session_id)
+    if updated is None:
+        return jsonify({"error": "Không tìm thấy phiên"}), 404
+    return jsonify(updated)
+
+
 # ── Service Delivery Dashboard ─────────────────────────────────────────────
 
 @app.get("/crm/service-delivery")
@@ -16786,8 +18897,50 @@ def crm_service_delivery_page() -> Any:
     if redir is not None:
         return redir
     from collections import defaultdict
+    from crm_svc_presales import get_funnel_stats as _funnel_stats
+    now = datetime.utcnow()
+    period_start = f"{now.year:04d}-{now.month:02d}-01"
+    if now.month == 12:
+        period_end = f"{now.year:04d}-12-31"
+    else:
+        from datetime import timedelta
+        next_month = datetime(now.year, now.month + 1, 1)
+        period_end = (next_month - timedelta(days=1)).strftime("%Y-%m-%d")
     with get_connection() as conn:
-        lifecycles = _svc_list_active(conn, include_draft=True)
+        include_draft = not _crm_presales_on_lead_enabled()
+        lifecycles = _svc_list_active(conn, include_draft=include_draft)
+        from crm_lead_intake import get_intake_stats as _intake_stats
+        intake_stats = _intake_stats(conn)
+        funnel_stats = _funnel_stats(
+            conn,
+            period_start=period_start,
+            period_end=period_end,
+        )
+        am_staff = [
+            dict(r)
+            for r in conn.execute(
+                """
+                SELECT DISTINCT s.id, s.name
+                FROM crm_staff s
+                WHERE s.active = 1
+                  AND (
+                    s.id IN (
+                        SELECT assigned_am FROM crm_service_lifecycle
+                        WHERE assigned_am IS NOT NULL
+                    )
+                    OR s.id IN (
+                        SELECT assigned_am FROM crm_lead_presales
+                        WHERE assigned_am IS NOT NULL
+                    )
+                    OR s.id IN (
+                        SELECT owner_id FROM crm_leads
+                        WHERE owner_id IS NOT NULL
+                    )
+                  )
+                ORDER BY s.name
+                """
+            ).fetchall()
+        ]
     by_stage: dict = defaultdict(list)
     for lc in lifecycles:
         by_stage[lc["stage"]].append(lc)
@@ -16796,8 +18949,1704 @@ def crm_service_delivery_page() -> Any:
         by_stage=by_stage,
         stages=SVC_LIFECYCLE_STAGES,
         valid_slugs=sorted(SVC_LIFECYCLE_SLUGS),
+        intake_stats=intake_stats,
+        funnel_stats=funnel_stats,
+        am_staff=am_staff,
+        funnel_period_start=period_start,
+        funnel_period_end=period_end,
         **_admin_page_template_kwargs(),
     )
+
+
+# ── Service Workflow Detail ─────────────────────────────────────────────────
+
+@app.get("/crm/service-delivery/<int:lifecycle_id>")
+def crm_service_workflow_page(lifecycle_id: int) -> Any:
+    redir = _ensure_admin_session_html()
+    if redir is not None:
+        return redir
+    from crm_svc_tasks import (
+        SERVICE_LABELS as _svc_labels,
+        get_progress as _svc_progress,
+        list_tasks as _svc_list_tasks,
+        seed_tasks as _svc_seed,
+    )
+    from crm_svc_workflow_steps import SERVICE_WORKFLOW_STEPS as _svc_steps
+    with get_connection() as conn:
+        lc = conn.execute(
+            "SELECT * FROM crm_service_lifecycle WHERE id = ?", (lifecycle_id,)
+        ).fetchone()
+        if lc is None:
+            return "Không tìm thấy lifecycle", 404
+        lc = dict(lc)
+        _svc_seed(conn, lifecycle_id=lifecycle_id, service_slug=lc["service_slug"])
+        from crm_svc_tasks import ensure_recurring_deliver_tasks as _svc_ensure_deliver
+
+        _svc_ensure_deliver(conn, lifecycle_id=lifecycle_id, service_slug=lc["service_slug"])
+        from crm_service_lifecycle import get_stage_advance_info as _svc_advance_info
+
+        advance_info = _svc_advance_info(conn, lifecycle_id=lifecycle_id)
+        # Seed và load risks
+        from crm_svc_risk import (
+            seed_risks as _risk_seed,
+            list_risks as _risk_list,
+            get_latest_scan as _risk_latest_scan,
+        )
+        _risk_seed(conn, lifecycle_id=lifecycle_id, service_slug=lc["service_slug"])
+        risks = _risk_list(conn, lifecycle_id=lifecycle_id)
+        latest_risk_scan = _risk_latest_scan(conn, lifecycle_id=lifecycle_id)
+        tasks_by_stage = _svc_list_tasks(conn, lifecycle_id=lifecycle_id)
+        progress = _svc_progress(conn, lifecycle_id=lifecycle_id)
+        customer = None
+        if lc.get("customer_id"):
+            row = conn.execute(
+                "SELECT * FROM crm_customers WHERE id = ?", (lc["customer_id"],)
+            ).fetchone()
+            customer = dict(row) if row else None
+        # Finance data
+        from crm_svc_finance import (
+            get_summary as _fin_summary,
+            list_payments as _fin_payments,
+            list_expenses as _fin_expenses,
+            get_latest_finance_scan as _fin_scan,
+        )
+        contract_amount_vnd = 0
+        if lc.get("contract_id"):
+            c_row = conn.execute(
+                "SELECT amount_vnd FROM crm_contracts WHERE id = ?",
+                (lc["contract_id"],),
+            ).fetchone()
+            if c_row:
+                contract_amount_vnd = int(c_row["amount_vnd"] or 0)
+        finance_summary = _fin_summary(conn, lifecycle_id, contract_amount_vnd)
+        payments = _fin_payments(conn, lifecycle_id)
+        expenses = _fin_expenses(conn, lifecycle_id, cost_phase="delivery")
+        from crm_svc_presales import (
+            get_presales_cost_summary as _presales_summary,
+            show_presales_panel as _show_presales_panel,
+        )
+        presales_summary = _presales_summary(conn, lifecycle_id)
+        presales_expenses = _fin_expenses(conn, lifecycle_id, cost_phase="presales")
+        show_presales_panel = _show_presales_panel(lc)
+        latest_health_scan = _fin_scan(conn, lifecycle_id, "health")
+        latest_forecast_scan = _fin_scan(conn, lifecycle_id, "forecast")
+        from crm_svc_kpi import get_lifecycle_staff_metrics as _kpi_staff
+        lifecycle_staff = _kpi_staff(conn, lifecycle_id)
+        crm_staff_list = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT id, name FROM crm_staff WHERE COALESCE(active, 1) = 1 ORDER BY name"
+            ).fetchall()
+        ]
+        aeo_stats = None
+        if lc["service_slug"] == "dich-vu-aeo":
+            from crm_aeo import list_queries as _aeo_list
+            aeo_qs = _aeo_list(conn, lc["customer_id"]) if lc.get("customer_id") else []
+            total_q = len(aeo_qs)
+            visible_q = sum(1 for q in aeo_qs if q.get("brand_visible") == 1)
+            aeo_stats = {"total": total_q, "visible": visible_q}
+        from crm_lead_intake import list_sessions as _intake_list_sessions
+        intake_sessions = _intake_list_sessions(conn, lifecycle_id=lifecycle_id)
+        consult_brief = None
+        consult_advance_gate = None
+        if lc.get("stage") == "consult":
+            from crm_svc_consult_bridge import get_consult_brief as _consult_brief
+            try:
+                consult_brief = _consult_brief(conn, lifecycle_id)
+            except ValueError:
+                consult_brief = None
+        elif lc.get("stage") == "lead":
+            from crm_svc_consult_bridge import validate_consult_advance as _consult_gate
+            try:
+                consult_advance_gate = _consult_gate(conn, lifecycle_id)
+            except ValueError:
+                consult_advance_gate = None
+        consult_proposal_url = None
+        consult_stage_complete = False
+        if lc.get("stage") == "consult":
+            from crm_svc_tasks import is_stage_complete as _svc_stage_done
+
+            consult_stage_complete = _svc_stage_done(conn, lifecycle_id, "consult")
+            prop_customer_id = lc.get("customer_id")
+            if not prop_customer_id and lc.get("lead_id"):
+                lr = conn.execute(
+                    "SELECT converted_customer_id FROM crm_leads WHERE id = ?",
+                    (lc["lead_id"],),
+                ).fetchone()
+                if lr and lr[0]:
+                    prop_customer_id = int(lr[0])
+            if consult_stage_complete and prop_customer_id:
+                consult_proposal_url = (
+                    f"/crm/proposals?customer_id={prop_customer_id}"
+                    f"&lifecycle_id={lifecycle_id}"
+                    f"&service_slug={lc['service_slug']}&from_consult=1"
+                )
+        _intake_file = (
+            f'{lc["service_slug"]}.html'
+            if f'{lc["service_slug"]}.html' in _LEAD_INTAKE_FORM_FILES
+            else "00-form-chung.html"
+        )
+        from crm_svc_consult_bridge import get_lifecycle_funnel_progress as _lc_funnel
+
+        try:
+            lifecycle_funnel = _lc_funnel(conn, lifecycle_id)
+        except ValueError:
+            lifecycle_funnel = None
+        official_marketing_plan = None
+        tmmt_deliver_gate = None
+        if lc.get("marketing_plan_id") or lc.get("stage") in ("onboard", "deliver", "handover", "retain"):
+            from crm_lead_presales_marketing_plan import (
+                official_plan_payload as _official_mp_payload,
+                validate_lifecycle_deliver_advance as _tmmt_deliver_gate,
+            )
+
+            try:
+                official_marketing_plan = _official_mp_payload(conn, lifecycle_id)
+            except Exception:
+                official_marketing_plan = None
+            if lc.get("stage") == "onboard":
+                try:
+                    tmmt_deliver_gate = _tmmt_deliver_gate(conn, lifecycle_id)
+                except Exception:
+                    tmmt_deliver_gate = None
+    return render_template(
+        "crm_service_workflow.html",
+        lifecycle=lc,
+        tasks_by_stage=tasks_by_stage,
+        progress=progress,
+        stages=SVC_LIFECYCLE_STAGES,
+        customer=customer,
+        service_label=_svc_labels.get(lc["service_slug"], lc["service_slug"]),
+        service_steps=_svc_steps.get(lc["service_slug"], {}),
+        stage_labels={
+            "lead": "Lead", "consult": "Tư vấn", "proposal": "Báo giá",
+            "onboard": "Onboarding", "deliver": "Triển khai",
+            "handover": "Nghiệm thu", "retain": "Chăm sóc",
+        },
+        advance_info=advance_info,
+        intake_form_file=_intake_file,
+        intake_form_common="00-form-chung.html",
+        intake_sessions=intake_sessions,
+        risks=risks,
+        latest_risk_scan=latest_risk_scan,
+        finance_summary=finance_summary,
+        payments=payments,
+        expenses=expenses,
+        latest_health_scan=latest_health_scan,
+        latest_forecast_scan=latest_forecast_scan,
+        lifecycle_staff=lifecycle_staff,
+        crm_staff_list=crm_staff_list,
+        presales_summary=presales_summary,
+        presales_expenses=presales_expenses,
+        show_presales_panel=show_presales_panel,
+        consult_brief=consult_brief,
+        consult_advance_gate=consult_advance_gate,
+        consult_proposal_url=consult_proposal_url,
+        consult_stage_complete=consult_stage_complete,
+        lifecycle_funnel=lifecycle_funnel,
+        aeo_stats=aeo_stats,
+        official_marketing_plan=official_marketing_plan,
+        tmmt_deliver_gate=tmmt_deliver_gate,
+        today_iso=datetime.now().strftime("%Y-%m-%d"),
+        tmmt_strategy_labels=CRM_MP_STRATEGY_FRAMEWORK_LABELS_VI,
+        tmmt_prof_labels=CRM_MP_TARGET_MARKET_PROF_LABELS_VI,
+        tmmt_core_keys=[
+            "market_context",
+            "segmentation_icp",
+            "personas_roles",
+            "pains_desired_outcomes",
+        ],
+        **_admin_page_template_kwargs(),
+    )
+
+
+@app.patch("/api/crm/svc-tasks/<int:task_id>")
+def api_svc_task_patch(task_id: int) -> Any:
+    from crm_svc_tasks import update_task as _svc_update
+    payload = request.get_json(force=True) or {}
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id, lifecycle_id FROM crm_svc_tasks WHERE id = ?", (task_id,)
+        ).fetchone()
+        if row is None:
+            return jsonify({"error": "Không tìm thấy task"}), 404
+        lifecycle_id = int(row["lifecycle_id"])
+        is_done = payload.get("is_done")
+        notes = payload.get("notes")
+        form_data = payload.get("form_data")
+        done_by = _opt_pos_int(payload.get("done_by"))
+        _svc_update(
+            conn, task_id,
+            is_done=bool(is_done) if is_done is not None else None,
+            notes=str(notes)[:4000] if notes is not None else None,
+            form_data=form_data if isinstance(form_data, dict) else None,
+            done_by=done_by,
+        )
+        if isinstance(form_data, dict) and any(
+            k in form_data for k in ("assigned_sp", "seo_specialist", "content_specialist")
+        ):
+            try:
+                from crm_service_lifecycle import sync_assigned_sp_from_tasks
+
+                sync_assigned_sp_from_tasks(conn, lifecycle_id, overwrite=False)
+            except Exception as exc:
+                logger.warning(
+                    "sync_assigned_sp_from_tasks lifecycle=%s task=%s: %s",
+                    lifecycle_id,
+                    task_id,
+                    exc,
+                )
+        updated = conn.execute(
+            "SELECT * FROM crm_svc_tasks WHERE id = ?", (task_id,)
+        ).fetchone()
+    return jsonify(dict(updated))
+
+
+@app.post("/api/crm/svc-tasks")
+def api_svc_task_create() -> Any:
+    from crm_svc_tasks import create_custom_task as _svc_create
+    payload = request.get_json(force=True) or {}
+    lifecycle_id = _opt_pos_int(payload.get("lifecycle_id"))
+    stage = str(payload.get("stage", "")).strip()
+    title = str(payload.get("title", "")).strip()[:500]
+    description = str(payload.get("description", "")).strip()[:2000]
+    if not lifecycle_id or not stage or not title:
+        return jsonify({"error": "Cần lifecycle_id, stage và title"}), 400
+    with get_connection() as conn:
+        tid = _svc_create(
+            conn, lifecycle_id=lifecycle_id,
+            stage=stage, title=title, description=description,
+        )
+        row = conn.execute(
+            "SELECT * FROM crm_svc_tasks WHERE id = ?", (tid,)
+        ).fetchone()
+    return jsonify(dict(row)), 201
+
+
+@app.delete("/api/crm/svc-tasks/<int:task_id>")
+def api_svc_task_delete(task_id: int) -> Any:
+    from crm_svc_tasks import delete_task as _svc_delete
+    with get_connection() as conn:
+        ok = _svc_delete(conn, task_id)
+    if not ok:
+        return jsonify({"error": "Không thể xoá — không phải custom task"}), 404
+    return jsonify({"ok": True})
+
+
+@app.post("/api/crm/svc-tasks/<int:task_id>/ai-assist")
+def api_svc_task_ai_assist(task_id: int) -> Any:
+    from crm_svc_tasks import SERVICE_LABELS as _svc_lbl, run_ai_assist as _svc_ai
+    payload = request.get_json(force=True) or {}
+    ctx: dict = payload.get("context") or {}
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT t.*, lc.service_slug, lc.customer_id
+            FROM crm_svc_tasks t
+            JOIN crm_service_lifecycle lc ON lc.id = t.lifecycle_id
+            WHERE t.id = ?
+            """,
+            (task_id,),
+        ).fetchone()
+        if row is None:
+            return jsonify({"error": "Không tìm thấy task"}), 404
+        if row["customer_id"]:
+            cust = conn.execute(
+                "SELECT name FROM crm_customers WHERE id = ?",
+                (row["customer_id"],),
+            ).fetchone()
+            if cust:
+                ctx.setdefault("customer_name", cust["name"] or "KH")
+        ctx.setdefault(
+            "service_name", _svc_lbl.get(row["service_slug"], row["service_slug"])
+        )
+        if str(row["stage"] or "") == "consult":
+            from crm_svc_consult_bridge import build_ai_context_for_consult
+
+            ctx = build_ai_context_for_consult(
+                conn,
+                int(row["lifecycle_id"]),
+                task_id,
+                ctx,
+            )
+            ctx.setdefault(
+                "service_name", _svc_lbl.get(row["service_slug"], row["service_slug"])
+            )
+            if row["customer_id"] and not ctx.get("customer_name"):
+                cust = conn.execute(
+                    "SELECT name FROM crm_customers WHERE id = ?",
+                    (row["customer_id"],),
+                ).fetchone()
+                if cust:
+                    ctx["customer_name"] = cust["name"] or "KH"
+        output = _svc_ai(conn, task_id=task_id, customer_context=ctx)
+    return jsonify({"ai_output": output, "task_id": task_id})
+
+
+# ── Service Risk Management ──────────────────────────────────────────────────
+
+@app.get("/api/crm/svc-risks/<int:lifecycle_id>")
+def api_svc_risks_list(lifecycle_id: int) -> Any:
+    from crm_svc_risk import list_risks as _risk_list, get_latest_scan as _risk_scan
+    with get_connection() as conn:
+        risks = _risk_list(conn, lifecycle_id)
+        latest_scan = _risk_scan(conn, lifecycle_id)
+    return jsonify({"risks": risks, "latest_scan": latest_scan})
+
+
+@app.patch("/api/crm/svc-risks/<int:risk_id>")
+def api_svc_risk_patch(risk_id: int) -> Any:
+    from crm_svc_risk import update_risk as _risk_update
+    payload = request.get_json(force=True) or {}
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM crm_svc_risks WHERE id = ?", (risk_id,)
+        ).fetchone()
+        if row is None:
+            return jsonify({"error": "Không tìm thấy risk"}), 404
+        _risk_update(
+            conn, risk_id,
+            probability=str(payload["probability"]) if "probability" in payload else None,
+            impact=str(payload["impact"]) if "impact" in payload else None,
+            mitigation=str(payload["mitigation"])[:2000] if "mitigation" in payload else None,
+            is_active=bool(payload["is_active"]) if "is_active" in payload else None,
+        )
+        updated = conn.execute(
+            "SELECT * FROM crm_svc_risks WHERE id = ?", (risk_id,)
+        ).fetchone()
+    return jsonify(dict(updated))
+
+
+@app.post("/api/crm/svc-risks")
+def api_svc_risk_create() -> Any:
+    from crm_svc_risk import create_custom_risk as _risk_create
+    payload = request.get_json(force=True) or {}
+    lifecycle_id = _opt_pos_int(payload.get("lifecycle_id"))
+    title = str(payload.get("title", "")).strip()[:500]
+    stage = str(payload.get("stage", "")).strip()
+    category = str(payload.get("category", "")).strip()[:100]
+    if not lifecycle_id or not title:
+        return jsonify({"error": "Cần lifecycle_id và title"}), 400
+    with get_connection() as conn:
+        rid = _risk_create(
+            conn, lifecycle_id=lifecycle_id, stage=stage, title=title, category=category
+        )
+        row = conn.execute("SELECT * FROM crm_svc_risks WHERE id = ?", (rid,)).fetchone()
+    return jsonify(dict(row)), 201
+
+
+@app.delete("/api/crm/svc-risks/<int:risk_id>")
+def api_svc_risk_delete(risk_id: int) -> Any:
+    from crm_svc_risk import delete_risk as _risk_delete
+    with get_connection() as conn:
+        ok = _risk_delete(conn, risk_id)
+    if not ok:
+        return jsonify({"error": "Không thể xoá — không phải custom risk"}), 404
+    return jsonify({"ok": True})
+
+
+@app.post("/api/crm/svc-risks/<int:lifecycle_id>/ai-scan")
+def api_svc_risk_ai_scan(lifecycle_id: int) -> Any:
+    from crm_svc_risk import run_ai_risk_scan as _risk_scan_fn
+    from crm_svc_tasks import SERVICE_LABELS as _svc_labels
+    with get_connection() as conn:
+        lc = conn.execute(
+            "SELECT * FROM crm_service_lifecycle WHERE id = ?", (lifecycle_id,)
+        ).fetchone()
+        if lc is None:
+            return jsonify({"error": "Không tìm thấy lifecycle"}), 404
+        lc = dict(lc)
+        ctx: dict = {
+            "service_name": _svc_labels.get(lc["service_slug"], lc["service_slug"]),
+            "current_stage": lc["stage"],
+            "progress_summary": "",
+            "customer_name": "KH",
+        }
+        if lc.get("customer_id"):
+            cust = conn.execute(
+                "SELECT name FROM crm_customers WHERE id = ?", (lc["customer_id"],)
+            ).fetchone()
+            if cust:
+                ctx["customer_name"] = cust["name"] or "KH"
+        output = _risk_scan_fn(conn, lifecycle_id=lifecycle_id, customer_context=ctx)
+    return jsonify({"ai_output": output, "lifecycle_id": lifecycle_id})
+
+
+
+# ── Business Dashboard + Service Finance Tracking ──────────────────────────────
+
+@app.get("/crm/business-dashboard")
+def crm_business_dashboard_page() -> Any:
+    redir = _ensure_admin_session_html()
+    if redir is not None:
+        return redir
+    from crm_svc_finance_kpi import (
+        collect_finance_kpi_alerts,
+        get_alert_thresholds,
+        get_finance_kpi_trends,
+        load_finance_kpi_bundle,
+    )
+    from crm_svc_finance_kpi_inbox import get_finance_kpi_inbox_summary
+
+    now = datetime.utcnow()
+    year = _opt_pos_int(request.args.get("year")) or now.year
+    month = _opt_pos_int(request.args.get("month")) or now.month
+    trend_months = _opt_pos_int(request.args.get("trend_months")) or 6
+    trend_months = max(3, min(trend_months, 12))
+
+    with get_connection() as conn:
+        bundle = load_finance_kpi_bundle(conn, year=year, month=month)
+        kpi_alerts = collect_finance_kpi_alerts(
+            conn, year=year, month=month, bundle=bundle
+        )
+        trends = get_finance_kpi_trends(
+            conn, year=year, month=month, months=trend_months
+        )
+        thresholds = get_alert_thresholds(conn)
+        kpi_inbox = get_finance_kpi_inbox_summary(conn)
+
+    exec_m = bundle["exec_metrics"]
+    conc = bundle["portfolio_metrics"]["concentration"]
+    lead = bundle["lead_kpi"]
+    ret = bundle["retention_metrics"]
+    ar = bundle["ar_aging"]
+
+    return render_template(
+        "crm_business_dashboard.html",
+        year=year,
+        month=month,
+        trend_months=trend_months,
+        kpi_alerts=kpi_alerts,
+        trends=trends,
+        thresholds=thresholds,
+        exec_metrics=exec_m,
+        concentration=conc,
+        lead_kpi=lead,
+        retention_metrics=ret,
+        ar_aging=ar,
+        kpi_inbox=kpi_inbox,
+        **_admin_page_template_kwargs(),
+    )
+
+
+@app.get("/crm/owner-weekly")
+def crm_owner_weekly_dashboard_page() -> Any:
+    redir = _ensure_admin_session_html()
+    if redir is not None:
+        return redir
+    from crm_owner_weekly_dashboard import (
+        OWNER_WEEKLY_TARGET_GROUPS,
+        OWNER_WEEKLY_TARGET_LABELS,
+        get_owner_weekly_dashboard,
+        get_owner_weekly_targets,
+    )
+    from crm_owner_weekly_inbox import get_owner_weekly_inbox_summary
+
+    year = _opt_pos_int(request.args.get("year"))
+    week = _opt_pos_int(request.args.get("week"))
+    trend_weeks = _opt_pos_int(request.args.get("trend_weeks")) or 8
+    week_end_raw = str(request.args.get("week_end") or "").strip()[:10]
+    week_end = None
+    if week_end_raw:
+        try:
+            week_end = date.fromisoformat(week_end_raw)
+        except ValueError:
+            week_end = None
+
+    with get_connection() as conn:
+        dashboard = get_owner_weekly_dashboard(
+            conn,
+            week_end=week_end,
+            year=year,
+            iso_week=week,
+            trend_weeks=trend_weeks,
+        )
+        targets = get_owner_weekly_targets(conn)
+        weekly_inbox = get_owner_weekly_inbox_summary(conn)
+
+    return render_template(
+        "crm_owner_weekly_dashboard.html",
+        dashboard=dashboard,
+        targets=targets,
+        target_labels=OWNER_WEEKLY_TARGET_LABELS,
+        target_groups=OWNER_WEEKLY_TARGET_GROUPS,
+        weekly_inbox=weekly_inbox,
+        can_configure=_admin_section_can("crm_owner_weekly_dashboard", "configure"),
+        can_export=_admin_section_can("crm_owner_weekly_dashboard", "export"),
+        **_admin_page_template_kwargs(),
+    )
+
+
+@app.get("/api/crm/owner-weekly")
+def api_crm_owner_weekly_dashboard() -> Any:
+    from crm_owner_weekly_dashboard import get_owner_weekly_dashboard
+
+    year = _opt_pos_int(request.args.get("year"))
+    week = _opt_pos_int(request.args.get("week"))
+    trend_weeks = _opt_pos_int(request.args.get("trend_weeks")) or 8
+    week_end_raw = str(request.args.get("week_end") or "").strip()[:10]
+    week_end = None
+    if week_end_raw:
+        try:
+            week_end = date.fromisoformat(week_end_raw)
+        except ValueError:
+            week_end = None
+
+    with get_connection() as conn:
+        dashboard = get_owner_weekly_dashboard(
+            conn,
+            week_end=week_end,
+            year=year,
+            iso_week=week,
+            trend_weeks=trend_weeks,
+        )
+    return jsonify(dashboard)
+
+
+@app.get("/api/crm/owner-weekly/config")
+def api_crm_owner_weekly_config_get() -> Any:
+    from crm_owner_weekly_dashboard import (
+        OWNER_WEEKLY_ENV_KEYS,
+        OWNER_WEEKLY_TARGET_DEFAULTS,
+        OWNER_WEEKLY_TARGET_LABELS,
+        get_owner_weekly_targets,
+    )
+
+    with get_connection() as conn:
+        values = get_owner_weekly_targets(conn)
+    return jsonify(
+        {
+            "targets": values,
+            "defaults": OWNER_WEEKLY_TARGET_DEFAULTS,
+            "labels": OWNER_WEEKLY_TARGET_LABELS,
+            "env_keys": OWNER_WEEKLY_ENV_KEYS,
+        }
+    )
+
+
+@app.patch("/api/crm/owner-weekly/config")
+def api_crm_owner_weekly_config_patch() -> Any:
+    if not _admin_section_can("crm_owner_weekly_dashboard", "configure"):
+        return _admin_section_forbidden_json("crm_owner_weekly_dashboard", "configure")
+    from crm_owner_weekly_dashboard import set_owner_weekly_targets
+
+    payload = request.get_json(force=True) or {}
+    updates = payload.get("targets") or payload.get("thresholds") or payload
+    if not isinstance(updates, dict):
+        return jsonify({"error": "targets phải là object."}), 400
+    with get_connection() as conn:
+        values = set_owner_weekly_targets(conn, updates)
+    return jsonify({"ok": True, "targets": values})
+
+
+@app.get("/api/crm/owner-weekly/cash-snapshots")
+def api_crm_owner_weekly_cash_snapshots_get() -> Any:
+    from crm_owner_cash_ledger import list_cash_snapshots
+
+    limit = _opt_pos_int(request.args.get("limit")) or 24
+    with get_connection() as conn:
+        snapshots = list_cash_snapshots(conn, limit=limit)
+    return jsonify({"snapshots": snapshots})
+
+
+@app.post("/api/crm/owner-weekly/cash-snapshots")
+def api_crm_owner_weekly_cash_snapshots_upsert() -> Any:
+    if not _admin_section_can("crm_owner_weekly_dashboard", "configure"):
+        return _admin_section_forbidden_json("crm_owner_weekly_dashboard", "configure")
+    from crm_owner_cash_ledger import upsert_cash_snapshot
+
+    payload = request.get_json(force=True) or {}
+    snap_raw = str(payload.get("snapshot_on") or "").strip()[:10]
+    if not snap_raw:
+        return jsonify({"error": "snapshot_on bắt buộc (YYYY-MM-DD)."}), 400
+    try:
+        snap_on = date.fromisoformat(snap_raw)
+    except ValueError:
+        return jsonify({"error": "snapshot_on không hợp lệ."}), 400
+    try:
+        balance = int(payload.get("balance_vnd"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "balance_vnd phải là số nguyên."}), 400
+    source = str(payload.get("source") or "manual").strip().lower()
+    notes = str(payload.get("notes") or "").strip()
+    with get_connection() as conn:
+        row = upsert_cash_snapshot(
+            conn,
+            snapshot_on=snap_on,
+            balance_vnd=balance,
+            source=source,
+            notes=notes,
+        )
+    return jsonify({"ok": True, "snapshot": row})
+
+
+@app.delete("/api/crm/owner-weekly/cash-snapshots")
+def api_crm_owner_weekly_cash_snapshots_delete() -> Any:
+    if not _admin_section_can("crm_owner_weekly_dashboard", "configure"):
+        return _admin_section_forbidden_json("crm_owner_weekly_dashboard", "configure")
+    from crm_owner_cash_ledger import delete_cash_snapshot
+
+    snap_raw = str(request.args.get("snapshot_on") or "").strip()[:10]
+    if not snap_raw:
+        payload = request.get_json(silent=True) or {}
+        snap_raw = str(payload.get("snapshot_on") or "").strip()[:10]
+    if not snap_raw:
+        return jsonify({"error": "snapshot_on bắt buộc."}), 400
+    try:
+        snap_on = date.fromisoformat(snap_raw)
+    except ValueError:
+        return jsonify({"error": "snapshot_on không hợp lệ."}), 400
+    with get_connection() as conn:
+        deleted = delete_cash_snapshot(conn, snap_on)
+    return jsonify({"ok": True, "deleted": deleted})
+
+
+@app.get("/api/crm/owner-weekly/export")
+def api_crm_owner_weekly_export() -> Any:
+    if not _admin_section_can("crm_owner_weekly_dashboard", "export"):
+        return _admin_section_forbidden_json("crm_owner_weekly_dashboard", "export")
+    from crm_owner_weekly_dashboard import (
+        build_owner_weekly_export_sheets,
+        get_owner_weekly_dashboard,
+    )
+
+    year = _opt_pos_int(request.args.get("year"))
+    week = _opt_pos_int(request.args.get("week"))
+    week_end_raw = str(request.args.get("week_end") or "").strip()[:10]
+    week_end = None
+    if week_end_raw:
+        try:
+            week_end = date.fromisoformat(week_end_raw)
+        except ValueError:
+            week_end = None
+    fmt = str(request.args.get("format") or "xlsx").strip().lower()
+    if fmt not in ("csv", "xlsx"):
+        fmt = "xlsx"
+
+    with get_connection() as conn:
+        dashboard = get_owner_weekly_dashboard(
+            conn,
+            week_end=week_end,
+            year=year,
+            iso_week=week,
+        )
+    sheets = build_owner_weekly_export_sheets(dashboard)
+    wk = dashboard.get("week") or {}
+    iso_year = int(wk.get("iso_year") or datetime.utcnow().year)
+    iso_week = int(wk.get("iso_week") or 1)
+    stamp = datetime.now().strftime("%Y-%m-%d")
+    base = f"owner-weekly-{iso_year:04d}-W{iso_week:02d}-{stamp}"
+    if fmt == "xlsx":
+        return _crm_re_export_xlsx_sheets(sheets, filename=f"{base}.xlsx")
+    headers, rows = sheets[0][1], list(sheets[0][2])
+    for title, _hdr, sheet_rows in sheets[1:]:
+        rows.append([])
+        rows.append([f"=== {title.upper()} ==="])
+        if _hdr:
+            rows.append(list(_hdr))
+        rows.extend(sheet_rows)
+    return _crm_re_export_csv(headers, rows, filename=f"{base}.csv")
+
+
+@app.post("/api/crm/owner-weekly/alert-cron")
+def api_crm_owner_weekly_alert_cron() -> Any:
+    if not _crm_finance_kpi_cron_allowed():
+        return jsonify({"error": "Unauthorized"}), 403
+    from crm_owner_weekly_notify import dispatch_owner_weekly_alerts
+
+    payload = request.get_json(silent=True) or {}
+    year = _opt_pos_int(payload.get("year") or request.args.get("year"))
+    week = _opt_pos_int(payload.get("week") or request.args.get("iso_week") or request.args.get("week"))
+    only_red_raw = payload.get("only_red", request.args.get("only_red", "0"))
+    only_red = str(only_red_raw).strip().lower() not in ("0", "false", "no")
+    public_base = (os.getenv("PTT_PUBLIC_BASE_URL") or request.host_url or "").rstrip("/")
+    dashboard_url = ""
+    if year and week:
+        dashboard_url = f"{public_base}/crm/owner-weekly?year={year}&week={week}"
+
+    with get_connection() as conn:
+        result = dispatch_owner_weekly_alerts(
+            conn,
+            iso_year=year,
+            iso_week=week,
+            only_red=only_red,
+            dashboard_url=dashboard_url,
+        )
+    code = 200 if result.get("ok") else 400
+    return jsonify(result), code
+
+
+@app.post("/api/crm/owner-weekly/inbox/sync")
+def api_crm_owner_weekly_inbox_sync() -> Any:
+    from crm_owner_weekly_dashboard import get_owner_weekly_dashboard
+    from crm_owner_weekly_inbox import sync_owner_weekly_inbox
+
+    payload = request.get_json(silent=True) or {}
+    year = _opt_pos_int(payload.get("year") or request.args.get("year"))
+    week = _opt_pos_int(payload.get("week") or request.args.get("week"))
+    public_base = (os.getenv("PTT_PUBLIC_BASE_URL") or request.host_url or "").rstrip("/")
+
+    with get_connection() as conn:
+        if year and week:
+            dashboard = get_owner_weekly_dashboard(conn, year=year, iso_week=week)
+            y = int(dashboard["week"]["iso_year"])
+            w = int(dashboard["week"]["iso_week"])
+        else:
+            from crm_owner_weekly_dashboard import resolve_week_bounds
+
+            _s, _e, y, w = resolve_week_bounds()
+            dashboard = get_owner_weekly_dashboard(conn, year=y, iso_week=w)
+        dash_url = f"{public_base}/crm/owner-weekly?year={y}&week={w}"
+        inbox = sync_owner_weekly_inbox(
+            conn,
+            iso_year=y,
+            iso_week=w,
+            dashboard=dashboard,
+            dashboard_url=dash_url,
+        )
+    return jsonify({"ok": True, "inbox": inbox})
+
+
+@app.get("/api/crm/owner-weekly/inbox/summary")
+def api_crm_owner_weekly_inbox_summary() -> Any:
+    from crm_owner_weekly_inbox import get_owner_weekly_inbox_summary
+
+    with get_connection() as conn:
+        summary = get_owner_weekly_inbox_summary(conn)
+    return jsonify(summary)
+
+
+@app.get("/crm/financials")
+def crm_financials_page() -> Any:
+    redir = _ensure_admin_session_html()
+    if redir is not None:
+        return redir
+    from crm_svc_finance import (
+        BILLING_TYPE_LABELS,
+        get_ar_aging as _ar_aging,
+        get_recurring_revenue_summary as _recurring_sum,
+        get_service_package_rollup as _pkg_rollup,
+        get_summary as _fin_sum,
+    )
+    from crm_svc_retention import get_retention_metrics as _retention_metrics
+    from crm_lead_kpi_metrics import get_unified_lead_kpi_summary as _lead_kpi
+    from crm_svc_portfolio import get_portfolio_metrics as _portfolio_metrics
+    from crm_svc_exec_metrics import get_exec_metrics as _exec_metrics
+    from crm_svc_finance_kpi import collect_finance_kpi_alerts
+    from crm_svc_tasks import SERVICE_LABELS as _svc_labels
+    now = datetime.utcnow()
+    year = _opt_pos_int(request.args.get("year")) or now.year
+    month = _opt_pos_int(request.args.get("month")) or now.month
+    with get_connection() as conn:
+        lcs = conn.execute(
+            """
+            SELECT lc.id, lc.service_slug, lc.stage, lc.contract_id, lc.customer_id,
+                   cu.name AS customer_name
+            FROM crm_service_lifecycle lc
+            LEFT JOIN crm_customers cu ON cu.id = lc.customer_id
+            WHERE lc.status = 'active'
+            ORDER BY lc.id
+            """
+        ).fetchall()
+        rows = []
+        for lc in lcs:
+            lc = dict(lc)
+            contract_amount_vnd = 0
+            if lc.get("contract_id"):
+                c_row = conn.execute(
+                    "SELECT amount_vnd FROM crm_contracts WHERE id = ?",
+                    (lc["contract_id"],),
+                ).fetchone()
+                if c_row:
+                    contract_amount_vnd = int(c_row["amount_vnd"] or 0)
+            summary = _fin_sum(conn, lc["id"], contract_amount_vnd)
+            rows.append({
+                "lifecycle_id": lc["id"],
+                "service_slug": lc["service_slug"],
+                "service_label": _svc_labels.get(lc["service_slug"], lc["service_slug"]),
+                "stage": lc["stage"],
+                "customer_name": lc.get("customer_name") or "—",
+                **summary,
+            })
+        ar_aging = _ar_aging(conn)
+        recurring_summary = _recurring_sum(conn, year=year, month=month)
+        package_rollup = _pkg_rollup(conn, year=year, month=month)
+        for pkg in package_rollup["packages"]:
+            pkg["service_label"] = _svc_labels.get(
+                pkg["service_slug"], pkg["service_slug"]
+            )
+        retention_metrics = _retention_metrics(conn, year=year, month=month)
+        lead_kpi = _lead_kpi(conn, year=year, month=month, period_cohort=True)
+        portfolio_metrics = _portfolio_metrics(conn, year=year, month=month)
+        exec_metrics = _exec_metrics(conn, year=year, month=month)
+        kpi_bundle = {
+            "year": year,
+            "month": month,
+            "ar_aging": ar_aging,
+            "recurring_summary": recurring_summary,
+            "package_rollup": package_rollup,
+            "retention_metrics": retention_metrics,
+            "lead_kpi": lead_kpi,
+            "portfolio_metrics": portfolio_metrics,
+            "exec_metrics": exec_metrics,
+        }
+        kpi_alerts = collect_finance_kpi_alerts(
+            conn, year=year, month=month, bundle=kpi_bundle
+        )
+    rows.sort(key=lambda r: r["margin_pct"])
+    return render_template(
+        "crm_financials.html",
+        rows=rows,
+        ar_aging=ar_aging,
+        recurring_summary=recurring_summary,
+        package_rollup=package_rollup,
+        retention_metrics=retention_metrics,
+        lead_kpi=lead_kpi,
+        portfolio_metrics=portfolio_metrics,
+        exec_metrics=exec_metrics,
+        kpi_alerts=kpi_alerts,
+        billing_type_labels=BILLING_TYPE_LABELS,
+        year=year,
+        month=month,
+        **_admin_page_template_kwargs(),
+    )
+
+
+@app.get("/api/crm/finance/ar-aging")
+def api_crm_finance_ar_aging() -> Any:
+    from crm_svc_finance import get_ar_aging as _ar_aging
+    as_of = str(request.args.get("as_of") or "").strip()[:10]
+    am_id = _opt_pos_int(request.args.get("am_id"))
+    with get_connection() as conn:
+        result = _ar_aging(conn, as_of=as_of or None, am_id=am_id)
+    return jsonify(result)
+
+
+@app.get("/api/crm/finance/recurring-summary")
+def api_crm_finance_recurring_summary() -> Any:
+    from crm_svc_finance import get_recurring_revenue_summary as _recurring_sum
+    now = datetime.utcnow()
+    year = _opt_pos_int(request.args.get("year")) or now.year
+    month = _opt_pos_int(request.args.get("month")) or now.month
+    am_id = _opt_pos_int(request.args.get("am_id"))
+    with get_connection() as conn:
+        result = _recurring_sum(conn, year=year, month=month, am_id=am_id)
+    return jsonify(result)
+
+
+@app.get("/api/crm/finance/lead-kpi")
+def api_crm_finance_lead_kpi() -> Any:
+    from crm_lead_kpi_metrics import get_unified_lead_kpi_summary as _lead_kpi
+
+    now = datetime.utcnow()
+    year = _opt_pos_int(request.args.get("year")) or now.year
+    month = _opt_pos_int(request.args.get("month")) or now.month
+    staff_id = _opt_pos_int(request.args.get("staff_id"))
+    with get_connection() as conn:
+        result = _lead_kpi(
+            conn,
+            year=year,
+            month=month,
+            staff_id=staff_id,
+            period_cohort=True,
+        )
+    return jsonify(result)
+
+
+@app.post("/api/crm/finance/period-inputs")
+def api_crm_finance_period_inputs() -> Any:
+    payload = request.get_json(force=True) or {}
+    year = _opt_pos_int(payload.get("year"))
+    month = _opt_pos_int(payload.get("month"))
+    if year is None or month is None or month < 1 or month > 12:
+        return jsonify({"error": "year và month không hợp lệ."}), 400
+    try:
+        amount = max(0, int(payload.get("marketing_spend_vnd") or 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "marketing_spend_vnd không hợp lệ."}), 400
+    from crm_svc_exec_metrics import get_cac_metrics, set_marketing_spend_vnd
+
+    with get_connection() as conn:
+        set_marketing_spend_vnd(conn, year=year, month=month, amount_vnd=amount)
+        cac = get_cac_metrics(conn, year=year, month=month)
+    return jsonify({"ok": True, "cac": cac})
+
+
+@app.get("/api/crm/finance/kpi-alerts")
+def api_crm_finance_kpi_alerts() -> Any:
+    from crm_svc_finance_kpi import collect_finance_kpi_alerts as _kpi_alerts
+
+    now = datetime.utcnow()
+    year = _opt_pos_int(request.args.get("year")) or now.year
+    month = _opt_pos_int(request.args.get("month")) or now.month
+    with get_connection() as conn:
+        result = _kpi_alerts(conn, year=year, month=month)
+    return jsonify(result)
+
+
+@app.get("/api/crm/finance/kpi-export")
+def api_crm_finance_kpi_export() -> Any:
+    from crm_svc_finance_kpi import (
+        build_finance_kpi_export_sheets as _export_sheets,
+        load_finance_kpi_bundle as _kpi_bundle,
+    )
+
+    now = datetime.utcnow()
+    year = _opt_pos_int(request.args.get("year")) or now.year
+    month = _opt_pos_int(request.args.get("month")) or now.month
+    fmt = str(request.args.get("format") or "csv").strip().lower()
+    if fmt not in ("csv", "xlsx"):
+        fmt = "csv"
+    with get_connection() as conn:
+        bundle = _kpi_bundle(conn, year=year, month=month)
+    sheets = _export_sheets(bundle)
+    stamp = datetime.now().strftime("%Y-%m-%d")
+    base = f"crm-finance-kpi-{year:04d}-{month:02d}-{stamp}"
+    if fmt == "xlsx":
+        return _crm_re_export_xlsx_sheets(sheets, filename=f"{base}.xlsx")
+    headers, rows = sheets[0][1], list(sheets[0][2])
+    for title, _hdr, sheet_rows in sheets[1:]:
+        rows.append([])
+        rows.append([f"=== {title.upper()} ==="])
+        if _hdr:
+            rows.append(list(_hdr))
+        rows.extend(sheet_rows)
+    return _crm_re_export_csv(headers, rows, filename=f"{base}.csv")
+
+
+@app.get("/api/crm/finance/kpi-trends")
+def api_crm_finance_kpi_trends() -> Any:
+    from crm_svc_finance_kpi import get_finance_kpi_trends as _kpi_trends
+
+    now = datetime.utcnow()
+    year = _opt_pos_int(request.args.get("year")) or now.year
+    month = _opt_pos_int(request.args.get("month")) or now.month
+    months = _opt_pos_int(request.args.get("months")) or 6
+    with get_connection() as conn:
+        result = _kpi_trends(conn, year=year, month=month, months=months)
+    return jsonify(result)
+
+
+@app.get("/api/crm/finance/kpi-config")
+def api_crm_finance_kpi_config_get() -> Any:
+    from crm_svc_finance_kpi import THRESHOLD_DEFAULTS, THRESHOLD_ENV_KEYS
+    from crm_svc_finance_kpi import get_alert_thresholds as _thresholds
+
+    with get_connection() as conn:
+        values = _thresholds(conn)
+    return jsonify(
+        {
+            "thresholds": values,
+            "defaults": THRESHOLD_DEFAULTS,
+            "env_keys": THRESHOLD_ENV_KEYS,
+        }
+    )
+
+
+@app.patch("/api/crm/finance/kpi-config")
+def api_crm_finance_kpi_config_patch() -> Any:
+    from crm_svc_finance_kpi import set_alert_thresholds as _set_thresholds
+
+    payload = request.get_json(force=True) or {}
+    updates = payload.get("thresholds") or payload
+    if not isinstance(updates, dict):
+        return jsonify({"error": "thresholds phải là object."}), 400
+    with get_connection() as conn:
+        values = _set_thresholds(conn, updates)
+    return jsonify({"ok": True, "thresholds": values})
+
+
+@app.post("/api/crm/finance/kpi-alert-cron")
+def api_crm_finance_kpi_alert_cron() -> Any:
+    if not _crm_finance_kpi_cron_allowed():
+        return jsonify({"error": "Unauthorized"}), 403
+    from crm_svc_finance_kpi_notify import dispatch_finance_kpi_alerts
+
+    now = datetime.utcnow()
+    payload = request.get_json(silent=True) or {}
+    year = _opt_pos_int(payload.get("year") or request.args.get("year")) or now.year
+    month = _opt_pos_int(payload.get("month") or request.args.get("month")) or now.month
+    only_critical_raw = payload.get("only_critical", request.args.get("only_critical", "1"))
+    only_critical = str(only_critical_raw).strip().lower() not in ("0", "false", "no")
+    public_base = (os.getenv("PTT_PUBLIC_BASE_URL") or request.host_url or "").rstrip("/")
+    dashboard_url = f"{public_base}/crm/business-dashboard?year={year}&month={month}"
+
+    with get_connection() as conn:
+        result = dispatch_finance_kpi_alerts(
+            conn,
+            year=year,
+            month=month,
+            only_critical=only_critical,
+            dashboard_url=dashboard_url,
+        )
+    code = 200 if result.get("ok") else 400
+    return jsonify(result), code
+
+
+@app.post("/api/crm/finance/kpi-inbox/sync")
+def api_crm_finance_kpi_inbox_sync() -> Any:
+    from crm_svc_finance_kpi_inbox import sync_finance_kpi_inbox
+
+    now = datetime.utcnow()
+    payload = request.get_json(silent=True) or {}
+    year = _opt_pos_int(payload.get("year") or request.args.get("year")) or now.year
+    month = _opt_pos_int(payload.get("month") or request.args.get("month")) or now.month
+    public_base = (os.getenv("PTT_PUBLIC_BASE_URL") or request.host_url or "").rstrip("/")
+    dashboard_url = f"{public_base}/crm/business-dashboard?year={year}&month={month}"
+    with get_connection() as conn:
+        inbox = sync_finance_kpi_inbox(
+            conn, year=year, month=month, dashboard_url=dashboard_url
+        )
+    return jsonify({"ok": True, "inbox": inbox})
+
+
+@app.get("/api/crm/finance/kpi-inbox/summary")
+def api_crm_finance_kpi_inbox_summary() -> Any:
+    from crm_svc_finance_kpi_inbox import get_finance_kpi_inbox_summary
+
+    with get_connection() as conn:
+        summary = get_finance_kpi_inbox_summary(conn)
+    return jsonify(summary)
+
+
+@app.get("/api/crm/finance/exec-metrics")
+def api_crm_finance_exec_metrics() -> Any:
+    from crm_svc_exec_metrics import get_exec_metrics as _exec_metrics
+
+    now = datetime.utcnow()
+    year = _opt_pos_int(request.args.get("year")) or now.year
+    month = _opt_pos_int(request.args.get("month")) or now.month
+    am_id = _opt_pos_int(request.args.get("am_id"))
+    with get_connection() as conn:
+        result = _exec_metrics(conn, year=year, month=month, am_id=am_id)
+    return jsonify(result)
+
+
+@app.get("/api/crm/finance/portfolio-metrics")
+def api_crm_finance_portfolio_metrics() -> Any:
+    from crm_svc_portfolio import get_portfolio_metrics as _portfolio_metrics
+
+    now = datetime.utcnow()
+    year = _opt_pos_int(request.args.get("year")) or now.year
+    month = _opt_pos_int(request.args.get("month")) or now.month
+    with get_connection() as conn:
+        result = _portfolio_metrics(conn, year=year, month=month)
+    return jsonify(result)
+
+
+@app.get("/api/crm/finance/retention-metrics")
+def api_crm_finance_retention_metrics() -> Any:
+    from crm_svc_retention import get_retention_metrics as _retention_metrics
+
+    now = datetime.utcnow()
+    year = _opt_pos_int(request.args.get("year")) or now.year
+    month = _opt_pos_int(request.args.get("month")) or now.month
+    with get_connection() as conn:
+        result = _retention_metrics(conn, year=year, month=month)
+    return jsonify(result)
+
+
+@app.get("/api/crm/finance/service-package-rollup")
+def api_crm_finance_service_package_rollup() -> Any:
+    from crm_svc_finance import get_service_package_rollup as _pkg_rollup
+    from crm_svc_tasks import SERVICE_LABELS as _svc_labels
+
+    now = datetime.utcnow()
+    year = _opt_pos_int(request.args.get("year")) or now.year
+    month = _opt_pos_int(request.args.get("month")) or now.month
+    status = str(request.args.get("status") or "active").strip() or "active"
+    with get_connection() as conn:
+        result = _pkg_rollup(conn, year=year, month=month, lifecycle_status=status)
+        for pkg in result["packages"]:
+            pkg["service_label"] = _svc_labels.get(
+                pkg["service_slug"], pkg["service_slug"]
+            )
+    return jsonify(result)
+
+
+@app.get("/crm/staff-kpi")
+def crm_staff_kpi_page() -> Any:
+    redir = _ensure_admin_session_html()
+    if redir is not None:
+        return redir
+    from crm_svc_kpi import (
+        get_am_metrics as _am_met,
+        get_sp_metrics as _sp_met,
+        get_targets as _get_tgt,
+        get_latest_kpi_scan as _latest_scan,
+    )
+    from crm_svc_presales import (
+        AM_LEAD_METRIC_LABELS as _am_lead_labels,
+        get_am_lead_metrics as _am_lead_met,
+    )
+    now = datetime.utcnow()
+    staff_id = _opt_pos_int(request.args.get("staff_id"))
+    year = _opt_pos_int(request.args.get("year")) or now.year
+    month = _opt_pos_int(request.args.get("month")) or now.month
+
+    with get_connection() as conn:
+        all_staff = [
+            dict(r) for r in conn.execute(
+                "SELECT id, name FROM crm_staff WHERE active = 1 ORDER BY name"
+            ).fetchall()
+        ]
+        selected_staff = None
+        am_metrics = None
+        am_lead_metrics = None
+        sp_metrics = None
+        targets: dict = {}
+        latest_am_scan = ""
+        latest_sp_scan = ""
+        latest_am_lead_scan = ""
+        am_lead_cap_alerts: dict[str, Any] = {"over_cap_count": 0, "alerts": []}
+
+        kpi_readiness: dict[str, Any] | None = None
+        am_backfill_result: dict[str, int] | None = None
+
+        if staff_id:
+            row = conn.execute(
+                "SELECT id, name FROM crm_staff WHERE id = ?", (staff_id,)
+            ).fetchone()
+            if row:
+                selected_staff = dict(row)
+                from crm_service_lifecycle import (
+                    backfill_assigned_am_for_staff as _backfill_am,
+                )
+                from crm_svc_kpi import get_staff_kpi_readiness as _kpi_ready
+
+                am_backfill_result = _backfill_am(conn, staff_id)
+                kpi_readiness = _kpi_ready(conn, staff_id)
+                am_metrics = _am_met(conn, staff_id, year, month)
+                am_lead_metrics = _am_lead_met(conn, staff_id, year, month)
+                from crm_svc_presales import get_am_presales_cap_alerts as _cap_alerts
+
+                am_lead_cap_alerts = _cap_alerts(conn, staff_id)
+                sp_metrics = _sp_met(conn, staff_id, year, month)
+                targets = _get_tgt(conn, staff_id, year, month)
+                latest_am_scan = _latest_scan(conn, staff_id, "am", year, month)
+                latest_sp_scan = _latest_scan(conn, staff_id, "sp", year, month)
+                latest_am_lead_scan = _latest_scan(conn, staff_id, "am_lead", year, month)
+
+    return render_template(
+        "crm_staff_kpi.html",
+        all_staff=all_staff,
+        selected_staff=selected_staff,
+        selected_staff_id=staff_id,
+        year=year,
+        month=month,
+        am_metrics=am_metrics,
+        am_lead_metrics=am_lead_metrics,
+        am_lead_metric_labels=_am_lead_labels,
+        sp_metrics=sp_metrics,
+        targets=targets,
+        latest_am_scan=latest_am_scan,
+        latest_sp_scan=latest_sp_scan,
+        latest_am_lead_scan=latest_am_lead_scan,
+        am_lead_cap_alerts=am_lead_cap_alerts,
+        kpi_readiness=kpi_readiness,
+        am_backfill_result=am_backfill_result,
+        **_admin_page_template_kwargs(),
+    )
+
+
+@app.get("/api/crm/svc-finance/<int:lifecycle_id>/summary")
+def api_svc_finance_summary(lifecycle_id: int) -> Any:
+    from crm_svc_finance import get_summary as _fin_sum
+    with get_connection() as conn:
+        lc_row = conn.execute(
+            "SELECT contract_id FROM crm_service_lifecycle WHERE id = ?", (lifecycle_id,)
+        ).fetchone()
+        if lc_row is None:
+            return jsonify({"error": "Không tìm thấy lifecycle"}), 404
+        contract_amount_vnd = 0
+        if lc_row["contract_id"]:
+            c_row = conn.execute(
+                "SELECT amount_vnd FROM crm_contracts WHERE id = ?",
+                (lc_row["contract_id"],),
+            ).fetchone()
+            if c_row:
+                contract_amount_vnd = int(c_row["amount_vnd"] or 0)
+        summary = _fin_sum(conn, lifecycle_id, contract_amount_vnd)
+    return jsonify(summary)
+
+
+@app.post("/api/crm/svc-payments")
+def api_svc_payment_create() -> Any:
+    from crm_svc_finance import create_payment as _pay_create
+    payload = request.get_json(force=True) or {}
+    lifecycle_id = _opt_pos_int(payload.get("lifecycle_id"))
+    amount_vnd = _opt_pos_int(payload.get("amount_vnd"))
+    received_on = str(payload.get("received_on", "")).strip()[:10]
+    due_on = str(payload.get("due_on", "")).strip()[:10]
+    status = str(payload.get("status", "pending")).strip()
+    notes = str(payload.get("notes", "")).strip()
+    if not lifecycle_id or amount_vnd is None or not received_on:
+        return jsonify({"error": "Cần lifecycle_id, amount_vnd, received_on"}), 400
+    with get_connection() as conn:
+        pid = _pay_create(
+            conn,
+            lifecycle_id,
+            amount_vnd,
+            received_on,
+            status,
+            notes,
+            due_on=due_on,
+        )
+        row = conn.execute(
+            "SELECT * FROM crm_svc_payments WHERE id = ?", (pid,)
+        ).fetchone()
+    return jsonify(dict(row)), 201
+
+
+@app.patch("/api/crm/svc-payments/<int:payment_id>")
+def api_svc_payment_patch(payment_id: int) -> Any:
+    from crm_svc_finance import update_payment as _pay_update
+    payload = request.get_json(force=True) or {}
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM crm_svc_payments WHERE id = ?", (payment_id,)
+        ).fetchone()
+        if row is None:
+            return jsonify({"error": "Không tìm thấy payment"}), 404
+        amount_vnd = _opt_pos_int(payload.get("amount_vnd")) if "amount_vnd" in payload else None
+        _pay_update(
+            conn, payment_id,
+            amount_vnd=amount_vnd,
+            received_on=str(payload["received_on"])[:10] if "received_on" in payload else None,
+            due_on=str(payload["due_on"])[:10] if "due_on" in payload else None,
+            status=str(payload["status"]) if "status" in payload else None,
+            notes=str(payload["notes"]) if "notes" in payload else None,
+        )
+        updated = conn.execute(
+            "SELECT * FROM crm_svc_payments WHERE id = ?", (payment_id,)
+        ).fetchone()
+    return jsonify(dict(updated))
+
+
+@app.delete("/api/crm/svc-payments/<int:payment_id>")
+def api_svc_payment_delete(payment_id: int) -> Any:
+    from crm_svc_finance import delete_payment as _pay_del
+    with get_connection() as conn:
+        ok = _pay_del(conn, payment_id)
+    if not ok:
+        return jsonify({"error": "Không tìm thấy payment"}), 404
+    return jsonify({"ok": True})
+
+
+@app.post("/api/crm/svc-expenses")
+def api_svc_expense_create() -> Any:
+    from crm_svc_finance import ExpenseValidationError, create_expense as _exp_create
+    from crm_svc_finance import create_presales_expense as _presales_exp_create
+    payload = request.get_json(force=True) or {}
+    lifecycle_id = _opt_pos_int(payload.get("lifecycle_id"))
+    presales_id = _opt_pos_int(payload.get("presales_id"))
+    lead_id = _opt_pos_int(payload.get("lead_id"))
+    title = str(payload.get("title", "")).strip()[:500]
+    category = str(payload.get("category", "khac")).strip()
+    amount_vnd = _opt_pos_int(payload.get("amount_vnd"))
+    expense_on = str(payload.get("expense_on", "")).strip()[:10]
+    notes = str(payload.get("notes", "")).strip()
+    cost_phase = str(payload.get("cost_phase", "")).strip() or None
+    lifecycle_stage = str(payload.get("lifecycle_stage", "")).strip() or None
+    if not title or amount_vnd is None or not expense_on:
+        return jsonify({"error": "Cần title, amount_vnd, expense_on"}), 400
+    with get_connection() as conn:
+        try:
+            if presales_id or lead_id:
+                if not _crm_presales_on_lead_enabled():
+                    return jsonify({"error": "PTT_PRESALES_ON_LEAD chưa bật"}), 400
+                if lifecycle_id:
+                    return jsonify({
+                        "error": "Dùng presales_id hoặc lead_id — không gửi lifecycle_id"
+                    }), 400
+                if lead_id:
+                    prev = fetch_lead_by_id(conn, lead_id)
+                    if not _crm_lead_can_access(conn, prev):
+                        return jsonify({"error": "Không có quyền."}), 403
+                    if prev is None:
+                        return jsonify({"error": "Không tìm thấy lead."}), 404
+                eid = _presales_exp_create(
+                    conn,
+                    title=title,
+                    category=category,
+                    amount_vnd=amount_vnd,
+                    expense_on=expense_on,
+                    notes=notes,
+                    presales_id=presales_id,
+                    lead_id=lead_id,
+                    lifecycle_stage=lifecycle_stage,
+                )
+            else:
+                if not lifecycle_id:
+                    return jsonify({
+                        "error": "Cần lifecycle_id hoặc presales_id/lead_id"
+                    }), 400
+                eid = _exp_create(
+                    conn,
+                    lifecycle_id,
+                    title,
+                    category,
+                    amount_vnd,
+                    expense_on,
+                    notes,
+                    cost_phase=cost_phase,
+                    lifecycle_stage=lifecycle_stage,
+                )
+        except ExpenseValidationError as exc:
+            return jsonify({"error": str(exc)}), 400
+        except Exception as exc:
+            from crm_svc_presales import PresalesCapExceededError
+
+            if isinstance(exc, PresalesCapExceededError):
+                return jsonify({"error": str(exc)}), 400
+            raise
+        row = conn.execute(
+            "SELECT * FROM crm_svc_expenses WHERE id = ?", (eid,)
+        ).fetchone()
+    return jsonify(dict(row)), 201
+
+
+@app.get("/api/crm/service-lifecycle/<int:lifecycle_id>/presales-summary")
+def api_svc_presales_summary(lifecycle_id: int) -> Any:
+    from crm_svc_presales import get_presales_cost_summary as _presales_sum
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM crm_service_lifecycle WHERE id = ?", (lifecycle_id,)
+        ).fetchone()
+        if row is None:
+            return jsonify({"error": "Không tìm thấy lifecycle"}), 404
+        summary = _presales_sum(conn, lifecycle_id)
+    return jsonify(summary)
+
+
+@app.patch("/api/crm/svc-expenses/<int:expense_id>")
+def api_svc_expense_patch(expense_id: int) -> Any:
+    from crm_svc_finance import update_expense as _exp_update
+    payload = request.get_json(force=True) or {}
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT id FROM crm_svc_expenses WHERE id = ?", (expense_id,)
+        ).fetchone()
+        if row is None:
+            return jsonify({"error": "Không tìm thấy expense"}), 404
+        amount_vnd = _opt_pos_int(payload.get("amount_vnd")) if "amount_vnd" in payload else None
+        _exp_update(
+            conn, expense_id,
+            title=str(payload["title"])[:500] if "title" in payload else None,
+            category=str(payload["category"]) if "category" in payload else None,
+            amount_vnd=amount_vnd,
+            expense_on=str(payload["expense_on"])[:10] if "expense_on" in payload else None,
+            notes=str(payload["notes"]) if "notes" in payload else None,
+        )
+        updated = conn.execute(
+            "SELECT * FROM crm_svc_expenses WHERE id = ?", (expense_id,)
+        ).fetchone()
+    return jsonify(dict(updated))
+
+
+@app.delete("/api/crm/svc-expenses/<int:expense_id>")
+def api_svc_expense_delete(expense_id: int) -> Any:
+    from crm_svc_finance import delete_expense as _exp_del
+    with get_connection() as conn:
+        ok = _exp_del(conn, expense_id)
+    if not ok:
+        return jsonify({"error": "Không tìm thấy expense"}), 404
+    return jsonify({"ok": True})
+
+
+@app.post("/api/crm/svc-finance/<int:lifecycle_id>/ai-scan")
+def api_svc_finance_ai_scan(lifecycle_id: int) -> Any:
+    from crm_svc_finance import (
+        get_summary as _fin_sum,
+        run_ai_finance_scan as _fin_scan_fn,
+    )
+    from crm_svc_tasks import SERVICE_LABELS as _svc_labels
+    payload = request.get_json(force=True) or {}
+    scan_type = str(payload.get("scan_type", "health")).strip()
+    if scan_type not in ("health", "forecast"):
+        return jsonify({"error": "scan_type phải là 'health' hoặc 'forecast'"}), 400
+    with get_connection() as conn:
+        lc = conn.execute(
+            "SELECT * FROM crm_service_lifecycle WHERE id = ?", (lifecycle_id,)
+        ).fetchone()
+        if lc is None:
+            return jsonify({"error": "Không tìm thấy lifecycle"}), 404
+        lc = dict(lc)
+        contract_amount_vnd = 0
+        days_elapsed = 0
+        contract_days = 0
+        if lc.get("contract_id"):
+            c_row = conn.execute(
+                "SELECT amount_vnd, starts_on, ends_on FROM crm_contracts WHERE id = ?",
+                (lc["contract_id"],),
+            ).fetchone()
+            if c_row:
+                contract_amount_vnd = int(c_row["amount_vnd"] or 0)
+                try:
+                    from datetime import date
+                    today = date.today()
+                    if c_row["starts_on"]:
+                        start = date.fromisoformat(c_row["starts_on"][:10])
+                        days_elapsed = max(0, (today - start).days)
+                        if c_row["ends_on"]:
+                            end = date.fromisoformat(c_row["ends_on"][:10])
+                            contract_days = max(0, (end - start).days)
+                except (ValueError, TypeError):
+                    pass
+        summary = _fin_sum(conn, lifecycle_id, contract_amount_vnd)
+        customer_name = "KH"
+        if lc.get("customer_id"):
+            cust = conn.execute(
+                "SELECT name FROM crm_customers WHERE id = ?", (lc["customer_id"],)
+            ).fetchone()
+            if cust:
+                customer_name = cust["name"] or "KH"
+        ctx = {
+            "service_name": _svc_labels.get(lc["service_slug"], lc["service_slug"]),
+            "customer_name": customer_name,
+            "contract_amount_vnd": summary["expected_revenue"],
+            "received_revenue": summary["received_revenue"],
+            "total_expenses": summary["delivery_expenses"],
+            "profit": summary["profit"],
+            "margin_pct": summary["margin_pct"],
+            "days_elapsed": days_elapsed,
+            "contract_days": contract_days,
+        }
+        output = _fin_scan_fn(conn, lifecycle_id, scan_type, ctx)
+    return jsonify({"ai_output": output, "scan_type": scan_type, "lifecycle_id": lifecycle_id})
+
+
+@app.get("/api/crm/staff-kpi/<int:staff_id>/metrics")
+def api_staff_kpi_metrics(staff_id: int) -> Any:
+    from crm_svc_kpi import get_am_metrics as _am_met, get_sp_metrics as _sp_met
+    role = request.args.get("role", "am")
+    year = _opt_pos_int(request.args.get("year")) or datetime.utcnow().year
+    month = _opt_pos_int(request.args.get("month")) or datetime.utcnow().month
+    with get_connection() as conn:
+        staff = conn.execute(
+            "SELECT id, name FROM crm_staff WHERE id = ?", (staff_id,)
+        ).fetchone()
+        if staff is None:
+            return jsonify({"error": "Không tìm thấy staff"}), 404
+        if role == "am":
+            metrics = _am_met(conn, staff_id, year, month)
+        else:
+            metrics = _sp_met(conn, staff_id, year, month)
+    return jsonify({"staff_id": staff_id, "role": role, "year": year, "month": month, **metrics})
+
+
+@app.get("/api/crm/staff-kpi/<int:staff_id>/lead-metrics")
+def api_staff_kpi_lead_metrics(staff_id: int) -> Any:
+    from crm_svc_presales import get_am_lead_metrics as _am_lead_met
+    year = _opt_pos_int(request.args.get("year")) or datetime.utcnow().year
+    month = _opt_pos_int(request.args.get("month")) or datetime.utcnow().month
+    with get_connection() as conn:
+        staff = conn.execute(
+            "SELECT id, name FROM crm_staff WHERE id = ?", (staff_id,)
+        ).fetchone()
+        if staff is None:
+            return jsonify({"error": "Không tìm thấy staff"}), 404
+        metrics = _am_lead_met(conn, staff_id, year, month)
+    return jsonify({"staff_id": staff_id, "year": year, "month": month, **metrics})
+
+
+@app.get("/api/crm/service-lifecycle/funnel-stats")
+def api_service_lifecycle_funnel_stats() -> Any:
+    from crm_svc_presales import get_funnel_stats as _funnel_stats
+    am_id = _opt_pos_int(request.args.get("am_id"))
+    service_slug = str(request.args.get("service_slug") or "").strip() or None
+    period_start = str(request.args.get("from") or "").strip()[:10] or None
+    period_end = str(request.args.get("to") or "").strip()[:10] or None
+    with get_connection() as conn:
+        stats = _funnel_stats(
+            conn,
+            am_id=am_id,
+            service_slug=service_slug,
+            period_start=period_start,
+            period_end=period_end,
+        )
+    return jsonify(stats)
+
+
+@app.get("/api/crm/service-lifecycle/<int:lifecycle_id>/consult-brief")
+def api_svc_consult_brief(lifecycle_id: int) -> Any:
+    from crm_svc_consult_bridge import get_consult_brief as _consult_brief
+    with get_connection() as conn:
+        try:
+            brief = _consult_brief(conn, lifecycle_id)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+    return jsonify(brief)
+
+
+@app.post("/api/crm/service-lifecycle/<int:lifecycle_id>/consult-prefill")
+def api_svc_consult_prefill(lifecycle_id: int) -> Any:
+    from crm_svc_consult_bridge import prefill_consult_task as _prefill
+    payload = request.get_json(force=True) or {}
+    overwrite = bool(payload.get("overwrite"))
+    with get_connection() as conn:
+        try:
+            result = _prefill(conn, lifecycle_id, overwrite=overwrite)
+            conn.commit()
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+    return jsonify(result)
+
+
+@app.get("/api/crm/service-lifecycle/<int:lifecycle_id>/funnel-progress")
+def api_svc_lifecycle_funnel_progress(lifecycle_id: int) -> Any:
+    from crm_svc_consult_bridge import get_lifecycle_funnel_progress as _lc_funnel
+    with get_connection() as conn:
+        try:
+            progress = _lc_funnel(conn, lifecycle_id)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 404
+    return jsonify(progress)
+
+
+@app.post("/api/crm/staff-kpi/<int:staff_id>/backfill-am")
+def api_staff_kpi_backfill_am(staff_id: int) -> Any:
+    from crm_service_lifecycle import backfill_assigned_am_for_staff as _backfill_am
+    from crm_svc_kpi import get_staff_kpi_readiness as _kpi_ready
+
+    with get_connection() as conn:
+        staff = conn.execute(
+            "SELECT id, name FROM crm_staff WHERE id = ?", (staff_id,)
+        ).fetchone()
+        if staff is None:
+            return jsonify({"error": "Không tìm thấy staff"}), 404
+        result = _backfill_am(conn, staff_id)
+        readiness = _kpi_ready(conn, staff_id)
+    return jsonify({"ok": True, **result, "readiness": readiness})
+
+
+@app.post("/api/crm/staff-kpi/<int:staff_id>/targets")
+def api_staff_kpi_set_target(staff_id: int) -> Any:
+    from crm_svc_kpi import set_target as _set_tgt
+    payload = request.get_json(force=True) or {}
+    role = str(payload.get("role", "am")).strip()
+    metric_key = str(payload.get("metric_key", "")).strip()
+    year = _opt_pos_int(payload.get("year"))
+    month = _opt_pos_int(payload.get("month"))
+    target_value = payload.get("target_value")
+    if not metric_key or not year or not month or target_value is None:
+        return jsonify({"error": "Cần metric_key, year, month, target_value"}), 400
+    try:
+        target_value = float(target_value)
+    except (TypeError, ValueError):
+        return jsonify({"error": "target_value phải là số"}), 400
+    with get_connection() as conn:
+        _set_tgt(conn, staff_id, role, metric_key, year, month, target_value)
+    return jsonify({
+        "ok": True, "staff_id": staff_id, "metric_key": metric_key,
+        "year": year, "month": month, "target_value": target_value,
+    })
+
+
+@app.post("/api/crm/staff-kpi/<int:staff_id>/ai-scan")
+def api_staff_kpi_ai_scan(staff_id: int) -> Any:
+    from crm_svc_kpi import (
+        get_am_metrics as _am_met,
+        get_sp_metrics as _sp_met,
+        get_targets as _get_tgt,
+        run_ai_kpi_scan as _ai_scan,
+    )
+    payload = request.get_json(force=True) or {}
+    role = str(payload.get("role", "am")).strip()
+    year = _opt_pos_int(payload.get("year")) or datetime.utcnow().year
+    month = _opt_pos_int(payload.get("month")) or datetime.utcnow().month
+    if role not in ("am", "sp", "am_lead"):
+        return jsonify({"error": "role phải là 'am', 'sp' hoặc 'am_lead'"}), 400
+    with get_connection() as conn:
+        staff = conn.execute(
+            "SELECT name FROM crm_staff WHERE id = ?", (staff_id,)
+        ).fetchone()
+        if staff is None:
+            return jsonify({"error": "Không tìm thấy staff"}), 404
+        targets = _get_tgt(conn, staff_id, year, month)
+        if role == "am_lead":
+            from crm_svc_kpi import run_ai_lead_kpi_scan as _lead_ai_scan
+            from crm_svc_presales import (
+                get_am_lead_metrics as _am_lead_met,
+                get_am_presales_cap_alerts as _cap_alerts,
+            )
+            metrics = _am_lead_met(conn, staff_id, year, month)
+            cap_alerts = _cap_alerts(conn, staff_id)
+            go_n = int(metrics.get("lead_go_decisions") or 0)
+            cost = int(metrics.get("presales_cost_vnd") or 0)
+            ctx = {
+                "staff_name": staff["name"],
+                "month": month,
+                "year": year,
+                "lead_intake_completed": int(metrics.get("lead_intake_completed") or 0),
+                "lead_phone_within_48h_pct": float(
+                    metrics.get("lead_phone_within_48h_pct") or 0
+                ),
+                "lead_phone_within_48h_num": int(
+                    metrics.get("lead_phone_within_48h_num") or 0
+                ),
+                "lead_phone_within_48h_denom": int(
+                    metrics.get("lead_phone_within_48h_denom") or 0
+                ),
+                "lead_go_decisions": go_n,
+                "lead_to_consult_pct": float(metrics.get("lead_to_consult_pct") or 0),
+                "lead_to_consult_num": int(metrics.get("lead_to_consult_num") or 0),
+                "lead_to_consult_denom": int(metrics.get("lead_to_consult_denom") or 0),
+                "presales_cost_vnd": cost,
+                "presales_cost_per_go_vnd": int(cost / go_n) if go_n > 0 else 0,
+                "lead_avg_phone_minutes": float(
+                    metrics.get("lead_avg_phone_minutes") or 0
+                ),
+                "target_lead_intake_completed": int(
+                    targets.get("lead_intake_completed", 0)
+                ),
+                "target_lead_phone_within_48h_pct": float(
+                    targets.get("lead_phone_within_48h_pct", 0)
+                ),
+                "target_lead_to_consult_pct": float(
+                    targets.get("lead_to_consult_pct", 0)
+                ),
+                "target_presales_cost_vnd": int(targets.get("presales_cost_vnd", 0)),
+                "presales_over_cap_count": int(cap_alerts.get("over_cap_count") or 0),
+            }
+            output = _lead_ai_scan(conn, staff_id, year, month, ctx)
+        elif role == "am":
+            metrics = _am_met(conn, staff_id, year, month)
+            ctx = {
+                "staff_name": staff["name"],
+                "month": month,
+                "year": year,
+                "received_revenue": metrics["received_revenue"],
+                "active_services": metrics["active_services"],
+                "avg_margin_pct": metrics["avg_margin_pct"],
+                "outstanding": metrics["outstanding"],
+                "target_received_revenue": int(targets.get("received_revenue", 0)),
+                "target_active_services": int(targets.get("active_services", 0)),
+                "target_avg_margin_pct": float(targets.get("avg_margin_pct", 0)),
+            }
+            output = _ai_scan(conn, staff_id, role, year, month, ctx)
+        else:
+            metrics = _sp_met(conn, staff_id, year, month)
+            ctx = {
+                "staff_name": staff["name"],
+                "month": month,
+                "year": year,
+                "tasks_completed": metrics["tasks_completed"],
+                "tasks_pending": metrics["tasks_pending"],
+                "risks_resolved": metrics["risks_resolved"],
+                "target_tasks_completed": int(targets.get("tasks_completed", 0)),
+                "target_risks_resolved": int(targets.get("risks_resolved", 0)),
+            }
+            output = _ai_scan(conn, staff_id, role, year, month, ctx)
+    return jsonify({"ai_output": output, "staff_id": staff_id, "role": role})
+
+
+@app.get("/api/crm/svc-lifecycle/<int:lifecycle_id>/staff-metrics")
+def api_svc_lifecycle_staff_metrics(lifecycle_id: int) -> Any:
+    from crm_svc_kpi import get_lifecycle_staff_metrics as _lc_staff
+    with get_connection() as conn:
+        result = _lc_staff(conn, lifecycle_id)
+    return jsonify(result)
 
 
 @app.get("/api/crm/service-lifecycle")
@@ -16824,22 +20673,99 @@ def api_svc_lifecycle_create() -> Any:
     return jsonify(dict(row)), 201
 
 
+@app.get("/crm/customers/<int:customer_id>/lifecycle/new")
+def crm_customer_lifecycle_new(customer_id: int) -> Any:
+    with get_connection() as conn:
+        cu = conn.execute("SELECT id, name FROM crm_customers WHERE id = ?", (customer_id,)).fetchone()
+        if cu is None:
+            return "Không tìm thấy khách hàng", 404
+    from crm_service_lifecycle import VALID_SLUGS
+    slugs = sorted(VALID_SLUGS)
+    return render_template("crm_lifecycle_new.html", customer=dict(cu), slugs=slugs)
+
+
+@app.post("/crm/customers/<int:customer_id>/lifecycle/new")
+def crm_customer_lifecycle_new_post(customer_id: int) -> Any:
+    service_slug = request.form.get("service_slug", "").strip()
+    from crm_service_lifecycle import create_draft_lifecycle, VALID_SLUGS
+    if not service_slug or service_slug not in VALID_SLUGS:
+        return "service_slug không hợp lệ", 400
+    with get_connection() as conn:
+        cu = conn.execute("SELECT id FROM crm_customers WHERE id = ?", (customer_id,)).fetchone()
+        if cu is None:
+            return "Không tìm thấy khách hàng", 404
+        lid = create_draft_lifecycle(conn, lead_id=None, service_slug=service_slug,
+                                     suggested_by="human", customer_id=customer_id)
+    return redirect(url_for("crm_service_workflow_page", lifecycle_id=lid))
+
+
+@app.post("/api/crm/customers/<int:customer_id>/lifecycle")
+def api_customer_lifecycle_create(customer_id: int) -> Any:
+    payload = request.get_json(force=True) or {}
+    service_slug = str(payload.get("service_slug", "")).strip()
+    if not service_slug:
+        return jsonify({"error": "Cần service_slug"}), 400
+    from crm_service_lifecycle import create_draft_lifecycle
+    with get_connection() as conn:
+        cu = conn.execute("SELECT id FROM crm_customers WHERE id = ?", (customer_id,)).fetchone()
+        if cu is None:
+            return jsonify({"error": "Không tìm thấy khách hàng"}), 404
+        lid = create_draft_lifecycle(
+            conn, lead_id=None, service_slug=service_slug,
+            suggested_by="human", customer_id=customer_id,
+        )
+        row = conn.execute("SELECT * FROM crm_service_lifecycle WHERE id = ?", (lid,)).fetchone()
+    return jsonify(dict(row)), 201
+
+
 @app.patch("/api/crm/service-lifecycle/<int:lifecycle_id>")
 def api_svc_lifecycle_patch(lifecycle_id: int) -> Any:
     payload = request.get_json(force=True) or {}
     to_stage = str(payload.get("stage", "")).strip()
     notes = str(payload.get("notes", "")).strip()[:2000]
     actor_id = _opt_pos_int(payload.get("actor_id"))
+    override_reason = str(payload.get("override_reason") or "").strip()[:500]
+    confirm = bool(payload.get("confirm"))
+    gate_warnings: list[str] = []
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT id FROM crm_service_lifecycle WHERE id = ?", (lifecycle_id,)
+            "SELECT id, stage FROM crm_service_lifecycle WHERE id = ?", (lifecycle_id,)
         ).fetchone()
         if row is None:
             return jsonify({"error": "Không tìm thấy lifecycle"}), 404
         if to_stage:
             if to_stage not in SVC_LIFECYCLE_STAGES:
                 return jsonify({"error": f"Stage không hợp lệ: {to_stage}"}), 400
-            _svc_advance_stage(conn, lifecycle_id, to_stage, actor_id=actor_id, notes=notes)
+            if to_stage == "consult" and str(row["stage"] or "") == "lead":
+                from crm_svc_consult_bridge import validate_consult_advance as _consult_gate
+
+                gate = _consult_gate(
+                    conn,
+                    lifecycle_id,
+                    override_reason=override_reason,
+                    allow_override=_admin_full_access(),
+                )
+                if not gate.get("ok"):
+                    return jsonify({
+                        "error": (gate.get("messages") or ["Không thể chuyển Consult"])[0],
+                        "gate": gate,
+                        "requires_override": bool(gate.get("requires_override")),
+                    }), 400
+                if gate.get("requires_confirm") and not confirm:
+                    return jsonify({
+                        "error": (gate.get("messages") or ["Cần xác nhận"])[0],
+                        "gate": gate,
+                        "requires_confirm": True,
+                    }), 400
+                gate_warnings = list(gate.get("messages") or [])
+                if override_reason:
+                    notes = f"{notes}\nDirector override: {override_reason}".strip()[:2000]
+            try:
+                from crm_service_lifecycle import StageAdvanceError
+
+                _svc_advance_stage(conn, lifecycle_id, to_stage, actor_id=actor_id, notes=notes)
+            except StageAdvanceError as exc:
+                return jsonify({"error": str(exc)}), 400
             if to_stage == "retain":
                 try:
                     from crm_service_lifecycle import check_kpi_alert_async
@@ -16854,10 +20780,30 @@ def api_svc_lifecycle_patch(lifecycle_id: int) -> Any:
                 (slug, ts, lifecycle_id),
             )
             conn.commit()
+        if "presales_cost_cap_vnd" in payload:
+            from crm_svc_presales import set_presales_cost_cap as _set_presales_cap
+            cap_val = _opt_pos_int(payload.get("presales_cost_cap_vnd"))
+            _set_presales_cap(conn, lifecycle_id, cap_val)
+        if payload.get("suggest_sp_from_tasks"):
+            from crm_service_lifecycle import sync_assigned_sp_from_tasks
+
+            sync_assigned_sp_from_tasks(conn, lifecycle_id, overwrite=False)
+        if "assigned_sp_id" in payload:
+            from crm_service_lifecycle import set_assigned_sp as _set_assigned_sp
+
+            raw_sp = payload.get("assigned_sp_id")
+            sp_id = _opt_pos_int(raw_sp) if raw_sp not in (None, "", 0) else None
+            try:
+                _set_assigned_sp(conn, lifecycle_id, sp_id, overwrite=True)
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
         updated = conn.execute(
             "SELECT * FROM crm_service_lifecycle WHERE id = ?", (lifecycle_id,)
         ).fetchone()
-    return jsonify(dict(updated))
+    out = dict(updated)
+    if gate_warnings:
+        out["gate_warnings"] = gate_warnings
+    return jsonify(out)
 
 
 @app.get("/api/crm/service-lifecycle/<int:lifecycle_id>/events")
@@ -16870,15 +20816,20 @@ def api_svc_lifecycle_events(lifecycle_id: int) -> Any:
     return jsonify([dict(r) for r in rows])
 
 
+from blueprints import register_crm_product_blueprints
+
+register_crm_product_blueprints(app)
+
 init_db()
 
 if __name__ == "__main__":
     start_facebook_autosync_worker(app)
     _port = int(os.environ.get("PORT", "5050"))
+    _debug = os.environ.get("FLASK_DEBUG", "1").strip().lower() in {"1", "true", "yes"}
     print("\n" + "=" * 62)
     print(f"  PTT Advertising — trang chủ: http://127.0.0.1:{_port}/")
     print(f"  Thiết bị khác (Wi‑Fi/LAN): http://<IP-máy-này>:{_port}/")
     print(f"  Kiểm tra đúng app: curl -s http://127.0.0.1:{_port}/healthz")
     print("=" * 62 + "\n")
     # host 0.0.0.0: truy cập từ điện thoại / máy khác trong mạng
-    app.run(debug=True, host="0.0.0.0", port=_port, use_reloader=False)
+    app.run(debug=_debug, host="0.0.0.0", port=_port, use_reloader=False)

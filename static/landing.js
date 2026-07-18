@@ -21,8 +21,36 @@ function isDesktopNavMega() {
   return window.matchMedia("(min-width: 901px)").matches;
 }
 
+function syncLandingTopbarRowHeight() {
+  const bar = document.querySelector(".landing-topbar");
+  if (!bar) return;
+  const row = bar.querySelector(".nav-wrap");
+  if (row) {
+    document.documentElement.style.setProperty(
+      "--landing-topbar-row-h",
+      `${Math.round(row.getBoundingClientRect().height)}px`
+    );
+  }
+}
+
 if (document.body.classList.contains("landing-body")) {
   document.documentElement.classList.add("landing-pad");
+
+  function syncLandingTopbarHeight() {
+    const bar = document.querySelector(".landing-topbar");
+    if (!bar) return;
+    const h = Math.round(bar.getBoundingClientRect().height);
+    document.documentElement.style.setProperty("--landing-topbar-h", `${h}px`);
+    syncLandingTopbarRowHeight();
+  }
+
+  syncLandingTopbarHeight();
+  window.addEventListener("resize", syncLandingTopbarHeight, { passive: true });
+  window.addEventListener("orientationchange", syncLandingTopbarHeight, { passive: true });
+} else if (document.querySelector(".landing-topbar")) {
+  syncLandingTopbarRowHeight();
+  window.addEventListener("resize", syncLandingTopbarRowHeight, { passive: true });
+  window.addEventListener("orientationchange", syncLandingTopbarRowHeight, { passive: true });
 }
 
 function elementFromClickEvent(e) {
@@ -351,13 +379,21 @@ window.addEventListener("hashchange", expandSagaIfHashTargetsHiddenCard);
 const servicesAccordion = document.querySelector("[data-services-accordion]");
 
 if (toggleButton && mobileMenu) {
+  function setMobileMenuOpen(open) {
+    mobileMenu.classList.toggle("open", open);
+    toggleButton.setAttribute("aria-expanded", open ? "true" : "false");
+    document.body.classList.toggle("mobile-menu-open", open);
+    document.body.style.overflow = open ? "hidden" : "";
+    syncLandingTopbarRowHeight();
+  }
+
   toggleButton.addEventListener("click", () => {
-    mobileMenu.classList.toggle("open");
+    setMobileMenuOpen(!mobileMenu.classList.contains("open"));
   });
 
   mobileMenu.querySelectorAll("a").forEach((link) => {
     link.addEventListener("click", () => {
-      mobileMenu.classList.remove("open");
+      setMobileMenuOpen(false);
     });
   });
 
@@ -365,7 +401,7 @@ if (toggleButton && mobileMenu) {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     if (!target.closest("[data-mobile-menu]") && !target.closest("[data-menu-toggle]")) {
-      mobileMenu.classList.remove("open");
+      setMobileMenuOpen(false);
     }
   });
 }
@@ -540,10 +576,33 @@ function initHomeHeroSlider() {
 
   let idx = 0;
   let timer = 0;
-  const AUTO_MS = 6500;
+  const AUTO_MS = 5000;
   const prefersReduce = window.matchMedia("(prefers-reduced-motion: reduce)");
   /** @type {HTMLButtonElement[]} */
   const dotButtons = [];
+
+  function ensureHeroVideoLoaded(video) {
+    if (!video?.hasAttribute("data-lazy-video")) return;
+    const source = video.querySelector("source[data-src]");
+    if (!source || source.getAttribute("src")) return;
+    source.src = source.getAttribute("data-src") || "";
+    source.removeAttribute("data-src");
+    video.load();
+  }
+
+  function syncHeroVideos(activeIdx) {
+    slides.forEach((slide, i) => {
+      const video = slide.querySelector(".home-slide-video");
+      if (!video) return;
+      if (i === activeIdx && !prefersReduce.matches) {
+        ensureHeroVideoLoaded(video);
+        const playPromise = video.play();
+        if (playPromise?.catch) playPromise.catch(() => {});
+      } else {
+        video.pause();
+      }
+    });
+  }
 
   function goTo(nextIdx) {
     const n = slides.length;
@@ -559,6 +618,7 @@ function initHomeHeroSlider() {
       btn.setAttribute("aria-selected", sel ? "true" : "false");
       btn.tabIndex = sel ? 0 : -1;
     });
+    syncHeroVideos(idx);
   }
 
   slides.forEach((_, i) => {
@@ -578,7 +638,7 @@ function initHomeHeroSlider() {
   function scheduleAuto() {
     window.clearInterval(timer);
     timer = 0;
-    if (prefersReduce.matches) return;
+    if (prefersReduce.matches || slides.length <= 1) return;
     timer = window.setInterval(() => goTo(idx + 1), AUTO_MS);
   }
 
@@ -616,9 +676,24 @@ function initHomeHeroSlider() {
 
 initHomeHeroSlider();
 
-const partnerSlider = document.querySelector(".partner-slider");
-const partnerTrack = document.querySelector(".partner-slider-track");
-if (partnerSlider && partnerTrack) {
+function initPartnerLogoMarquee() {
+  const partnerSlider = document.querySelector(".partner-slider");
+  const partnerTrack = document.querySelector(".partner-slider-track");
+  if (!partnerSlider || !partnerTrack) return;
+
+  const prefersReduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!prefersReduce) {
+    const slides = [...partnerTrack.querySelectorAll(".partner-slide")];
+    if (slides.length) {
+      slides.forEach((slide) => {
+        const clone = slide.cloneNode(true);
+        clone.setAttribute("aria-hidden", "true");
+        clone.setAttribute("tabindex", "-1");
+        partnerTrack.appendChild(clone);
+      });
+    }
+  }
+
   partnerSlider.addEventListener("focusin", () => {
     partnerTrack.classList.add("is-paused");
   });
@@ -628,6 +703,8 @@ if (partnerSlider && partnerTrack) {
     partnerTrack.classList.remove("is-paused");
   });
 }
+
+initPartnerLogoMarquee();
 
 const contactForm = document.getElementById("contact-form");
 if (contactForm) {
@@ -671,21 +748,40 @@ if (contactForm) {
     const elName = document.getElementById("contact-name");
     const elEmail = document.getElementById("contact-email");
     const elPhone = document.getElementById("contact-tel");
-    const elMsg = document.getElementById("contact-need");
+    const elBudget = document.getElementById("contact-budget");
+    const elCompany = document.getElementById("contact-company");
+    const elGoal = document.getElementById("contact-goal");
+    const elHelp = document.getElementById("contact-help");
+    const elAdditional = document.getElementById("contact-additional");
     const name = elName && "value" in elName ? String(elName.value).trim() : "";
     const email = elEmail && "value" in elEmail ? String(elEmail.value).trim() : "";
-    if (!name || !email) {
-      setToast("Vui lòng điền họ tên và email.", true);
+    const phone = elPhone && "value" in elPhone ? String(elPhone.value).trim() : "";
+    const budget = elBudget && "value" in elBudget ? String(elBudget.value).trim() : "";
+    const company = elCompany && "value" in elCompany ? String(elCompany.value).trim() : "";
+    if (!name || !email || !phone || !budget || !company) {
+      setToast("Vui lòng điền đủ các trường bắt buộc (*).", true);
       return;
     }
-    const phone = elPhone && "value" in elPhone ? String(elPhone.value).trim() : "";
-    const message = elMsg && "value" in elMsg ? String(elMsg.value).trim() : "";
+    const goal = elGoal && "value" in elGoal ? String(elGoal.value).trim() : "";
+    const helpRequest = elHelp && "value" in elHelp ? String(elHelp.value).trim() : "";
+    const additionalInfo =
+      elAdditional && "value" in elAdditional ? String(elAdditional.value).trim() : "";
     setLoading(true);
     try {
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ name, email, phone, message }),
+        body: JSON.stringify({
+          form_type: "full",
+          name,
+          email,
+          phone,
+          budget,
+          company,
+          goal,
+          help_request: helpRequest,
+          additional_info: additionalInfo,
+        }),
         credentials: "same-origin",
       });
       const data = await res.json().catch(() => ({}));

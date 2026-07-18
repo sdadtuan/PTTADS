@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pttads.vn/schemas/channel/normalized-daily-performance.schema.json",
+  "title": "NormalizedDailyPerformance",
+  "type": "object",
+  "required": [
+    "client_id",
+    "channel",
+    "date",
+    "spend",
+    "impressions",
+    "clicks",
+    "conversions",
+    "currency"
+  ],
+  "properties": {
+    "client_id": { "type": "string" },
+    "channel": {
+      "type": "string",
+      "enum": ["meta", "zalo", "google", "email", "tiktok"]
+    },
+    "date": { "type": "string", "format": "date" },
+    "spend": { "type": "number", "minimum": 0 },
+    "impressions": { "type": "integer", "minimum": 0 },
+    "clicks": { "type": "integer", "minimum": 0 },
+    "conversions": { "type": "number", "minimum": 0 },
+    "currency": { "type": "string", "minLength": 3, "maxLength": 3 },
+    "external_campaign_id": { "type": ["string", "null"] },
+    "external_ad_group_id": { "type": ["string", "null"] },
+    "external_ad_id": { "type": ["string", "null"] },
+    "reach": { "type": ["integer", "null"] },
+    "conversion_value": { "type": ["number", "null"] },
+    "cpc": { "type": ["number", "null"] },
+    "cpm": { "type": ["number", "null"] },
+    "ctr": { "type": ["number", "null"] },
+    "cpa": { "type": ["number", "null"] },
+    "roas": { "type": ["number", "null"] },
+    "frequency": { "type": ["number", "null"] },
+    "raw": { "type": "object" }
+  },
+  "additionalProperties": false
+}

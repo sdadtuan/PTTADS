@@ -20,6 +20,7 @@ from crm_lead_store import (
     log_lead_activity,
     update_lead,
 )
+from crm_lead_kpi_metrics import is_lead_qualified, is_lead_won
 
 
 def _lead_sla_delete_pending(conn: sqlite3.Connection, lead_id: int) -> None:
@@ -189,6 +190,8 @@ def fetch_lead_owner_stats(
     product_line: str | None = None,
     zone: str | None = None,
     sla_overdue_only: bool = False,
+    hide_review_queue: bool = True,
+    review_queue_only: bool = False,
 ) -> list[dict[str, Any]]:
     """Hiệu suất lead theo owner — cùng bộ lọc với danh sách lead bên dưới.
 
@@ -208,6 +211,8 @@ def fetch_lead_owner_stats(
         product_line=product_line,
         zone=zone,
         sla_overdue_only=sla_overdue_only,
+        hide_review_queue=hide_review_queue,
+        review_queue_only=review_queue_only,
         limit=5000,
     )
     buckets: dict[int | None, dict[str, Any]] = {}
@@ -226,6 +231,7 @@ def fetch_lead_owner_stats(
                 "won": 0,
                 "lost": 0,
                 "open": 0,
+                "qualified": 0,
                 "hot": 0,
                 "sla_overdue": 0,
                 "score_sum": 0,
@@ -240,7 +246,7 @@ def fetch_lead_owner_stats(
         pid_key = int(pid_raw)
         pcode = str(lead.get("re_project_code") or "").strip()
         pname = str(lead.get("re_project_name") or "").strip()
-        from crm_project_leads import format_project_display_label
+        from crm_project_leads import format_project_display_label, format_project_full_label
 
         plabel = format_project_display_label(code=pcode, name=pname, project_id=pid_key)
         pfull = format_project_full_label(code=pcode, name=pname, project_id=pid_key)
@@ -265,10 +271,12 @@ def fetch_lead_owner_stats(
 
         if st == "lost":
             b["lost"] += 1
-        elif st == "post_sale" or st == "won" or pipe.get("all_complete"):
+        elif is_lead_won(conn, int(lead.get("id") or 0)):
             b["won"] += 1
         else:
             b["open"] += 1
+        if is_lead_qualified(conn, int(lead.get("id") or 0)):
+            b["qualified"] += 1
 
         if str(lead.get("lead_level") or "") == "hot":
             b["hot"] += 1
@@ -279,6 +287,7 @@ def fetch_lead_owner_stats(
     for b in buckets.values():
         total = int(b["total"] or 0)
         won = int(b["won"] or 0)
+        qualified = int(b["qualified"] or 0)
         by_stage = dict(b["by_care_stage"])
         projects = sorted(
             [p for p in b["by_project"].values() if p.get("project_id")],
@@ -291,11 +300,13 @@ def fetch_lead_owner_stats(
                 "owner_code": b["owner_code"],
                 "total": total,
                 "won": won,
+                "qualified_leads": qualified,
                 "lost": int(b["lost"] or 0),
                 "open": int(b["open"] or 0),
                 "hot": int(b["hot"] or 0),
                 "sla_overdue": int(b["sla_overdue"] or 0),
-                "conversion_rate": round(won * 100.0 / total, 1) if total else 0.0,
+                "conversion_rate": round(won * 100.0 / qualified, 1) if qualified else 0.0,
+                "close_rate_pct": round(won * 100.0 / qualified, 1) if qualified else 0.0,
                 "avg_score": round(float(b["score_sum"]) / total, 1) if total else 0.0,
                 "by_care_stage": by_stage,
                 "project_count": len([p for p in projects if p.get("project_id")]),
@@ -350,6 +361,7 @@ def reassign_leads_from_inactive_owners(
             conn,
             region=str(ld.get("region") or ""),
             product_interest=str(ld.get("product_interest") or ""),
+            industry_slug=str(ld.get("industry_slug") or ""),
             lead_level=str(ld.get("lead_level") or "warm"),
             prefer_min_workload=(fallback == "min_workload"),
         )

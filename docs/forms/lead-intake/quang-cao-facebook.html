@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Form tiếp nhận Lead — Quảng cáo Facebook (Meta Ads) — PTT Lead Intake</title>
+<style>
+:root { --navy:#0F172A; --accent:#2563EB; --gray:#64748B; --light:#F1F5F9; --border:#CBD5E1; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:"Segoe UI",system-ui,-apple-system,sans-serif; color:var(--navy); background:#fff; line-height:1.5; font-size:13px; }
+.page { max-width:920px; margin:0 auto; padding:1.5rem 1.25rem 3rem; }
+header.doc-header { background:var(--navy); color:#fff; padding:1.25rem 1.5rem; border-radius:8px; margin-bottom:1.5rem; position:relative; }
+header.doc-header .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
+header.doc-header .header-brand img { height:52px; width:auto; display:block; }
+header.doc-header h1 { font-size:1.35rem; margin-bottom:.25rem; }
+header.doc-header .meta { font-size:.85rem; opacity:.85; }
+header.doc-header .slug { color:#93C5FD; font-size:.8rem; }
+.meta-grid { display:grid; grid-template-columns:1fr 1fr; gap:.75rem 1.25rem; margin-top:1rem; background:rgba(255,255,255,.08); padding:1rem; border-radius:6px; }
+.form-section { margin-bottom:1.75rem; page-break-inside:avoid; }
+.section-head { display:flex; align-items:center; gap:.75rem; border-bottom:3px solid var(--accent); padding-bottom:.4rem; margin-bottom:1rem; }
+.section-head h2 { font-size:1.05rem; color:var(--navy); }
+.part-badge { background:var(--accent); color:#fff; font-size:.7rem; font-weight:600; padding:.2rem .55rem; border-radius:4px; white-space:nowrap; }
+h3 { font-size:.95rem; color:var(--accent); margin:1rem 0 .5rem; }
+p, li { margin-bottom:.35rem; }
+.hint { color:var(--gray); font-size:.8rem; font-style:italic; }
+.script-box { background:var(--light); border-left:4px solid var(--accent); padding:.75rem 1rem; margin:.5rem 0; border-radius:0 6px 6px 0; }
+.field { margin-bottom:.65rem; }
+.field-wide { grid-column:1/-1; }
+.field label { display:block; font-weight:600; font-size:.8rem; margin-bottom:.2rem; color:var(--gray); }
+.line { border-bottom:1px solid var(--border); height:1.4rem; }
+.lines { border-bottom:1px solid var(--border); height:1.2rem; margin-bottom:.35rem; }
+.lines-sm .lines, .lines-sm { height:1rem; }
+.lines-tall { min-height:3.5rem; border:1px solid var(--border); border-radius:4px; background:#FAFAFA; }
+.cb { display:inline-block; width:1rem; text-align:center; }
+.cb-group { display:grid; gap:.4rem .75rem; }
+.cb-group.cols-2 { grid-template-columns:1fr 1fr; }
+.cb-group.cols-3 { grid-template-columns:1fr 1fr 1fr; }
+.cb-item { display:flex; align-items:flex-start; gap:.35rem; font-size:.85rem; }
+.cb-go { color:#15803D; } .cb-nurture { color:#B45309; } .cb-nogo { color:#B91C1C; }
+.data-table, .q-table { width:100%; border-collapse:collapse; margin:.75rem 0; font-size:.82rem; }
+.data-table th, .q-table th { background:var(--accent); color:#fff; padding:.45rem .6rem; text-align:left; font-weight:600; }
+.data-table td, .q-table td { border:1px solid var(--border); padding:.45rem .6rem; vertical-align:top; }
+.data-table tr:nth-child(even) td { background:var(--light); }
+.q-num { text-align:center; font-weight:700; color:var(--accent); }
+.q-note .lines { min-height:2.4rem; }
+.score { width:2rem; text-align:center; background:#fff !important; }
+.bant-table td, .bant-table th { font-size:.78rem; }
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+.footer-note { margin-top:2rem; padding:1rem; background:var(--light); border-radius:6px; font-size:.8rem; color:var(--gray); }
+@media print {
+  body { font-size:11px; }
+  .page { padding:0; max-width:100%; }
+  header.doc-header { border-radius:0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .form-section { page-break-inside:avoid; }
+  .part-badge, .data-table th, .q-table th { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+<header class="doc-header">
+  <div class="header-top">
+    <div>
+      <div class="slug">PTT · Lead Intake · quang-cao-facebook</div>
+      <h1>Form tiếp nhận Lead — Quảng cáo Facebook (Meta Ads)</h1>
+      <div class="meta">Form tiếp nhận lead — Gọi điện (15–25 phút) + Gặp trực tiếp (45–60 phút)</div>
+    </div>
+    <div class="header-brand"><img src="/static/images/ptt-logo.png" alt="PTT Advertising Solutions"></div>
+  </div>
+  <div class="meta-grid">
+    <div class="field"><label>Account Manager (AM)</label><div class="line"></div></div>
+    <div class="field"><label>Ngày gọi / gặp</label><div class="line"></div></div>
+    <div class="field"><label>Lead ID / CRM</label><div class="line"></div></div>
+    <div class="field"><label>Nguồn lead (form/referral/ads/...)</label><div class="line"></div></div>
+    <div class="field"><label>Dịch vụ quan tâm</label><div class="line"></div></div>
+    <div class="field"><label>Tên KH / Công ty</label><div class="line"></div></div>
+    <div class="field"><label>SĐT / Email</label><div class="line"></div></div>
+    <div class="field"><label>Chức danh người liên hệ</label><div class="line"></div></div>
+  </div>
+</header>
+<section class="form-section"><div class="section-head"><h2>Quảng cáo Facebook (Meta Ads) — Tổng quan & ICP</h2><span class="part-badge">PHẦN A</span></div><p><strong>Tổng quan:</strong> Quản lý Meta Ads — lead gen, sales, traffic. Retainer tháng.</p>
+<p><strong>ICP lý tưởng:</strong> Chạy Ads mới hoặc tối ưu account; cần CPL/ROAS ổn định; có LP/fanpage.</p>
+<p><strong>SLA:</strong> Phản hồi ≤2h · Strategy call 1–3 ngày · Setup campaign 3–5 ngày sau onboard</p></section>
+<section class="form-section"><div class="section-head"><h2>Qualify qua điện thoại — Quảng cáo Facebook (Meta Ads)</h2><span class="part-badge">PHẦN A</span></div><div class="script-box"><strong>Script mở đầu (tailored)</strong><p>"Anh/chị chạy Facebook Ads — mục tiêu lead, sale hay traffic? Em hỏi ngân sách/ngày và có BM/Ads account chưa ạ?"</p></div><table class="q-table"><thead><tr><th style="width:3rem">#</th><th>Câu hỏi</th><th style="width:35%">Ghi chú / trả lời</th></tr></thead><tbody><tr><td class="q-num">P1</td><td class="q-text">Mục tiêu: lead/sale/traffic/awareness?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">P2</td><td class="q-text">KPI CPL/ROAS baseline?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">P3</td><td class="q-text">Ngân sách/ngày (VND)?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">P4</td><td class="q-text">LP URL — live & tốc độ?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">P5</td><td class="q-text">Fanpage link & BM owner?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">P6</td><td class="q-text">Pixel/CAPI setup status?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">P7</td><td class="q-text">Creative ai làm — có sẵn?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">P8</td><td class="q-text">Lịch sử policy/vi phạm?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">P9</td><td class="q-text">Account cũ hay mới?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">P10</td><td class="q-text">Retargeting audience có chưa?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">P11</td><td class="q-text">Ngành sản phẩm — restricted?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">P12</td><td class="q-text">Geo target?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">P13</td><td class="q-text">Catalog/DPA cần không?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">P14</td><td class="q-text">Agency cũ kết quả?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">P15</td><td class="q-text">Timeline scale budget?</td><td class="q-note"><div class="lines"></div></td></tr></tbody></table><h3>Red flags</h3><div class="cb-group cols-2"><label class="cb-item"><span class="cb">☐</span> Không LP</label><label class="cb-item"><span class="cb">☐</span> Pixel lỗi/không cài</label><label class="cb-item"><span class="cb">☐</span> Ngành hạn chế không disclose</label><label class="cb-item"><span class="cb">☐</span> Ngân sách/ngày quá thấp learning</label><label class="cb-item"><span class="cb">☐</span> BM không add partner được</label></div><h3>Urgency triggers</h3><div class="cb-group cols-2"><label class="cb-item"><span class="cb">☐</span> Campaign launch date</label><label class="cb-item"><span class="cb">☐</span> Account disabled recovery</label><label class="cb-item"><span class="cb">☐</span> Seasonal sale</label><label class="cb-item"><span class="cb">☐</span> Competitor aggressive Ads</label><label class="cb-item"><span class="cb">☐</span> New product launch</label></div><table class="data-table"><thead><tr><th style="width:28%">Phản đối</th><th>Cách xử lý / ghi chú AM</th></tr></thead><tbody><tr><td><strong>Tự boost post đủ</strong></td><td><div class="lines"></div><p class="hint">Ads Manager = targeting + pixel + optimize algorithm.</p></td></tr><tr><td><strong>CPL agency cao hơn tự chạy</strong></td><td><div class="lines"></div><p class="hint">So sánh quality lead + time + creative test volume.</p></td></tr><tr><td><strong>Burn budget tháng trước</strong></td><td><div class="lines"></div><p class="hint">Audit account — thường structure/audience issue.</p></td></tr><tr><td><strong>Creative nội bộ không cần agency</strong></td><td><div class="lines"></div><p class="hint">OK — PTT optimize + media plan; creative KH supply.</p></td></tr><tr><td><strong>Không tin % phí quản lý</strong></td><td><div class="lines"></div><p class="hint">Minh bạch fee + spend report hàng tuần.</p></td></tr><tr><td><strong>CAPI phức tạp</strong></td><td><div class="lines"></div><p class="hint">PTT setup CAPI standard; server-side improve match rate.</p></td></tr></tbody></table><h3>BANT+ Scoring (rút gọn)</h3>
+<p class="hint">Đánh giá 1–5 mỗi tiêu chí. Tổng ≥24: Go | 18–23: Nurture | &lt;18: No-Go</p>
+<table class="data-table bant-table">
+<thead><tr><th>Tiêu chí</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>Ghi chú</th></tr></thead>
+<tbody><tr><td><strong>Budget</strong><br><span class="hint">Ngân sách thực tế/tháng hoặc dự án? Ai duyệt chi?</span></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td><div class="lines lines-sm"></div></td></tr><tr><td><strong>Authority</strong><br><span class="hint">Ai ký HĐ? Ai quyết định cuối cùng?</span></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td><div class="lines lines-sm"></div></td></tr><tr><td><strong>Need</strong><br><span class="hint">Pain point #1? Hậu quả nếu không giải quyết?</span></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td><div class="lines lines-sm"></div></td></tr><tr><td><strong>Timeline</strong><br><span class="hint">Khi nào cần bắt đầu? Deadline campaign/go-live?</span></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td><div class="lines lines-sm"></div></td></tr><tr><td><strong>Fit</strong><br><span class="hint">Phù hợp ICP PTT? Scope trong năng lực?</span></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td><div class="lines lines-sm"></div></td></tr><tr><td><strong>History</strong><br><span class="hint">Đã thử gì? Agency cũ? Kết quả?</span></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td class="score"></td><td><div class="lines lines-sm"></div></td></tr></tbody>
+<tfoot><tr><td colspan="6"><strong>Tổng điểm</strong></td><td><div class="line"></div></td></tr></tfoot>
+</table><h3>Nhiệt độ lead &amp; quyết định</h3>
+<div class="cb-group cols-3">
+  <label class="cb-item"><span class="cb">☐</span> <strong>Hot</strong> — budget + timeline + DM engaged</label>
+  <label class="cb-item"><span class="cb">☐</span> <strong>Warm</strong> — nhu cầu rõ, thiếu budget/timeline</label>
+  <label class="cb-item"><span class="cb">☐</span> <strong>Cold</strong> — chỉ hỏi giá, không pain point</label>
+</div>
+<div class="cb-group cols-3" style="margin-top:.75rem">
+  <label class="cb-item cb-go"><span class="cb">☐</span> <strong>Go</strong> → Book Tư vấn</label>
+  <label class="cb-item cb-nurture"><span class="cb">☐</span> <strong>Nurture</strong> → Drip + follow-up</label>
+  <label class="cb-item cb-nogo"><span class="cb">☐</span> <strong>No-Go</strong> → Từ chối lịch sự</label>
+</div>
+<div class="field field-wide"><label>Lý do quyết định</label><div class="lines lines-tall"></div></div></section>
+<section class="form-section"><div class="section-head"><h2>Gặp trực tiếp — Quảng cáo Facebook (Meta Ads)</h2><span class="part-badge">PHẦN B</span></div><div class="field field-wide"><label>Recap cuộc gọi — pain point xác nhận</label><div class="lines lines-tall"></div></div><h3>Discovery sâu (15–20 câu)</h3><table class="q-table"><thead><tr><th style="width:3rem">#</th><th>Câu hỏi</th><th style="width:35%">Ghi chú / trả lời</th></tr></thead><tbody><tr><td class="q-num">D1</td><td class="q-text">Funnel stage mapping?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D2</td><td class="q-text">Audience persona 3 layer?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D3</td><td class="q-text">Creative angle tested?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D4</td><td class="q-text">Offer/lead magnet?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D5</td><td class="q-text">LP message match score?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D6</td><td class="q-text">Form friction audit?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D7</td><td class="q-text">Pixel events priority list?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D8</td><td class="q-text">CAPI vs browser dedup?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D9</td><td class="q-text">BM structure clean?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D10</td><td class="q-text">Ad account spending limit?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D11</td><td class="q-text">Catalog feed quality?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D12</td><td class="q-text">UTM convention?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D13</td><td class="q-text">Weekly report format?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D14</td><td class="q-text">Creative refresh cadence?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D15</td><td class="q-text">Policy risk products?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D16</td><td class="q-text">Competitor Ad Library insights?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D17</td><td class="q-text">Budget scaling rules?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D18</td><td class="q-text">Learning phase plan?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D19</td><td class="q-text">Whatsapp/Messenger ads?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D20</td><td class="q-text">Influencer whitelisting?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">D21</td><td class="q-text">Break-even CPL/ROAS math?</td><td class="q-note"><div class="lines"></div></td></tr></tbody></table><h3>Live audit / Demo checklist</h3><div class="cb-group cols-2"><label class="cb-item"><span class="cb">☐</span> Ads Manager audit live</label><label class="cb-item"><span class="cb">☐</span> LP PageSpeed</label><label class="cb-item"><span class="cb">☐</span> Pixel Helper check</label><label class="cb-item"><span class="cb">☐</span> Audience overlap estimate</label><label class="cb-item"><span class="cb">☐</span> Creative swipe file ngành</label><label class="cb-item"><span class="cb">☐</span> CPL benchmark share</label></div><div class="field field-wide"><label>Insight chính từ demo</label><div class="lines lines-tall"></div></div><h3>Tài liệu thu thập</h3><table class="data-table"><colgroup><col style="width:40%"><col style="width:30%"><col style="width:30%"></colgroup><thead><tr><th>Tài liệu</th><th>Lead</th><th>Onboard</th></tr></thead><tbody><tr><td>Fanpage link</td><td>☐</td><td>☐</td></tr><tr><td>Screenshot Ads Manager</td><td>☐</td><td>☐</td></tr><tr><td>LP URL</td><td>☐</td><td>☐</td></tr><tr><td>Media kit/creative</td><td>☐</td><td>☐</td></tr><tr><td>BM partner access</td><td>—</td><td>☐</td></tr><tr><td>Pixel verify</td><td>—</td><td>☐</td></tr></tbody></table><h3>KPI framing</h3><table class="q-table"><thead><tr><th style="width:3rem">#</th><th>Câu hỏi</th><th style="width:35%">Ghi chú / trả lời</th></tr></thead><tbody><tr><td class="q-num">K1</td><td class="q-text">CTR/CPL/ROAS target?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">K2</td><td class="q-text">Báo cáo tuần+tháng?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">K3</td><td class="q-text">Creative refresh 2 tuần?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">K4</td><td class="q-text">Scale budget threshold?</td><td class="q-note"><div class="lines"></div></td></tr></tbody></table><h3>Scope boundary</h3><table class="q-table"><thead><tr><th style="width:3rem">#</th><th>Câu hỏi</th><th style="width:35%">Ghi chú / trả lời</th></tr></thead><tbody><tr><td class="q-num">S1</td><td class="q-text">IN: setup, optimize, report?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">S2</td><td class="q-text">OUT: creative production, LP build?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">S3</td><td class="q-text">Min spend/ngày?</td><td class="q-note"><div class="lines"></div></td></tr><tr><td class="q-num">S4</td><td class="q-text">% fee vs flat retainer?</td><td class="q-note"><div class="lines"></div></td></tr></tbody></table><div class="script-box"><strong>Script chốt — book Proposal/Tư vấn</strong><p>"Em gửi Proposal Meta Ads — KPI, cấu trúc campaign, phí quản lý. BM partner sau ký — setup 3–5 ngày. Họp [ngày] ạ?"</p></div><h3>Upsell paths</h3><div class="cb-group cols-2"><label class="cb-item"><span class="cb">☐</span> Google Ads</label><label class="cb-item"><span class="cb">☐</span> Landing page mới</label><label class="cb-item"><span class="cb">☐</span> Thuê TK nếu BM issue</label></div><div class="field"><label>Ngày họp Proposal / gửi báo giá</label><div class="line"></div></div><div class="field field-wide"><label>Người tham dự + budget xác nhận</label><div class="lines lines-tall"></div></div></section>
+<section class="form-section"><div class="section-head"><h2>Đồng bộ CRM — Task Lead (form_fields)</h2></div><p class="hint">Điền các trường sau vào CRM Service Delivery → stage Lead.</p>
+<table class="data-table"><thead><tr><th>Key</th><th>Label</th><th>Giá trị</th></tr></thead>
+<tbody><tr><td><code>niche</code></td><td>Ngành sản phẩm</td><td><div class="line"></div></td></tr><tr><td><code>daily_budget</code></td><td>Ngân sách/ngày (VND)</td><td><div class="line"></div></td></tr><tr><td><code>campaign_goal</code></td><td>Mục tiêu campaign</td><td><div class="line"></div></td></tr><tr><td><code>has_ads_account</code></td><td>Có tài khoản Ads không</td><td><div class="line"></div></td></tr></tbody></table></section>
+<div class="footer-note">
+  PTT Agency · Service Delivery · Sau buổi gọi/gặp: cập nhật CRM task <strong>Lead</strong> + Lead care <strong>first_contact</strong>.
+  In form: Ctrl/Cmd+P · Tạo lại: <code>python3 scripts/generate_lead_intake_forms.py</code>
+</div>
+</div>
+</body>
+</html>

@@ -71,6 +71,22 @@ Mỗi file gồm 7 phần đồng nhất:
 
 ---
 
+## Lead Intake (Form gọi & gặp KH)
+
+Checklist tiếp nhận lead tại stage **Lead** — gọi điện (PHẦN A) và gặp trực tiếp (PHẦN B).
+
+| Tài liệu | Đường dẫn |
+|----------|-----------|
+| Design spec | [2026-06-30-lead-intake-system-design.md](../2026-06-30-lead-intake-system-design.md) |
+| Kế hoạch triển khai | [2026-06-30-lead-intake-system.md](../../superpowers/plans/2026-06-30-lead-intake-system.md) |
+| Form HTML (13 file) | [forms/lead-intake/](../../forms/lead-intake/) |
+| Route CRM (Phase 1) | `/crm/forms/lead-intake/<slug>.html` từ Service Workflow |
+| Generator | `scripts/generate_lead_intake_forms.py` |
+
+**Roadmap:** Phase 2+ — module `crm_lead_intake.py`, trang `/crm/intake`, lưu session DB, auto-sync task Lead.
+
+---
+
 ## SLA Chung (áp dụng mọi dịch vụ)
 
 | Mốc | Thời gian tối đa |

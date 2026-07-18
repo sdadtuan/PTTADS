@@ -2,7 +2,7 @@
 
 > **Phiên bản:** 2026-05 · **Codebase:** `PTT/` · **Production:** `https://pttads.vn` · **Local:** `http://127.0.0.1:5050`  
 > **Loại tài liệu:** Functional + Technical Specification (master)  
-> **Tài liệu liên quan:** [`HE_THONG_PTT.md`](HE_THONG_PTT.md) (tóm tắt) · [`SPEC_UI_UX_PTT.md`](SPEC_UI_UX_PTT.md) (UI/UX) · [`HUONG_DAN_SU_DUNG_PTT.md`](HUONG_DAN_SU_DUNG_PTT.md) (hướng dẫn sử dụng) · [`PHAN_QUYEN_HUONG_DAN.md`](PHAN_QUYEN_HUONG_DAN.md) (phân quyền) · [`TEST_CASES_PTT.md`](TEST_CASES_PTT.md) (QA)
+> **Tài liệu liên quan:** [`HE_THONG_PTT.md`](HE_THONG_PTT.md) (tóm tắt) · [`SPEC_AGENCY_OPERATING_PLATFORM.md`](SPEC_AGENCY_OPERATING_PLATFORM.md) (target agency platform) · [`SPEC_UI_UX_PTT.md`](SPEC_UI_UX_PTT.md) (UI/UX) · [`HUONG_DAN_SU_DUNG_PTT.md`](HUONG_DAN_SU_DUNG_PTT.md) (hướng dẫn sử dụng) · [`PHAN_QUYEN_HUONG_DAN.md`](PHAN_QUYEN_HUONG_DAN.md) (phân quyền) · [`TEST_CASES_PTT.md`](TEST_CASES_PTT.md) (QA)
 
 ---
 

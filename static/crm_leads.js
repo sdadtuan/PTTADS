@@ -11,6 +11,10 @@
   const staffPortal = !!meta.staff_portal;
   const leadsOnlyUi = !!meta.leads_only_ui;
   const simpleLeadUi = staffPortal || leadsOnlyUi;
+  const pageRoot = document.querySelector(".crm-leads-app[data-lead-page]");
+  const leadPageMode = String(pageRoot?.dataset.leadPage || meta.page_mode || "list");
+  const isDetailPage = leadPageMode === "detail";
+  let detailTab = "overview";
   const statusLabels = meta.status_labels || {};
   const levelLabels = meta.level_labels || {};
   const sourceLabels = meta.source_labels || {};
@@ -20,31 +24,62 @@
   const careContactLabels = meta.care_contact_labels || {};
   const careStatusTypes = meta.care_status_types || [];
   const careStatusLabels = meta.care_status_labels || {};
+  const serviceLabels = meta.service_labels || {};
+  const industryLabels = meta.industry_labels || {};
+  const catalogServiceSlugs = Array.isArray(meta.service_slugs) ? meta.service_slugs : [];
+  const catalogIndustrySlugs = Array.isArray(meta.industry_slugs) ? meta.industry_slugs : [];
 
   const OUTREACH_ACTIVITY_TYPES = new Set(["call", "message", "email", "meeting", "proposal", "task", "reminder"]);
 
+  const hideReLeadFields = meta.hide_re_lead_fields !== false;
+  const canManageReviewQueue = !!meta.can_manage_review_queue;
+
+  let renderLeadWorkspace = function () {};
+  let bindWorkspaceUi = function () {};
+  let renderIndustryAddon = function () {};
+  let renderReviewQueuePanel = function () {};
+  let releaseReviewQueue = async function () {};
+  let renderReviewInboxBanner = function () {};
+  let bindReviewInboxUi = function () {};
+  let enableReviewQueueFilter = function () {};
+
   const CARE_STAGES = Array.isArray(meta.care_pipeline_stages) && meta.care_pipeline_stages.length
     ? meta.care_pipeline_stages
-    : [
-        { key: "intake", label: "Tiếp nhận & phân loại", hint: "" },
-        { key: "first_contact", label: "Liên hệ lần đầu", hint: "" },
-        { key: "qualify", label: "Khai thác nhu cầu", hint: "" },
-        { key: "advise", label: "Tư vấn & thông tin", hint: "" },
-        { key: "nurture", label: "Nuôi dưỡng", hint: "" },
-        { key: "negotiate", label: "Phản đối & đàm phán", hint: "" },
-        { key: "closing", label: "Chốt giao dịch", hint: "" },
-        { key: "post_sale", label: "Chăm sóc sau bán", hint: "" },
-      ];
+    : [{ key: "first_contact", label: "Liên hệ lần đầu", hint: "" }];
 
   const CARE_STAGE_PLACEHOLDERS = {
-    intake: "Ví dụ: Lead Hot từ Facebook — ngân sách ~3 tỷ, khu vực Q7, mục đích ở.",
-    first_contact: "Ví dụ: Đã gọi sau 8 phút — xác nhận nhu cầu, ghi ngân sách & khu vực.",
-    qualify: "Ví dụ: Tài chính 70% vốn tự có, mua trong 2 tháng, vợ là người quyết định.",
-    advise: "Ví dụ: Đã gửi bảng giá + video dự án, hẹn xem nhà mẫu thứ Bảy.",
-    nurture: "Ví dụ: Follow-up Zalo — khách cần thêm thời gian, cập nhật ưu đãi T6.",
-    negotiate: "Ví dụ: Khách phản đối giá — đã giải thích CSBH, đề xuất chiết khấu 2%.",
-    closing: "Ví dụ: Khách đồng ý cọc — hẹn ký HĐ và làm thủ tục vay ngân hàng.",
-    post_sale: "Ví dụ: Hỗ trợ bàn giao căn, xử lý phát sinh sổ đỏ, hẹn check-in sau 1 tháng.",
+    first_contact:
+      "Ví dụ: Đã gọi — xác nhận nhu cầu dịch vụ marketing, ngân sách dự kiến và thời gian triển khai.",
+  };
+
+  const CARE_EARLY_STAGE_KEYS = new Set(["first_contact"]);
+  const OUTREACH_STAGE_KEYS = new Set(["first_contact"]);
+  const CONTACT_OK_CARE_STATUS = "da_lien_he_thanh_cong";
+  const CARE_STAGE_MIN_NOTE_LEN = 3;
+
+  /** Tình trạng CSKH — bước B2 Liên hệ lần đầu. */
+  const CARE_STATUS_BY_STAGE = {
+    first_contact: [
+      "khong_goi_duoc",
+      "khong_nghe_may",
+      "khach_khong_tra_loi",
+      "cho_phan_hoi_khach",
+      "khach_hen_goi_lai",
+      "so_sai",
+      "khong_lien_lac_duoc",
+      "da_lien_he_thanh_cong",
+    ],
+  };
+
+  const QUICK_CARE_TEMPLATES = {
+    khong_goi_duoc: { summary: "Không gọi được — thuê bao, tắt máy hoặc không kết nối.", contact: "goi_dien" },
+    khong_nghe_may: { summary: "Gọi điện — khách không nghe máy.", contact: "goi_dien" },
+    khach_khong_tra_loi: { summary: "Đã nhắn/gọi — khách chưa trả lời.", contact: "zalo" },
+    cho_phan_hoi_khach: { summary: "Đã liên hệ — chờ khách phản hồi thêm thông tin.", contact: "zalo" },
+    khach_hen_goi_lai: { summary: "Khách hẹn gọi lại — đã ghi nhận thời gian.", contact: "goi_dien" },
+    so_sai: { summary: "Số điện thoại sai hoặc không tồn tại.", contact: "goi_dien" },
+    khong_lien_lac_duoc: { summary: "Không liên lạc được qua mọi kênh đã thử.", contact: "goi_dien" },
+    da_lien_he_thanh_cong: { summary: "Liên hệ thành công — đã trao đổi với khách.", contact: "goi_dien" },
   };
 
   let careStageFocusKey = null;
@@ -68,6 +103,315 @@
     return OUTREACH_ACTIVITY_TYPES.has(String(a.activity_type || ""));
   }
 
+  function leadDetailUrl(id) {
+    return `/crm/leads/${id}`;
+  }
+
+  function leadPresalesActive() {
+    return !!(
+      window.CrmLeadPresales &&
+      typeof window.CrmLeadPresales.isActive === "function" &&
+      window.CrmLeadPresales.isActive()
+    );
+  }
+
+  function leadInLifecycleHandoff(lead) {
+    return !!(lead && (lead.converted_customer_id || lead.converted_case_id));
+  }
+
+  function visiblePipelineStages(stages, lead) {
+    if (!Array.isArray(stages)) return [];
+    if (leadInLifecycleHandoff(lead)) return [];
+    if (meta.presales_on_lead && leadPresalesActive() && leadPresalesCareReady(lead)) return [];
+    if (meta.presales_on_lead) {
+      return stages.filter((s) => CARE_EARLY_STAGE_KEYS.has(s.key));
+    }
+    return stages;
+  }
+
+  function switchDetailTab(tabKey) {
+    detailTab = tabKey || "overview";
+    document.querySelectorAll(".crm-leads-detail-tab").forEach((btn) => {
+      const on = btn.dataset.detailTab === detailTab;
+      btn.classList.toggle("is-active", on);
+      btn.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    document.querySelectorAll(".crm-leads-detail-panel").forEach((panel) => {
+      const on = panel.id === `crm-leads-tab-${detailTab}`;
+      panel.classList.toggle("is-active", on);
+      panel.hidden = !on;
+    });
+    updatePrimaryActionButton();
+  }
+
+  function shouldShowCarePanel(lead) {
+    if (leadInLifecycleHandoff(lead)) return false;
+    if (!meta.presales_on_lead) return true;
+    if (!leadPresalesCareReady(lead)) return true;
+    return !leadPresalesActive();
+  }
+
+  function navigateToCareStage(stageKey, opts = {}) {
+    if (!selectedLead?.care_pipeline) return;
+    const key = String(stageKey || "").trim();
+    if (!key) return;
+    if (isDetailPage && detailTab !== "process") {
+      switchDetailTab("process");
+    }
+    careStageFocusKey = key;
+    renderCarePipeline(selectedLead);
+    const panel = $("crm-leads-care-stage-panel");
+    if (panel && opts.scroll !== false) {
+      panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      panel.classList.remove("is-flash");
+      void panel.offsetWidth;
+      panel.classList.add("is-flash");
+      window.setTimeout(() => panel.classList.remove("is-flash"), 900);
+    }
+  }
+
+  function renderCareNav(lead) {
+    const el = $("crm-leads-care-nav");
+    if (!el || !lead?.care_pipeline) {
+      if (el) el.innerHTML = "";
+      return;
+    }
+    const stages = visiblePipelineStages(lead.care_pipeline.stages || [], lead);
+    const currentKey = lead.care_pipeline.current_stage_key || "first_contact";
+    el.innerHTML = stages
+      .map((stage) => {
+        const num = careStageDisplayNum(stage);
+        let state = "upcoming";
+        if (stage.done) state = "done";
+        else if (stage.current) state = "current";
+        const isFocus = stage.key === (careStageFocusKey || currentKey);
+        return `<button type="button"
+          class="crm-leads-care-nav-btn is-${state}${isFocus ? " is-focus" : ""}"
+          data-care-nav="${esc(stage.key)}"
+          title="${esc(stage.label)}">${stage.done ? "✓ " : ""}B${num}</button>`;
+      })
+      .join("");
+  }
+
+  function leadInReviewQueue(lead) {
+    return !!lead?.review_queue?.active;
+  }
+
+  function updateProcessPanelsVisibility(lead) {
+    const carePanel = $("crm-leads-care-panel");
+    const psPanel = $("crm-leads-presales-panel");
+    const lifecycleBanner = $("crm-leads-lifecycle-banner");
+    const reviewPanel = $("crm-leads-review-panel");
+    const handoff = leadInLifecycleHandoff(lead);
+    const careReady = leadPresalesCareReady(lead);
+    const inReview = leadInReviewQueue(lead);
+    if (lifecycleBanner) {
+      lifecycleBanner.hidden = !handoff;
+      const links = $("crm-leads-lifecycle-links");
+      if (links && handoff) {
+        const parts = [];
+        if (lead?.converted_customer_id) parts.push(`KH #${lead.converted_customer_id}`);
+        if (lead?.converted_case_id) parts.push(`Case #${lead.converted_case_id}`);
+        links.innerHTML = parts.length
+          ? `<a href="/crm/hub" class="btn-secondary btn-sm">Mở CRM Hub · ${esc(parts.join(" · "))}</a>`
+          : "";
+      }
+    }
+    if (carePanel) carePanel.hidden = !shouldShowCarePanel(lead) || (inReview && !canManageReviewQueue);
+    if (reviewPanel) reviewPanel.hidden = !inReview || !canManageReviewQueue;
+    if (psPanel && meta.presales_on_lead) {
+      psPanel.hidden = handoff || inReview;
+      psPanel.classList.toggle("is-locked", !careReady || inReview);
+    }
+    renderReviewQueuePanel(lead);
+    updatePresalesCareGate(lead);
+  }
+
+  function updatePrimaryActionButton() {
+    const btn = $("crm-leads-primary-action");
+    if (!btn || !isDetailPage || !selectedLead) return;
+    if (leadInLifecycleHandoff(selectedLead)) {
+      btn.textContent = "Mở CRM Hub";
+      btn.onclick = () => { window.location.href = "/crm/hub"; };
+      return;
+    }
+    if (meta.presales_on_lead && leadPresalesActive() && detailTab === "process") {
+      btn.textContent = "Chuyển bước pre-sales";
+      btn.onclick = () => {
+        switchDetailTab("process");
+        $("crm-leads-presales-advance")?.click();
+      };
+      return;
+    }
+    const stage = selectedLead.care_pipeline?.current_stage_key || "first_contact";
+    if (detailTab !== "process") {
+      btn.textContent = "Xử lý lead";
+      btn.onclick = () => switchDetailTab("process");
+      return;
+    }
+    if (stage === "first_contact" && !selectedLead.care_pipeline?.all_complete) {
+      if (!stageHasContactOkReport(stage)) {
+        btn.textContent = "Gửi báo cáo";
+        btn.onclick = () => $("crm-leads-care-form")?.requestSubmit();
+      } else {
+        btn.textContent = "Hoàn thành B2";
+        btn.onclick = () => $("crm-leads-care-stage-complete")?.click();
+      }
+      return;
+    }
+    btn.textContent = "Xem quy trình";
+    btn.onclick = () => switchDetailTab("process");
+  }
+
+  function updateDetailNextHint(lead) {
+    const el = $("crm-leads-detail-next-hint");
+    if (!el || !lead) return;
+    if (leadInLifecycleHandoff(lead)) {
+      el.textContent = "Lead đã chuyển lifecycle — xem lịch sử tại tab Lịch sử.";
+      return;
+    }
+    if (meta.presales_on_lead && leadPresalesActive()) {
+      el.textContent = "Đang pre-sales — hoàn thành Lead → Tư vấn → Báo giá, rồi tạo HĐ draft.";
+      return;
+    }
+    if (meta.presales_on_lead && leadPresalesCareReady(lead)) {
+      el.textContent = "Đã xong B2 — chọn dịch vụ và bắt đầu pre-sales.";
+      return;
+    }
+    if (meta.presales_on_lead && !leadPresalesCareReady(lead)) {
+      const gate = leadPresalesCareGate(lead);
+      el.textContent = gate?.message || "Hoàn thành B2 (Liên hệ OK) trước pre-sales.";
+      return;
+    }
+    const stage = lead.care_pipeline?.current_stage_label || lead.status_label || "";
+    el.textContent = stage ? `Bước hiện tại: ${stage}. Tab Xử lý để ghi báo cáo hoặc chuyển bước.` : "";
+  }
+
+  function careStageDisplayNum(stage) {
+    if (!stage) return 2;
+    return stage.key === "first_contact" ? 2 : (stage.index ?? 0) + 1;
+  }
+
+  function stageHasContactOkReport(stageKey) {
+    return stageCareReports(stageKey).some(
+      (r) => String(r.care_status || "") === CONTACT_OK_CARE_STATUS,
+    );
+  }
+
+  function leadPresalesCareGate(lead) {
+    return lead?.presales_care_gate || null;
+  }
+
+  function leadPresalesCareReady(lead) {
+    const gate = leadPresalesCareGate(lead);
+    return !meta.presales_on_lead || !gate || !!gate.complete;
+  }
+
+  function renderPresalesGateSteps(gate, containerId) {
+    const stepsEl = $(containerId || "crm-leads-presales-care-gate-steps");
+    if (!stepsEl || !gate) return;
+    stepsEl.innerHTML = (gate.stages || [])
+      .map((s) => {
+        const label = esc(s.label || s.key);
+        return `<button type="button"
+          class="crm-leads-presales-care-gate-step${s.done ? " is-done" : ""}"
+          data-care-nav="${esc(s.key)}"
+          title="${s.done ? "Xem lại " : "Xử lý "}${label}">
+          <span class="crm-leads-presales-care-gate-step-num">B${s.index || ""}</span>
+          ${label}${s.done ? " ✓" : ""}
+        </button>`;
+      })
+      .join("");
+  }
+
+  function updatePresalesCareGate(lead) {
+    if (!meta.presales_on_lead) return;
+    const gate = leadPresalesCareGate(lead);
+    const psPanel = $("crm-leads-presales-panel");
+    const lockedBanner = $("crm-leads-presales-locked-banner");
+    const lockedMsg = $("crm-leads-presales-locked-msg");
+    const headDesc = $("crm-leads-presales-head-desc");
+    const setup = $("crm-leads-presales-setup");
+    const slugSel = $("crm-leads-presales-slug");
+    const startBtn = $("crm-leads-presales-start");
+    const careReady = leadPresalesCareReady(lead);
+    const psActive = leadPresalesActive();
+    if (!gate) return;
+    if (lockedBanner) lockedBanner.hidden = careReady;
+    if (lockedMsg) {
+      lockedMsg.textContent = careReady
+        ? ""
+        : gate.message || "Hoàn thành B2 ở panel phía trên trước khi mở pre-sales.";
+    }
+    if (headDesc) {
+      headDesc.textContent = careReady
+        ? "Lead → Tư vấn → Báo giá. Lifecycle chỉ tạo khi ký HĐ."
+        : "Mở khóa sau khi hoàn thành B2 ở panel phía trên.";
+    }
+    renderPresalesGateSteps(gate, "crm-leads-presales-care-gate-steps");
+    if (setup) setup.hidden = !careReady || psActive;
+    if (slugSel) slugSel.disabled = !careReady || psActive;
+    if (startBtn) {
+      startBtn.disabled = !careReady || psActive;
+      startBtn.title = careReady
+        ? "Bắt đầu pre-sales sau khi chọn dịch vụ"
+        : gate.message || "";
+    }
+    if (psPanel) psPanel.classList.toggle("is-locked", !careReady);
+  }
+
+  function applyQuickCareToForm(careStatus) {
+    const tpl = QUICK_CARE_TEMPLATES[careStatus] || {
+      summary: careStatusLabels[careStatus] || careStatus,
+      contact: "goi_dien",
+    };
+    const statusEl = $("crm-leads-care-status");
+    const contactEl = $("crm-leads-care-contact");
+    const summaryEl = $("crm-leads-care-summary");
+    const errEl = $("crm-leads-care-err");
+    const okEl = $("crm-leads-care-ok");
+    if (errEl) errEl.hidden = true;
+    if (okEl) okEl.hidden = true;
+    if (statusEl) statusEl.value = careStatus;
+    if (contactEl && tpl.contact) contactEl.value = tpl.contact;
+    if (summaryEl) {
+      summaryEl.value = tpl.summary;
+      summaryEl.focus();
+    }
+  }
+
+  async function submitQuickCareReport(careStatus) {
+    if (!selectedId || !selectedLead?.care_pipeline) return;
+    const tpl = QUICK_CARE_TEMPLATES[careStatus] || { summary: careStatusLabels[careStatus] || careStatus, contact: "goi_dien" };
+    const errEl = $("crm-leads-care-err");
+    const okEl = $("crm-leads-care-ok");
+    if (errEl) errEl.hidden = true;
+    if (okEl) okEl.hidden = true;
+    try {
+      const res = await reqJson(`/api/crm/leads/${selectedId}/activities`, {
+        method: "POST",
+        body: JSON.stringify({
+          contact_type: tpl.contact || "goi_dien",
+          care_status: careStatus,
+          care_stage_key: selectedLead.care_pipeline.current_stage_key,
+          summary: tpl.summary,
+        }),
+      });
+      if (res.lead) {
+        selectedLead = res.lead;
+        renderDetail(res.lead);
+      } else {
+        await openLead(selectedId, { silent: true });
+      }
+      if (okEl) okEl.hidden = false;
+    } catch (e) {
+      if (errEl) {
+        errEl.textContent = e instanceof Error ? e.message : "Lỗi.";
+        errEl.hidden = false;
+      }
+    }
+  }
+
   function renderCarePipeline(lead) {
     const el = $("crm-leads-care-pipeline");
     if (!el) return;
@@ -77,8 +421,8 @@
       return;
     }
     const pipe = lead.care_pipeline || {};
-    const stages = pipe.stages || [];
-    const currentKey = pipe.current_stage_key || "intake";
+    const stages = visiblePipelineStages(pipe.stages || [], lead);
+    const currentKey = pipe.current_stage_key || "first_contact";
     if (!careStageFocusKey || !stages.some((s) => s.key === careStageFocusKey)) {
       careStageFocusKey = currentKey;
     }
@@ -99,18 +443,13 @@
           title="${esc(stage.hint || doneTitle || stage.label)}"
           aria-current="${stage.current ? "step" : "false"}"
           aria-pressed="${isFocus ? "true" : "false"}">
-          <span class="crm-leads-care-step-num">${stage.index + 1}</span>
+          <span class="crm-leads-care-step-num">${careStageDisplayNum(stage)}</span>
           <span class="crm-leads-care-step-label">${esc(stage.label)}</span>
           ${stage.done ? '<span class="crm-leads-care-step-check" aria-hidden="true">✓</span>' : ""}
         </button>`;
       })
       .join("");
-    el.querySelectorAll("[data-care-stage]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        careStageFocusKey = btn.getAttribute("data-care-stage");
-        renderCarePipeline(lead);
-      });
-    });
+    renderCareNav(lead);
     renderCareStagePanel(lead);
   }
 
@@ -147,6 +486,24 @@
       </ul>`;
   }
 
+  function careStatusOptionsForStage(stageKey) {
+    const keys = CARE_STATUS_BY_STAGE[stageKey];
+    if (Array.isArray(keys) && keys.length) {
+      return keys.filter((k) => careStatusTypes.includes(k) || careStatusLabels[k]);
+    }
+    return careStatusTypes.length ? careStatusTypes : Object.keys(careStatusLabels);
+  }
+
+  function refreshCareStatusSelect(stageKey, opts = {}) {
+    const statusEl = $("crm-leads-care-status");
+    if (!statusEl) return;
+    const allowed = careStatusOptionsForStage(stageKey);
+    const prev = opts.keepValue ? statusEl.value : "";
+    fillSelect(statusEl, allowed, careStatusLabels, "");
+    const pick = prev && allowed.includes(prev) ? prev : allowed[0] || "";
+    if (pick) statusEl.value = pick;
+  }
+
   function renderCareStagePanel(lead) {
     const panel = $("crm-leads-care-stage-panel");
     if (!panel) return;
@@ -155,7 +512,7 @@
       return;
     }
     const pipe = lead.care_pipeline;
-    const currentKey = pipe.current_stage_key || "intake";
+    const currentKey = pipe.current_stage_key || "first_contact";
     const focusKey = careStageFocusKey || currentKey;
     const focusStage = (pipe.stages || []).find((s) => s.key === focusKey) || (pipe.stages || [])[0];
     const currentStage = (pipe.stages || []).find((s) => s.key === currentKey);
@@ -180,7 +537,7 @@
     const completeWrap = panel.querySelector(".crm-leads-care-stage-complete-wrap");
     if (errEl) errEl.hidden = true;
     if (okEl) okEl.hidden = true;
-    if (numEl) numEl.textContent = String((focusStage.index ?? 0) + 1);
+    if (numEl) numEl.textContent = String(careStageDisplayNum(focusStage));
     if (nameEl) nameEl.textContent = focusStage.label || "—";
     if (hintEl) hintEl.textContent = focusStage.hint || "—";
     renderStageReports(focusKey, focusStage.label);
@@ -188,16 +545,33 @@
     const allDone = !!pipe.all_complete;
     const canReport = isCurrent && !allDone && !!selectedId;
     if (reportTitle) {
+      const stepNum = careStageDisplayNum(focusStage);
       reportTitle.textContent = isCurrent
-        ? `Báo cáo bước ${(focusStage.index ?? 0) + 1}: ${focusStage.label || ""}`
-        : `Xem báo cáo bước ${(focusStage.index ?? 0) + 1}: ${focusStage.label || ""}`;
+        ? `Báo cáo chăm sóc · B${stepNum}: ${focusStage.label || ""}`
+        : `Lịch sử báo cáo · B${stepNum}: ${focusStage.label || ""}`;
+    }
+    const formSteps = $("crm-leads-care-form-steps");
+    if (formSteps && isCurrent && !allDone) {
+      formSteps.textContent = "① Chọn trạng thái chăm sóc → ② Ghi chú → ③ Lưu báo cáo & lịch sử";
     }
     if (stageKeyInput) stageKeyInput.value = isCurrent ? focusKey : "";
     if (summaryEl) {
       summaryEl.placeholder = CARE_STAGE_PLACEHOLDERS[focusKey] || "Ghi theo hướng dẫn bước ở trên…";
     }
+    refreshCareStatusSelect(focusKey, { keepValue: canReport && focusKey === currentKey });
     if (careForm) careForm.hidden = !canReport;
-    if (reportReadonly) reportReadonly.hidden = canReport || allDone;
+    if (reportReadonly) {
+      if (canReport || allDone) {
+        reportReadonly.hidden = true;
+      } else if (focusStage.done) {
+        reportReadonly.hidden = false;
+        reportReadonly.innerHTML = `Bước đã hoàn thành — xem báo cáo ở trên. Chỉ ghi báo cáo mới ở <strong>bước đang thực hiện</strong>.`;
+      } else {
+        reportReadonly.hidden = false;
+        const curLabel = currentStage?.label || currentKey;
+        reportReadonly.innerHTML = `Chưa tới bước này. Hiện đang ở <strong>${esc(curLabel)}</strong> — chỉ ghi báo cáo ở bước đang thực hiện.`;
+      }
+    }
     if (reportWrap) reportWrap.hidden = false;
     if (careForm) {
       careForm.querySelectorAll("input, select, textarea, button").forEach((n) => {
@@ -205,11 +579,73 @@
       });
     }
     if (noteEl && focusKey !== currentKey) noteEl.value = "";
-    if (completeBtn) {
+    if (completeWrap) completeWrap.hidden = !isCurrent || allDone;
+    const outreachQuick = $("crm-leads-outreach-quick");
+    const outreachQuickTitle = $("crm-leads-outreach-quick-title");
+    const outreachQuickHint = $("crm-leads-outreach-quick-hint");
+    const reqHint = $("crm-leads-care-require-hint");
+    const isOutreach = isCurrent && OUTREACH_STAGE_KEYS.has(focusKey) && !allDone;
+    const stageReportCount = isCurrent ? stageCareReports(currentKey).length : 0;
+    const hasStageReport = stageReportCount > 0;
+    const hasContactOk = isCurrent ? stageHasContactOkReport(currentKey) : false;
+    if (outreachQuick) outreachQuick.hidden = !isOutreach;
+    if (outreachQuickTitle && isOutreach) {
+      const stepNum = (focusStage.index ?? 0) + 1;
+      outreachQuickTitle.textContent = `Báo cáo liên hệ nhanh (B${stepNum})`;
+    }
+    if (outreachQuickHint && isOutreach) {
+      outreachQuickHint.textContent =
+        focusKey === "first_contact"
+          ? "Ghi kết quả gọi/nhắn lần đầu — không gọi được, không nghe máy, không trả lời…"
+          : "Ghi kết quả follow-up khai thác nhu cầu — tương tự liên hệ lần đầu.";
+    }
+    if (reqHint) {
+      if (isCurrent && !allDone) {
+        reqHint.hidden = false;
+        if (!hasStageReport) {
+          reqHint.textContent =
+            "B2: chọn trạng thái chăm sóc → ghi chú → Lưu báo cáo. Cần báo cáo 「Liên hệ OK」 trước khi hoàn thành.";
+        } else if (!hasContactOk) {
+          reqHint.textContent =
+            "Đã có báo cáo — cần ít nhất một báo cáo trạng thái 「Liên hệ OK」 rồi ghi chú hoàn thành B2.";
+        } else {
+          reqHint.textContent = `Đã có ${stageReportCount} báo cáo + Liên hệ OK — nhập ghi chú hoàn thành B2.`;
+        }
+      } else if (meta.presales_on_lead && leadPresalesCareReady(lead) && !leadPresalesActive()) {
+        reqHint.hidden = false;
+        reqHint.textContent = "Đã hoàn thành B2 — có thể bắt đầu pre-sales (chọn dịch vụ bên dưới).";
+      } else {
+        reqHint.hidden = true;
+      }
+    }
+    if (completeBtn && isCurrent && !allDone) {
+      completeBtn.hidden = false;
+      completeBtn.disabled = !hasStageReport || !hasContactOk;
+      completeBtn.title =
+        !hasStageReport
+          ? "Lưu ít nhất một báo cáo chăm sóc trước khi hoàn thành B2"
+          : !hasContactOk
+            ? "Cần báo cáo trạng thái 「Liên hệ OK」 trước khi hoàn thành B2"
+            : "Ghi chú hoàn thành B2 rồi nhấn để mở pre-sales";
+    } else if (completeBtn) {
       completeBtn.hidden = !isCurrent || allDone;
       completeBtn.disabled = !isCurrent || allDone;
+      completeBtn.title = "";
     }
-    if (completeWrap) completeWrap.hidden = !isCurrent || allDone;
+    const focusHint = $("crm-leads-care-stage-focus-hint");
+    if (focusHint) {
+      if (!isCurrent && !allDone && focusStage) {
+        focusHint.hidden = false;
+        if (focusStage.done) {
+          focusHint.textContent = `Đang xem lại B${(focusStage.index ?? 0) + 1} — ${focusStage.label}. Báo cáo đã lưu bên dưới.`;
+        } else {
+          const curLabel = currentStage?.label || currentKey;
+          focusHint.textContent = `Đang xem trước B${(focusStage.index ?? 0) + 1}. Bước đang làm: ${curLabel}.`;
+        }
+      } else {
+        focusHint.hidden = true;
+      }
+    }
     const kicker = panel.querySelector(".crm-leads-care-stage-panel-kicker");
     if (kicker) {
       kicker.textContent = isCurrent
@@ -237,6 +673,29 @@
     if (errEl) errEl.hidden = true;
     if (okEl) okEl.hidden = true;
     const note = ($("crm-leads-care-stage-note")?.value || "").trim();
+    const stageReportCount = stageCareReports(currentKey).length;
+    if (stageReportCount < 1) {
+      if (errEl) {
+        errEl.textContent = "Gửi ít nhất một báo cáo chăm sóc cho B2 trước khi hoàn thành.";
+        errEl.hidden = false;
+      }
+      return;
+    }
+    if (!stageHasContactOkReport(currentKey)) {
+      if (errEl) {
+        errEl.textContent =
+          "Phải có báo cáo trạng thái 「Liên hệ OK」 (da_lien_he_thanh_cong) trước khi hoàn thành B2.";
+        errEl.hidden = false;
+      }
+      return;
+    }
+    if (note.length < CARE_STAGE_MIN_NOTE_LEN) {
+      if (errEl) {
+        errEl.textContent = `Ghi chú hoàn thành bước bắt buộc (tối thiểu ${CARE_STAGE_MIN_NOTE_LEN} ký tự) — GDKD kiểm tra lịch sử.`;
+        errEl.hidden = false;
+      }
+      return;
+    }
     if (btn) {
       btn.disabled = true;
       btn.textContent = "Đang lưu…";
@@ -271,12 +730,25 @@
     }
   }
 
+  function timelineActivityItem(a) {
+    if (!a || a.activity_type === "system") {
+      const body = String(a?.content || "");
+      if (body.startsWith("Hoàn thành bước")) {
+        return { type: "stage_complete", data: a };
+      }
+      return null;
+    }
+    return { type: isCareReportActivity(a) ? "care" : "note", data: a };
+  }
+
   function renderCareTimeline(activities, statusLogs) {
     const el = $("crm-leads-care-timeline");
     if (!el) return;
-    const acts = (activities || []).filter((a) => a.activity_type !== "system");
+    const acts = (activities || [])
+      .map(timelineActivityItem)
+      .filter(Boolean);
     const timelineItems = [
-      ...acts.map((a) => ({ type: isCareReportActivity(a) ? "care" : "note", data: a })),
+      ...acts,
       ...(statusLogs || []).map((l) => ({ type: "status", data: l })),
     ].sort((a, b) => {
       const ta = String(a.data.created_at || "");
@@ -287,6 +759,19 @@
     el.innerHTML = timelineItems.length
       ? timelineItems
           .map((item) => {
+            if (item.type === "stage_complete") {
+              const r = item.data;
+              const who = r.user_name || r.created_by || "";
+              return `
+            <li class="crm-ev crm-ev-stage-complete">
+              <div class="crm-ev-dot" aria-hidden="true"></div>
+              <div class="crm-ev-body">
+                <time datetime="${esc(r.created_at)}">${esc(formatViDateTime(r.created_at))}</time>
+                <span class="crm-leads-ev-stage">Hoàn thành bước</span>
+                <p><strong>${esc(r.content)}</strong>${who ? ` · ${esc(who)}` : ""}</p>
+              </div>
+            </li>`;
+            }
             if (item.type === "care") {
               const r = item.data;
               const statusLabel = r.care_status_label || r.result || "—";
@@ -382,12 +867,11 @@
   let lastFbStatusPollAt = 0;
   let lastListRevision = 0;
   let leadsListTotal = 0;
-  let leadsListTruncated = false;
   let leadsLoadSeq = 0;
   let openLeadSeq = 0;
-  let leadsListOffset = 0;
+  let leadsListPage = 1;
   let projectList = [];
-  let leadsListLimit = 500;
+  let leadsListLimit = 100;
   const notifyShownLeadIds = new Set();
   const NOTIFY_POLL_MS = 2000;
   const NOTIFY_POLL_PENDING_MS = 1500;
@@ -1368,8 +1852,10 @@
     const on = !!show;
     const cfgBtn = $("crm-leads-config-btn");
     const rulesBtn = $("crm-leads-rules-btn");
+    const catalogBtn = $("crm-leads-catalog-btn");
     if (cfgBtn) cfgBtn.hidden = !on;
     if (rulesBtn) rulesBtn.hidden = !on;
+    if (catalogBtn) catalogBtn.hidden = !on;
   }
 
   async function refreshLeadConfig() {
@@ -1419,11 +1905,16 @@
   }
 
   function isViewModalOpen() {
+    if (isDetailPage) return true;
     const el = $("crm-leads-view-modal");
     return el && !el.hidden;
   }
 
   function setDetailVisible(show) {
+    if (isDetailPage) {
+      if (show) switchDetailTab(detailTab || "overview");
+      return;
+    }
     if (show) showModal("crm-leads-view-modal");
     else hideModal("crm-leads-view-modal");
   }
@@ -1533,9 +2024,11 @@
       <div class="crm-leads-stat"><span class="crm-leads-stat-val">${stats.total || 0}</span><span class="crm-leads-stat-lbl">Tổng lead</span></div>
       <div class="crm-leads-stat crm-leads-stat--hot"><span class="crm-leads-stat-val">${stats.by_level?.hot || 0}</span><span class="crm-leads-stat-lbl">Hot</span></div>
       <div class="crm-leads-stat crm-leads-stat--warn"><span class="crm-leads-stat-val">${stats.sla_overdue || 0}</span><span class="crm-leads-stat-lbl">Quá SLA</span></div>
+      ${canManageReviewQueue ? `<div class="crm-leads-stat crm-leads-stat--alert crm-leads-stat--review" role="button" tabindex="0" title="Lọc inbox tra soát"><span class="crm-leads-stat-val">${stats.review_queue_count || 0}</span><span class="crm-leads-stat-lbl">Inbox tra soát</span></div>` : ""}
       <div class="crm-leads-stat crm-leads-stat--success"><span class="crm-leads-stat-val">${stats.conversion_rate || 0}%</span><span class="crm-leads-stat-lbl">Chuyển đổi</span></div>
       <div class="crm-leads-stat"><span class="crm-leads-stat-val">${stats.won || 0}</span><span class="crm-leads-stat-lbl">Chốt</span></div>`;
     renderOwnerStats(stats.by_owner || []);
+    renderReviewInboxBanner(stats);
   }
 
   function formatLeadProjectCell(lead) {
@@ -1608,6 +2101,10 @@
     return !lead.owner_id;
   }
 
+  function leadsTotalPages() {
+    return Math.max(1, Math.ceil(leadsListTotal / leadsListLimit));
+  }
+
   function leadPipelineAlertMessage(lead) {
     const msg = String(lead?.pipeline_alert_message || "").trim();
     if (msg) return msg;
@@ -1618,12 +2115,13 @@
   function renderList() {
     const el = $("crm-leads-list");
     const countEl = $("crm-leads-list-count");
+    const totalPages = leadsTotalPages();
     if (countEl) {
-      if (leadsListTotal > leads.length) {
-        countEl.textContent = `${leads.length} / ${leadsListTotal}`;
-        countEl.title = "Dùng bộ lọc hoặc tìm kiếm để thu hẹp danh sách";
+      if (leadsListTotal > leadsListLimit) {
+        countEl.textContent = `Trang ${leadsListPage}/${totalPages} · ${leadsListTotal}`;
+        countEl.title = `${leadsListLimit} lead mỗi trang`;
       } else {
-        countEl.textContent = String(leads.length);
+        countEl.textContent = String(leadsListTotal);
         countEl.title = "";
       }
     }
@@ -1645,8 +2143,8 @@
             <th>Phân loại</th>
             <th>Điểm</th>
             <th>Owner</th>
-            <th>Dự án</th>
-            <th>FB về</th>
+            ${hideReLeadFields ? "" : "<th>Dự án</th>"}
+            <th>Đổ về</th>
             <th>Phân công</th>
             <th>Nguồn</th>
           </tr>
@@ -1662,6 +2160,7 @@
                   <span class="crm-leads-row-avatar" aria-hidden="true">${esc(initials(l.full_name))}</span>
                   <span class="crm-leads-row-name">${esc(l.full_name)}</span>
                   ${l.sla_overdue ? '<span class="crm-leads-badge crm-leads-badge--sla">SLA</span>' : ""}
+                  ${l.review_queue?.active ? '<span class="crm-leads-badge crm-leads-badge--alert">Tra soát</span>' : ""}
                   ${alert ? '<span class="crm-leads-badge crm-leads-badge--alert">!</span>' : ""}
                 </td>
                 <td>${esc(l.phone || l.email || "—")}</td>
@@ -1669,8 +2168,8 @@
                 <td>${badge(l.lead_level, false, l.status)}</td>
                 <td class="crm-leads-cell-score">${l.lead_score}</td>
                 <td>${esc(l.owner_name || "—")}</td>
-                <td>${formatLeadProjectCell(l)}</td>
-                <td class="crm-leads-cell-time">${esc(formatLeadTime(l.facebook_received_at))}</td>
+                ${hideReLeadFields ? "" : `<td>${formatLeadProjectCell(l)}</td>`}
+                <td class="crm-leads-cell-time">${esc(formatLeadTime(l.received_at || l.facebook_received_at))}</td>
                 <td class="crm-leads-cell-time">${esc(formatLeadTime(l.assigned_at))}</td>
                 <td>${esc(l.source_label || l.source || "—")}</td>
               </tr>`;
@@ -1679,10 +2178,19 @@
             .join("")}
         </tbody>
       </table>
-      ${leadsListTruncated ? `<div class="crm-leads-list-more"><p class="muted">Hiển thị ${leads.length} / ${leadsListTotal} lead. Dùng tìm kiếm, bộ lọc Nguồn = Facebook, hoặc tải thêm.</p><button type="button" class="btn-secondary" id="crm-leads-load-more">Tải thêm</button></div>` : ""}
+      ${leadsListTotal > leadsListLimit || leadsListPage > 1
+        ? `<div class="crm-leads-pagination">
+            <button type="button" class="btn-secondary btn-sm" id="crm-leads-page-prev"${leadsListPage <= 1 ? " disabled" : ""}>Trước</button>
+            <span class="crm-leads-pagination-info">Trang ${leadsListPage} / ${totalPages} · ${leadsListTotal} lead</span>
+            <button type="button" class="btn-secondary btn-sm" id="crm-leads-page-next"${leadsListPage >= totalPages ? " disabled" : ""}>Sau</button>
+          </div>`
+        : ""}
     </div>`;
-    $("crm-leads-load-more")?.addEventListener("click", () => {
-      loadLeads({ append: true }).catch(alertErr);
+    $("crm-leads-page-prev")?.addEventListener("click", () => {
+      if (leadsListPage > 1) loadLeads({ page: leadsListPage - 1 }).catch(alertErr);
+    });
+    $("crm-leads-page-next")?.addEventListener("click", () => {
+      if (leadsListPage < totalPages) loadLeads({ page: leadsListPage + 1 }).catch(alertErr);
     });
     $("crm-leads-f-project")?.addEventListener("change", () => {
       fillOwnerSelectForLead({
@@ -1693,6 +2201,7 @@
   }
 
   function renderDetail(lead) {
+    const prevCareReady = leadPresalesCareReady(selectedLead);
     selectedLead = lead;
     const nameEl = $("crm-leads-detail-name");
     const badgesEl = $("crm-leads-detail-badges");
@@ -1702,6 +2211,9 @@
     badgesEl.innerHTML =
       badge(lead.lead_level, lead.sla_overdue, lead.status) +
       `<span class="crm-leads-badge crm-leads-badge--neutral">${esc(lead.status_label)}</span>` +
+      (lead.review_queue?.active
+        ? `<span class="crm-leads-badge crm-leads-badge--alert">Phải tra soát</span>`
+        : "") +
       `<span class="crm-leads-badge crm-leads-badge--neutral">${esc(lead.source_label)}</span>` +
       (lead.sla_no_activity ? `<span class="crm-leads-badge crm-leads-badge--sla">Không activity</span>` : "") +
       (isLeadPipelineAlert(lead) ? `<span class="crm-leads-badge crm-leads-badge--alert" title="${esc(leadPipelineAlertMessage(lead))}">Cần xử lý</span>` : "");
@@ -1709,15 +2221,20 @@
       <div><dt>SĐT</dt><dd>${esc(lead.phone || "—")}</dd></div>
       <div><dt>Email</dt><dd>${esc(lead.email || "—")}</dd></div>
       <div><dt>Owner</dt><dd>${esc(lead.owner_name || "Chưa gán")}</dd></div>
-      <div><dt>Dự án BĐS</dt><dd>${lead.re_project_code ? `<strong>${esc(lead.re_project_code)}</strong>${lead.re_project_name ? `<span class="muted"> — ${esc(lead.re_project_name)}</span>` : ""}` : esc(lead.re_project_label || "Chưa gán")}</dd></div>
-      <div><dt>FB về</dt><dd>${esc(formatLeadTime(lead.facebook_received_at))}</dd></div>
+      ${hideReLeadFields
+        ? ""
+        : `<div><dt>Dự án BĐS</dt><dd>${lead.re_project_code ? `<strong>${esc(lead.re_project_code)}</strong>${lead.re_project_name ? `<span class="muted"> — ${esc(lead.re_project_name)}</span>` : ""}` : esc(lead.re_project_label || "Chưa gán")}</dd></div>`}
+      <div><dt>Đổ về</dt><dd>${esc(formatLeadTime(lead.received_at || lead.facebook_received_at))}</dd></div>
       <div><dt>Phân công</dt><dd>${esc(formatLeadTime(lead.assigned_at))}</dd></div>
       <div><dt>Điểm</dt><dd>${lead.lead_score}</dd></div>
-      <div><dt>Khu vực</dt><dd>${esc(lead.region || "—")}</dd></div>
+      ${hideReLeadFields
+        ? ""
+        : `<div><dt>Khu vực</dt><dd>${esc(lead.region || "—")}</dd></div>
       <div><dt>Dòng SP</dt><dd>${esc(lead.product_line_label || lead.product_line || "—")}</dd></div>
       <div><dt>Phân khu</dt><dd>${esc(lead.zone || "—")}</dd></div>
-      <div><dt>Mã căn</dt><dd>${esc(lead.re_product_label || lead.re_product_unit_code || "—")}${lead.re_product_status === "hold" ? ' <span class="crm-leads-badge crm-leads-badge--sla">Giữ chỗ</span>' : ""}</dd></div>
-      <div><dt>Sản phẩm (text)</dt><dd>${esc(lead.product_interest || "—")}</dd></div>
+      <div><dt>Mã căn</dt><dd>${esc(lead.re_product_label || lead.re_product_unit_code || "—")}${lead.re_product_status === "hold" ? ' <span class="crm-leads-badge crm-leads-badge--sla">Giữ chỗ</span>' : ""}</dd></div>`}
+      <div><dt>Ngành</dt><dd>${esc(lead.industry_label || lead.industry_slug || "—")}</dd></div>
+      <div><dt>Dịch vụ quan tâm</dt><dd>${esc(lead.product_interest_label || lead.product_interest || "—")}</dd></div>
       ${lead.converted_case_id ? `<div><dt>Case CRM</dt><dd><a href="/crm?case=${lead.converted_case_id}">#${lead.converted_case_id}</a></dd></div>` : ""}
       ${lead.converted_customer_id ? `<div><dt>Khách hàng</dt><dd><a href="/crm/customers?id=${lead.converted_customer_id}">#${lead.converted_customer_id}</a></dd></div>` : ""}
       <div><dt>Tạo lúc</dt><dd>${esc((lead.created_at || "—").slice(0, 16))}${lead.created_by ? ` · ${esc(lead.created_by)}` : ""}</dd></div>
@@ -1728,18 +2245,39 @@
     if (delBtn) delBtn.hidden = !canDeleteLeads;
     const holdBtn = $("crm-leads-hold-product");
     const releaseBtn = $("crm-leads-release-product");
-    const canHold = !!(lead.re_project_id && lead.re_product_id && lead.re_product_status !== "hold");
-    const canRelease = !!(lead.re_product_id && lead.re_product_status === "hold");
+    const canHold =
+      !hideReLeadFields && !!(lead.re_project_id && lead.re_product_id && lead.re_product_status !== "hold");
+    const canRelease = !hideReLeadFields && !!(lead.re_product_id && lead.re_product_status === "hold");
     if (holdBtn) holdBtn.hidden = !canHold;
     if (releaseBtn) releaseBtn.hidden = !canRelease;
+    const convBtn = $("crm-leads-convert-btn");
+    if (convBtn && meta.presales_on_lead) convBtn.hidden = true;
     renderScoreBreakdown(lead);
     $("crm-leads-ai-result").hidden = true;
     renderDuplicates(lead);
     careStageFocusKey = lead.care_pipeline?.current_stage_key || null;
     renderCarePipeline(lead);
+    renderIndustryAddon(lead);
     loadCareHistory(lead);
     setCareFormEnabled(true);
     loadAudit(lead.id);
+    updateProcessPanelsVisibility(lead);
+    updateDetailNextHint(lead);
+    renderLeadWorkspace(lead);
+    updatePrimaryActionButton();
+    updatePresalesCareGate(lead);
+    window.CrmLeadPresales?.setCareGate?.(leadPresalesCareGate(lead));
+    if (
+      meta.presales_on_lead &&
+      leadPresalesCareReady(lead) &&
+      !prevCareReady &&
+      window.CrmLeadPresales?.load
+    ) {
+      window.CrmLeadPresales.load(lead.id).catch(() => {});
+    }
+    if (isDetailPage && lead.full_name) {
+      document.title = `${lead.full_name} · Lead #${lead.id}`;
+    }
   }
 
   async function loadAudit(leadId) {
@@ -1827,6 +2365,7 @@
     if ($("crm-leads-filter-owner")?.value) p.set("owner_id", $("crm-leads-filter-owner").value);
     appendProjectFilterParams(p);
     if ($("crm-leads-sla-only")?.checked) p.set("sla_overdue", "1");
+    if ($("crm-leads-review-only")?.checked) p.set("review_queue", "1");
   }
 
   async function loadStats() {
@@ -1838,20 +2377,28 @@
   }
 
   async function loadLeads(opts) {
-    const append = !!(opts && opts.append);
-    if (!append) leadsListOffset = 0;
+    if (isDetailPage) {
+      if (selectedId) await openLead(selectedId, { silent: true });
+      return;
+    }
+    if (opts && opts.page != null) {
+      leadsListPage = Math.max(1, Number(opts.page) || 1);
+    } else {
+      leadsListPage = 1;
+    }
     const seq = ++leadsLoadSeq;
     const p = new URLSearchParams();
     appendLeadListFilterParams(p);
     p.set("limit", String(leadsListLimit));
-    p.set("offset", String(leadsListOffset));
+    p.set("offset", String((leadsListPage - 1) * leadsListLimit));
     const data = await reqJson(`/api/crm/leads?${p.toString()}`);
     if (seq !== leadsLoadSeq) return;
-    const batch = data.leads || [];
-    leads = append ? leads.concat(batch) : batch;
+    leads = data.leads || [];
     leadsListTotal = Number(data.total) || leads.length;
-    leadsListTruncated = !!data.truncated;
-    leadsListOffset = leads.length;
+    const totalPages = leadsTotalPages();
+    if (leadsListPage > totalPages && totalPages > 0) {
+      return loadLeads({ page: totalPages });
+    }
     renderList();
     if (selectedId && leads.find((l) => l.id === selectedId)) {
       if (isViewModalOpen()) await openLead(selectedId, { silent: true });
@@ -1867,17 +2414,24 @@
   }
 
   async function openLead(id, opts) {
+    if (!isDetailPage && !opts?.silent) {
+      window.location.href = leadDetailUrl(id);
+      return;
+    }
     const seq = ++openLeadSeq;
     selectedId = id;
-    renderList();
-    if (!opts?.silent) setDetailVisible(true);
+    if ($("crm-leads-list")) renderList();
+    if (!opts?.silent && !isDetailPage) setDetailVisible(true);
     try {
       const data = await reqJson(`/api/crm/leads/${id}`);
       if (seq !== openLeadSeq || selectedId !== id) return;
       renderDetail(data.lead);
       fillOwnerSelectForLead(data.lead).catch(() => {});
+      if (window.CrmLeadPresales && typeof window.CrmLeadPresales.load === "function") {
+        window.CrmLeadPresales.load(id).catch(() => {});
+      }
     } catch (e) {
-      if (seq === openLeadSeq && selectedId === id && !opts?.silent) setDetailVisible(false);
+      if (seq === openLeadSeq && selectedId === id && !opts?.silent && !isDetailPage) setDetailVisible(false);
       throw e;
     }
   }
@@ -1894,6 +2448,10 @@
       $("crm-leads-f-project").value = lead?.re_project_id ? String(lead.re_project_id) : "";
     }
     $("crm-leads-f-region").value = lead?.region || "";
+    if ($("crm-leads-f-industry")) {
+      $("crm-leads-f-industry").value = lead?.industry_slug || "";
+      $("crm-leads-f-industry").required = !isEdit;
+    }
     $("crm-leads-f-product").value = lead?.product_interest || "";
     $("crm-leads-f-need").value = lead?.need || "";
     syncLeadFormSegment(lead?.re_project_id || 0, lead).catch(() => {});
@@ -2079,6 +2637,37 @@
     await refreshProductPicker(pid, { selected: lead?.re_product_id ? String(lead.re_product_id) : "" });
   }
 
+  function fillCatalogSelects() {
+    const svcEl = $("crm-leads-f-product");
+    if (svcEl) {
+      const cur = svcEl.value;
+      const opts = ['<option value="">— Chọn dịch vụ —</option>']
+        .concat(
+          catalogServiceSlugs.map((slug) => {
+            const label = serviceLabels[slug] || slug;
+            return `<option value="${esc(slug)}">${esc(label)}</option>`;
+          })
+        )
+        .join("");
+      svcEl.innerHTML = opts;
+      if (cur) svcEl.value = cur;
+    }
+    const indEl = $("crm-leads-f-industry");
+    if (indEl) {
+      const cur = indEl.value;
+      const opts = ['<option value="">— Chọn ngành —</option>']
+        .concat(
+          catalogIndustrySlugs.map((slug) => {
+            const label = industryLabels[slug] || slug;
+            return `<option value="${esc(slug)}">${esc(label)}</option>`;
+          })
+        )
+        .join("");
+      indEl.innerHTML = opts;
+      if (cur) indEl.value = cur;
+    }
+  }
+
   function initFilters() {
     fillSelect($("crm-leads-filter-status"), meta.statuses || [], statusLabels, "Trạng thái");
     fillSelect($("crm-leads-filter-level"), meta.levels || [], levelLabels, "Phân loại");
@@ -2093,6 +2682,7 @@
     if (statusEl && careStatusTypes.length) statusEl.value = careStatusTypes[0];
     fillProductLineSelect($("crm-leads-filter-line"), "Dòng SP");
     fillProductLineSelect($("crm-leads-f-line"), "— Chọn dòng SP —");
+    fillCatalogSelects();
   }
 
   async function loadRulesMeta() {
@@ -2151,6 +2741,10 @@
       });
       selectedId = null;
       selectedLead = null;
+      if (isDetailPage) {
+        window.location.href = "/crm/leads";
+        return;
+      }
       setDetailVisible(false);
       await loadLeads();
       await loadStats();
@@ -2187,6 +2781,12 @@
     $("crm-leads-cfg-dup").value = cfg.duplicate_policy || "flag";
     $("crm-leads-cfg-fallback").value = cfg.inactive_owner_fallback || "round_robin";
     $("crm-leads-cfg-act-sla").checked = cfg.activity_sla_enabled !== false;
+    if ($("crm-leads-cfg-b2-review-enabled")) {
+      $("crm-leads-cfg-b2-review-enabled").checked = cfg.b2_review_queue_enabled !== false;
+    }
+    if ($("crm-leads-cfg-b2-deadline-hours")) {
+      $("crm-leads-cfg-b2-deadline-hours").value = String(cfg.b2_contact_deadline_hours ?? 24);
+    }
     loadAssignConfigFromLeadConfig(cfg);
     switchConfigTab("general");
     $("crm-leads-config-err").hidden = true;
@@ -2219,6 +2819,8 @@
           duplicate_policy: $("crm-leads-cfg-dup")?.value || "flag",
           inactive_owner_fallback: $("crm-leads-cfg-fallback")?.value || "round_robin",
           activity_sla_enabled: $("crm-leads-cfg-act-sla")?.checked !== false,
+          b2_review_queue_enabled: $("crm-leads-cfg-b2-review-enabled")?.checked !== false,
+          b2_contact_deadline_hours: Number($("crm-leads-cfg-b2-deadline-hours")?.value || 24),
           assign_config: collectAssignConfigFromForm(),
           facebook_config: collectFacebookConfigFromForm(),
         }),
@@ -2353,6 +2955,8 @@
           duplicate_policy: $("crm-leads-cfg-dup").value,
           inactive_owner_fallback: $("crm-leads-cfg-fallback").value,
           activity_sla_enabled: $("crm-leads-cfg-act-sla").checked,
+          b2_review_queue_enabled: $("crm-leads-cfg-b2-review-enabled")?.checked !== false,
+          b2_contact_deadline_hours: Number($("crm-leads-cfg-b2-deadline-hours")?.value || 24),
           assign_config: collectAssignConfigFromForm(),
           facebook_config: collectFacebookConfigFromForm(),
           hot_priority_assign: assignStrategiesDraft.find((s) => s.id === "hot_priority_min_load")?.enabled !== false,
@@ -2447,15 +3051,18 @@
       source: $("crm-leads-f-source").value,
       region: $("crm-leads-f-region").value.trim(),
       product_interest: $("crm-leads-f-product").value.trim(),
+      industry_slug: ($("crm-leads-f-industry")?.value || "").trim(),
       need: $("crm-leads-f-need").value.trim(),
     };
-    const projectVal = ($("crm-leads-f-project")?.value || "").trim();
-    if (projectVal) payload.re_project_id = Number(projectVal);
-    else payload.re_project_id = null;
-    payload.product_line = ($("crm-leads-f-line")?.value || "").trim();
-    payload.zone = ($("crm-leads-f-zone")?.value || "").trim();
-    const prodPick = ($("crm-leads-f-product-pick")?.value || "").trim();
-    payload.re_product_id = prodPick ? Number(prodPick) : null;
+    if (!hideReLeadFields) {
+      const projectVal = ($("crm-leads-f-project")?.value || "").trim();
+      if (projectVal) payload.re_project_id = Number(projectVal);
+      else payload.re_project_id = null;
+      payload.product_line = ($("crm-leads-f-line")?.value || "").trim();
+      payload.zone = ($("crm-leads-f-zone")?.value || "").trim();
+      const prodPick = ($("crm-leads-f-product-pick")?.value || "").trim();
+      payload.re_product_id = prodPick ? Number(prodPick) : null;
+    }
     const id = ($("crm-leads-form-id").value || "").trim();
     if (id) {
       payload.status = $("crm-leads-f-status").value;
@@ -2470,6 +3077,11 @@
       const contactErrs = validateContactFields(payload.phone, payload.email);
       if (contactErrs.length) {
         errEl.textContent = contactErrs.join(" ");
+        errEl.hidden = false;
+        return;
+      }
+      if (!payload.industry_slug) {
+        errEl.textContent = "Chọn ngành khách hàng.";
         errEl.hidden = false;
         return;
       }
@@ -2521,8 +3133,17 @@
     const okEl = $("crm-leads-care-ok");
     if (errEl) errEl.hidden = true;
     if (okEl) okEl.hidden = true;
-    const summary = ($("crm-leads-care-summary")?.value || "").trim();
-    if (!summary) return;
+    const summaryRaw = ($("crm-leads-care-summary")?.value || "").trim();
+    if (summaryRaw.length < CARE_STAGE_MIN_NOTE_LEN) {
+      if (errEl) {
+        errEl.textContent = `Ghi chú bắt buộc (tối thiểu ${CARE_STAGE_MIN_NOTE_LEN} ký tự).`;
+        errEl.hidden = false;
+      }
+      return;
+    }
+    const stageKey =
+      $("crm-leads-care-stage-key")?.value || selectedLead?.care_pipeline?.current_stage_key || "";
+    const summary = summaryRaw;
     const nextAt = $("crm-leads-care-next-at")?.value || "";
     try {
       const res = await reqJson(`/api/crm/leads/${selectedId}/activities`, {
@@ -2603,6 +3224,33 @@
     el.querySelectorAll("[data-id]").forEach((n) => {
       n.addEventListener("click", () => openLead(Number(n.dataset.id)).catch(alertErr));
     });
+  });
+
+  async function openLeadIntake(mode, form) {
+    if (!selectedId) return;
+    try {
+      let url =
+        `/api/crm/intake/entry?lead_id=${selectedId}&mode=${encodeURIComponent(mode || "phone")}`;
+      if (form) url += `&form=${encodeURIComponent(form)}`;
+      const data = await reqJson(url);
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+        return;
+      }
+      alert(data.error || "Không mở được Lead Intake");
+    } catch (e) {
+      alertErr(e);
+    }
+  }
+
+  $("crm-leads-intake-phone")?.addEventListener("click", () => {
+    openLeadIntake("phone").catch(alertErr);
+  });
+  $("crm-leads-intake-meet")?.addEventListener("click", () => {
+    openLeadIntake("in_person").catch(alertErr);
+  });
+  $("crm-leads-intake-common")?.addEventListener("click", () => {
+    openLeadIntake("phone", "common").catch(alertErr);
   });
 
   $("crm-leads-ai-summary")?.addEventListener("click", async () => {
@@ -2847,7 +3495,7 @@
     }
   });
 
-  ["crm-leads-search", "crm-leads-filter-status", "crm-leads-filter-level", "crm-leads-filter-source", "crm-leads-filter-project", "crm-leads-filter-line", "crm-leads-filter-zone", "crm-leads-filter-owner", "crm-leads-sla-only"].forEach((id) => {
+  ["crm-leads-search", "crm-leads-filter-status", "crm-leads-filter-level", "crm-leads-filter-source", "crm-leads-filter-project", "crm-leads-filter-line", "crm-leads-filter-zone", "crm-leads-filter-owner", "crm-leads-sla-only", "crm-leads-review-only"].forEach((id) => {
     $(id)?.addEventListener("change", () => {
       Promise.all([loadLeads(), loadStats()]).catch(alertErr);
     });
@@ -2862,6 +3510,7 @@
     if ($("crm-leads-filter-zone")) $("crm-leads-filter-zone").innerHTML = '<option value="">Phân khu</option>';
     if ($("crm-leads-filter-owner")) $("crm-leads-filter-owner").value = "";
     if ($("crm-leads-sla-only")) $("crm-leads-sla-only").checked = false;
+    if ($("crm-leads-review-only")) $("crm-leads-review-only").checked = false;
     loadLeads().catch(alertErr);
   });
   $("crm-leads-filter-reset")?.addEventListener("click", () => {
@@ -2874,7 +3523,15 @@
     if ($("crm-leads-filter-zone")) $("crm-leads-filter-zone").innerHTML = '<option value="">Phân khu</option>';
     if ($("crm-leads-filter-owner")) $("crm-leads-filter-owner").value = "";
     if ($("crm-leads-sla-only")) $("crm-leads-sla-only").checked = false;
+    if ($("crm-leads-review-only")) $("crm-leads-review-only").checked = false;
     loadLeads().catch(alertErr);
+  });
+
+  $("crm-leads-review-auto")?.addEventListener("click", () => {
+    releaseReviewQueue("auto").catch(alertErr);
+  });
+  $("crm-leads-review-manual")?.addEventListener("click", () => {
+    releaseReviewQueue("manual").catch(alertErr);
   });
 
   function alertErr(e) { alert(e instanceof Error ? e.message : String(e)); }
@@ -2946,7 +3603,7 @@
     });
     el.addEventListener("click", () => {
       dismissLeadNotifyToast(el);
-      if (lead.id) openLead(Number(lead.id)).catch(alertErr);
+      if (lead.id) window.location.href = leadDetailUrl(Number(lead.id));
     });
     stack.appendChild(el);
     requestAnimationFrame(() => el.classList.add("is-visible"));
@@ -3038,11 +3695,160 @@
     }
   }
 
-  async function init() {
+  function installLeadModules() {
+    if (installLeadModules._done) return;
+    installLeadModules._done = true;
+    if (typeof window.createCrmLeadWorkspace === "function") {
+      const workspace = window.createCrmLeadWorkspace({
+        $,
+        esc,
+        meta,
+        isDetailPage,
+        get detailTab() {
+          return detailTab;
+        },
+        switchDetailTab,
+        get selectedLead() {
+          return selectedLead;
+        },
+        leadInReviewQueue,
+        leadInLifecycleHandoff,
+        leadPresalesCareReady,
+        leadPresalesCareGate,
+        navigateToCareStage,
+        canManageReviewQueue,
+      });
+      renderLeadWorkspace = workspace.renderLeadWorkspace;
+      bindWorkspaceUi = workspace.bindWorkspaceUi;
+    }
+    if (typeof window.createCrmLeadReview === "function") {
+      const review = window.createCrmLeadReview({
+        $,
+        esc,
+        canManageReviewQueue,
+        formatViDateTime,
+        reqJson,
+        getSelectedId: () => selectedId,
+        getSelectedLead: () => selectedLead,
+        setSelectedLead: (lead) => {
+          selectedLead = lead;
+        },
+        renderDetail,
+        loadLeads,
+        loadStats,
+        fillOwnerSelectForLead,
+        getLeadsListPage: () => leadsListPage,
+        setLeadsListPage: (page) => {
+          leadsListPage = page;
+        },
+      });
+      renderReviewQueuePanel = review.renderReviewQueuePanel;
+      releaseReviewQueue = review.releaseReviewQueue;
+      renderReviewInboxBanner = review.renderReviewInboxBanner;
+      bindReviewInboxUi = review.bindReviewInboxUi;
+      enableReviewQueueFilter = review.enableReviewQueueFilter;
+    }
+    if (typeof window.createCrmLeadAddon === "function") {
+      const addon = window.createCrmLeadAddon({
+        $,
+        esc,
+        reqJson,
+        getSelectedLead: () => selectedLead,
+        setSelectedLead: (lead) => {
+          selectedLead = lead;
+        },
+        onSaved: (lead) => renderLeadWorkspace(lead),
+      });
+      renderIndustryAddon = addon.renderIndustryAddon;
+    }
+  }
+
+  async function initDetailPage() {
+    installLeadModules();
+    bindRulesModalDelegation();
+    initFilters();
+    fillSelect($("crm-leads-b1-level"), meta.levels || [], levelLabels, "— Chọn —");
+    setCareFormEnabled(false);
+    await loadRulesMeta();
+    if (!simpleLeadUi) {
+      await loadStaff();
+    }
+    await loadProjects();
+    bindDetailPageUi();
+    bindWorkspaceUi();
+    if (window.CrmLeadPresales) {
+      window.CrmLeadPresales.onChanged = () => {
+        if (selectedLead) {
+          updateProcessPanelsVisibility(selectedLead);
+          updatePresalesCareGate(selectedLead);
+          renderLeadWorkspace(selectedLead);
+        }
+        updateDetailNextHint(selectedLead);
+        updatePrimaryActionButton();
+      };
+    }
+    const bootId = Number(pageRoot?.dataset.leadId || meta.lead_id || 0);
+    if (!bootId) throw new Error("Thiếu ID lead.");
+    const hashTab = String(window.location.hash || "").replace("#", "");
+    if (hashTab === "process" || hashTab === "history" || hashTab === "overview") {
+      detailTab = hashTab;
+    }
+    await openLead(bootId, { silent: true });
+    switchDetailTab(detailTab);
+  }
+
+  function bindDetailPageUi() {
+    document.querySelectorAll(".crm-leads-detail-tab").forEach((btn) => {
+      btn.addEventListener("click", () => switchDetailTab(btn.dataset.detailTab || "overview"));
+    });
+    $("crm-leads-more-btn")?.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const menu = $("crm-leads-more-menu");
+      if (!menu) return;
+      menu.hidden = !menu.hidden;
+      $("crm-leads-more-btn")?.setAttribute("aria-expanded", menu.hidden ? "false" : "true");
+    });
+    document.addEventListener("click", () => {
+      const menu = $("crm-leads-more-menu");
+      if (menu) menu.hidden = true;
+      $("crm-leads-more-btn")?.setAttribute("aria-expanded", "false");
+    });
+    document.querySelectorAll("[data-quick-care]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        applyQuickCareToForm(btn.getAttribute("data-quick-care"));
+      });
+    });
+    $("crm-leads-care-pipeline")?.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-care-stage]");
+      if (!btn || !selectedLead) return;
+      navigateToCareStage(btn.getAttribute("data-care-stage"));
+    });
+    $("crm-leads-care-nav")?.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-care-nav]");
+      if (!btn) return;
+      navigateToCareStage(btn.getAttribute("data-care-nav"));
+    });
+    document.getElementById("crm-leads-tab-process")?.addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-care-nav]");
+      if (!btn) return;
+      navigateToCareStage(btn.getAttribute("data-care-nav"));
+    });
+  }
+
+  window.CrmLeadCare = {
+    navigateToCareStage,
+    leadPresalesCareReady,
+  };
+
+  async function initListPage() {
+    installLeadModules();
     bindRulesModalDelegation();
     initFilters();
     setCareFormEnabled(false);
     setConfigureButtonsVisible(canConfigure);
+    const reviewWrap = $("crm-leads-review-wrap");
+    if (reviewWrap) reviewWrap.hidden = !canManageReviewQueue;
+    bindReviewInboxUi();
     const fbBtn = $("crm-leads-fb-btn");
     if (fbBtn) fbBtn.hidden = simpleLeadUi;
     await loadRulesMeta();
@@ -3058,6 +3864,14 @@
     if (!simpleLeadUi) {
       await initFacebookAutoSync();
     }
+  }
+
+  async function init() {
+    if (isDetailPage) {
+      await initDetailPage();
+      return;
+    }
+    await initListPage();
   }
   init().catch((e) => showInitError(e instanceof Error ? e.message : String(e)));
 })();

@@ -3,7 +3,7 @@
 > **Phiên bản:** 2026-05 · **Codebase:** `PTT/` · **Production:** `https://pttads.vn` · **Local:** `http://127.0.0.1:5050`
 
 Tài liệu tổng hợp **đặc tả chức năng (Spec)** và **hướng dẫn giao diện (UI/UX)** cho hệ thống PTT Website Suite (Landing + CMS + CRM).  
-**Spec hệ thống đầy đủ:** [`SPEC_HE_THONG_PTT.md`](SPEC_HE_THONG_PTT.md) · Tham chiếu: [`HE_THONG_PTT.md`](HE_THONG_PTT.md) · [`HUONG_DAN_SU_DUNG_PTT.md`](HUONG_DAN_SU_DUNG_PTT.md) · [`PHAN_QUYEN_HUONG_DAN.md`](PHAN_QUYEN_HUONG_DAN.md)
+**Spec hệ thống đầy đủ:** [`SPEC_HE_THONG_PTT.md`](SPEC_HE_THONG_PTT.md) · **Agency target:** [`SPEC_AGENCY_OPERATING_PLATFORM.md`](SPEC_AGENCY_OPERATING_PLATFORM.md) · **Agency UI Phase 1:** [`SPEC_UI_UX_AGENCY.md`](SPEC_UI_UX_AGENCY.md) · Tham chiếu: [`HE_THONG_PTT.md`](HE_THONG_PTT.md) · [`HUONG_DAN_SU_DUNG_PTT.md`](HUONG_DAN_SU_DUNG_PTT.md) · [`PHAN_QUYEN_HUONG_DAN.md`](PHAN_QUYEN_HUONG_DAN.md)
 
 ---
 

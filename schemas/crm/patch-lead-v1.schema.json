@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pttads.vn/schemas/crm/patch-lead-v1.schema.json",
+  "title": "PatchLeadV1",
+  "description": "Lead patch — assign (owner_id), status, score stub (Phase 2 write contract v1.0.0).",
+  "type": "object",
+  "minProperties": 1,
+  "properties": {
+    "owner_id": { "type": ["integer", "null"], "minimum": 1 },
+    "status": { "type": "string", "maxLength": 64 },
+    "score": { "type": "number", "minimum": 0, "maximum": 100 },
+    "assigned_by": { "type": "string", "maxLength": 120 }
+  },
+  "additionalProperties": false
+}

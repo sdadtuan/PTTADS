@@ -1,0 +1,1647 @@
+{% extends "admin_layout.html" %}
+
+{% block title %}{{ service_label }} — Workflow — CRM{% endblock %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+{% block body_class_extra %}crm-body crm-svc-workflow-page{% endblock %}
+
+{% block admin_page_title %}{{ service_label }}{% endblock %}
+{% block admin_page_desc %}
+  <p class="admin-page-desc">
+    KH: <strong>{{ customer.name if customer else '#' ~ lifecycle.customer_id }}</strong>
+    &nbsp;·&nbsp; Stage hiện tại:
+    <span style="background:#6366f1;color:#fff;padding:2px 8px;border-radius:4px;font-size:.75rem;">
+      {{ stage_labels.get(lifecycle.stage, lifecycle.stage) }}
+    </span>
+    &nbsp;·&nbsp;
+    <a href="{{ url_for('crm_service_delivery_page') }}"
+       style="font-size:.8rem;color:#6366f1;">← Về kanban</a>
+  </p>
+{% endblock %}
+
+{% block admin_main %}
+{% set total_tasks = progress.values() | sum(attribute='total') %}
+{% set done_tasks  = progress.values() | sum(attribute='done') %}
+{% set total_pct   = ((done_tasks / total_tasks * 100) | int) if total_tasks > 0 else 0 %}
+
+{# Overall progress bar #}
+<div style="margin-bottom:1.5rem;">
+  <div style="display:flex;justify-content:space-between;font-size:.8rem;color:#555;margin-bottom:4px;">
+    <span>Tiến độ tổng: {{ done_tasks }}/{{ total_tasks }} tasks</span>
+    <span>{{ total_pct }}%</span>
+  </div>
+  <div style="height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;">
+    <div style="height:100%;background:#6366f1;width:{{ total_pct }}%;transition:width .3s;"></div>
+  </div>
+</div>
+
+{% if lifecycle_funnel %}
+<div style="margin-bottom:1.25rem;padding:.75rem 1rem;background:#f0fdfa;border:1px solid #99f6e4;border-radius:8px;">
+  <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.55rem;">
+    <div style="font-size:.78rem;font-weight:700;color:#0f766e;text-transform:uppercase;">
+      Funnel deal này
+    </div>
+    <a href="{{ lifecycle_funnel.dashboard_funnel_url }}"
+       style="font-size:.75rem;color:#0d9488;font-weight:600;text-decoration:none;">
+      Xem cohort {{ lifecycle_funnel.cohort_period_start }} → {{ lifecycle_funnel.cohort_period_end }} →
+    </a>
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:.35rem .65rem;font-size:.78rem;margin-bottom:.45rem;">
+    {% for m in lifecycle_funnel.milestones %}
+    <span style="padding:.2rem .55rem;border-radius:999px;
+          background:{% if m.done %}#ccfbf1{% else %}#fff{% endif %};
+          border:1px solid {% if m.done %}#5eead4{% else %}#cbd5e1{% endif %};
+          color:{% if m.done %}#115e59{% else %}#64748b{% endif %};">
+      {% if m.done %}✓{% else %}○{% endif %} {{ m.label }}
+    </span>
+    {% endfor %}
+  </div>
+  <div style="font-size:.75rem;color:#475569;display:flex;flex-wrap:wrap;gap:.75rem;">
+    {% if lifecycle_funnel.decision %}
+    <span>Intake: <strong>{{ lifecycle_funnel.decision | upper }}</strong> · BANT {{ lifecycle_funnel.bant_total }}/30</span>
+    {% endif %}
+    {% if lifecycle_funnel.days_to_proposal is not none %}
+    <span>Consult→Proposal: <strong>{{ lifecycle_funnel.days_to_proposal }}</strong> ngày
+      {% if lifecycle_funnel.within_7d_proposal %}
+      <span style="color:#15803d;">(≤7d ✓)</span>
+      {% else %}
+      <span style="color:#b45309;">(&gt;7d)</span>
+      {% endif %}
+    </span>
+    {% endif %}
+    {% if lifecycle_funnel.decision == 'go' and lifecycle_funnel.milestones[2].done %}
+    <span>Gặp PHẦN B trước Consult:
+      <strong>{% if lifecycle_funnel.in_person_before_consult %}Có{% else %}Chưa{% endif %}</strong>
+    </span>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if lifecycle.stage == 'consult' and consult_brief %}
+{# ─── Consult Brief Panel (Phase C1) ─────────────────────────────────────────── #}
+{% set cb = consult_brief %}
+{% set rd = cb.readiness %}
+{% set hl = cb.highlights %}
+<div style="margin-bottom:1.25rem;padding:1rem 1.15rem;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:10px;">
+  <div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.85rem;">
+    <div>
+      <div style="font-size:.7rem;font-weight:700;color:#5b21b6;text-transform:uppercase;letter-spacing:.04em;">
+        Consult Brief
+      </div>
+      <div style="font-size:.85rem;color:#4c1d95;margin-top:.25rem;">
+        Decision:
+        <strong style="color:{% if rd.decision == 'go' %}#15803d{% elif rd.decision == 'no_go' %}#b91c1c{% elif rd.decision == 'nurture' %}#b45309{% else %}#64748b{% endif %};">
+          {{ rd.decision_label }}
+        </strong>
+        · BANT <strong>{{ rd.bant_total }}/30</strong>
+        · {{ rd.temperature_label }}
+        {% if cb.intake_sessions %}
+        · Intake
+        {% for s in cb.intake_sessions if s.status == 'completed' %}
+        <span style="font-size:.75rem;background:#ede9fe;color:#5b21b6;padding:1px 6px;border-radius:999px;margin-left:.15rem;">
+          #{{ s.id }} {{ 'Gọi' if s.mode == 'phone' else 'Gặp' }} ✓
+        </span>
+        {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+    <span style="font-size:.7rem;font-weight:600;padding:.25rem .55rem;border-radius:999px;
+          background:{% if rd.consult_gate_level == 'ok' %}#dcfce7{% elif rd.consult_gate_level == 'block' %}#fee2e2{% else %}#fef3c7{% endif %};
+          color:{% if rd.consult_gate_level == 'ok' %}#166534{% elif rd.consult_gate_level == 'block' %}#991b1b{% else %}#92400e{% endif %};">
+      Gate: {{ rd.consult_gate_level | upper }}
+    </span>
+  </div>
+
+  <p style="font-size:.75rem;color:#6d28d9;margin:0 0 .75rem;line-height:1.45;">
+    <strong>Form audit Consult</strong> (task card) nằm ở tab <strong>Tư vấn</strong> phía dưới — không phải Lead Intake.
+    Bấm <strong>↓ Form audit Consult</strong> để cuộn tới form.
+  </p>
+
+  {% if hl.pain or hl.budget_vnd or hl.domain or hl.niche %}
+  <div style="font-size:.8rem;color:#374151;line-height:1.55;margin-bottom:.75rem;">
+    {% if hl.pain %}<span><strong>Pain:</strong> {{ hl.pain[:180] }}{% if hl.pain|length > 180 %}…{% endif %}</span>{% endif %}
+    {% if hl.budget_vnd %}<span style="margin-left:.75rem;"><strong>NS:</strong> {{ "{:,.0f}".format(hl.budget_vnd) }} ₫</span>{% endif %}
+    {% if hl.domain %}<span style="margin-left:.75rem;"><strong>Domain:</strong> {{ hl.domain }}</span>{% endif %}
+    {% if hl.niche %}<span style="margin-left:.75rem;"><strong>Ngành:</strong> {{ hl.niche }}</span>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if not rd.has_intake_in_person and rd.decision == 'go' %}
+  <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:.55rem .75rem;
+              font-size:.78rem;color:#92400e;margin-bottom:.75rem;">
+    ⚠ Chưa có buổi gặp PHẦN B (in_person)
+    <a href="{{ url_for('crm_lead_intake_page', lifecycle_id=lifecycle.id, mode='in_person', auto_create=1) }}"
+       style="margin-left:.5rem;color:#b45309;font-weight:600;">Mở Intake gặp →</a>
+  </div>
+  {% endif %}
+
+  {% if cb.red_flags %}
+  <div style="font-size:.75rem;color:#991b1b;margin-bottom:.55rem;">
+    <strong>Red flags:</strong> {{ cb.red_flags | join(' · ') }}
+  </div>
+  {% endif %}
+
+  {% if cb.stakeholders %}
+  <div style="font-size:.75rem;color:#475569;margin-bottom:.45rem;">
+    <strong>Stakeholders:</strong>
+    {% for sh in cb.stakeholders[:4] %}
+    {{ sh.get('role', '') }}: {{ sh.get('name', '—') }}{% if not loop.last %} · {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if cb.commitments %}
+  <div style="font-size:.75rem;color:#475569;margin-bottom:.45rem;">
+    <strong>Cam kết KH:</strong>
+    {% for c in cb.commitments[:3] %}
+    {{ c.get('text', c) }}{% if not loop.last %} · {% endif %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% set latest_sess = cb.intake_sessions[0] if cb.intake_sessions else none %}
+  {% if latest_sess and latest_sess.proposal_date %}
+  <div style="font-size:.75rem;color:#475569;margin-bottom:.45rem;">
+    <strong>Proposal date:</strong> {{ latest_sess.proposal_date[:10] }}
+  </div>
+  {% endif %}
+
+  {% if cb.latest_intake_summary %}
+  <div style="background:#faf5ff;border:1px solid #e9d5ff;border-radius:8px;padding:.65rem .8rem;
+              font-size:.78rem;color:#4c1d95;line-height:1.55;margin-bottom:.75rem;white-space:pre-wrap;">
+    <strong>AI / tóm tắt Intake:</strong> {{ cb.latest_intake_summary[:600] }}{% if cb.latest_intake_summary|length > 600 %}…{% endif %}
+  </div>
+  {% endif %}
+
+  {% if cb.recommended_actions %}
+  <ul style="margin:0 0 .85rem 1.1rem;padding:0;font-size:.75rem;color:#5b21b6;line-height:1.5;">
+    {% for action in cb.recommended_actions %}
+    <li>{{ action }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  <div style="display:flex;flex-wrap:wrap;gap:.5rem;font-size:.78rem;">
+    <a href="#svc-tab-consult"
+       onclick="svcShowTab('consult'); setTimeout(function(){ document.getElementById('svc-tab-consult')?.scrollIntoView({behavior:'smooth',block:'start'}); }, 80);"
+       style="padding:.35rem .85rem;background:#4f46e5;color:#fff;border:none;border-radius:6px;
+              text-decoration:none;font-weight:700;">↓ Form audit Consult</a>
+    <button type="button" onclick="svcConsultPrefill(false)"
+            style="padding:.35rem .7rem;background:#5b21b6;color:#fff;border:none;border-radius:6px;
+                   cursor:pointer;font-weight:600;">Prefill form Consult</button>
+    <a href="{{ url_for('crm_lead_intake_page', lifecycle_id=lifecycle.id) }}"
+       style="padding:.35rem .7rem;background:#fff;border:1px solid #c4b5fd;border-radius:6px;
+              color:#5b21b6;text-decoration:none;font-weight:600;">Mở Intake</a>
+    <button type="button" onclick="svcShowTab('lead')"
+            style="padding:.35rem .7rem;background:#fff;border:1px solid #c4b5fd;border-radius:6px;
+                   color:#5b21b6;cursor:pointer;font-weight:600;">Xem task Lead</button>
+    {% if consult_stage_complete and consult_proposal_url %}
+    <a href="{{ consult_proposal_url }}"
+       style="padding:.35rem .85rem;background:#2563eb;color:#fff;border-radius:6px;
+              text-decoration:none;font-weight:700;">Tạo Proposal từ Consult</a>
+    {% elif consult_stage_complete and not lifecycle.customer_id %}
+    <span style="padding:.35rem .7rem;background:#f1f5f9;color:#64748b;border-radius:6px;font-size:.75rem;">
+      Gắn customer/convert lead để tạo Proposal
+    </span>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# Chuyển giai đoạn — tuần tự, sau khi hoàn thành task #}
+<div style="margin-bottom:1.25rem;padding:.85rem 1rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;">
+  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;justify-content:space-between;">
+    <div style="font-size:.85rem;color:#374151;">
+      Giai đoạn hiện tại: <strong>{{ stage_labels.get(lifecycle.stage, lifecycle.stage) }}</strong>
+      {% if advance_info and advance_info.current_total > 0 %}
+      · Task: <strong>{{ advance_info.current_done }}/{{ advance_info.current_total }}</strong>
+      {% endif %}
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:center;">
+      {% if advance_info and advance_info.next_stage %}
+      <button type="button" id="svc-advance-next-btn"
+              onclick="svcAdvanceNext()"
+              {% if not advance_info.can_advance_forward %}disabled{% endif %}
+              style="padding:.45rem .9rem;background:{% if advance_info.can_advance_forward %}#6366f1{% else %}#cbd5e1{% endif %};
+                     color:#fff;border:none;border-radius:6px;font-size:.82rem;cursor:{% if advance_info.can_advance_forward %}pointer{% else %}not-allowed{% endif %};">
+        Chuyển → {{ stage_labels.get(advance_info.next_stage, advance_info.next_stage) }}
+      </button>
+      {% endif %}
+    </div>
+  </div>
+  {% if advance_info and advance_info.block_reason and not advance_info.can_advance_forward and advance_info.next_stage %}
+  <p id="svc-advance-hint" style="margin:.5rem 0 0;font-size:.78rem;color:#b45309;">{{ advance_info.block_reason }}</p>
+  {% else %}
+  <p id="svc-advance-hint" style="margin:.5rem 0 0;font-size:.78rem;color:#6b7280;display:none;"></p>
+  {% endif %}
+  <p id="svc-advance-err" style="margin:.35rem 0 0;font-size:.78rem;color:#dc2626;display:none;"></p>
+</div>
+
+{% if lifecycle.stage == 'lead' and consult_advance_gate and advance_info and advance_info.next_stage == 'consult' %}
+<div id="svc-consult-gate-banner"
+     style="margin-bottom:1.25rem;padding:.65rem 1rem;border-radius:8px;font-size:.82rem;font-weight:600;
+            border:1px solid {% if consult_advance_gate.level == 'ok' %}#86efac{% elif consult_advance_gate.level == 'block' %}#fecaca{% else %}#fde68a{% endif %};
+            background:{% if consult_advance_gate.level == 'ok' %}#dcfce7{% elif consult_advance_gate.level == 'block' %}#fee2e2{% else %}#fef3c7{% endif %};
+            color:{% if consult_advance_gate.level == 'ok' %}#166534{% elif consult_advance_gate.level == 'block' %}#991b1b{% else %}#92400e{% endif %};">
+  {% if consult_advance_gate.level == 'ok' and advance_info.can_advance_forward %}
+  ✓ Sẵn sàng chuyển Tư vấn — Intake GO · BANT {{ consult_advance_gate.bant_total }}/30
+  {% elif consult_advance_gate.decision == 'no_go' %}
+  ⛔ No-Go — không nên chuyển Consult{% if admin_full_access %} (Director có thể override khi bấm Chuyển){% endif %}
+  {% elif consult_advance_gate.decision == 'nurture' %}
+  ⚠ Nurture — cân nhắc trước khi Consult sâu (sẽ hỏi xác nhận khi chuyển)
+  {% else %}
+  {% for msg in consult_advance_gate.messages %}{{ msg }}{% if not loop.last %} · {% endif %}{% endfor %}
+  {% endif %}
+</div>
+{% endif %}
+
+{% if lifecycle.stage == 'onboard' and advance_info and advance_info.next_stage == 'deliver' and tmmt_deliver_gate %}
+<div id="svc-tmmt-gate-banner-top"
+     style="margin-bottom:1.25rem;padding:.65rem 1rem;border-radius:8px;font-size:.82rem;font-weight:600;
+            border:1px solid {% if tmmt_deliver_gate.complete %}#86efac{% else %}#fde68a{% endif %};
+            background:{% if tmmt_deliver_gate.complete %}#dcfce7{% else %}#fffbeb{% endif %};
+            color:{% if tmmt_deliver_gate.complete %}#166534{% else %}#92400e{% endif %};">
+  {% if tmmt_deliver_gate.complete %}
+  ✓ TMMT chính thức đủ — sẵn sàng chuyển Triển khai (Deliver)
+  {% else %}
+  ⚠ Gate Deliver: {% for msg in tmmt_deliver_gate.messages %}{{ msg }}{% if not loop.last %} · {% endif %}{% endfor %}
+  {% endif %}
+</div>
+{% endif %}
+
+{% if lifecycle.stage in ('onboard', 'deliver') %}
+<div id="crm-svc-tmmt-panel" class="crm-svc-tmmt-panel" style="margin-bottom:1.25rem;padding:.85rem 1rem;background:#fff;border:1px solid #e2e8f0;border-radius:10px;">
+  <div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:.5rem;margin-bottom:.65rem;">
+    <div>
+      <h3 style="margin:0;font-size:.95rem;">TMMT chính thức (Onboard → Deliver)</h3>
+      <p class="muted" style="margin:.25rem 0 0;font-size:.78rem;">Điền trước khi chuyển giai đoạn Triển khai — gate R5 Product Model.</p>
+    </div>
+    <div id="crm-svc-tmmt-status" style="font-size:.78rem;"></div>
+  </div>
+  <ul id="crm-svc-tmmt-checklist" class="crm-svc-tmmt-checklist"></ul>
+  <p id="crm-svc-tmmt-gate-banner" class="crm-svc-tmmt-gate-inline" hidden></p>
+  <div id="crm-svc-tmmt-fields"></div>
+  <p class="crm-form-msg is-error" id="crm-svc-tmmt-err" hidden></p>
+</div>
+{% endif %}
+
+{# Lead intake — chỉ stage Lead (Consult dùng Consult Brief panel) #}
+{% if lifecycle.stage == 'lead' %}
+<div style="margin-bottom:1.25rem;padding:.75rem 1rem;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;">
+  <div style="font-size:.82rem;font-weight:600;color:#1e40af;margin-bottom:.45rem;">Lead Intake — Gọi &amp; gặp KH</div>
+  <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;font-size:.8rem;">
+    <a href="{{ url_for('crm_lead_intake_page', lifecycle_id=lifecycle.id, mode='phone', auto_create=1) }}"
+       style="padding:.35rem .75rem;background:#16a34a;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;">
+      Gọi lead (PHẦN A)
+    </a>
+    <a href="{{ url_for('crm_lead_intake_page', lifecycle_id=lifecycle.id, mode='in_person', auto_create=1) }}"
+       style="padding:.35rem .75rem;background:#0d9488;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;">
+      Gặp KH (PHẦN B)
+    </a>
+    <a href="{{ url_for('crm_lead_intake_page', lifecycle_id=lifecycle.id) }}"
+       style="padding:.35rem .75rem;background:#fff;color:#16a34a;border:1px solid #16a34a;border-radius:6px;text-decoration:none;">
+      Quản lý phiên
+    </a>
+    <a href="{{ url_for('crm_lead_intake_form_file', filename=intake_form_file) }}"
+       target="_blank" rel="noopener"
+       style="padding:.35rem .75rem;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;">
+      Form dịch vụ (in / PDF)
+    </a>
+    <a href="{{ url_for('crm_lead_intake_form_file', filename=intake_form_common) }}"
+       target="_blank" rel="noopener"
+       style="padding:.35rem .75rem;background:#fff;color:#2563eb;border:1px solid #2563eb;border-radius:6px;text-decoration:none;">
+      Form chung (in)
+    </a>
+    {% if lifecycle.lead_id %}
+    <a href="{{ url_for('crm_lead_intake_page', lead_id=lifecycle.lead_id, service_slug='_common', mode='phone', auto_create=1) }}"
+       style="padding:.35rem .75rem;background:#7c3aed;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;">
+      Form chung (web)
+    </a>
+    {% endif %}
+    <span style="color:#64748b;font-size:.75rem;">
+      Tự lưu · Chỉnh sửa lại · Hoàn thành → sync task Lead
+    </span>
+  </div>
+  {% if intake_sessions %}
+  <div style="margin-top:.55rem;font-size:.75rem;color:#475569;">
+    Phiên gần đây:
+    {% for s in intake_sessions[:3] %}
+    <a href="{{ url_for('crm_lead_intake_page', lifecycle_id=lifecycle.id, session_id=s.id) }}"
+       style="margin-right:.5rem;color:#2563eb;">
+      #{{ s.id }} {{ 'Gọi' if s.mode == 'phone' else 'Gặp' }}
+      {% if s.status == 'completed' %}✓{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{# Stage tabs #}
+<div style="display:flex;gap:4px;margin-bottom:1rem;flex-wrap:wrap;">
+  {% for stage in stages %}
+  {% set prog = progress.get(stage, {}) %}
+  <button class="svc-tab-btn"
+          data-stage="{{ stage }}"
+          onclick="svcShowTab('{{ stage }}')"
+          style="padding:.375rem .75rem;border-radius:6px;border:1px solid #e2e8f0;
+                 background:{% if stage == lifecycle.stage %}#6366f1{% else %}#fff{% endif %};
+                 color:{% if stage == lifecycle.stage %}#fff{% else %}#444{% endif %};
+                 font-size:.8rem;cursor:pointer;">
+    {{ stage_labels.get(stage, stage) }}
+    {% if prog.total > 0 %}
+    <span style="font-size:.7rem;opacity:.8;">{{ prog.done }}/{{ prog.total }}</span>
+    {% endif %}
+  </button>
+  {% endfor %}
+</div>
+
+{# Tab panes #}
+{% for stage in stages %}
+<div id="svc-tab-{{ stage }}"
+     style="display:{% if stage == lifecycle.stage %}block{% else %}none{% endif %};">
+
+  {% set stage_tasks = tasks_by_stage.get(stage, []) %}
+  {% if stage == 'consult' and stage_tasks %}
+  <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:.65rem .85rem;
+              margin-bottom:.75rem;font-size:.82rem;color:#3730a3;">
+    <strong>Form audit Consult</strong> — điền các trường bên dưới (prefill từ Lead/Intake nếu cần).
+  </div>
+  {% endif %}
+  {% if not stage_tasks %}
+  <p style="color:#aaa;font-size:.85rem;padding:1rem 0;">Chưa có tasks — seed tự động khi mở trang.</p>
+  {% endif %}
+
+  {% for task in stage_tasks %}
+  <div id="task-card-{{ task.id }}"
+       style="background:#fff;border:1px solid {% if task.is_done %}#bbf7d0{% else %}#e2e8f0{% endif %};
+              border-radius:8px;padding:1rem;margin-bottom:.75rem;
+              {% if task.is_done %}opacity:.7;{% endif %}">
+
+    {# Header #}
+    <div style="display:flex;align-items:flex-start;gap:.75rem;margin-bottom:.5rem;">
+      <input type="checkbox" {% if task.is_done %}checked{% endif %}
+             onchange="svcToggleDone({{ task.id }}, this.checked)"
+             style="margin-top:3px;cursor:pointer;width:16px;height:16px;">
+      <div style="flex:1;">
+        <div style="font-weight:600;font-size:.9rem;
+                    {% if task.is_done %}text-decoration:line-through;color:#888;{% endif %}">
+          {{ task.title }}
+          {% if task.is_custom %}
+          <span style="font-size:.65rem;background:#fef3c7;color:#92400e;
+                       padding:1px 6px;border-radius:4px;margin-left:.25rem;">tuỳ chỉnh</span>
+          {% endif %}
+        </div>
+        {% if task.description %}
+        <div style="font-size:.78rem;color:#666;margin-top:2px;">{{ task.description }}</div>
+        {% endif %}
+      </div>
+      {% if task.is_custom %}
+      <button onclick="svcDeleteTask({{ task.id }})"
+              title="Xoá task"
+              style="background:none;border:none;cursor:pointer;color:#f87171;font-size:.8rem;padding:2px 6px;">✕</button>
+      {% endif %}
+    </div>
+
+    {# Form fields #}
+    {% if task.form_fields %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.5rem;
+                margin:.75rem 0;padding:.75rem;background:#f8fafc;border-radius:6px;">
+      {% for field in task.form_fields %}
+      <label style="font-size:.75rem;color:#555;">
+        {{ field.label }}
+        {% if field.type == 'textarea' %}
+        <textarea rows="2"
+                  data-task-id="{{ task.id }}" data-field-key="{{ field.key }}"
+                  onchange="svcSaveFormField({{ task.id }}, '{{ field.key }}', this.value)"
+                  style="width:100%;margin-top:2px;padding:4px;border:1px solid #ddd;
+                         border-radius:4px;font-size:.78rem;box-sizing:border-box;resize:vertical;"
+        >{{ task.form_data.get(field.key, '') }}</textarea>
+        {% else %}
+        <input type="{{ field.type }}"
+               data-task-id="{{ task.id }}" data-field-key="{{ field.key }}"
+               value="{{ task.form_data.get(field.key, '') }}"
+               onchange="svcSaveFormField({{ task.id }}, '{{ field.key }}', this.value)"
+               style="width:100%;margin-top:2px;padding:4px;border:1px solid #ddd;
+                      border-radius:4px;font-size:.78rem;box-sizing:border-box;">
+        {% endif %}
+      </label>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# Notes #}
+    <div style="margin:.5rem 0;">
+      <label style="font-size:.75rem;color:#555;display:block;">Ghi chú AM</label>
+      <textarea rows="2"
+                onchange="svcSaveNotes({{ task.id }}, this.value)"
+                style="width:100%;margin-top:2px;padding:4px;border:1px solid #ddd;
+                       border-radius:4px;font-size:.78rem;box-sizing:border-box;resize:vertical;"
+      >{{ task.notes }}</textarea>
+    </div>
+
+    {# AI Output #}
+    {% if task.ai_output %}
+    <div id="ai-output-{{ task.id }}"
+         style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;
+                padding:.75rem;margin:.5rem 0;font-size:.8rem;white-space:pre-wrap;">{{ task.ai_output }}</div>
+    {% else %}
+    <div id="ai-output-{{ task.id }}" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;
+         border-radius:6px;padding:.75rem;margin:.5rem 0;font-size:.8rem;white-space:pre-wrap;"></div>
+    {% endif %}
+
+    {# Actions #}
+    <div style="display:flex;gap:.5rem;margin-top:.5rem;">
+      {% if task.ai_prompt_key %}
+      <button onclick="svcAiAssist({{ task.id }}, '{{ stage }}')"
+              id="ai-btn-{{ task.id }}"
+              style="padding:.3rem .7rem;background:#6366f1;color:#fff;border:none;
+                     border-radius:6px;font-size:.78rem;cursor:pointer;">
+        AI Hỗ trợ
+      </button>
+      {% endif %}
+      <span id="ai-status-{{ task.id }}" style="font-size:.75rem;color:#888;align-self:center;"></span>
+    </div>
+  </div>
+  {% endfor %}
+
+  {# Add custom task #}
+  <div style="margin-top:.75rem;">
+    <details>
+      <summary style="font-size:.8rem;color:#6366f1;cursor:pointer;user-select:none;">
+        + Thêm task tuỳ chỉnh cho stage này
+      </summary>
+      <div style="display:flex;gap:.5rem;margin-top:.5rem;">
+        <input type="text" id="custom-title-{{ stage }}"
+               placeholder="Tên task..."
+               style="flex:1;padding:.375rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+        <button onclick="svcAddCustomTask('{{ stage }}')"
+                style="padding:.375rem .75rem;background:#22c55e;color:#fff;border:none;
+                       border-radius:6px;font-size:.8rem;cursor:pointer;">Thêm</button>
+      </div>
+    </details>
+  </div>
+</div>
+{% endfor %}
+
+<script>
+const _lifecycleId = {{ lifecycle.id }};
+const _svcNextStage = {{ (advance_info.next_stage if advance_info else None) | tojson }};
+const _svcConsultGate = {{ consult_advance_gate | tojson if consult_advance_gate else 'null' }};
+const _svcCanConsultOverride = {{ admin_full_access | tojson }};
+
+function svcAdvanceNext() {
+  if (!_svcNextStage) return;
+  const errEl = document.getElementById('svc-advance-err');
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  const notes = (document.getElementById('svc-advance-notes')?.value || '').trim();
+  const body = {stage: _svcNextStage, notes};
+  if (_svcNextStage === 'consult' && _svcConsultGate && _svcConsultGate.requires_confirm) {
+    const msg = (_svcConsultGate.messages || []).join('\n') || 'Tiếp tục chuyển Tư vấn?';
+    if (!confirm(msg + '\n\nTiếp tục chuyển giai đoạn?')) return;
+    body.confirm = true;
+  }
+  svcAdvancePatch(body);
+}
+
+function svcAdvancePatch(body) {
+  const errEl = document.getElementById('svc-advance-err');
+  fetch('/api/crm/service-lifecycle/' + _lifecycleId, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  })
+    .then(r => r.json().then(d => ({ok: r.ok, status: r.status, d})))
+    .then(({ok, d}) => {
+      if (!ok) {
+        if (d.requires_confirm && !body.confirm) {
+          const msg = (d.gate && d.gate.messages ? d.gate.messages.join('\n') : d.error) || 'Xác nhận?';
+          if (confirm(msg + '\n\nTiếp tục chuyển giai đoạn?')) {
+            body.confirm = true;
+            svcAdvancePatch(body);
+          }
+          return;
+        }
+        if (d.requires_override && _svcCanConsultOverride && !body.override_reason) {
+          const reason = prompt('Director override No-Go — nhập lý do (bắt buộc):');
+          if (!reason || !reason.trim()) return;
+          body.override_reason = reason.trim();
+          body.confirm = true;
+          svcAdvancePatch(body);
+          return;
+        }
+        if (errEl) {
+          errEl.textContent = d.error || 'Không chuyển được giai đoạn.';
+          errEl.style.display = 'block';
+        }
+        return;
+      }
+      if (d.gate_warnings && d.gate_warnings.length) {
+        alert(d.gate_warnings.join('\n'));
+      }
+      location.reload();
+    })
+    .catch(() => {
+      if (errEl) {
+        errEl.textContent = 'Mất kết nối.';
+        errEl.style.display = 'block';
+      }
+    });
+}
+
+function svcConsultPrefill(overwrite) {
+  if (!confirm(overwrite
+      ? 'Ghi đè toàn bộ field Consult từ Lead/Intake?'
+      : 'Prefill các field Consult còn trống từ Lead/Intake?')) return;
+  fetch('/api/crm/service-lifecycle/{{ lifecycle.id }}/consult-prefill', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({overwrite: !!overwrite}),
+  })
+    .then(r => r.json().then(d => ({ok: r.ok, d})))
+    .then(({ok, d}) => {
+      if (!ok) {
+        alert(d.error || 'Prefill thất bại.');
+        return;
+      }
+      const n = (d.fields || []).length;
+      alert(n ? ('Đã prefill ' + n + ' field: ' + d.fields.join(', ')) : 'Không có field trống để prefill.');
+      location.reload();
+    })
+    .catch(() => alert('Mất kết nối.'));
+}
+
+function svcShowTab(stage) {
+  document.querySelectorAll('[id^="svc-tab-"]').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.svc-tab-btn').forEach(btn => {
+    btn.style.background = '#fff';
+    btn.style.color = '#444';
+  });
+  document.getElementById('svc-tab-' + stage).style.display = 'block';
+  const btn = document.querySelector('[data-stage="' + stage + '"]');
+  if (btn) { btn.style.background = '#6366f1'; btn.style.color = '#fff'; }
+}
+
+function svcToggleDone(taskId, isDone) {
+  fetch('/api/crm/svc-tasks/' + taskId, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({is_done: isDone}),
+  }).then(r => r.json()).then(() => {
+    const card = document.getElementById('task-card-' + taskId);
+    if (!card) return;
+    card.style.borderColor = isDone ? '#bbf7d0' : '#e2e8f0';
+    card.style.opacity = isDone ? '0.7' : '1';
+    location.reload();
+  }).catch(console.error);
+}
+
+const _formDataCache = {};
+function svcSaveFormField(taskId, key, value) {
+  if (!_formDataCache[taskId]) _formDataCache[taskId] = {};
+  _formDataCache[taskId][key] = value;
+  clearTimeout(_formDataCache['_t_' + taskId]);
+  _formDataCache['_t_' + taskId] = setTimeout(() => {
+    fetch('/api/crm/svc-tasks/' + taskId, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({form_data: _formDataCache[taskId]}),
+    }).catch(console.error);
+  }, 800);
+}
+
+function svcSaveNotes(taskId, notes) {
+  clearTimeout(window['_nt_' + taskId]);
+  window['_nt_' + taskId] = setTimeout(() => {
+    fetch('/api/crm/svc-tasks/' + taskId, {
+      method: 'PATCH',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({notes}),
+    }).catch(console.error);
+  }, 800);
+}
+
+function svcAiAssist(taskId, stage) {
+  const btn = document.getElementById('ai-btn-' + taskId);
+  const status = document.getElementById('ai-status-' + taskId);
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'Đang tạo...';
+  const ctx = {};
+  document.querySelectorAll('[data-task-id="' + taskId + '"]').forEach(el => {
+    ctx[el.dataset.fieldKey] = el.value;
+  });
+  fetch('/api/crm/svc-tasks/' + taskId + '/ai-assist', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({context: ctx}),
+  }).then(r => r.json()).then(data => {
+    const out = document.getElementById('ai-output-' + taskId);
+    if (out) { out.textContent = data.ai_output || '(AI không có phản hồi)'; out.style.display = 'block'; }
+    if (status) status.textContent = '';
+    if (btn) btn.disabled = false;
+  }).catch(err => {
+    if (status) status.textContent = 'Lỗi: ' + err;
+    if (btn) btn.disabled = false;
+  });
+}
+
+function svcAddCustomTask(stage) {
+  const input = document.getElementById('custom-title-' + stage);
+  const title = (input ? input.value : '').trim();
+  if (!title) return;
+  fetch('/api/crm/svc-tasks', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({lifecycle_id: _lifecycleId, stage, title}),
+  }).then(r => r.json()).then(() => location.reload())
+    .catch(console.error);
+}
+
+function svcDeleteTask(taskId) {
+  if (!confirm('Xoá task này?')) return;
+  fetch('/api/crm/svc-tasks/' + taskId, {method: 'DELETE'})
+    .then(() => location.reload())
+    .catch(console.error);
+}
+</script>
+
+{# ─── Risk Section ────────────────────────────────────────────────────── #}
+<div style="margin-top:2rem;border-top:2px solid #fee2e2;padding-top:1.5rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+    <h3 style="margin:0;font-size:.95rem;color:#dc2626;">
+      ⚠️ Quản lý rủi ro
+      <span style="font-weight:400;font-size:.8rem;color:#888;">
+        ({{ risks|selectattr('is_active','equalto',1)|list|length }} đang hoạt động /
+         {{ risks|length }} tổng)
+      </span>
+    </h3>
+    <button onclick="riskAiScan()"
+            id="risk-scan-btn"
+            style="padding:.3rem .75rem;background:#dc2626;color:#fff;border:none;
+                   border-radius:6px;font-size:.78rem;cursor:pointer;">
+      AI Scan rủi ro
+    </button>
+  </div>
+
+  {# AI Scan result #}
+  <div id="risk-scan-output"
+       style="{% if not latest_risk_scan %}display:none;{% endif %}
+              background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;
+              padding:.75rem;margin-bottom:1rem;font-size:.8rem;white-space:pre-wrap;">{{ latest_risk_scan }}</div>
+  <div id="risk-scan-status" style="font-size:.75rem;color:#888;margin-bottom:.5rem;"></div>
+
+  {# Risk list #}
+  {% if risks %}
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:.8rem;">
+      <thead>
+        <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+          <th style="text-align:left;padding:.5rem .75rem;font-weight:600;">Rủi ro</th>
+          <th style="text-align:center;padding:.5rem .5rem;font-weight:600;">Stage</th>
+          <th style="text-align:center;padding:.5rem .5rem;font-weight:600;">Xác suất</th>
+          <th style="text-align:center;padding:.5rem .5rem;font-weight:600;">Ảnh hưởng</th>
+          <th style="text-align:left;padding:.5rem .75rem;font-weight:600;">Biện pháp</th>
+          <th style="text-align:center;padding:.5rem .5rem;font-weight:600;">Trạng thái</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for risk in risks %}
+        <tr id="risk-row-{{ risk.id }}"
+            style="border-bottom:1px solid #f1f5f9;
+                   {% if not risk.is_active %}opacity:.45;{% endif %}">
+          <td style="padding:.5rem .75rem;">
+            <div style="font-weight:500;">{{ risk.title }}</div>
+            {% if risk.category %}
+            <div style="font-size:.7rem;color:#6366f1;">{{ risk.category }}</div>
+            {% endif %}
+            {% if risk.is_custom %}
+            <span style="font-size:.65rem;background:#fef3c7;color:#92400e;
+                         padding:1px 5px;border-radius:3px;">tuỳ chỉnh</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center;padding:.5rem .5rem;">
+            <span style="font-size:.7rem;background:#e0e7ff;color:#4338ca;
+                         padding:1px 6px;border-radius:3px;">
+              {{ stage_labels.get(risk.stage, risk.stage) if risk.stage else '—' }}
+            </span>
+          </td>
+          <td style="text-align:center;padding:.5rem .5rem;">
+            {% set prob_color = {'cao': '#dc2626', 'trung': '#d97706', 'thap': '#16a34a'} %}
+            <span style="font-size:.7rem;background:{{ prob_color.get(risk.probability, '#888') }}20;
+                         color:{{ prob_color.get(risk.probability, '#888') }};
+                         padding:1px 6px;border-radius:3px;font-weight:600;">
+              {{ risk.probability }}
+            </span>
+          </td>
+          <td style="text-align:center;padding:.5rem .5rem;">
+            {% set imp_color = {'cao': '#dc2626', 'trung': '#d97706', 'thap': '#16a34a'} %}
+            <span style="font-size:.7rem;background:{{ imp_color.get(risk.impact, '#888') }}20;
+                         color:{{ imp_color.get(risk.impact, '#888') }};
+                         padding:1px 6px;border-radius:3px;font-weight:600;">
+              {{ risk.impact }}
+            </span>
+          </td>
+          <td style="padding:.5rem .75rem;max-width:240px;">
+            <div style="font-size:.75rem;color:#555;line-height:1.4;">
+              {{ risk.mitigation[:120] ~ '...' if risk.mitigation|length > 120 else risk.mitigation }}
+            </div>
+          </td>
+          <td style="text-align:center;padding:.5rem .5rem;">
+            <div style="display:flex;gap:.25rem;justify-content:center;flex-wrap:nowrap;">
+              <button onclick="riskToggleActive({{ risk.id }}, {{ 0 if risk.is_active else 1 }})"
+                      title="{{ 'Đánh dấu đã xử lý' if risk.is_active else 'Kích hoạt lại' }}"
+                      style="padding:2px 8px;border-radius:4px;border:none;cursor:pointer;font-size:.72rem;
+                             background:{{ '#dcfce7' if risk.is_active else '#f3f4f6' }};
+                             color:{{ '#16a34a' if risk.is_active else '#666' }};">
+                {{ '✓ Active' if risk.is_active else '↺ Done' }}
+              </button>
+              {% if risk.is_custom %}
+              <button onclick="riskDelete({{ risk.id }})"
+                      title="Xoá"
+                      style="padding:2px 6px;border-radius:4px;border:none;cursor:pointer;
+                             background:#fee2e2;color:#dc2626;font-size:.72rem;">✕</button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p style="color:#aaa;font-size:.85rem;">Chưa có rủi ro. Tải lại trang để seed.</p>
+  {% endif %}
+
+  {# Add custom risk #}
+  <div style="margin-top:.75rem;">
+    <details>
+      <summary style="font-size:.8rem;color:#dc2626;cursor:pointer;user-select:none;">
+        + Thêm rủi ro tuỳ chỉnh
+      </summary>
+      <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap;">
+        <input type="text" id="risk-title-input"
+               placeholder="Tên rủi ro..."
+               style="flex:2;min-width:180px;padding:.375rem .5rem;border:1px solid #ddd;
+                      border-radius:6px;font-size:.8rem;">
+        <select id="risk-stage-input"
+                style="padding:.375rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+          <option value="">— Stage —</option>
+          {% for stage in stages %}
+          <option value="{{ stage }}">{{ stage_labels.get(stage, stage) }}</option>
+          {% endfor %}
+        </select>
+        <input type="text" id="risk-category-input"
+               placeholder="Loại (optional)"
+               style="width:120px;padding:.375rem .5rem;border:1px solid #ddd;
+                      border-radius:6px;font-size:.8rem;">
+        <button onclick="riskCreate()"
+                style="padding:.375rem .75rem;background:#dc2626;color:#fff;border:none;
+                       border-radius:6px;font-size:.8rem;cursor:pointer;">Thêm</button>
+      </div>
+    </details>
+  </div>
+</div>
+
+<script>
+// ─── Risk JS ───────────────────────────────────────────────────────────────
+function riskToggleActive(riskId, newActive) {
+  fetch('/api/crm/svc-risks/' + riskId, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({is_active: newActive === 1}),
+  }).then(() => location.reload()).catch(console.error);
+}
+
+function riskDelete(riskId) {
+  if (!confirm('Xoá rủi ro này?')) return;
+  fetch('/api/crm/svc-risks/' + riskId, {method: 'DELETE'})
+    .then(() => location.reload())
+    .catch(console.error);
+}
+
+function riskCreate() {
+  const title = (document.getElementById('risk-title-input').value || '').trim();
+  const stage = document.getElementById('risk-stage-input').value;
+  const category = (document.getElementById('risk-category-input').value || '').trim();
+  if (!title) return;
+  fetch('/api/crm/svc-risks', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({lifecycle_id: _lifecycleId, stage, title, category}),
+  }).then(() => location.reload()).catch(console.error);
+}
+
+function riskAiScan() {
+  const btn = document.getElementById('risk-scan-btn');
+  const status = document.getElementById('risk-scan-status');
+  const out = document.getElementById('risk-scan-output');
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'AI đang phân tích rủi ro...';
+  fetch('/api/crm/svc-risks/' + _lifecycleId + '/ai-scan', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: '{}',
+  }).then(r => r.json()).then(data => {
+    if (out) {
+      out.textContent = data.ai_output || '(Không có kết quả)';
+      out.style.display = 'block';
+    }
+    if (status) status.textContent = '';
+    if (btn) btn.disabled = false;
+  }).catch(err => {
+    if (status) status.textContent = 'Lỗi: ' + err;
+    if (btn) btn.disabled = false;
+  });
+}
+</script>
+
+{# ─── Finance Section ─────────────────────────────────────────────────────── #}
+<div style="margin-top:2rem;border-top:2px solid #dcfce7;padding-top:1.5rem;">
+  <h3 style="margin:0 0 1rem;font-size:.95rem;color:#16a34a;">
+    💰 Tài chính dịch vụ
+  </h3>
+
+  {# Summary metrics #}
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1.5rem;">
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:.75rem;text-align:center;">
+      <div style="font-size:.7rem;color:#666;margin-bottom:.25rem;">Kỳ vọng (HĐ)</div>
+      <div style="font-size:1rem;font-weight:700;color:#16a34a;">
+        {{ "{:,.0f}".format(finance_summary.expected_revenue) }} ₫
+      </div>
+    </div>
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:.75rem;text-align:center;">
+      <div style="font-size:.7rem;color:#666;margin-bottom:.25rem;">Thực nhận</div>
+      <div style="font-size:1rem;font-weight:700;color:#2563eb;">
+        {{ "{:,.0f}".format(finance_summary.received_revenue) }} ₫
+      </div>
+    </div>
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:.75rem;text-align:center;">
+      <div style="font-size:.7rem;color:#666;margin-bottom:.25rem;">Chi phí triển khai (HĐ)</div>
+      <div style="font-size:1rem;font-weight:700;color:#dc2626;">
+        {{ "{:,.0f}".format(finance_summary.delivery_expenses) }} ₫
+      </div>
+      {% if finance_summary.presales_expenses > 0 %}
+      <div style="font-size:.65rem;color:#9ca3af;margin-top:.25rem;">
+        Pre-sales: {{ "{:,.0f}".format(finance_summary.presales_expenses) }} ₫ (không tính margin)
+      </div>
+      {% endif %}
+    </div>
+    <div style="background:{% if finance_summary.margin_pct >= 50 %}#f0fdf4{% elif finance_summary.margin_pct >= 20 %}#fefce8{% else %}#fef2f2{% endif %};
+                border:1px solid {% if finance_summary.margin_pct >= 50 %}#bbf7d0{% elif finance_summary.margin_pct >= 20 %}#fef08a{% else %}#fecaca{% endif %};
+                border-radius:8px;padding:.75rem;text-align:center;">
+      <div style="font-size:.7rem;color:#666;margin-bottom:.25rem;">Lợi nhuận</div>
+      <div style="font-size:.95rem;font-weight:700;color:{% if finance_summary.margin_pct >= 50 %}#16a34a{% elif finance_summary.margin_pct >= 20 %}#ca8a04{% else %}#dc2626{% endif %};">
+        {{ "{:,.0f}".format(finance_summary.profit) }} ₫
+        <span style="font-size:.7rem;font-weight:400;">({{ finance_summary.margin_pct }}%)</span>
+      </div>
+    </div>
+  </div>
+
+  {# ── Payments ── #}
+  <div style="margin-bottom:1.5rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
+      <h4 style="margin:0;font-size:.85rem;color:#374151;">
+        Thu tiền
+        <span style="font-weight:400;color:#888;font-size:.75rem;">({{ payments|length }} khoản)</span>
+      </h4>
+    </div>
+    {% if payments %}
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:.8rem;">
+        <thead>
+          <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+            <th style="text-align:left;padding:.4rem .6rem;font-weight:600;">Ngày thu</th>
+            <th style="text-align:left;padding:.4rem .6rem;font-weight:600;">Đến hạn</th>
+            <th style="text-align:right;padding:.4rem .6rem;font-weight:600;">Số tiền</th>
+            <th style="text-align:center;padding:.4rem .6rem;font-weight:600;">Trạng thái</th>
+            <th style="text-align:left;padding:.4rem .6rem;font-weight:600;">Ghi chú</th>
+            <th style="text-align:center;padding:.4rem .6rem;font-weight:600;">Xóa</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in payments %}
+          <tr style="border-bottom:1px solid #f1f5f9;">
+            <td style="padding:.4rem .6rem;">{{ p.received_on or '—' }}</td>
+            <td style="padding:.4rem .6rem;">
+              {% if p.status == 'pending' %}
+              <span style="{% if (p.due_on or p.received_on) and (p.due_on or p.received_on) < today_iso %}color:#dc2626;font-weight:600;{% endif %}">
+                {{ p.due_on or p.received_on or '—' }}
+              </span>
+              {% else %}—{% endif %}
+            </td>
+            <td style="padding:.4rem .6rem;text-align:right;font-weight:500;">
+              {{ "{:,.0f}".format(p.amount_vnd) }} ₫
+            </td>
+            <td style="padding:.4rem .6rem;text-align:center;">
+              {% if p.status == 'received' %}
+              <span style="font-size:.7rem;background:#dcfce7;color:#16a34a;padding:1px 8px;border-radius:3px;">Đã nhận</span>
+              {% elif p.status == 'pending' %}
+              <span style="font-size:.7rem;background:#fef9c3;color:#ca8a04;padding:1px 8px;border-radius:3px;">Chờ</span>
+              {% else %}
+              <span style="font-size:.7rem;background:#f3f4f6;color:#9ca3af;padding:1px 8px;border-radius:3px;">Huỷ</span>
+              {% endif %}
+            </td>
+            <td style="padding:.4rem .6rem;color:#555;font-size:.75rem;">{{ p.notes or '—' }}</td>
+            <td style="padding:.4rem .6rem;text-align:center;">
+              <div style="display:flex;gap:.25rem;justify-content:center;">
+              <button onclick="paymentEditOpen({{ p.id }}, {{ p.amount_vnd }}, '{{ p.received_on }}', '{{ p.due_on or p.received_on }}', '{{ p.status }}', '{{ p.notes | replace("'", "\\'") }}')"
+                      style="padding:1px 8px;border-radius:4px;border:none;cursor:pointer;
+                             background:#dbeafe;color:#1d4ed8;font-size:.72rem;">Sửa</button>
+              <button onclick="paymentDelete({{ p.id }})"
+                      style="padding:1px 7px;border-radius:4px;border:none;cursor:pointer;
+                             background:#fee2e2;color:#dc2626;font-size:.72rem;">✕</button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p style="color:#aaa;font-size:.8rem;margin:.25rem 0;">Chưa có khoản thu.</p>
+    {% endif %}
+    <div id="pay-edit-panel" style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;
+         border-radius:6px;padding:.75rem;margin:.5rem 0;">
+      <div style="font-size:.8rem;font-weight:600;margin-bottom:.5rem;color:#15803d;">Sửa khoản thu</div>
+      <input type="hidden" id="pay-edit-id">
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+        <input type="date" id="pay-edit-date"
+               style="padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+        <input type="date" id="pay-edit-due" title="Đến hạn (AR)"
+               style="padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+        <input type="number" id="pay-edit-amount" placeholder="Số tiền (VND)"
+               style="width:160px;padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+        <select id="pay-edit-status"
+                style="padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+          <option value="pending">Chờ nhận</option>
+          <option value="received">Đã nhận</option>
+          <option value="cancelled">Huỷ</option>
+        </select>
+        <input type="text" id="pay-edit-notes" placeholder="Ghi chú"
+               style="flex:1;min-width:120px;padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+        <button onclick="paymentUpdate()"
+                style="padding:.35rem .75rem;background:#15803d;color:#fff;border:none;
+                       border-radius:6px;font-size:.8rem;cursor:pointer;">Lưu</button>
+        <button onclick="document.getElementById('pay-edit-panel').style.display='none'"
+                style="padding:.35rem .75rem;background:#e5e7eb;color:#374151;border:none;
+                       border-radius:6px;font-size:.8rem;cursor:pointer;">Huỷ</button>
+      </div>
+    </div>
+    <div style="margin-top:.5rem;">
+      <details>
+        <summary style="font-size:.8rem;color:#16a34a;cursor:pointer;user-select:none;">
+          + Thêm khoản thu
+        </summary>
+        <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap;align-items:center;">
+          <input type="date" id="pay-date"
+                 style="padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+          <input type="date" id="pay-due" placeholder="Đến hạn"
+                 title="Đến hạn thu (AR)"
+                 style="padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+          <input type="number" id="pay-amount" placeholder="Số tiền (VND)"
+                 style="width:160px;padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+          <select id="pay-status"
+                  style="padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+            <option value="pending">Chờ nhận</option>
+            <option value="received">Đã nhận</option>
+            <option value="cancelled">Huỷ</option>
+          </select>
+          <input type="text" id="pay-notes" placeholder="Ghi chú"
+                 style="flex:1;min-width:120px;padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+          <button onclick="paymentCreate()"
+                  style="padding:.35rem .75rem;background:#16a34a;color:#fff;border:none;
+                         border-radius:6px;font-size:.8rem;cursor:pointer;">Thêm</button>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  {# ── Expenses ── #}
+  <div style="margin-bottom:1.5rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem;">
+      <h4 style="margin:0;font-size:.85rem;color:#374151;">
+        Chi phí
+        <span style="font-weight:400;color:#888;font-size:.75rem;">({{ expenses|length }} khoản)</span>
+      </h4>
+    </div>
+    {% if expenses %}
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:.8rem;">
+        <thead>
+          <tr style="background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+            <th style="text-align:left;padding:.4rem .6rem;font-weight:600;">Ngày</th>
+            <th style="text-align:left;padding:.4rem .6rem;font-weight:600;">Nội dung</th>
+            <th style="text-align:center;padding:.4rem .6rem;font-weight:600;">Loại</th>
+            <th style="text-align:right;padding:.4rem .6rem;font-weight:600;">Số tiền</th>
+            <th style="text-align:left;padding:.4rem .6rem;font-weight:600;">Ghi chú</th>
+            <th style="text-align:center;padding:.4rem .6rem;font-weight:600;">Xóa</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in expenses %}
+          <tr style="border-bottom:1px solid #f1f5f9;">
+            <td style="padding:.4rem .6rem;">{{ e.expense_on or '—' }}</td>
+            <td style="padding:.4rem .6rem;font-weight:500;">{{ e.title }}</td>
+            <td style="padding:.4rem .6rem;text-align:center;">
+              <span style="font-size:.7rem;background:#e0e7ff;color:#4338ca;
+                           padding:1px 6px;border-radius:3px;">{{ e.category }}</span>
+            </td>
+            <td style="padding:.4rem .6rem;text-align:right;color:#dc2626;font-weight:500;">
+              {{ "{:,.0f}".format(e.amount_vnd) }} ₫
+            </td>
+            <td style="padding:.4rem .6rem;color:#555;font-size:.75rem;">{{ e.notes or '—' }}</td>
+            <td style="padding:.4rem .6rem;text-align:center;">
+              <div style="display:flex;gap:.25rem;justify-content:center;">
+              <button onclick="expenseEditOpen({{ e.id }}, {{ e.amount_vnd }}, '{{ e.expense_on }}', '{{ e.title | replace("'", "\\'") }}', '{{ e.category }}', '{{ e.notes | replace("'", "\\'") }}')"
+                      style="padding:1px 8px;border-radius:4px;border:none;cursor:pointer;
+                             background:#dbeafe;color:#1d4ed8;font-size:.72rem;">Sửa</button>
+              <button onclick="expenseDelete({{ e.id }})"
+                      style="padding:1px 7px;border-radius:4px;border:none;cursor:pointer;
+                             background:#fee2e2;color:#dc2626;font-size:.72rem;">✕</button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p style="color:#aaa;font-size:.8rem;margin:.25rem 0;">Chưa có chi phí.</p>
+    {% endif %}
+    <div id="exp-edit-panel" style="display:none;background:#fef2f2;border:1px solid #fecaca;
+         border-radius:6px;padding:.75rem;margin:.5rem 0;">
+      <div style="font-size:.8rem;font-weight:600;margin-bottom:.5rem;color:#dc2626;">Sửa chi phí</div>
+      <input type="hidden" id="exp-edit-id">
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">
+        <input type="date" id="exp-edit-date"
+               style="padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+        <input type="text" id="exp-edit-title" placeholder="Nội dung..."
+               style="flex:2;min-width:150px;padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+        <select id="exp-edit-category"
+                style="padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+          <option value="nhan-cong">Nhân công</option>
+          <option value="cong-cu">Công cụ</option>
+          <option value="quang-cao">Quảng cáo</option>
+          <option value="outsource">Outsource</option>
+          <option value="khac">Khác</option>
+        </select>
+        <input type="number" id="exp-edit-amount" placeholder="Số tiền (VND)"
+               style="width:160px;padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+        <input type="text" id="exp-edit-notes" placeholder="Ghi chú"
+               style="flex:1;min-width:100px;padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+        <button onclick="expenseUpdate()"
+                style="padding:.35rem .75rem;background:#dc2626;color:#fff;border:none;
+                       border-radius:6px;font-size:.8rem;cursor:pointer;">Lưu</button>
+        <button onclick="document.getElementById('exp-edit-panel').style.display='none'"
+                style="padding:.35rem .75rem;background:#e5e7eb;color:#374151;border:none;
+                       border-radius:6px;font-size:.8rem;cursor:pointer;">Huỷ</button>
+      </div>
+    </div>
+    <div style="margin-top:.5rem;">
+      <details>
+        <summary style="font-size:.8rem;color:#dc2626;cursor:pointer;user-select:none;">
+          + Thêm chi phí
+        </summary>
+        <div style="display:flex;gap:.5rem;margin-top:.5rem;flex-wrap:wrap;align-items:center;">
+          <input type="date" id="exp-date"
+                 style="padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+          <input type="text" id="exp-title" placeholder="Nội dung..."
+                 style="flex:2;min-width:150px;padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+          <select id="exp-category"
+                  style="padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+            <option value="nhan-cong">Nhân công</option>
+            <option value="cong-cu">Công cụ</option>
+            <option value="quang-cao">Quảng cáo</option>
+            <option value="outsource">Outsource</option>
+            <option value="khac">Khác</option>
+          </select>
+          <input type="number" id="exp-amount" placeholder="Số tiền (VND)"
+                 style="width:160px;padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+          <input type="text" id="exp-notes" placeholder="Ghi chú"
+                 style="flex:1;min-width:100px;padding:.35rem .5rem;border:1px solid #ddd;border-radius:6px;font-size:.8rem;">
+          <button onclick="expenseCreate()"
+                  style="padding:.35rem .75rem;background:#dc2626;color:#fff;border:none;
+                         border-radius:6px;font-size:.8rem;cursor:pointer;">Thêm</button>
+        </div>
+      </details>
+    </div>
+  </div>
+
+  {# ── AI Finance Scan ── #}
+  <div style="border-top:1px solid #e5e7eb;padding-top:1rem;">
+    <div style="display:flex;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap;">
+      <button onclick="financeAiScan('health')" id="fin-health-btn"
+              style="padding:.3rem .75rem;background:#0891b2;color:#fff;border:none;
+                     border-radius:6px;font-size:.78rem;cursor:pointer;">
+        🔍 AI Health Check
+      </button>
+      <button onclick="financeAiScan('forecast')" id="fin-forecast-btn"
+              style="padding:.3rem .75rem;background:#7c3aed;color:#fff;border:none;
+                     border-radius:6px;font-size:.78rem;cursor:pointer;">
+        📈 AI Dự báo burn rate
+      </button>
+      <span id="fin-scan-status" style="font-size:.75rem;color:#888;align-self:center;"></span>
+    </div>
+    {% if latest_health_scan %}
+    <div style="background:#ecfeff;border:1px solid #a5f3fc;border-radius:6px;
+                padding:.75rem;margin-bottom:.5rem;font-size:.8rem;white-space:pre-wrap;">
+      <div style="font-size:.7rem;color:#0891b2;font-weight:600;margin-bottom:.25rem;">Health Check</div>
+      <div id="fin-health-output">{{ latest_health_scan }}</div>
+    </div>
+    {% else %}
+    <div id="fin-health-output" style="display:none;background:#ecfeff;border:1px solid #a5f3fc;
+         border-radius:6px;padding:.75rem;margin-bottom:.5rem;font-size:.8rem;white-space:pre-wrap;"></div>
+    {% endif %}
+    {% if latest_forecast_scan %}
+    <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;
+                padding:.75rem;font-size:.8rem;white-space:pre-wrap;">
+      <div style="font-size:.7rem;color:#7c3aed;font-weight:600;margin-bottom:.25rem;">Dự báo Burn Rate</div>
+      <div id="fin-forecast-output">{{ latest_forecast_scan }}</div>
+    </div>
+    {% else %}
+    <div id="fin-forecast-output" style="display:none;background:#f5f3ff;border:1px solid #ddd6fe;
+         border-radius:6px;padding:.75rem;font-size:.8rem;white-space:pre-wrap;"></div>
+    {% endif %}
+  </div>
+</div>
+
+{# ─── Staff Section ─────────────────────────────────────────────────────────── #}
+<div style="margin-top:2rem;border-top:2px solid #e0e7ff;padding-top:1.5rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+    <h3 style="margin:0;font-size:.95rem;font-weight:700;color:#4338ca;">
+      Nhân sự phụ trách
+    </h3>
+    <a href="/crm/staff-kpi" style="font-size:.75rem;color:#6366f1;text-decoration:none;">
+      Xem KPI dashboard →
+    </a>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+    {% if lifecycle_staff.am %}
+    {% set am = lifecycle_staff.am %}
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:1rem;">
+      <div style="font-size:.7rem;color:#3b82f6;font-weight:600;margin-bottom:.25rem;text-transform:uppercase;letter-spacing:.05em;">Account Manager</div>
+      <div style="font-size:.95rem;font-weight:700;color:#1e40af;margin-bottom:.75rem;">{{ am.name }}</div>
+      <div style="display:flex;gap:1.5rem;font-size:.8rem;">
+        <div>
+          <div style="color:#93c5fd;font-size:.7rem;">Tasks done</div>
+          <div style="font-weight:600;color:#1e40af;">{{ am.tasks_done }}</div>
+        </div>
+        <div>
+          <div style="color:#93c5fd;font-size:.7rem;">Doanh thu</div>
+          <div style="font-weight:600;color:#15803d;">{{ "{:,.0f}".format(am.received_revenue) }} ₫</div>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div style="background:#f9fafb;border:1px dashed #d1d5db;border-radius:8px;padding:1rem;
+                display:flex;align-items:center;justify-content:center;">
+      <span style="font-size:.8rem;color:#9ca3af;">Chưa phân công AM</span>
+    </div>
+    {% endif %}
+
+    {% if lifecycle_staff.sp %}
+    {% set sp = lifecycle_staff.sp %}
+    <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;padding:1rem;">
+      <div style="font-size:.7rem;color:#7c3aed;font-weight:600;margin-bottom:.25rem;text-transform:uppercase;letter-spacing:.05em;">Specialist</div>
+      <div style="font-size:.95rem;font-weight:700;color:#5b21b6;margin-bottom:.75rem;">{{ sp.name }}</div>
+      <div style="display:flex;gap:1.5rem;font-size:.8rem;">
+        <div>
+          <div style="color:#c4b5fd;font-size:.7rem;">Tasks done</div>
+          <div style="font-weight:600;color:#5b21b6;">{{ sp.tasks_done }}</div>
+        </div>
+        <div>
+          <div style="color:#c4b5fd;font-size:.7rem;">Rủi ro xử lý</div>
+          <div style="font-weight:600;color:#15803d;">{{ sp.risks_resolved }}</div>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div style="background:#f9fafb;border:1px dashed #d1d5db;border-radius:8px;padding:1rem;">
+      <div style="font-size:.8rem;color:#9ca3af;margin-bottom:.65rem;">Chưa phân công SP</div>
+    </div>
+    {% endif %}
+
+    <div style="grid-column:1 / -1;background:#faf5ff;border:1px solid #e9d5ff;border-radius:8px;padding:.75rem 1rem;">
+      <div style="font-size:.75rem;font-weight:600;color:#6d28d9;margin-bottom:.5rem;">Gán Specialist</div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;">
+        <select id="lc-sp-select"
+                style="min-width:12rem;padding:.35rem .5rem;border:1px solid #ddd6fe;border-radius:6px;font-size:.8rem;">
+          <option value="">— Chưa gán —</option>
+          {% for st in crm_staff_list %}
+          <option value="{{ st.id }}"{% if lifecycle.assigned_sp == st.id %} selected{% endif %}>{{ st.name }}</option>
+          {% endfor %}
+        </select>
+        <button type="button" onclick="lcSpAssignSave()"
+                style="padding:.35rem .75rem;background:#7c3aed;color:#fff;border:none;border-radius:6px;font-size:.75rem;cursor:pointer;">
+          Lưu SP
+        </button>
+        <button type="button" onclick="lcSpSuggestFromTask()"
+                style="padding:.35rem .75rem;background:#fff;color:#6d28d9;border:1px solid #ddd6fe;border-radius:6px;font-size:.75rem;cursor:pointer;">
+          Gợi ý từ task Lead/Onboard
+        </button>
+        <span id="lc-sp-status" style="font-size:.7rem;color:#15803d;"></span>
+      </div>
+      <p style="margin:.45rem 0 0;font-size:.7rem;color:#7c3aed;">
+        KPI SP trên <a href="/crm/staff-kpi" style="color:#6d28d9;">/crm/staff-kpi</a> filter theo <code>assigned_sp</code>.
+        Field task 「SEO/Content Specialist」 tự sync nếu khớp tên NV.
+      </p>
+    </div>
+  </div>
+</div>
+
+{% if show_presales_panel %}
+{# ─── Pre-sales cost panel (Lead / Consult / Proposal) ─────────────────────── #}
+<div style="margin-top:2rem;border-top:2px solid #fde68a;padding-top:1.5rem;">
+  {% if presales_summary.over_cap %}
+  <div id="presales-cap-banner"
+       style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:.75rem 1rem;
+              margin-bottom:1rem;font-size:.8rem;color:#991b1b;line-height:1.5;">
+    <strong>⚠ Vượt cap pre-sales:</strong> {{ presales_summary.cap_alert_message }}
+  </div>
+  {% else %}
+  <div id="presales-cap-banner" style="display:none;"></div>
+  {% endif %}
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem;gap:1rem;">
+    <div>
+      <h3 style="margin:0 0 .35rem;font-size:.95rem;font-weight:700;color:#b45309;">
+        Chi phí pre-sales (nội bộ PTT)
+      </h3>
+      <p style="margin:0;font-size:.75rem;color:#92400e;max-width:36rem;">
+        Khách chưa trả — ghi cước điện thoại, đi lại, công Lead/Consult. Không tính vào margin HĐ.
+      </p>
+    </div>
+    <div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:.75rem 1rem;text-align:right;min-width:9rem;">
+      <div style="font-size:.65rem;color:#b45309;text-transform:uppercase;letter-spacing:.04em;">Tổng pre-sales</div>
+      <div style="font-size:1.15rem;font-weight:700;color:#92400e;" id="presales-total-display">
+        {{ "{:,.0f}".format(presales_summary.total_presales_vnd) }} ₫
+      </div>
+      <div style="font-size:.65rem;color:#a16207;">{{ presales_summary.expense_count }} khoản</div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-bottom:1rem;font-size:.75rem;">
+    <span style="color:#92400e;font-weight:600;">Cap lifecycle (₫):</span>
+    <input type="number" id="ps-cap-input" min="0" step="100000"
+           value="{{ presales_summary.presales_cost_cap_vnd or '' }}"
+           placeholder="VD: 3000000"
+           style="width:8rem;padding:.3rem .45rem;border:1px solid #fcd34d;border-radius:6px;font-size:.8rem;">
+    <button type="button" onclick="presalesCapSave()"
+            style="padding:.3rem .65rem;background:#fff;border:1px solid #fcd34d;border-radius:6px;
+                   color:#b45309;font-size:.75rem;cursor:pointer;">Lưu cap</button>
+    <span id="ps-cap-status" style="color:#15803d;font-size:.7rem;"></span>
+    {% if presales_summary.presales_cost_cap_vnd %}
+    <span style="color:#92400e;font-size:.7rem;">
+      Còn lại: <strong id="ps-cap-remaining">{{ "{:,.0f}".format(presales_summary.cap_remaining_vnd or 0) }} ₫</strong>
+      ({{ presales_summary.cap_utilization_pct or 0 }}% cap)
+    </span>
+    {% endif %}
+  </div>
+
+  {% if presales_expenses %}
+  <div style="overflow-x:auto;margin-bottom:1rem;">
+    <table style="width:100%;border-collapse:collapse;font-size:.8rem;">
+      <thead>
+        <tr style="background:#fffbeb;border-bottom:1px solid #fde68a;">
+          <th style="text-align:left;padding:.4rem .6rem;font-weight:600;">Ngày</th>
+          <th style="text-align:left;padding:.4rem .6rem;font-weight:600;">Nội dung</th>
+          <th style="text-align:center;padding:.4rem .6rem;font-weight:600;">Loại</th>
+          <th style="text-align:center;padding:.4rem .6rem;font-weight:600;">Stage</th>
+          <th style="text-align:right;padding:.4rem .6rem;font-weight:600;">Số tiền</th>
+          <th style="text-align:center;padding:.4rem .6rem;font-weight:600;">Xóa</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in presales_expenses[:8] %}
+        <tr style="border-bottom:1px solid #fef3c7;">
+          <td style="padding:.4rem .6rem;">{{ e.expense_on or '—' }}</td>
+          <td style="padding:.4rem .6rem;">{{ e.title }}</td>
+          <td style="padding:.4rem .6rem;text-align:center;">
+            <span style="font-size:.7rem;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;">{{ e.category }}</span>
+          </td>
+          <td style="padding:.4rem .6rem;text-align:center;font-size:.75rem;color:#78716c;">{{ e.lifecycle_stage or lifecycle.stage }}</td>
+          <td style="padding:.4rem .6rem;text-align:right;color:#b45309;font-weight:600;">{{ "{:,.0f}".format(e.amount_vnd) }} ₫</td>
+          <td style="padding:.4rem .6rem;text-align:center;">
+            <button onclick="presalesExpenseDelete({{ e.id }})"
+                    style="padding:1px 7px;border-radius:4px;border:none;cursor:pointer;background:#fee2e2;color:#dc2626;font-size:.72rem;">✕</button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p style="color:#a8a29e;font-size:.8rem;margin:0 0 1rem;">Chưa ghi chi phí pre-sales.</p>
+  {% endif %}
+
+  <details>
+    <summary style="cursor:pointer;font-size:.8rem;color:#b45309;font-weight:600;">+ Ghi chi phí pre-sales</summary>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-top:.75rem;">
+      <input type="date" id="ps-exp-date"
+             style="padding:.35rem .5rem;border:1px solid #fcd34d;border-radius:6px;font-size:.8rem;">
+      <input type="text" id="ps-exp-title" placeholder="Mô tả (VD: cước gọi qualify)..."
+             style="flex:2;min-width:160px;padding:.35rem .5rem;border:1px solid #fcd34d;border-radius:6px;font-size:.8rem;">
+      <select id="ps-exp-category"
+              style="padding:.35rem .5rem;border:1px solid #fcd34d;border-radius:6px;font-size:.8rem;">
+        <option value="dien_thoai">Điện thoại / SIM</option>
+        <option value="di_lai">Đi lại / gặp KH</option>
+        <option value="cong_lead">Công AM Lead</option>
+        <option value="cong_tu_van">Công Consult</option>
+        <option value="cong_cu">Công cụ</option>
+        <option value="khac_presales">Khác</option>
+      </select>
+      <input type="number" id="ps-exp-amount" placeholder="VND" min="0" step="1000"
+             style="width:120px;padding:.35rem .5rem;border:1px solid #fcd34d;border-radius:6px;font-size:.8rem;">
+      <input type="text" id="ps-exp-notes" placeholder="Ghi chú"
+             style="flex:1;min-width:100px;padding:.35rem .5rem;border:1px solid #fcd34d;border-radius:6px;font-size:.8rem;">
+      <button type="button" onclick="presalesExpenseCreate()"
+              style="padding:.4rem .85rem;background:#d97706;color:#fff;border:none;border-radius:6px;font-size:.8rem;cursor:pointer;">Lưu</button>
+    </div>
+    <p id="ps-exp-err" style="display:none;color:#dc2626;font-size:.75rem;margin-top:.5rem;"></p>
+  </details>
+</div>
+{% endif %}
+
+{% if aeo_stats is not none %}
+<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1rem 1.25rem;margin-top:1rem;">
+  <div style="font-weight:600;font-size:.875rem;color:#374151;margin-bottom:.6rem;">AEO Monitoring</div>
+  <div style="display:flex;align-items:center;gap:1.5rem;font-size:.875rem;">
+    <span>Queries đang track: <strong>{{ aeo_stats.total }}</strong></span>
+    <span>Brand visible: <strong style="color:{% if aeo_stats.total > 0 and aeo_stats.visible == aeo_stats.total %}#16a34a{% elif aeo_stats.visible > 0 %}#d97706{% else %}#dc2626{% endif %};">
+      {{ aeo_stats.visible }}/{{ aeo_stats.total }}
+    </strong></span>
+    <a href="/crm/aeo?customer_id={{ lifecycle.customer_id }}"
+       style="font-size:.8rem;color:#3b82f6;text-decoration:none;">→ Mở AEO Workspace</a>
+  </div>
+</div>
+{% endif %}
+
+{% if lifecycle.stage == "proposal" %}
+<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1rem 1.25rem;margin-top:1rem;">
+  <div style="font-weight:600;font-size:.875rem;color:#374151;margin-bottom:.5rem;">Đề xuất Dịch vụ</div>
+  <div style="font-size:.875rem;">
+    <a href="/crm/proposals?customer_id={{ lifecycle.customer_id }}&lifecycle_id={{ lifecycle.id }}"
+       style="color:#3b82f6;text-decoration:none;font-weight:500;">→ Tạo / Xem Đề xuất</a>
+    <span style="margin-left:.75rem;font-size:.8rem;color:#6b7280;">Lifecycle đang ở stage Báo giá</span>
+  </div>
+</div>
+{% endif %}
+
+<script>
+// ─── Finance JS ────────────────────────────────────────────────────────────────
+function paymentCreate() {
+  const date = document.getElementById('pay-date').value;
+  const due = document.getElementById('pay-due').value;
+  const amount = parseInt(document.getElementById('pay-amount').value || '0', 10);
+  const status = document.getElementById('pay-status').value;
+  const notes = (document.getElementById('pay-notes').value || '').trim();
+  if (!date || !amount) return;
+  fetch('/api/crm/svc-payments', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      lifecycle_id: _lifecycleId, amount_vnd: amount, received_on: date,
+      due_on: due || date, status, notes,
+    }),
+  }).then(() => location.reload()).catch(console.error);
+}
+
+function paymentDelete(paymentId) {
+  if (!confirm('Xoá khoản thu này?')) return;
+  fetch('/api/crm/svc-payments/' + paymentId, {method: 'DELETE'})
+    .then(() => location.reload())
+    .catch(console.error);
+}
+
+function expenseCreate() {
+  const date = document.getElementById('exp-date').value;
+  const title = (document.getElementById('exp-title').value || '').trim();
+  const category = document.getElementById('exp-category').value;
+  const amount = parseInt(document.getElementById('exp-amount').value || '0', 10);
+  const notes = (document.getElementById('exp-notes').value || '').trim();
+  if (!date || !title || !amount) return;
+  fetch('/api/crm/svc-expenses', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      lifecycle_id: _lifecycleId, title, category, amount_vnd: amount, expense_on: date, notes,
+      cost_phase: 'delivery',
+    }),
+  }).then(() => location.reload()).catch(console.error);
+}
+
+function lcSpAssignSave() {
+  const sel = document.getElementById('lc-sp-select');
+  const status = document.getElementById('lc-sp-status');
+  const raw = sel && sel.value ? sel.value : '';
+  const body = { assigned_sp_id: raw ? parseInt(raw, 10) : null };
+  if (status) { status.textContent = 'Đang lưu...'; status.style.color = '#6d28d9'; }
+  fetch('/api/crm/service-lifecycle/' + _lifecycleId, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  }).then(r => r.json().then(d => ({ ok: r.ok, d }))).then(({ ok, d }) => {
+    if (!ok) {
+      if (status) { status.textContent = d.error || 'Lỗi'; status.style.color = '#dc2626'; }
+      return;
+    }
+    if (status) { status.textContent = 'Đã lưu — tải lại...'; status.style.color = '#15803d'; }
+    setTimeout(function() { location.reload(); }, 350);
+  }).catch(function(err) {
+    if (status) { status.textContent = String(err); status.style.color = '#dc2626'; }
+  });
+}
+
+function lcSpSuggestFromTask() {
+  const status = document.getElementById('lc-sp-status');
+  if (status) { status.textContent = 'Đang gợi ý...'; status.style.color = '#6d28d9'; }
+  fetch('/api/crm/service-lifecycle/' + _lifecycleId, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ suggest_sp_from_tasks: true }),
+  }).then(r => r.json().then(d => ({ ok: r.ok, d }))).then(({ ok, d }) => {
+    if (!ok) {
+      if (status) { status.textContent = d.error || 'Không gợi ý được'; status.style.color = '#dc2626'; }
+      return;
+    }
+    if (!d.assigned_sp) {
+      if (status) {
+        status.textContent = 'Task chưa có tên SP khớp NV — chọn thủ công.';
+        status.style.color = '#92400e';
+      }
+      return;
+    }
+    if (status) { status.textContent = 'Đã gán — tải lại...'; status.style.color = '#15803d'; }
+    setTimeout(function() { location.reload(); }, 350);
+  }).catch(function(err) {
+    if (status) { status.textContent = String(err); status.style.color = '#dc2626'; }
+  });
+}
+
+function presalesCapSave() {
+  const capInput = document.getElementById('ps-cap-input');
+  const status = document.getElementById('ps-cap-status');
+  const capVal = parseInt(capInput && capInput.value ? capInput.value : '0', 10);
+  if (status) status.textContent = 'Đang lưu...';
+  fetch('/api/crm/service-lifecycle/' + _lifecycleId, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ presales_cost_cap_vnd: capVal > 0 ? capVal : 0 }),
+  }).then(r => r.json().then(d => ({ ok: r.ok, d }))).then(({ ok, d }) => {
+    if (!ok) {
+      if (status) { status.textContent = d.error || 'Lỗi'; status.style.color = '#dc2626'; }
+      return;
+    }
+    if (status) { status.textContent = 'Đã lưu cap'; status.style.color = '#15803d'; }
+    setTimeout(function() { location.reload(); }, 400);
+  }).catch(function(err) {
+    if (status) { status.textContent = String(err); status.style.color = '#dc2626'; }
+  });
+}
+
+function presalesExpenseCreate() {
+  const errEl = document.getElementById('ps-exp-err');
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  const date = document.getElementById('ps-exp-date').value;
+  const title = (document.getElementById('ps-exp-title').value || '').trim();
+  const category = document.getElementById('ps-exp-category').value;
+  const amount = parseInt(document.getElementById('ps-exp-amount').value || '0', 10);
+  const notes = (document.getElementById('ps-exp-notes').value || '').trim();
+  if (!date || !title || !amount) {
+    if (errEl) { errEl.textContent = 'Cần ngày, mô tả và số tiền.'; errEl.style.display = 'block'; }
+    return;
+  }
+  fetch('/api/crm/svc-expenses', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      lifecycle_id: _lifecycleId, title, category, amount_vnd: amount, expense_on: date, notes,
+      cost_phase: 'presales',
+    }),
+  }).then(r => r.json().then(data => ({ ok: r.ok, data }))).then(({ ok, data }) => {
+    if (!ok) {
+      if (errEl) { errEl.textContent = data.error || 'Không lưu được.'; errEl.style.display = 'block'; }
+      return;
+    }
+    location.reload();
+  }).catch(err => {
+    if (errEl) { errEl.textContent = String(err); errEl.style.display = 'block'; }
+  });
+}
+
+function presalesExpenseDelete(expenseId) {
+  if (!confirm('Xoá chi phí pre-sales này?')) return;
+  fetch('/api/crm/svc-expenses/' + expenseId, {method: 'DELETE'})
+    .then(() => location.reload())
+    .catch(console.error);
+}
+
+function expenseDelete(expenseId) {
+  if (!confirm('Xoá chi phí này?')) return;
+  fetch('/api/crm/svc-expenses/' + expenseId, {method: 'DELETE'})
+    .then(() => location.reload())
+    .catch(console.error);
+}
+
+function paymentEditOpen(id, amount, date, due, status, notes) {
+  document.getElementById('pay-edit-id').value = id;
+  document.getElementById('pay-edit-amount').value = amount;
+  document.getElementById('pay-edit-date').value = date;
+  document.getElementById('pay-edit-due').value = due || date;
+  document.getElementById('pay-edit-status').value = status;
+  document.getElementById('pay-edit-notes').value = notes;
+  document.getElementById('pay-edit-panel').style.display = 'block';
+}
+
+function paymentUpdate() {
+  const id = document.getElementById('pay-edit-id').value;
+  const amount = parseInt(document.getElementById('pay-edit-amount').value || '0', 10);
+  const date = document.getElementById('pay-edit-date').value;
+  const due = document.getElementById('pay-edit-due').value;
+  const status = document.getElementById('pay-edit-status').value;
+  const notes = (document.getElementById('pay-edit-notes').value || '').trim();
+  if (!id || !amount || !date) return;
+  fetch('/api/crm/svc-payments/' + id, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      amount_vnd: amount, received_on: date, due_on: due || date, status, notes,
+    }),
+  }).then(() => location.reload()).catch(console.error);
+}
+
+function expenseEditOpen(id, amount, date, title, category, notes) {
+  document.getElementById('exp-edit-id').value = id;
+  document.getElementById('exp-edit-amount').value = amount;
+  document.getElementById('exp-edit-date').value = date;
+  document.getElementById('exp-edit-title').value = title;
+  document.getElementById('exp-edit-category').value = category;
+  document.getElementById('exp-edit-notes').value = notes;
+  document.getElementById('exp-edit-panel').style.display = 'block';
+}
+
+function expenseUpdate() {
+  const id = document.getElementById('exp-edit-id').value;
+  const amount = parseInt(document.getElementById('exp-edit-amount').value || '0', 10);
+  const date = document.getElementById('exp-edit-date').value;
+  const title = (document.getElementById('exp-edit-title').value || '').trim();
+  const category = document.getElementById('exp-edit-category').value;
+  const notes = (document.getElementById('exp-edit-notes').value || '').trim();
+  if (!id || !amount || !date || !title) return;
+  fetch('/api/crm/svc-expenses/' + id, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({title, category, amount_vnd: amount, expense_on: date, notes}),
+  }).then(() => location.reload()).catch(console.error);
+}
+
+function financeAiScan(scanType) {
+  const btnId = scanType === 'health' ? 'fin-health-btn' : 'fin-forecast-btn';
+  const outId = scanType === 'health' ? 'fin-health-output' : 'fin-forecast-output';
+  const btn = document.getElementById(btnId);
+  const out = document.getElementById(outId);
+  const status = document.getElementById('fin-scan-status');
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'AI đang phân tích...';
+  fetch('/api/crm/svc-finance/' + _lifecycleId + '/ai-scan', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({scan_type: scanType}),
+  }).then(r => r.json()).then(data => {
+    if (out) {
+      out.textContent = data.ai_output || '(Không có kết quả)';
+      out.style.display = 'block';
+    }
+    if (status) status.textContent = '';
+    if (btn) btn.disabled = false;
+  }).catch(err => {
+    if (status) status.textContent = 'Lỗi: ' + err;
+    if (btn) btn.disabled = false;
+  });
+}
+</script>
+{% if lifecycle.stage in ('onboard', 'deliver') %}
+<script id="crm-svc-tmmt-meta" type="application/json">{{ {
+  "lifecycle_id": lifecycle.id,
+  "initial": official_marketing_plan,
+  "strategy_labels": tmmt_strategy_labels,
+  "prof_labels": tmmt_prof_labels,
+  "core_keys": tmmt_core_keys,
+  "tmmt_min_filled": 6
+} | tojson }}</script>
+{% set _tmmt_js = 'crm_svc_tmmt.js' %}
+<script src="{{ url_for('static', filename=_tmmt_js) }}?v={{ static_v(_tmmt_js) }}"></script>
+<style>
+.crm-svc-tmmt-checklist { display:flex; flex-wrap:wrap; gap:.35rem .75rem; margin:0 0 .65rem; padding:0; list-style:none; font-size:.75rem; }
+.crm-svc-tmmt-checklist li { padding:.2rem .55rem; border-radius:999px; background:#f1f5f9; color:#64748b; }
+.crm-svc-tmmt-checklist li.is-done { background:#dcfce7; color:#166534; }
+.crm-svc-tmmt-field { display:block; margin:.45rem 0; font-size:.78rem; }
+.crm-svc-tmmt-field span { display:block; margin-bottom:.2rem; color:#475569; }
+.crm-svc-tmmt-input { width:100%; font:inherit; padding:.35rem .5rem; border:1px solid #e2e8f0; border-radius:6px; }
+.crm-svc-tmmt-section { margin-top:.65rem; padding-top:.5rem; border-top:1px dashed #e2e8f0; }
+.crm-svc-tmmt-more { margin-top:.5rem; font-size:.78rem; }
+.crm-svc-tmmt-msgs { margin:.5rem 0 0 1rem; color:#b45309; font-size:.75rem; }
+.crm-svc-tmmt-actions { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:.65rem; }
+.crm-svc-tmmt-gate-inline { margin:0 0 .5rem; font-size:.78rem; color:#b45309; font-weight:600; }
+</style>
+{% endif %}
+{% endblock %}

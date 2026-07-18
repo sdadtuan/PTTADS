@@ -1,0 +1,2 @@
+# Phase 3 Track T — Temporal Python worker
+temporalio>=1.8.0

@@ -393,6 +393,16 @@ def ensure_lead_schema(conn: sqlite3.Connection) -> None:
     from crm_lead_care_pipeline import ensure_lead_care_pipeline_schema
 
     ensure_lead_care_pipeline_schema(conn)
+    if "industry_slug" not in cols:
+        conn.execute(
+            "ALTER TABLE crm_leads ADD COLUMN industry_slug TEXT NOT NULL DEFAULT ''"
+        )
+    from crm_lead_catalog import ensure_lead_catalog_schema
+
+    ensure_lead_catalog_schema(conn)
+    from crm_lead_assign_scope import ensure_staff_assign_scope_schema
+
+    ensure_staff_assign_scope_schema(conn)
 
 
 def compute_lead_score(
@@ -710,6 +720,7 @@ def assign_lead_owner(
     *,
     region: str = "",
     product_interest: str = "",
+    industry_slug: str = "",
     prefer_staff_id: int | None = None,
     lead_level: str = "warm",
     lead_score: int = 0,
@@ -745,6 +756,7 @@ def assign_lead_owner(
         lead_score=int(lead_score or 0),
         region=str(region or ""),
         product_interest=str(product_interest or ""),
+        industry_slug=str(industry_slug or ""),
         source=str(source or ""),
         need=str(need or ""),
         prefer_staff_id=prefer_staff_id,
@@ -816,9 +828,8 @@ def lead_row_to_dict(row: sqlite3.Row | dict[str, Any], conn: sqlite3.Connection
                 )
         except Exception:
             sla_no_activity = False
-    fb_received = _lead_facebook_received_at(
+    received_at = _lead_received_at(
         meta if isinstance(meta, dict) else {},
-        source=str(d.get("source") or ""),
         created_at=str(d.get("created_at") or ""),
     )
     assigned_at = _lead_assigned_at(
@@ -834,7 +845,9 @@ def lead_row_to_dict(row: sqlite3.Row | dict[str, Any], conn: sqlite3.Connection
         is_duplicate=bool(d.get("is_duplicate")),
         created_by=str(d.get("created_by") or ""),
     )
-    from crm_lead_care_pipeline import care_pipeline_state
+    from crm_lead_care_pipeline import care_pipeline_state, presales_care_gate_state
+    from crm_lead_catalog import get_industry_label, get_service_label
+    from crm_lead_review_queue import review_queue_public_state
 
     care_pipeline = care_pipeline_state(
         status=st,
@@ -848,7 +861,7 @@ def lead_row_to_dict(row: sqlite3.Row | dict[str, Any], conn: sqlite3.Connection
         status_label = "Mất"
     else:
         status_label = care_label
-    return {
+    result: dict[str, Any] = {
         "id": int(d["id"]),
         "full_name": str(d.get("full_name") or ""),
         "phone": str(d.get("phone") or ""),
@@ -857,6 +870,17 @@ def lead_row_to_dict(row: sqlite3.Row | dict[str, Any], conn: sqlite3.Connection
         "source_label": LEAD_SOURCE_LABELS.get(normalize_source(d.get("source")), "Khác"),
         "region": str(d.get("region") or ""),
         "product_interest": str(d.get("product_interest") or ""),
+        "product_interest_label": (
+            get_service_label(conn, str(d.get("product_interest") or ""))
+            if conn is not None
+            else str(d.get("product_interest") or "")
+        ),
+        "industry_slug": str(d.get("industry_slug") or ""),
+        "industry_label": (
+            get_industry_label(conn, str(d.get("industry_slug") or ""))
+            if conn is not None
+            else str(d.get("industry_slug") or "")
+        ),
         "need": str(d.get("need") or ""),
         "lead_score": int(d.get("lead_score") or 0),
         "lead_level": lv,
@@ -899,12 +923,36 @@ def lead_row_to_dict(row: sqlite3.Row | dict[str, Any], conn: sqlite3.Connection
         "re_product_unit_code": str(d.get("re_product_unit_code") or ""),
         "re_product_status": str(d.get("re_product_status") or ""),
         "re_product_label": _lead_product_label(d),
-        "facebook_received_at": fb_received,
+        "received_at": received_at,
+        "facebook_received_at": received_at,
         "assigned_at": assigned_at,
         "pipeline_alert": pipeline_alert,
         "pipeline_alert_message": pipeline_alert_message,
         "care_pipeline": care_pipeline,
+        "presales_care_gate": presales_care_gate_state(
+            care_stage_current=str(d.get("care_stage_current") or ""),
+            care_stages_done_json=str(d.get("care_stages_done_json") or ""),
+        ),
+        "review_queue": review_queue_public_state(
+            meta if isinstance(meta, dict) else {},
+            assigned_at=assigned_at,
+        ),
     }
+    try:
+        from crm_lead_industry_addon import lead_industry_addon_payload
+
+        result["industry_addon"] = lead_industry_addon_payload(
+            conn, int(d["id"]), industry_slug=str(d.get("industry_slug") or "")
+        )
+    except Exception:
+        result["industry_addon"] = {
+            "industry_slug": str(d.get("industry_slug") or ""),
+            "pack": None,
+            "data": {},
+            "has_pack": False,
+            "legacy_re_removed": True,
+        }
+    return result
 
 
 def activity_row_to_dict(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
@@ -965,18 +1013,14 @@ _LEAD_SELECT = """
     LEFT JOIN crm_re_project_products pr ON pr.id = l.re_product_id
 """
 
-# Thời điểm phân công dùng sort — khớp _lead_assigned_at (meta → log → updated_at nếu có owner).
-_LEAD_SORT_ASSIGNED_AT = """
-    CASE WHEN l.owner_id IS NOT NULL THEN COALESCE(
-        NULLIF(substr(replace(trim(json_extract(l.meta_json, '$.auto_assigned_at')), 'T', ' '), 1, 19), ''),
-        NULLIF(substr(replace(trim(json_extract(l.meta_json, '$.facebook_enriched_at')), 'T', ' '), 1, 19), ''),
-        (
-            SELECT MIN(a2.created_at)
-            FROM crm_lead_assignment_logs a2
-            WHERE a2.lead_id = l.id AND a2.to_user_id IS NOT NULL
-        ),
-        l.updated_at
-    ) ELSE NULL END
+# Sắp theo ngày đổ về DESC — khớp cột «Đổ về» (_lead_received_at).
+_LEAD_SORT_RECEIVED_AT = """
+    COALESCE(
+        NULLIF(substr(replace(trim(json_extract(l.meta_json, '$.facebook_created_time')), 'T', ' '), 1, 19), ''),
+        NULLIF(substr(replace(trim(json_extract(l.meta_json, '$.ingested_at')), 'T', ' '), 1, 19), ''),
+        NULLIF(substr(replace(trim(l.created_at), 'T', ' '), 1, 19), ''),
+        '1970-01-01 00:00:00'
+    )
 """
 
 
@@ -1036,19 +1080,38 @@ def _normalize_lead_ts(raw: str | None) -> str:
     return s.replace("T", " ")[:19]
 
 
-def _lead_facebook_received_at(
+def _ensure_ingested_at_meta(
     meta: dict[str, Any],
     *,
-    source: str,
-    created_at: str,
-) -> str:
+    ts: str,
+    created_by: str,
+) -> None:
+    """Ghi ingested_at cho ingest tự động (webhook, form) — không ghi đè nếu đã có."""
+    if _normalize_lead_ts(str(meta.get("ingested_at") or "")):
+        return
+    cb = str(created_by or "").strip().lower()
+    if cb.startswith("system:") or cb.startswith("webhook:"):
+        meta["ingested_at"] = ts
+
+
+def _lead_received_at(meta: dict[str, Any], *, created_at: str) -> str:
+    """Thời điểm lead đổ về — mọi nguồn (FB, Zalo, webform, nhập tay…)."""
     for key in ("facebook_created_time", "ingested_at"):
         v = _normalize_lead_ts(str(meta.get(key) or ""))
         if v:
             return v
-    if normalize_source(source) == "facebook" or str(meta.get("facebook_leadgen_id") or "").strip():
-        return _normalize_lead_ts(created_at)
-    return ""
+    return _normalize_lead_ts(created_at)
+
+
+def _lead_facebook_received_at(
+    meta: dict[str, Any],
+    *,
+    source: str = "",
+    created_at: str = "",
+) -> str:
+    """Alias cũ — dùng _lead_received_at."""
+    _ = source
+    return _lead_received_at(meta, created_at=created_at)
 
 
 def _lead_assigned_at(
@@ -1121,6 +1184,8 @@ def _lead_list_filters(
     product_line: str | None = None,
     zone: str | None = None,
     staff_portal_id: int | None = None,
+    hide_review_queue: bool = True,
+    review_queue_only: bool = False,
 ) -> tuple[list[str], list[Any]]:
     """Mệnh đề WHERE danh sách lead — dùng chung count + fetch."""
     clauses: list[str] = [
@@ -1172,6 +1237,10 @@ def _lead_list_filters(
             "(l.full_name LIKE ? OR l.phone LIKE ? OR l.email LIKE ? OR l.need LIKE ? OR l.product_interest LIKE ?)"
         )
         params.extend([like] * 5)
+    if review_queue_only:
+        clauses.append("COALESCE(json_extract(l.meta_json, '$.review_queue.active'), '') = 'true'")
+    elif hide_review_queue:
+        clauses.append("COALESCE(json_extract(l.meta_json, '$.review_queue.active'), '') != 'true'")
     return clauses, params
 
 
@@ -1187,6 +1256,8 @@ def count_leads(
     product_line: str | None = None,
     zone: str | None = None,
     staff_portal_id: int | None = None,
+    hide_review_queue: bool = True,
+    review_queue_only: bool = False,
 ) -> int:
     clauses, params = _lead_list_filters(
         owner_id=owner_id,
@@ -1198,6 +1269,8 @@ def count_leads(
         product_line=product_line,
         zone=zone,
         staff_portal_id=staff_portal_id,
+        hide_review_queue=hide_review_queue,
+        review_queue_only=review_queue_only,
     )
     where = " WHERE " + " AND ".join(clauses)
     row = conn.execute(f"SELECT COUNT(*) AS c FROM crm_leads l{where}", params).fetchone()
@@ -1217,6 +1290,8 @@ def fetch_leads(
     zone: str | None = None,
     staff_portal_id: int | None = None,
     sla_overdue_only: bool = False,
+    hide_review_queue: bool = True,
+    review_queue_only: bool = False,
     limit: int = 100,
     offset: int = 0,
 ) -> list[sqlite3.Row]:
@@ -1230,15 +1305,17 @@ def fetch_leads(
         product_line=product_line,
         zone=zone,
         staff_portal_id=staff_portal_id,
+        hide_review_queue=hide_review_queue,
+        review_queue_only=review_queue_only,
     )
     where = " WHERE " + " AND ".join(clauses)
     lim = max(1, min(int(limit), 1000))
     off = max(0, int(offset))
-    # Sắp theo ngày phân công DESC (chưa gán xuống cuối), tie-break id DESC.
+    # Sắp ngày đổ về mới nhất trước.
     fetch_lim = min(1000, lim * 5) if sla_overdue_only else lim
     rows = conn.execute(
         f"""{_LEAD_SELECT}{where}
-        ORDER BY {_LEAD_SORT_ASSIGNED_AT} DESC, l.id DESC
+        ORDER BY {_LEAD_SORT_RECEIVED_AT} DESC, l.id DESC
         LIMIT ? OFFSET ?""",
         [*params, fetch_lim, off],
     ).fetchall()
@@ -1519,6 +1596,7 @@ def create_lead(
     zone: str = "",
     re_product_id: int | None = None,
     utm_campaign: str = "",
+    industry_slug: str = "",
     meta: dict[str, Any] | None = None,
     auto_assign: bool = True,
     duplicate_policy: str | None = None,
@@ -1526,43 +1604,35 @@ def create_lead(
     ts: str,
 ) -> tuple[sqlite3.Row, list[sqlite3.Row], list[dict[str, Any]]]:
     """Tạo lead mới; trả (lead, duplicates_found, duplicate_matches)."""
+    from crm_lead_catalog import normalize_industry_slug, normalize_product_interest
+    from crm_lead_industry_addon import reject_re_legacy_lead_input
     from crm_lead_rules import merge_incoming_into_primary, resolve_duplicate_policy
-    from crm_project_leads import validate_re_project_id
-    from crm_project_deep import fetch_product_by_id, normalize_product_line
 
-    validate_re_project_id(conn, re_project_id)
-    line_norm = normalize_product_line(product_line) if product_line else ""
-    zone_norm = str(zone or "").strip()[:60]
-    product_id_val: int | None = None
-    if re_product_id is not None:
-        if not re_project_id:
-            raise ValueError("Phải chọn dự án BĐS trước khi gán sản phẩm.")
-        prod = fetch_product_by_id(conn, int(re_project_id), int(re_product_id))
-        if prod is None:
-            raise ValueError("Sản phẩm không thuộc dự án đã chọn.")
-        pd = dict(prod)
-        product_id_val = int(re_product_id)
-        if not line_norm:
-            line_norm = str(pd.get("product_line") or "")
-        if not zone_norm:
-            zone_norm = str(pd.get("zone") or "")[:60]
-    if owner_id is not None and re_project_id is not None:
-        from crm_project_leads import assert_staff_in_project
-
-        assert_staff_in_project(conn, re_project_id, int(owner_id))
+    reject_re_legacy_lead_input(
+        re_project_id=re_project_id,
+        product_line=product_line,
+        zone=zone,
+        re_product_id=re_product_id,
+    )
+    re_project_id = None
+    product_line = ""
+    zone = ""
+    re_product_id = None
 
     if not str(source or "").strip():
         raise ValueError("Lead phải có nguồn (source).")
     if not str(full_name or "").strip():
         raise ValueError("Thiếu họ tên lead.")
     ph_norm, em_norm = validate_lead_contacts(phone=phone, email=email)
+    prod_interest = normalize_product_interest(conn, product_interest)
+    industry_key = normalize_industry_slug(conn, industry_slug)
 
     needs_clean, clean_reasons = lead_needs_cleanup(
         full_name=full_name,
         phone=phone,
         email=email,
         need=need,
-        product_interest=product_interest,
+        product_interest=prod_interest,
     )
     dup_matches = find_duplicate_matches(
         conn, phone=phone, email=email, re_project_id=re_project_id
@@ -1570,13 +1640,14 @@ def create_lead(
     dups = [m["row"] for m in dup_matches]
     policy = resolve_duplicate_policy(conn, duplicate_policy)
     st = normalize_status(status)
-    if needs_clean and st in ("intake", "pending_cleanup"):
+    if needs_clean and st not in ("lost",):
         st = "pending_cleanup"
     elif st not in ("lost", "pending_cleanup"):
         st = "intake" if st not in CARE_STAGE_KEYS else st
     src = normalize_source(source)
     act_count = 0
     meta_obj = dict(meta or {})
+    _ensure_ingested_at_meta(meta_obj, ts=ts, created_by=created_by)
     from crm_lead_scoring import score_lead
 
     score_result = score_lead(
@@ -1585,7 +1656,7 @@ def create_lead(
         phone=phone,
         email=email,
         need=need,
-        product_interest=product_interest,
+        product_interest=prod_interest,
         region=region,
         full_name=full_name,
         meta=meta_obj,
@@ -1611,7 +1682,7 @@ def create_lead(
                 email=email,
                 source=source,
                 region=region,
-                product_interest=product_interest,
+                product_interest=prod_interest,
                 need=need,
                 utm_campaign=utm_campaign,
                 merged_by=created_by,
@@ -1628,14 +1699,12 @@ def create_lead(
         final_owner, _owner_name, assign_strategy = assign_lead_owner(
             conn,
             region=region,
-            product_interest=product_interest,
+            product_interest=prod_interest,
+            industry_slug=industry_key,
             lead_level=level,
             lead_score=score,
             source=src,
             need=need,
-            re_project_id=re_project_id,
-            product_line=line_norm,
-            zone=zone_norm,
         )
         if assign_strategy and final_owner:
             meta_obj["assign_strategy"] = assign_strategy
@@ -1643,10 +1712,10 @@ def create_lead(
         elif auto_assign and not is_dup:
             meta_obj["assign_failed"] = True
             meta_obj["assign_failed_at"] = ts
-            if assign_strategy == "no_project_staff":
-                meta_obj["assign_failed_reason"] = "Dự án chưa có nhân viên nhận lead"
-            elif assign_strategy == "staff_not_in_project":
-                meta_obj["assign_failed_reason"] = "Nhân viên không thuộc dự án"
+            if assign_strategy == "no_scope_staff":
+                meta_obj["assign_failed_reason"] = (
+                    "Không có AM phụ trách ngành × dịch vụ này"
+                )
             else:
                 meta_obj["assign_failed_reason"] = (
                     "Không tìm được nhân viên phù hợp"
@@ -1658,12 +1727,12 @@ def create_lead(
         """
         INSERT INTO crm_leads (
             full_name, phone, phone_norm, email, email_norm, source, region,
-            product_interest, need, lead_score, lead_level, status, owner_id,
+            product_interest, industry_slug, need, lead_score, lead_level, status, owner_id,
             re_project_id, product_line, zone, re_product_id,
             duplicate_of_id, is_duplicate, utm_campaign, meta_json,
             status_entered_at, created_at, updated_at, created_by, updated_by,
             care_stage_current, care_stages_done_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             str(full_name).strip()[:240],
@@ -1673,16 +1742,17 @@ def create_lead(
             em_norm,
             src,
             str(region).strip()[:120],
-            str(product_interest).strip()[:300],
+            prod_interest[:300],
+            industry_key[:80],
             str(need).strip()[:2000],
             score,
             level,
             st,
             final_owner,
-            re_project_id,
-            line_norm,
-            zone_norm,
-            product_id_val,
+            None,
+            "",
+            "",
+            None,
             dup_of,
             is_dup,
             str(utm_campaign).strip()[:200],
@@ -1692,7 +1762,7 @@ def create_lead(
             ts,
             created_by[:120],
             created_by[:120],
-            "intake",
+            "first_contact",
             "{}",
         ),
     )
@@ -1724,6 +1794,13 @@ def create_lead(
         )
     row = fetch_lead_by_id(conn, lid)
     assert row is not None
+    if final_owner:
+        try:
+            from crm_service_lifecycle import sync_assigned_am_for_lead
+
+            sync_assigned_am_for_lead(conn, lid, overwrite=False)
+        except Exception:
+            pass
     if re_project_id is not None:
         try:
             from crm_re_projects import refresh_project_re_leads_new_kpi
@@ -1759,21 +1836,29 @@ def update_lead(
     product_line: str | None = None,
     zone: str | None = None,
     re_product_id: int | None | object = _UNSET,
+    industry_slug: str | None = None,
     updated_by: str = "",
     ts: str,
     status_note: str = "",
     status_override: bool = False,
 ) -> sqlite3.Row:
+    from crm_lead_catalog import normalize_industry_slug, normalize_product_interest
+    from crm_lead_industry_addon import reject_re_legacy_lead_input, sync_addon_on_industry_change
     from crm_lead_rules import validate_status_transition
-    from crm_project_leads import validate_re_project_id
-    from crm_project_deep import fetch_product_by_id, normalize_product_line
+
+    if re_project_id is not _UNSET:
+        reject_re_legacy_lead_input(re_project_id=re_project_id)
+    if product_line is not None:
+        reject_re_legacy_lead_input(product_line=product_line)
+    if zone is not None:
+        reject_re_legacy_lead_input(zone=zone)
+    if re_product_id is not _UNSET:
+        reject_re_legacy_lead_input(re_product_id=re_product_id)
 
     prev = fetch_lead_by_id(conn, lead_id)
     if prev is None:
         raise ValueError("Không tìm thấy lead.")
     pd = dict(prev)
-    if re_project_id is not _UNSET:
-        validate_re_project_id(conn, re_project_id if isinstance(re_project_id, int) else None)
     nm = str(full_name if full_name is not None else pd["full_name"]).strip()[:240]
     ph = str(phone if phone is not None else pd["phone"]).strip()[:80]
     em = str(email if email is not None else pd["email"]).strip()[:240]
@@ -1782,6 +1867,9 @@ def update_lead(
         raise ValueError("Lead phải có nguồn (source).")
     reg = str(region if region is not None else pd["region"]).strip()[:120]
     prod = str(product_interest if product_interest is not None else pd["product_interest"]).strip()[:300]
+    prod = normalize_product_interest(conn, prod)
+    industry_val = str(industry_slug if industry_slug is not None else pd.get("industry_slug") or "").strip()
+    industry_val = normalize_industry_slug(conn, industry_val) if industry_val else ""
     nd = str(need if need is not None else pd["need"]).strip()[:2000]
     old_st = normalize_status(pd["status"])
     new_st = normalize_status(status) if status is not None else old_st
@@ -1830,33 +1918,11 @@ def update_lead(
         level = normalize_level(new_st)
     old_owner = int(pd["owner_id"]) if pd.get("owner_id") else None
     new_owner = old_owner if owner_id is None else (int(owner_id) if owner_id else None)
-    new_project_id = pd.get("re_project_id")
-    if re_project_id is not _UNSET:
-        new_project_id = re_project_id
-    new_line = str(pd.get("product_line") or "")
-    if product_line is not None:
-        new_line = normalize_product_line(product_line)
-    new_zone = str(pd.get("zone") or "")
-    if zone is not None:
-        new_zone = str(zone or "").strip()[:60]
-    new_product_id = pd.get("re_product_id")
-    if re_product_id is not _UNSET:
-        new_product_id = re_product_id
-    if new_product_id is not None:
-        if not new_project_id:
-            raise ValueError("Phải chọn dự án BĐS trước khi gán sản phẩm.")
-        prod = fetch_product_by_id(conn, int(new_project_id), int(new_product_id))
-        if prod is None:
-            raise ValueError("Sản phẩm không thuộc dự án đã chọn.")
-        pdict = dict(prod)
-        if not new_line:
-            new_line = str(pdict.get("product_line") or "")
-        if not new_zone:
-            new_zone = str(pdict.get("zone") or "")[:60]
-    if new_owner and new_project_id:
-        from crm_project_leads import assert_staff_in_project
-
-        assert_staff_in_project(conn, int(new_project_id), int(new_owner))
+    new_project_id = None
+    new_line = ""
+    new_zone = ""
+    new_product_id = None
+    old_industry = str(pd.get("industry_slug") or "").strip()
     status_entered = str(pd.get("status_entered_at") or ts)
     if new_st != old_st:
         status_entered = ts
@@ -1883,7 +1949,7 @@ def update_lead(
         """
         UPDATE crm_leads SET
             full_name = ?, phone = ?, phone_norm = ?, email = ?, email_norm = ?,
-            source = ?, region = ?, product_interest = ?, need = ?,
+            source = ?, region = ?, product_interest = ?, industry_slug = ?, need = ?,
             lead_score = ?, lead_level = ?, status = ?, owner_id = ?,
             re_project_id = ?, product_line = ?, zone = ?, re_product_id = ?,
             meta_json = ?, status_entered_at = ?, updated_at = ?, updated_by = ?
@@ -1898,6 +1964,7 @@ def update_lead(
             src,
             reg,
             prod,
+            industry_val[:80],
             nd,
             score,
             level,
@@ -1929,6 +1996,15 @@ def update_lead(
         )
         row = fetch_lead_by_id(conn, lead_id)
         assert row is not None
+    if new_owner != old_owner:
+        try:
+            from crm_service_lifecycle import sync_assigned_am_for_lead
+
+            sync_assigned_am_for_lead(conn, int(lead_id), overwrite=True)
+        except Exception:
+            pass
+    if industry_slug is not None and industry_val != old_industry:
+        sync_addon_on_industry_change(conn, int(lead_id), industry_val)
     return row
 
 
@@ -1981,6 +2057,12 @@ def assign_lead(
     )
     row = fetch_lead_by_id(conn, lead_id)
     assert row is not None
+    try:
+        from crm_service_lifecycle import sync_assigned_am_for_lead
+
+        sync_assigned_am_for_lead(conn, int(lead_id), overwrite=True)
+    except Exception:
+        pass
     return row
 
 
@@ -2050,6 +2132,8 @@ def fetch_lead_stats(
     product_line: str | None = None,
     zone: str | None = None,
     sla_overdue_only: bool = False,
+    hide_review_queue: bool = True,
+    review_queue_only: bool = False,
 ) -> dict[str, Any]:
     """FR-09: Thống kê theo nguồn, owner, trạng thái — cùng bộ lọc danh sách lead."""
     clauses, params = _lead_list_filters(
@@ -2062,6 +2146,8 @@ def fetch_lead_stats(
         product_line=product_line,
         zone=zone,
         staff_portal_id=staff_portal_id,
+        hide_review_queue=hide_review_queue,
+        review_queue_only=review_queue_only,
     )
     where = " WHERE " + " AND ".join(clauses)
     by_status = conn.execute(
@@ -2092,14 +2178,13 @@ def fetch_lead_stats(
         f"SELECT COUNT(*) AS c FROM crm_leads l{where}",
         params,
     ).fetchone()
-    won = conn.execute(
-        f"""
-        SELECT COUNT(*) AS c FROM crm_leads l{where}
-        AND (l.status IN ('post_sale', 'won')
-             OR COALESCE(json_extract(l.care_stages_done_json, '$.post_sale'), '') != '')
-        """,
+    id_rows = conn.execute(
+        f"SELECT l.id FROM crm_leads l{where}",
         params,
-    ).fetchone()
+    ).fetchall()
+    from crm_lead_kpi_metrics import summarize_leads_kpi
+
+    kpi = summarize_leads_kpi(conn, [int(r["id"]) for r in id_rows])
     rows = fetch_leads(
         conn,
         owner_id=owner_id if staff_portal_id is None else None,
@@ -2112,6 +2197,8 @@ def fetch_lead_stats(
         product_line=product_line,
         zone=zone,
         sla_overdue_only=sla_overdue_only,
+        hide_review_queue=hide_review_queue,
+        review_queue_only=review_queue_only,
         limit=5000 if sla_overdue_only else 500,
     )
     if sla_overdue_only:
@@ -2119,11 +2206,15 @@ def fetch_lead_stats(
     else:
         overdue = sum(1 for r in rows if lead_row_to_dict(r, conn).get("sla_overdue"))
     t = int(total["c"]) if total else 0
-    w = int(won["c"]) if won else 0
+    w = int(kpi["won_leads"])
+    q = int(kpi["qualified_leads"])
     return {
         "total": t,
         "won": w,
-        "conversion_rate": round(w * 100.0 / t, 1) if t else 0.0,
+        "qualified_leads": q,
+        "conversion_rate": kpi["close_rate_pct"],
+        "close_rate_pct": kpi["close_rate_pct"],
+        "close_rate_decided_pct": kpi["close_rate_decided_pct"],
         "sla_overdue": overdue,
         "by_status": {str(r["status"]): int(r["c"]) for r in by_status},
         "by_source": {str(r["source"]): int(r["c"]) for r in by_source},
@@ -2144,9 +2235,12 @@ def fetch_lead_stats_extended(
     product_line: str | None = None,
     zone: str | None = None,
     sla_overdue_only: bool = False,
+    hide_review_queue: bool = True,
+    review_queue_only: bool = False,
     ts: str | None = None,
 ) -> dict[str, Any]:
     """Thống kê đầy đủ kèm SLA sync, cảnh báo và theo owner."""
+    from crm_lead_review_queue import count_review_queue_leads, sync_b2_review_queue
     from crm_lead_sla import (
         fetch_lead_owner_stats,
         fetch_lead_sla_alerts,
@@ -2157,6 +2251,7 @@ def fetch_lead_stats_extended(
     if ts:
         reassign_leads_from_inactive_owners(conn, ts=ts, actor="system:maintenance")
         sync_lead_sla_reminders(conn, ts=ts)
+        sync_b2_review_queue(conn, ts=ts, actor="system:b2_review")
     list_kw = dict(
         owner_id=owner_id,
         re_project_id=re_project_id,
@@ -2168,9 +2263,12 @@ def fetch_lead_stats_extended(
         product_line=product_line,
         zone=zone,
         sla_overdue_only=sla_overdue_only,
+        hide_review_queue=hide_review_queue,
+        review_queue_only=review_queue_only,
     )
     base = fetch_lead_stats(conn, **list_kw)
     base["by_owner"] = fetch_lead_owner_stats(conn, **list_kw)
+    base["review_queue_count"] = count_review_queue_leads(conn)
     sla_owner = int(staff_portal_id) if staff_portal_id is not None else owner_id
     base["sla_alerts"] = fetch_lead_sla_alerts(conn, owner_id=sla_owner, limit=30)
     return base

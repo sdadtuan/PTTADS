@@ -1,0 +1,50 @@
+name: Phase 2 Write Gates
+
+on:
+  push:
+    paths:
+      - "schemas/crm/**"
+      - "tests/test_leads_v1_write_contract.py"
+      - "tests/leads_v1_write_contract.py"
+      - "tests/leads_v1_contract.py"
+      - "ptt_crm/dual_run_write.py"
+      - "ptt_crm/write_soak_evidence.py"
+      - "scripts/ci_openapi_write_freeze.sh"
+      - "scripts/dual_run_write_check.py"
+      - "scripts/write_cutover_prod_gates.py"
+      - ".github/workflows/phase2-write-gates.yml"
+  pull_request:
+    paths:
+      - "schemas/crm/**"
+      - "tests/**"
+      - "ptt_crm/**"
+      - "scripts/**"
+      - ".github/workflows/phase2-write-gates.yml"
+
+jobs:
+  openapi-write-freeze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install contract test deps
+        run: pip install jsonschema referencing
+
+      - name: OpenAPI write freeze + contract tests
+        run: ./scripts/ci_openapi_write_freeze.sh
+
+  write-soak-evidence-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Soak evidence unit tests
+        run: python -m unittest tests.test_write_soak_evidence -q

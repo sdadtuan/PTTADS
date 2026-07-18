@@ -1,0 +1,206 @@
+openapi: 3.1.0
+info:
+  title: PTT CRM Leads API v1
+  version: 1.0.0
+  description: |
+    Lead read API — Phase 1b contract freeze.
+
+    **Source of truth (implementation):** `ptt_crm/leads_read.py` → `lead_row_to_v1()`
+
+    **Dual-run:** NestJS must return byte-identical JSON for LeadV1 fields.
+    Breaking changes require API version bump (`v2`).
+
+    **Auth Phase 1b:** Flask admin session with `crm_agency` view permission.
+    Future: internal header `X-PTT-Internal-Key` for service-to-service.
+
+  contact:
+    name: PTT Agency Platform
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://pttads.vn
+    description: Production
+  - url: http://127.0.0.1:5050
+    description: Local dev
+
+tags:
+  - name: Leads
+    description: CRM lead read (SQLite primary Phase 1; PG replica Phase 1b)
+
+paths:
+  /api/v1/leads:
+    get:
+      operationId: listLeadsV1
+      tags: [Leads]
+      summary: List leads
+      description: Paginated lead list with optional filters. Excludes duplicates by default.
+      security:
+        - AdminSession: []
+      parameters:
+        - name: client_id
+          in: query
+          description: Filter by agency client UUID (`meta.agency_client_id`)
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+          example: new
+        - name: source
+          in: query
+          description: CRM source field (e.g. facebook, web)
+          schema:
+            type: string
+        - name: channel
+          in: query
+          description: Ingest channel (meta, zalo, …)
+          schema:
+            type: string
+        - name: q
+          in: query
+          description: Search full_name, phone, or email
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Lead list
+          content:
+            application/json:
+              schema:
+                $ref: "./leads-list-response-v1.schema.json"
+              examples:
+                sample:
+                  $ref: "#/components/examples/ListLeadsSample"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "./error-response-v1.schema.json"
+        "403":
+          description: Forbidden — missing crm_agency permission
+          content:
+            application/json:
+              schema:
+                $ref: "./error-response-v1.schema.json"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "./error-response-v1.schema.json"
+
+  /api/v1/leads/{lead_id}:
+    get:
+      operationId: getLeadV1
+      tags: [Leads]
+      summary: Get lead by id
+      security:
+        - AdminSession: []
+      parameters:
+        - name: lead_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Lead found
+          content:
+            application/json:
+              schema:
+                $ref: "./lead-v1.schema.json"
+              examples:
+                sample:
+                  $ref: "#/components/examples/LeadSample"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "./error-response-v1.schema.json"
+              examples:
+                notFound:
+                  $ref: "#/components/examples/NotFound"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "./error-response-v1.schema.json"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "./error-response-v1.schema.json"
+
+components:
+  securitySchemes:
+    AdminSession:
+      type: apiKey
+      in: cookie
+      name: ptt_session
+      description: Flask admin session cookie (Phase 1b)
+
+  examples:
+    LeadSample:
+      summary: Canonical LeadV1 fixture
+      value:
+        id: 1
+        full_name: "Lead A"
+        phone: "0901111111"
+        email: ""
+        status: new
+        source: facebook
+        channel: meta
+        client_id: "550e8400-e29b-41d4-a716-446655440000"
+        campaign_id: null
+        external_lead_id: "fb-1"
+        owner_id: null
+        created_at: "2026-07-17"
+        received_at: "2026-07-17"
+        is_duplicate: false
+
+    ListLeadsSample:
+      summary: Canonical list response
+      value:
+        leads:
+          - id: 1
+            full_name: "Lead A"
+            phone: "0901111111"
+            email: ""
+            status: new
+            source: facebook
+            channel: meta
+            client_id: "550e8400-e29b-41d4-a716-446655440000"
+            campaign_id: null
+            external_lead_id: "fb-1"
+            owner_id: null
+            created_at: "2026-07-17"
+            received_at: "2026-07-17"
+            is_duplicate: false
+        total: 1
+        limit: 50
+        offset: 0
+
+    NotFound:
+      value:
+        error: Not found

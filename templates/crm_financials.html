@@ -1,0 +1,645 @@
+{% extends "admin_layout.html" %}
+{% block admin_main %}
+<div style="padding:1.5rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem;">
+    <div>
+      <h2 style="margin:0;font-size:1.1rem;font-weight:700;">
+        Tổng hợp tài chính dịch vụ
+      </h2>
+      <a href="/crm/business-dashboard?year={{ year }}&month={{ month }}"
+         style="font-size:.78rem;color:#6366f1;text-decoration:none;">← Business Dashboard</a>
+    </div>
+    <form method="get" style="display:flex;align-items:center;gap:.5rem;font-size:.8rem;">
+      <label style="color:#64748b;">Kỳ</label>
+      <input type="number" name="month" min="1" max="12" value="{{ month }}"
+             style="width:3rem;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;">
+      <span>/</span>
+      <input type="number" name="year" min="2020" max="2099" value="{{ year }}"
+             style="width:4.5rem;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;">
+      <button type="submit"
+              style="padding:.25rem .6rem;background:#6366f1;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+        Xem
+      </button>
+    </form>
+    <a href="/api/crm/finance/kpi-export?year={{ year }}&month={{ month }}&format=csv"
+       style="padding:.25rem .65rem;background:#fff;border:1px solid #cbd5e1;border-radius:4px;
+              font-size:.78rem;color:#334155;text-decoration:none;">
+      ⬇ Export KPI (CSV)
+    </a>
+    <a href="/api/crm/finance/kpi-export?year={{ year }}&month={{ month }}&format=xlsx"
+       style="padding:.25rem .65rem;background:#fff;border:1px solid #cbd5e1;border-radius:4px;
+              font-size:.78rem;color:#334155;text-decoration:none;">
+      ⬇ Excel
+    </a>
+    <span style="font-size:.8rem;color:#888;">{{ rows|length }} lifecycle đang hoạt động</span>
+  </div>
+
+  {% if kpi_alerts.alert_count %}
+  <div style="margin-bottom:1.25rem;border-radius:8px;padding:.85rem 1rem;
+              background:{% if kpi_alerts.has_critical %}#fef2f2{% else %}#fffbeb{% endif %};
+              border:1px solid {% if kpi_alerts.has_critical %}#fecaca{% else %}#fde68a{% endif %};">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.5rem;">
+      <strong style="font-size:.88rem;color:{% if kpi_alerts.has_critical %}#991b1b{% else %}#92400e{% endif %};">
+        {{ kpi_alerts.alert_count }} cảnh báo KPI
+        {% if kpi_alerts.critical_count %}
+        · {{ kpi_alerts.critical_count }} nghiêm trọng
+        {% endif %}
+      </strong>
+      <span style="font-size:.72rem;color:#64748b;">{{ month }}/{{ year }}</span>
+    </div>
+    <ul style="margin:0;padding-left:1.1rem;font-size:.78rem;line-height:1.55;
+               color:{% if kpi_alerts.has_critical %}#7f1d1d{% else %}#78350f{% endif %};">
+      {% for alert in kpi_alerts.alerts %}
+      <li>
+        <span style="font-weight:600;">[{{ 'Nghiêm trọng' if alert.level == 'critical' else 'Cảnh báo' }}]</span>
+        {{ alert.title }} — {{ alert.message }}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {# ─── AR Aging + Recurring ─── #}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
+    <div style="background:#fff;border:1px solid #fecaca;border-radius:8px;padding:1rem;">
+      <h3 style="margin:0 0 .75rem;font-size:.9rem;font-weight:700;color:#991b1b;">
+        AR quá hạn ({{ ar_aging.as_of }})
+      </h3>
+      <div style="display:flex;gap:1.5rem;margin-bottom:.75rem;font-size:.85rem;">
+        <div>
+          <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;">Tổng chờ thu</div>
+          <div style="font-weight:700;color:#1e293b;">{{ "{:,.0f}".format(ar_aging.total_pending_vnd) }} ₫</div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#64748b;text-transform:uppercase;">Quá hạn</div>
+          <div style="font-weight:700;color:#dc2626;">{{ "{:,.0f}".format(ar_aging.total_overdue_vnd) }} ₫</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.35rem;font-size:.72rem;margin-bottom:.75rem;">
+        {% for key, label in ar_aging.bucket_labels.items() %}
+        <div style="display:flex;justify-content:space-between;padding:.25rem .4rem;background:#fef2f2;border-radius:4px;">
+          <span style="color:#7f1d1d;">{{ label }}</span>
+          <strong>{{ "{:,.0f}".format(ar_aging.buckets.get(key, 0)) }} ₫</strong>
+        </div>
+        {% endfor %}
+      </div>
+      {% if ar_aging.items %}
+      <details>
+        <summary style="font-size:.75rem;color:#b91c1c;cursor:pointer;">{{ ar_aging.items|length }} khoản pending</summary>
+        <div style="max-height:12rem;overflow:auto;margin-top:.5rem;">
+          <table style="width:100%;border-collapse:collapse;font-size:.72rem;">
+            <thead>
+              <tr style="background:#fef2f2;">
+                <th style="text-align:left;padding:.3rem .4rem;">KH</th>
+                <th style="text-align:left;padding:.3rem .4rem;">Đến hạn</th>
+                <th style="text-align:right;padding:.3rem .4rem;">Số tiền</th>
+                <th style="text-align:center;padding:.3rem .4rem;">Quá hạn</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in ar_aging.items %}
+              {% if item.days_overdue > 0 %}
+              <tr>
+                <td style="padding:.3rem .4rem;">{{ item.customer_name }}</td>
+                <td style="padding:.3rem .4rem;">{{ item.due_on or '—' }}</td>
+                <td style="padding:.3rem .4rem;text-align:right;">{{ "{:,.0f}".format(item.amount_vnd) }} ₫</td>
+                <td style="padding:.3rem .4rem;text-align:center;color:#dc2626;">{{ item.days_overdue }}d</td>
+              </tr>
+              {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      {% else %}
+      <p style="margin:0;font-size:.75rem;color:#16a34a;">Không có khoản chờ thu.</p>
+      {% endif %}
+    </div>
+
+    <div style="background:#fff;border:1px solid #bfdbfe;border-radius:8px;padding:1rem;">
+      <h3 style="margin:0 0 .75rem;font-size:.9rem;font-weight:700;color:#1d4ed8;">
+        Doanh thu recurring — {{ month }}/{{ year }}
+      </h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;font-size:.85rem;">
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Đã thu (recurring)</div>
+          <div style="font-weight:700;color:#1d4ed8;">{{ "{:,.0f}".format(recurring_summary.received_recurring_vnd) }} ₫</div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Chờ thu (recurring)</div>
+          <div style="font-weight:700;color:#ca8a04;">{{ "{:,.0f}".format(recurring_summary.pending_recurring_vnd) }} ₫</div>
+        </div>
+        <div style="grid-column:1 / -1;">
+          <div style="font-size:.65rem;color:#64748b;">HĐ recurring đang active</div>
+          <div style="font-weight:700;color:#1e293b;">{{ recurring_summary.active_recurring_contracts }}</div>
+        </div>
+      </div>
+      <p style="margin:.75rem 0 0;font-size:.7rem;color:#64748b;line-height:1.45;">
+        HĐ có <code>billing_type=recurring</code> (retainer). Tự gán khi tạo từ gói SEO/Ads/AEO…
+      </p>
+    </div>
+  </div>
+
+  {# ─── Gross margin / doanh thu theo gói dịch vụ ─── #}
+  <div style="margin-bottom:1.5rem;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+    <h3 style="margin:0 0 .35rem;font-size:.9rem;font-weight:700;color:#334155;">
+      Doanh thu & gross margin theo gói dịch vụ — {{ month }}/{{ year }}
+    </h3>
+    <p style="margin:0 0 .75rem;font-size:.7rem;color:#64748b;">
+      Cohort lifecycle <strong>active</strong>. Margin tháng = (thu tháng − chi delivery tháng) / thu tháng.
+    </p>
+    {% if package_rollup.packages %}
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:.78rem;">
+        <thead>
+          <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+            <th style="text-align:left;padding:.5rem .6rem;">Gói dịch vụ</th>
+            <th style="text-align:center;padding:.5rem .4rem;">Deal</th>
+            <th style="text-align:right;padding:.5rem .6rem;">Thu tháng</th>
+            <th style="text-align:right;padding:.5rem .6rem;">Chi delivery tháng</th>
+            <th style="text-align:center;padding:.5rem .4rem;">Margin tháng</th>
+            <th style="text-align:right;padding:.5rem .6rem;">Thu lifetime</th>
+            <th style="text-align:center;padding:.5rem .4rem;">Margin lifetime</th>
+            <th style="text-align:right;padding:.5rem .6rem;">AR quá hạn</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for pkg in package_rollup.packages %}
+          {% set mm = pkg.gross_margin_month_pct %}
+          {% set lm = pkg.gross_margin_lifetime_pct %}
+          <tr style="border-bottom:1px solid #f1f5f9;">
+            <td style="padding:.45rem .6rem;font-weight:500;">{{ pkg.service_label }}</td>
+            <td style="padding:.45rem .4rem;text-align:center;">{{ pkg.lifecycle_count }}</td>
+            <td style="padding:.45rem .6rem;text-align:right;color:#2563eb;">
+              {{ "{:,.0f}".format(pkg.received_month_vnd) }} ₫
+            </td>
+            <td style="padding:.45rem .6rem;text-align:right;color:#dc2626;">
+              {{ "{:,.0f}".format(pkg.delivery_expenses_month_vnd) }} ₫
+            </td>
+            <td style="padding:.45rem .4rem;text-align:center;">
+              <span style="font-weight:700;padding:2px 8px;border-radius:4px;
+                           background:{% if mm >= 50 %}#dcfce7{% elif mm >= 20 %}#fef9c3{% else %}#fee2e2{% endif %};
+                           color:{% if mm >= 50 %}#16a34a{% elif mm >= 20 %}#ca8a04{% else %}#dc2626{% endif %};">
+                {{ "%.1f"|format(mm) }}%
+              </span>
+            </td>
+            <td style="padding:.45rem .6rem;text-align:right;">
+              {{ "{:,.0f}".format(pkg.received_lifetime_vnd) }} ₫
+            </td>
+            <td style="padding:.45rem .4rem;text-align:center;">
+              <span style="font-weight:600;color:{% if lm >= 30 %}#16a34a{% elif lm >= 15 %}#ca8a04{% else %}#dc2626{% endif %};">
+                {{ "%.1f"|format(lm) }}%
+              </span>
+            </td>
+            <td style="padding:.45rem .6rem;text-align:right;color:#dc2626;">
+              {{ "{:,.0f}".format(pkg.ar_overdue_vnd) }} ₫
+            </td>
+          </tr>
+          {% endfor %}
+          {% set t = package_rollup.totals %}
+          <tr style="background:#f8fafc;font-weight:700;border-top:2px solid #e2e8f0;">
+            <td style="padding:.5rem .6rem;">Tổng</td>
+            <td style="padding:.5rem .4rem;text-align:center;">{{ t.lifecycle_count }}</td>
+            <td style="padding:.5rem .6rem;text-align:right;">{{ "{:,.0f}".format(t.received_month_vnd) }} ₫</td>
+            <td style="padding:.5rem .6rem;text-align:right;">{{ "{:,.0f}".format(t.delivery_expenses_month_vnd) }} ₫</td>
+            <td style="padding:.5rem .4rem;text-align:center;">{{ "%.1f"|format(t.gross_margin_month_pct) }}%</td>
+            <td style="padding:.5rem .6rem;text-align:right;">{{ "{:,.0f}".format(t.received_lifetime_vnd) }} ₫</td>
+            <td style="padding:.5rem .4rem;text-align:center;">{{ "%.1f"|format(t.gross_margin_lifetime_pct) }}%</td>
+            <td style="padding:.5rem .6rem;text-align:right;">{{ "{:,.0f}".format(t.ar_overdue_vnd) }} ₫</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p style="margin:0;font-size:.8rem;color:#94a3b8;">Chưa có lifecycle active để rollup.</p>
+    {% endif %}
+  </div>
+
+  {# ─── Retention / churn / renewal cohort ─── #}
+  {% set rc = retention_metrics.renewal_cohort %}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
+    <div style="background:#fff;border:1px solid #bbf7d0;border-radius:8px;padding:1rem;">
+      <h3 style="margin:0 0 .75rem;font-size:.9rem;font-weight:700;color:#166534;">
+        Retention khách hàng — {{ month }}/{{ year }}
+      </h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;font-size:.85rem;">
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">KH active tháng này</div>
+          <div style="font-weight:700;color:#1e293b;">{{ retention_metrics.active_customers }}</div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">KH active tháng trước</div>
+          <div style="font-weight:700;color:#1e293b;">{{ retention_metrics.active_customers_prev }}</div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Giữ lại (MoM)</div>
+          <div style="font-weight:700;color:#16a34a;">{{ retention_metrics.customers_retained }}</div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Retention rate</div>
+          <div style="font-weight:700;color:#15803d;">{{ "%.1f"|format(retention_metrics.customer_retention_pct) }}%</div>
+        </div>
+        <div style="grid-column:1 / -1;">
+          <div style="font-size:.65rem;color:#64748b;">Logo churn (MoM)</div>
+          <div style="font-weight:700;color:#dc2626;">{{ "%.1f"|format(retention_metrics.customer_churn_pct) }}%</div>
+        </div>
+      </div>
+      <p style="margin:.75rem 0 0;font-size:.7rem;color:#64748b;line-height:1.45;">
+        KH có ≥1 HĐ overlap tháng (signed/active/expiring/paused/renewed). Loại placeholder.
+      </p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:1rem;">
+      <h3 style="margin:0 0 .75rem;font-size:.9rem;font-weight:700;color:#92400e;">
+        Renewal cohort — HĐ hết hạn {{ month }}/{{ year }}
+      </h3>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:.5rem;font-size:.82rem;margin-bottom:.75rem;">
+        <div style="padding:.35rem .5rem;background:#fffbeb;border-radius:4px;">
+          <span style="color:#78350f;font-size:.65rem;">Hết hạn</span>
+          <div style="font-weight:700;">{{ rc.contracts_ending }}</div>
+        </div>
+        <div style="padding:.35rem .5rem;background:#dcfce7;border-radius:4px;">
+          <span style="color:#166534;font-size:.65rem;">Gia hạn</span>
+          <div style="font-weight:700;color:#16a34a;">{{ rc.renewed }}</div>
+        </div>
+        <div style="padding:.35rem .5rem;background:#fee2e2;border-radius:4px;">
+          <span style="color:#991b1b;font-size:.65rem;">Churn</span>
+          <div style="font-weight:700;color:#dc2626;">{{ rc.churned }}</div>
+        </div>
+        <div style="padding:.35rem .5rem;background:#f1f5f9;border-radius:4px;">
+          <span style="color:#475569;font-size:.65rem;">Hoàn thành</span>
+          <div style="font-weight:700;">{{ rc.completed }}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:1.5rem;font-size:.85rem;margin-bottom:.5rem;">
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Renewal rate</div>
+          <div style="font-weight:700;color:#16a34a;">{{ "%.1f"|format(rc.renewal_rate_pct) }}%</div>
+          <div style="font-size:.62rem;color:#64748b;">{{ rc.contracts_decided }} HĐ đã quyết định</div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Cohort churn</div>
+          <div style="font-weight:700;color:#dc2626;">{{ "%.1f"|format(rc.cohort_churn_rate_pct) }}%</div>
+        </div>
+        {% if rc.pending > 0 %}
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Chưa quyết định</div>
+          <div style="font-weight:700;color:#ca8a04;">{{ rc.pending }}</div>
+        </div>
+        {% endif %}
+      </div>
+      {% if rc.items %}
+      <details>
+        <summary style="font-size:.75rem;color:#92400e;cursor:pointer;">{{ rc.items|length }} HĐ trong cohort</summary>
+        <div style="max-height:10rem;overflow:auto;margin-top:.5rem;">
+          <table style="width:100%;border-collapse:collapse;font-size:.72rem;">
+            <thead>
+              <tr style="background:#fffbeb;">
+                <th style="text-align:left;padding:.3rem .4rem;">KH</th>
+                <th style="text-align:left;padding:.3rem .4rem;">Hết hạn</th>
+                <th style="text-align:center;padding:.3rem .4rem;">Kết quả</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in rc.items %}
+              <tr>
+                <td style="padding:.3rem .4rem;">{{ item.customer_name }}</td>
+                <td style="padding:.3rem .4rem;">{{ item.ends_on }}</td>
+                <td style="padding:.3rem .4rem;text-align:center;">
+                  {% if item.outcome == 'renewed' %}
+                  <span style="color:#16a34a;">Gia hạn</span>
+                  {% elif item.outcome == 'churned' %}
+                  <span style="color:#dc2626;">Churn</span>
+                  {% elif item.outcome == 'completed' %}
+                  <span style="color:#64748b;">Hoàn thành</span>
+                  {% else %}
+                  <span style="color:#ca8a04;">Chờ</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+      {% else %}
+      <p style="margin:0;font-size:.75rem;color:#64748b;">Không có HĐ hết hạn trong tháng.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ─── Lead qualified + Close rate (thống nhất) ─── #}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
+    <div style="background:#fff;border:1px solid #c7d2fe;border-radius:8px;padding:1rem;">
+      <h3 style="margin:0 0 .75rem;font-size:.9rem;font-weight:700;color:#3730a3;">
+        Lead đủ chuẩn — cohort {{ month }}/{{ year }}
+      </h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;font-size:.85rem;">
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Qualified tháng</div>
+          <div style="font-weight:700;color:#1e293b;">{{ lead_kpi.qualified_in_month }}</div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Qualified tích lũy</div>
+          <div style="font-weight:700;color:#1e293b;">{{ lead_kpi.qualified_leads }}</div>
+        </div>
+      </div>
+      <p style="margin:.75rem 0 0;font-size:.7rem;color:#64748b;line-height:1.45;">
+        Intake <strong>Go</strong>, có pre-sales, lifecycle consult+, hoặc legacy qualified+.
+      </p>
+    </div>
+
+    <div style="background:#fff;border:1px solid #ddd6fe;border-radius:8px;padding:1rem;">
+      <h3 style="margin:0 0 .75rem;font-size:.9rem;font-weight:700;color:#5b21b6;">
+        Close rate — thống nhất
+      </h3>
+      <div style="display:flex;gap:1.5rem;font-size:.85rem;margin-bottom:.5rem;">
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Cohort tháng</div>
+          <div style="font-weight:700;color:#16a34a;">{{ "%.1f"|format(lead_kpi.cohort_close_rate_pct) }}%</div>
+          <div style="font-size:.62rem;color:#64748b;">{{ lead_kpi.won_from_month_cohort }}/{{ lead_kpi.qualified_in_month }} won</div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Cohort đã quyết định</div>
+          <div style="font-weight:700;color:#7c3aed;">{{ "%.1f"|format(lead_kpi.cohort_close_rate_decided_pct) }}%</div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Tích lũy</div>
+          <div style="font-weight:700;color:#1e293b;">{{ "%.1f"|format(lead_kpi.close_rate_pct) }}%</div>
+          <div style="font-size:.62rem;color:#64748b;">{{ lead_kpi.won_leads }}/{{ lead_kpi.qualified_leads }}</div>
+        </div>
+      </div>
+      <p style="margin:0;font-size:.7rem;color:#64748b;line-height:1.45;">
+        Close rate = won ÷ qualified. Cohort đã quyết định = won ÷ (won + lost) trong cohort tháng.
+      </p>
+    </div>
+  </div>
+
+  {# ─── Concentration + Capacity (nhóm 5) ─── #}
+  {% set conc = portfolio_metrics.concentration %}
+  {% set cap = portfolio_metrics.capacity %}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
+    <div style="background:#fff;border:1px solid #fecaca;border-radius:8px;padding:1rem;">
+      <h3 style="margin:0 0 .75rem;font-size:.9rem;font-weight:700;color:#991b1b;">
+        Rủi ro tập trung DT — {{ month }}/{{ year }}
+        {% if conc.concentration_risk %}
+        <span style="font-size:.65rem;background:#fee2e2;color:#b91c1c;padding:2px 8px;border-radius:4px;margin-left:.35rem;">Cảnh báo</span>
+        {% endif %}
+      </h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;font-size:.85rem;margin-bottom:.75rem;">
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Tổng thu tháng</div>
+          <div style="font-weight:700;">{{ "{:,.0f}".format(conc.total_received_vnd) }} ₫</div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Top-2 / tổng DT</div>
+          <div style="font-weight:700;color:{% if conc.concentration_risk %}#dc2626{% else %}#1e293b{% endif %};">
+            {{ "%.1f"|format(conc.top2_concentration_pct) }}%
+          </div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">Top-1 share</div>
+          <div style="font-weight:700;">{{ "%.1f"|format(conc.top1_share_pct) }}%</div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">KH có thu</div>
+          <div style="font-weight:700;">{{ conc.paying_customers }}</div>
+        </div>
+      </div>
+      {% if conc.top_customers %}
+      <div style="max-height:9rem;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:.72rem;">
+          <thead>
+            <tr style="background:#fef2f2;">
+              <th style="text-align:left;padding:.3rem .4rem;">Khách hàng</th>
+              <th style="text-align:right;padding:.3rem .4rem;">Thu</th>
+              <th style="text-align:right;padding:.3rem .4rem;">%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in conc.top_customers %}
+            <tr>
+              <td style="padding:.3rem .4rem;">{{ c.customer_name }}</td>
+              <td style="padding:.3rem .4rem;text-align:right;">{{ "{:,.0f}".format(c.received_vnd) }} ₫</td>
+              <td style="padding:.3rem .4rem;text-align:right;">{{ "%.1f"|format(c.share_pct) }}%</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p style="margin:0;font-size:.75rem;color:#64748b;">Chưa có doanh thu tháng này.</p>
+      {% endif %}
+    </div>
+
+    <div style="background:#fff;border:1px solid #bae6fd;border-radius:8px;padding:1rem;">
+      <h3 style="margin:0 0 .75rem;font-size:.9rem;font-weight:700;color:#0c4a6e;">
+        Công suất team — {{ month }}/{{ year }}
+        {% if cap.capacity_warning %}
+        <span style="font-size:.65rem;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;margin-left:.35rem;">Gần full</span>
+        {% endif %}
+      </h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;font-size:.82rem;margin-bottom:.75rem;">
+        <div style="padding:.35rem .5rem;background:#f0f9ff;border-radius:4px;">
+          <span style="color:#0369a1;font-size:.65rem;">AM utilization</span>
+          <div style="font-weight:700;">{{ "%.1f"|format(cap.am_utilization_pct) }}%</div>
+          <div style="font-size:.62rem;color:#64748b;">{{ cap.am_active_lifecycles }}/{{ cap.am_capacity_slots }} slot</div>
+        </div>
+        <div style="padding:.35rem .5rem;background:#f0f9ff;border-radius:4px;">
+          <span style="color:#0369a1;font-size:.65rem;">SP utilization</span>
+          <div style="font-weight:700;">{{ "%.1f"|format(cap.sp_utilization_pct) }}%</div>
+          <div style="font-size:.62rem;color:#64748b;">{{ cap.sp_active_lifecycles }}/{{ cap.sp_capacity_slots }} slot</div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">DT / AM</div>
+          <div style="font-weight:700;">{{ "{:,.0f}".format(cap.revenue_per_am_vnd) }} ₫</div>
+        </div>
+        <div>
+          <div style="font-size:.65rem;color:#64748b;">DT / lifecycle active</div>
+          <div style="font-weight:700;">{{ "{:,.0f}".format(cap.revenue_per_active_lifecycle_vnd) }} ₫</div>
+        </div>
+      </div>
+      <p style="margin:0;font-size:.7rem;color:#64748b;line-height:1.45;">
+        Cap mặc định: AM {{ cap.am_lifecycle_capacity }} LC/NV · SP {{ cap.sp_lifecycle_capacity }} LC/NV
+        (<code>PTT_AM_LIFECYCLE_CAPACITY</code>, <code>PTT_SP_LIFECYCLE_CAPACITY</code>).
+      </p>
+    </div>
+  </div>
+
+  {# ─── CAC + On-time + MRR/ARR ─── #}
+  {% set cac = exec_metrics.cac %}
+  {% set ot = exec_metrics.delivery_ontime %}
+  {% set mrr = exec_metrics.mrr_arr %}
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
+    <div style="background:#fff;border:1px solid #fed7aa;border-radius:8px;padding:1rem;">
+      <h3 style="margin:0 0 .75rem;font-size:.9rem;font-weight:700;color:#9a3412;">
+        CAC — {{ month }}/{{ year }}
+      </h3>
+      <div style="font-size:1.35rem;font-weight:700;color:#ea580c;margin-bottom:.5rem;">
+        {{ "{:,.0f}".format(cac.cac_vnd) }} ₫
+      </div>
+      <div style="font-size:.78rem;color:#64748b;line-height:1.5;">
+        <div>KH mới: <strong>{{ cac.new_customers }}</strong></div>
+        <div>Pre-sales: {{ "{:,.0f}".format(cac.presales_cost_vnd) }} ₫</div>
+        <div>
+          Marketing
+          {% if cac.marketing_spend_source == 'db' %}(đã nhập tháng){% else %}(env fallback){% endif %}:
+          {{ "{:,.0f}".format(cac.marketing_cost_vnd) }} ₫
+        </div>
+        <div style="margin-top:.35rem;font-size:.68rem;">
+          Chỉ pre-sales: {{ "{:,.0f}".format(cac.cac_presales_only_vnd) }} ₫/KH
+        </div>
+      </div>
+      <form id="crm-fin-marketing-form" style="margin-top:.75rem;padding-top:.65rem;border-top:1px solid #fed7aa;">
+        <label style="display:block;font-size:.72rem;color:#64748b;margin-bottom:.25rem;">
+          Chi marketing tháng {{ month }}/{{ year }} (VNĐ)
+        </label>
+        <div style="display:flex;gap:.35rem;align-items:center;">
+          <input type="number" name="marketing_spend_vnd" min="0" step="1000"
+                 value="{{ cac.marketing_cost_vnd if cac.marketing_spend_source == 'db' else '' }}"
+                 placeholder="{{ cac.marketing_cost_vnd if cac.marketing_spend_source == 'env' else '0' }}"
+                 style="flex:1;min-width:0;padding:.25rem .4rem;border:1px solid #fdba74;border-radius:4px;font-size:.78rem;">
+          <button type="submit"
+                  style="padding:.25rem .55rem;background:#ea580c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.72rem;">
+            Lưu
+          </button>
+        </div>
+        <p id="crm-fin-marketing-msg" style="margin:.35rem 0 0;font-size:.68rem;color:#64748b;"></p>
+      </form>
+    </div>
+
+    <div style="background:#fff;border:1px solid #a7f3d0;border-radius:8px;padding:1rem;">
+      <h3 style="margin:0 0 .75rem;font-size:.9rem;font-weight:700;color:#065f46;">
+        Delivery on-time
+      </h3>
+      <div style="font-size:1.35rem;font-weight:700;color:#059669;margin-bottom:.5rem;">
+        {{ "%.1f"|format(ot.on_time_rate_pct) }}%
+      </div>
+      <div style="font-size:.78rem;color:#64748b;line-height:1.5;">
+        <div>Đúng hạn: {{ ot.tasks_on_time }} / {{ ot.tasks_decided }} task (deliver/handover)</div>
+        <div>Trễ: {{ ot.tasks_late }} · Quá hạn chưa xong: {{ ot.tasks_pending_overdue }}</div>
+        <div style="font-size:.68rem;margin-top:.35rem;">SLA mặc định {{ ot.sla_days_default }} ngày/task</div>
+      </div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #bfdbfe;border-radius:8px;padding:1rem;">
+      <h3 style="margin:0 0 .75rem;font-size:.9rem;font-weight:700;color:#1e40af;">
+        MRR / ARR
+      </h3>
+      <div style="margin-bottom:.5rem;">
+        <div style="font-size:.65rem;color:#64748b;">MRR bookings</div>
+        <div style="font-size:1.1rem;font-weight:700;color:#2563eb;">
+          {{ "{:,.0f}".format(mrr.mrr_bookings_vnd) }} ₫
+        </div>
+      </div>
+      <div style="margin-bottom:.5rem;">
+        <div style="font-size:.65rem;color:#64748b;">ARR (×12)</div>
+        <div style="font-weight:700;color:#1d4ed8;">{{ "{:,.0f}".format(mrr.arr_bookings_vnd) }} ₫</div>
+      </div>
+      <div style="font-size:.78rem;color:#64748b;">
+        Cash recurring tháng: {{ "{:,.0f}".format(mrr.mrr_cash_vnd) }} ₫
+        ({{ "%.1f"|format(mrr.recurring_revenue_share_pct) }}% tổng thu)
+      </div>
+      <p style="margin:.5rem 0 0;font-size:.68rem;color:#64748b;line-height:1.45;">
+        MRR bookings quy amount HĐ recurring về tháng theo <code>billing_cycle</code>.
+      </p>
+    </div>
+  </div>
+
+  {% if rows %}
+  <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+      <thead>
+        <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+          <th style="text-align:left;padding:.6rem .75rem;font-weight:600;white-space:nowrap;">Khách hàng</th>
+          <th style="text-align:left;padding:.6rem .75rem;font-weight:600;white-space:nowrap;">Dịch vụ</th>
+          <th style="text-align:center;padding:.6rem .5rem;font-weight:600;">Stage</th>
+          <th style="text-align:right;padding:.6rem .75rem;font-weight:600;white-space:nowrap;">Kỳ vọng (HĐ)</th>
+          <th style="text-align:right;padding:.6rem .75rem;font-weight:600;white-space:nowrap;">Thực nhận</th>
+          <th style="text-align:right;padding:.6rem .75rem;font-weight:600;white-space:nowrap;">AR quá hạn</th>
+          <th style="text-align:right;padding:.6rem .75rem;font-weight:600;white-space:nowrap;">Chi phí</th>
+          <th style="text-align:right;padding:.6rem .75rem;font-weight:600;white-space:nowrap;">Lợi nhuận</th>
+          <th style="text-align:center;padding:.6rem .5rem;font-weight:600;">Margin</th>
+          <th style="text-align:center;padding:.6rem .5rem;font-weight:600;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% set m = row.margin_pct %}
+        <tr style="border-bottom:1px solid #f1f5f9;
+                   {% if m < 20 %}background:#fff5f5;{% elif m < 50 %}background:#fffbeb;{% endif %}">
+          <td style="padding:.5rem .75rem;font-weight:500;">
+            {{ row.customer_name or '—' }}
+          </td>
+          <td style="padding:.5rem .75rem;color:#555;">{{ row.service_label }}</td>
+          <td style="padding:.5rem .5rem;text-align:center;">
+            <span style="font-size:.7rem;background:#e0e7ff;color:#4338ca;
+                         padding:1px 8px;border-radius:3px;">{{ row.stage }}</span>
+          </td>
+          <td style="padding:.5rem .75rem;text-align:right;color:#374151;">
+            {{ "{:,.0f}".format(row.expected_revenue) }} ₫
+          </td>
+          <td style="padding:.5rem .75rem;text-align:right;color:#2563eb;font-weight:500;">
+            {{ "{:,.0f}".format(row.received_revenue) }} ₫
+          </td>
+          <td style="padding:.5rem .75rem;text-align:right;
+                     color:{% if row.ar_overdue_vnd > 0 %}#dc2626{% else %}#64748b{% endif %};">
+            {{ "{:,.0f}".format(row.ar_overdue_vnd or 0) }} ₫
+          </td>
+          <td style="padding:.5rem .75rem;text-align:right;color:#dc2626;">
+            {{ "{:,.0f}".format(row.total_expenses) }} ₫
+          </td>
+          <td style="padding:.5rem .75rem;text-align:right;font-weight:600;
+                     color:{% if row.profit >= 0 %}#16a34a{% else %}#dc2626{% endif %};">
+            {{ "{:,.0f}".format(row.profit) }} ₫
+          </td>
+          <td style="padding:.5rem .5rem;text-align:center;">
+            <span style="font-size:.8rem;font-weight:700;padding:2px 10px;border-radius:4px;
+                         background:{% if m >= 50 %}#dcfce7{% elif m >= 20 %}#fef9c3{% else %}#fee2e2{% endif %};
+                         color:{% if m >= 50 %}#16a34a{% elif m >= 20 %}#ca8a04{% else %}#dc2626{% endif %};">
+              {{ m }}%
+            </span>
+          </td>
+          <td style="padding:.5rem .5rem;text-align:center;">
+            <a href="/crm/service-delivery/{{ row.lifecycle_id }}"
+               style="font-size:.75rem;color:#6366f1;text-decoration:none;">Xem →</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p style="color:#aaa;text-align:center;padding:3rem;">Chưa có lifecycle nào đang hoạt động.</p>
+  {% endif %}
+</div>
+<script>
+(function () {
+  const form = document.getElementById("crm-fin-marketing-form");
+  if (!form) return;
+  const msg = document.getElementById("crm-fin-marketing-msg");
+  const year = {{ year }};
+  const month = {{ month }};
+  form.addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    const inp = form.querySelector("input[name='marketing_spend_vnd']");
+    const raw = inp && inp.value !== "" ? inp.value : "0";
+    const amount = Math.max(0, parseInt(raw, 10) || 0);
+    if (msg) msg.textContent = "Đang lưu…";
+    try {
+      const res = await fetch("/api/crm/finance/period-inputs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ year: year, month: month, marketing_spend_vnd: amount }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Lỗi lưu marketing spend");
+      if (msg) msg.textContent = "Đã lưu. Tải lại trang để cập nhật CAC.";
+      window.location.reload();
+    } catch (e) {
+      if (msg) msg.textContent = e instanceof Error ? e.message : "Lỗi";
+    }
+  });
+})();
+</script>
+{% endblock %}

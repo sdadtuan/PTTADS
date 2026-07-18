@@ -1,10 +1,50 @@
 /* ── CMS Live Chat ──────────────────────────────────────────── */
 
+/* Toàn trang — khung chat cao gần hết viewport */
+body.admin-live-chat-page .admin-app-layout {
+  height: calc(100vh - 56px);
+  max-height: calc(100vh - 56px);
+  overflow: hidden;
+}
+
+body.admin-live-chat-page .admin-app-main {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 100%;
+  padding: 0.4rem 1rem 0.5rem;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+body.admin-live-chat-page .admin-page-head {
+  flex-shrink: 0;
+  margin-bottom: 0.25rem;
+  padding-bottom: 0.35rem;
+}
+
+body.admin-live-chat-page .admin-page-title {
+  font-size: 1.2rem;
+}
+
+body.admin-live-chat-page .admin-page-desc {
+  display: none;
+}
+
+body.admin-live-chat-page .admin-page-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .lc-root {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 120px);
-  min-height: 520px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
 }
 
 /* Tab bar */
@@ -16,7 +56,7 @@
   flex-shrink: 0;
 }
 .lc-tab {
-  padding: 10px 20px;
+  padding: 8px 18px;
   border: none;
   background: none;
   font-size: 0.9rem;
@@ -61,10 +101,19 @@
   letter-spacing: 0.02em;
 }
 
-/* Panels */
-.lc-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.lc-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
 
-/* ── Inbox layout ─────────────────────────────────────────────── */
+.lc-panel[hidden] {
+  display: none !important;
+}
+
+/* ── Inbox — chiếm hết chiều cao còn lại trong lc-root ─────────── */
 .lc-inbox {
   display: flex;
   flex: 1;
@@ -72,16 +121,17 @@
   border: 1px solid #e5e7eb;
   border-radius: 0 0 10px 10px;
   overflow: hidden;
+  background: #fff;
 }
 
-/* Conversation sidebar */
 .lc-conv-sidebar {
-  width: 280px;
+  width: 260px;
   flex-shrink: 0;
   border-right: 1px solid #e5e7eb;
   display: flex;
   flex-direction: column;
   background: #f9fafb;
+  min-height: 0;
 }
 
 .lc-conv-filter {
@@ -108,6 +158,7 @@
 
 .lc-conv-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 6px 0;
 }
@@ -168,17 +219,21 @@
 }
 .lc-conv-status-dot.is-closed { background: #d1d5db; }
 
-/* ── Thread area ─────────────────────────────────────────────── */
+/* ── Thread: cột trên = hội thoại, cột dưới = trả lời ─────────── */
 .lc-thread-area {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
   background: #fff;
+  position: relative;
 }
 
 .lc-thread-empty {
-  flex: 1;
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -188,20 +243,34 @@
   font-size: 0.9rem;
 }
 
+.lc-thread-empty[hidden] {
+  display: none !important;
+}
+
 .lc-thread-inner {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  overflow: hidden;
+}
+
+.lc-thread-inner[hidden] {
+  display: none !important;
+}
+
+.lc-reply-box[hidden] {
+  display: none !important;
 }
 
 .lc-thread-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 18px;
+  padding: 10px 16px;
   border-bottom: 1px solid #f3f4f6;
   flex-shrink: 0;
+  background: #fff;
 }
 .lc-thread-title {
   font-size: 0.95rem;
@@ -222,30 +291,36 @@
   padding: 4px 10px;
 }
 
-/* Messages */
 .lc-messages {
   flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
-  padding: 16px 18px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  background: #f8faf9;
+  border: 1px solid rgba(57, 139, 67, 0.12);
+  border-radius: 8px;
+  margin: 0 12px 8px;
+  box-sizing: border-box;
 }
 
 .lc-msg {
   display: flex;
   flex-direction: column;
-  max-width: 72%;
+  max-width: 78%;
 }
 .lc-msg--visitor { align-self: flex-start; }
 .lc-msg--staff,
 .lc-msg--ai    { align-self: flex-end; }
 
 .lc-msg-bubble {
-  padding: 9px 13px;
+  padding: 11px 15px;
   border-radius: 14px;
-  font-size: 0.875rem;
-  line-height: 1.5;
+  font-size: 0.9375rem;
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -262,40 +337,86 @@
 .lc-msg--staff .lc-msg-meta,
 .lc-msg--ai    .lc-msg-meta { text-align: right; }
 
-/* Reply box */
+/* Ô trả lời — cố định ở đáy khung chat */
 .lc-reply-box {
-  border-top: 1px solid #e5e7eb;
-  padding: 12px 16px;
   flex-shrink: 0;
-  background: #fafafa;
+  border-top: 2px solid var(--primary, #398b43);
+  padding: 10px 16px 12px;
+  background: #fff;
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
 }
+
+.lc-reply-box.is-disabled {
+  opacity: 0.75;
+}
+
+.lc-reply-box.is-disabled .lc-reply-input,
+.lc-reply-box.is-disabled .lc-reply-send {
+  pointer-events: none;
+}
+
+.lc-reply-label {
+  margin: 0 0 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.lc-reply-hint {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  color: #6b7280;
+}
+
+.lc-reply-hint.is-warn {
+  color: #b45309;
+}
+
 .lc-reply-input {
   width: 100%;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   padding: 8px 12px;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
+  min-height: 52px;
+  max-height: 96px;
   resize: vertical;
   font-family: inherit;
   line-height: 1.5;
   box-sizing: border-box;
-  transition: border-color 0.15s, box-shadow 0.15s;
 }
 .lc-reply-input:focus {
   outline: none;
   border-color: var(--primary, #398b43);
-  box-shadow: 0 0 0 3px rgba(57,139,67,0.12);
+  box-shadow: 0 0 0 3px rgba(57, 139, 67, 0.12);
 }
+
 .lc-reply-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 8px;
+  gap: 12px;
+  margin-top: 10px;
 }
-.lc-reply-char { font-size: 0.72rem; color: #9ca3af; }
+
+.lc-reply-char {
+  font-size: 0.72rem;
+  color: #9ca3af;
+  flex: 1;
+}
+
+.lc-reply-send {
+  flex-shrink: 0;
+  min-width: 96px;
+  min-height: 42px;
+  padding: 0 1.25rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
 .lc-reply-msg {
   font-size: 0.78rem;
-  margin: 4px 0 0;
+  margin: 6px 0 0;
   min-height: 18px;
   color: #6b7280;
 }
@@ -346,7 +467,6 @@
   margin: 6px 0 0;
 }
 
-/* Toggle */
 .lc-toggle-wrap {
   display: flex;
   align-items: center;
@@ -379,7 +499,6 @@
 .lc-toggle-wrap input:checked ~ .lc-toggle-track .lc-toggle-knob { transform: translateX(18px); }
 .lc-toggle-label { font-size: 0.875rem; color: #374151; }
 
-/* Mode radio */
 .lc-mode-radios { display: flex; flex-direction: column; gap: 10px; }
 .lc-mode-radio {
   display: flex;

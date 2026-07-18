@@ -1,0 +1,540 @@
+{% extends "admin_layout.html" %}
+{% block admin_main %}
+{% macro fmt_metric(m) %}
+{% set v = m.value %}
+{% if m.format == 'vnd' %}
+{{ "{:,.0f}".format(v|float).replace(",", ".") }} ₫
+{% elif m.format == 'pct' %}
+{{ v }}%
+{% elif m.format == 'ratio' %}
+{{ v }}×
+{% elif m.format == 'days' %}
+{{ v }} ngày
+{% else %}
+{{ v }}
+{% endif %}
+{% endmacro %}
+
+{% macro rag_style(status) %}
+{% if status == 'red' %}#fef2f2; border-color:#fecaca;{% elif status == 'yellow' %}#fffbeb; border-color:#fde68a;{% else %}#f0fdf4; border-color:#bbf7d0;{% endif %}
+{% endmacro %}
+
+{% macro rag_text(status) %}
+{% if status == 'red' %}#991b1b{% elif status == 'yellow' %}#92400e{% else %}#166534{% endif %}
+{% endmacro %}
+
+{% macro sparkline(values, color='#6366f1') %}
+{% if values and values|length > 1 %}
+{% set mx = values|max %}
+{% set mn = values|min %}
+{% set span = mx - mn if mx != mn else 1 %}
+<svg width="100%" height="28" viewBox="0 0 120 28" role="img" aria-label="Trend {{ values|length }} tuần" style="margin-top:.25rem;">
+  <polyline fill="none" stroke="{{ color }}" stroke-width="1.5" stroke-linejoin="round"
+    points="{% for v in values %}{{ (loop.index0 * 120 / (values|length - 1))|round(2) }},{{ (24 - ((v - mn) / span * 20))|round(2) }}{% if not loop.last %} {% endif %}{% endfor %}" />
+</svg>
+{% endif %}
+{% endmacro %}
+
+<style>
+  .owd-nav-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    padding: .35rem .65rem;
+    font-size: .76rem;
+    font-weight: 600;
+    color: #334155;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .owd-nav-btn:hover { background: #f8fafc; border-color: #6366f1; color: #4338ca; }
+  .owd-nav-btn.is-primary { background: #6366f1; color: #fff; border-color: #6366f1; }
+  .owd-nav-btn.is-primary:hover { background: #4f46e5; color: #fff; }
+  .owd-jump-pill {
+    display: inline-flex;
+    padding: .25rem .55rem;
+    font-size: .72rem;
+    font-weight: 600;
+    border-radius: 999px;
+    text-decoration: none;
+    border: 1px solid #e2e8f0;
+    color: #475569;
+    background: #fff;
+  }
+  .owd-jump-pill:hover { border-color: #6366f1; color: #4338ca; }
+  .owd-metric-card { transition: box-shadow .15s, transform .15s; }
+  .owd-metric-card:hover { box-shadow: 0 4px 14px rgba(15, 23, 42, .08); }
+  .owd-drill-btn {
+    display: inline-flex;
+    align-items: center;
+    margin-top: .45rem;
+    padding: .22rem .5rem;
+    font-size: .68rem;
+    font-weight: 700;
+    color: #4338ca;
+    background: #eef2ff;
+    border: 1px solid #c7d2fe;
+    border-radius: 4px;
+    text-decoration: none;
+  }
+  .owd-drill-btn:hover { background: #e0e7ff; }
+  .owd-block-link {
+    font-size: .72rem;
+    font-weight: 600;
+    color: #6366f1;
+    text-decoration: none;
+    margin-left: .5rem;
+  }
+  .owd-block-link:hover { text-decoration: underline; }
+</style>
+
+{% set cl = dashboard.cash_ledger or {} %}
+{% set fin_url = '/crm/financials?year=' ~ dashboard.week.end[:4] ~ '&month=' ~ dashboard.week.end[5:7] %}
+{% set biz_url = '/crm/business-dashboard?year=' ~ dashboard.week.end[:4] ~ '&month=' ~ dashboard.week.end[5:7] %}
+{% set rag = dashboard.rag_counts or {} %}
+
+<div style="padding:1.5rem;max-width:1200px;">
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.75rem;">
+    <div>
+      <h2 style="margin:0;font-size:1.15rem;font-weight:700;">Dashboard tuần — Chủ doanh nghiệp</h2>
+      <p style="margin:.25rem 0 0;font-size:.78rem;color:#64748b;">
+        {{ dashboard.week.label }}
+      </p>
+    </div>
+    <form method="get" style="display:flex;align-items:center;gap:.5rem;font-size:.8rem;flex-wrap:wrap;">
+      <label style="color:#64748b;">Tuần (ISO)</label>
+      <input type="number" name="week" min="1" max="53" value="{{ dashboard.week.iso_week }}"
+             style="width:2.5rem;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;">
+      <span>/</span>
+      <input type="number" name="year" min="2020" max="2099" value="{{ dashboard.week.iso_year }}"
+             style="width:4.5rem;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;">
+      <label style="color:#64748b;">Trend</label>
+      <input type="number" name="trend_weeks" min="4" max="12"
+             value="{{ dashboard.trends.weeks if dashboard.trends else 8 }}"
+             style="width:2.5rem;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;">
+      <button type="submit"
+              style="padding:.25rem .6rem;background:#6366f1;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+        Xem
+      </button>
+      {% if can_export %}
+      <a href="/api/crm/owner-weekly/export?year={{ dashboard.week.iso_year }}&week={{ dashboard.week.iso_week }}&format=xlsx"
+         style="padding:.25rem .55rem;border:1px solid #cbd5e1;border-radius:4px;text-decoration:none;color:#334155;font-size:.78rem;">
+        Export Excel
+      </a>
+      <a href="/api/crm/owner-weekly/export?year={{ dashboard.week.iso_year }}&week={{ dashboard.week.iso_week }}&format=csv"
+         style="padding:.25rem .55rem;border:1px solid #cbd5e1;border-radius:4px;text-decoration:none;color:#334155;font-size:.78rem;">
+        Export CSV
+      </a>
+      {% endif %}
+    </form>
+  </div>
+
+  <nav aria-label="Điều hướng nhanh" style="margin-bottom:1rem;padding:.75rem .85rem;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;">
+    <div style="font-size:.68rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.45rem;">
+      Mở trang liên quan
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:.4rem;">
+      <a href="{{ fin_url }}" class="owd-nav-btn is-primary">💰 Chi tiết tài chính</a>
+      <a href="{{ biz_url }}" class="owd-nav-btn">📊 Business Dashboard</a>
+      <a href="/crm/leads" class="owd-nav-btn">🎯 Quản lý Lead</a>
+      <a href="/crm/sales" class="owd-nav-btn">📈 Kinh doanh / Pipeline</a>
+      <a href="/crm/proposals" class="owd-nav-btn">📄 Báo giá</a>
+      <a href="/crm/service-delivery" class="owd-nav-btn">⚙️ Service Delivery</a>
+      <a href="/crm/hub" class="owd-nav-btn">📥 Hub nhắc việc</a>
+      <a href="#owner-cash-ledger" class="owd-nav-btn">🏦 Sổ quỹ</a>
+      <a href="#owner-targets" class="owd-nav-btn">⚙️ Target RAG</a>
+    </div>
+  </nav>
+
+  <div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1rem;align-items:center;">
+    <span style="font-size:.72rem;color:#64748b;margin-right:.25rem;">Tóm tắt tuần:</span>
+    <span style="font-size:.72rem;padding:.2rem .5rem;border-radius:999px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;">
+      {{ rag.get('green', 0) }} xanh
+    </span>
+    <span style="font-size:.72rem;padding:.2rem .5rem;border-radius:999px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;">
+      {{ rag.get('yellow', 0) }} vàng
+    </span>
+    <span style="font-size:.72rem;padding:.2rem .5rem;border-radius:999px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;">
+      {{ rag.get('red', 0) }} đỏ
+    </span>
+    <span style="font-size:.72rem;color:#94a3b8;margin-left:.35rem;">| Nhảy tới:</span>
+    <a href="#block-cash" class="owd-jump-pill">Khối Tiền</a>
+    <a href="#block-sales" class="owd-jump-pill">Kinh doanh</a>
+    <a href="#block-efficiency" class="owd-jump-pill">Hiệu quả</a>
+    <a href="#block-risk" class="owd-jump-pill">Rủi ro</a>
+  </div>
+
+  <div style="margin-bottom:1rem;padding:.75rem .85rem;background:#fff;border:1px solid #e2e8f0;border-radius:8px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.65rem;">
+    <div style="font-size:.8rem;">
+      <strong>Sổ quỹ:</strong>
+      {% if cl.has_snapshot %}
+      <span style="color:#059669;">Đang dùng snapshot thật</span>
+      {% if cl.latest_snapshot %}
+      · {{ cl.latest_snapshot.snapshot_on }} =
+      {{ "{:,.0f}".format(cl.latest_snapshot.balance_vnd|float).replace(",", ".") }} ₫
+      {% endif %}
+      {% else %}
+      <span style="color:#d97706;">Proxy (thu − chi) — nên nhập snapshot</span>
+      {% endif %}
+    </div>
+    <a href="#owner-cash-ledger" class="owd-drill-btn">Nhập / xem sổ quỹ →</a>
+  </div>
+
+  <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;font-size:.72rem;">
+    <span style="padding:.2rem .5rem;border-radius:999px;background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;">
+      ● Xanh — đạt/vượt target
+    </span>
+    <span style="padding:.2rem .5rem;border-radius:999px;background:#fffbeb;color:#92400e;border:1px solid #fde68a;">
+      ● Vàng — lệch nhẹ, theo dõi sát
+    </span>
+    <span style="padding:.2rem .5rem;border-radius:999px;background:#fef2f2;color:#991b1b;border:1px solid #fecaca;">
+      ● Đỏ — cần xử lý trong 7 ngày
+    </span>
+  </div>
+
+  <div style="margin-bottom:1.25rem;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:.85rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;">
+    <div style="font-size:.82rem;">
+      <strong>Inbox Hub</strong> (scope Dashboard tuần):
+      {{ weekly_inbox.pending_count }} đang chờ
+      {% if weekly_inbox.critical_count %}· {{ weekly_inbox.critical_count }} đỏ{% endif %}
+      {% if weekly_inbox.warning_count %}· {{ weekly_inbox.warning_count }} vàng{% endif %}
+    </div>
+    <div style="display:flex;gap:.45rem;align-items:center;flex-wrap:wrap;">
+      <a href="/crm/hub" class="owd-nav-btn is-primary">Mở Hub →</a>
+      <button type="button" id="crm-owner-weekly-inbox-sync" class="owd-nav-btn" style="cursor:pointer;">
+        Đồng bộ inbox
+      </button>
+      <span id="crm-owner-weekly-inbox-msg" style="font-size:.68rem;color:#64748b;"></span>
+    </div>
+  </div>
+
+  {% set brief = dashboard.pre_execution %}
+  {% if brief.action_count %}
+  <section style="margin-bottom:1.5rem;border-radius:10px;padding:1rem 1.1rem;
+                  background:{% if brief.red_count %}#fef2f2{% else %}#fffbeb{% endif %};
+                  border:1px solid {% if brief.red_count %}#fecaca{% else %}#fde68a{% endif %};">
+    <h3 style="margin:0 0 .35rem;font-size:.95rem;color:{% if brief.red_count %}#991b1b{% else %}#92400e{% endif %};">
+      {{ brief.title }}
+    </h3>
+    <p style="margin:0 0 .75rem;font-size:.78rem;color:#64748b;">{{ brief.subtitle }}</p>
+    <p style="margin:0 0 .65rem;font-size:.8rem;font-weight:600;">
+      {{ brief.red_count }} đỏ · {{ brief.yellow_count }} vàng — xử lý trước khi cam kết kế hoạch tuần tới
+    </p>
+    <div style="display:flex;flex-direction:column;gap:.65rem;">
+      {% for action in brief.actions[:8] %}
+      <div style="background:#fff;border-radius:8px;padding:.65rem .75rem;border:1px solid #e2e8f0;">
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;">
+          <span style="font-size:.65rem;font-weight:700;padding:.1rem .4rem;border-radius:4px;
+                       background:{% if action.status == 'red' %}#fecaca{% else %}#fde68a{% endif %};
+                       color:{% if action.status == 'red' %}#991b1b{% else %}#92400e{% endif %};">
+            {{ action.block_label }}
+          </span>
+          <strong style="font-size:.82rem;">{{ action.metric_label }}</strong>
+          <span style="font-size:.72rem;color:#64748b;">— {{ action.status_label }}</span>
+        </div>
+        {% if action.hint %}
+        <p style="margin:.35rem 0 0;font-size:.76rem;color:#334155;">{{ action.hint }}</p>
+        {% endif %}
+        {% if action.steps %}
+        <ul style="margin:.35rem 0 0;padding-left:1.1rem;font-size:.74rem;color:#475569;line-height:1.45;">
+          {% for step in action.steps %}
+          <li>{{ step }}</li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        {% if action.links %}
+        <p style="margin:.4rem 0 0;font-size:.72rem;display:flex;flex-wrap:wrap;gap:.35rem;">
+          {% for link in action.links %}
+          <a href="{{ link.url }}" class="owd-drill-btn">{{ link.label }} →</a>
+          {% endfor %}
+        </p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% else %}
+  <section style="margin-bottom:1.5rem;border-radius:10px;padding:.85rem 1rem;background:#f0fdf4;border:1px solid #bbf7d0;">
+    <strong style="font-size:.88rem;color:#166534;">Tuần ổn định — không có chỉ số đỏ/vàng cần xử lý gấp.</strong>
+  </section>
+  {% endif %}
+
+  {% for block_key in ['cash', 'sales', 'efficiency', 'risk'] %}
+  {% set block = dashboard.blocks[block_key] %}
+  {% set block_module_url = fin_url if block_key == 'cash' else '/crm/sales' if block_key == 'sales' else biz_url if block_key == 'efficiency' else '/crm/hub' %}
+  {% set block_module_label = 'Tài chính' if block_key == 'cash' else 'Sales' if block_key == 'sales' else 'Business KPI' if block_key == 'efficiency' else 'Hub rủi ro' %}
+  <section id="block-{{ block_key }}" style="margin-bottom:1.25rem;scroll-margin-top:5rem;">
+    <h3 style="margin:0 0 .65rem;font-size:.92rem;font-weight:700;color:#1e293b;border-bottom:2px solid #e2e8f0;padding-bottom:.35rem;">
+      Khối {{ loop.index }}: {{ block.label }}
+      <a href="{{ block_module_url }}" class="owd-block-link">Mở {{ block_module_label }} →</a>
+    </h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.65rem;">
+      {% for m in block.metrics %}
+      <article class="owd-metric-card" style="border-radius:8px;padding:.75rem .85rem;border:1px solid;
+                      background:{{ rag_style(m.status) }};">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.35rem;">
+          <span style="font-size:.72rem;color:#64748b;line-height:1.3;">{{ m.label }}</span>
+          <span style="font-size:.6rem;font-weight:700;padding:.1rem .35rem;border-radius:4px;white-space:nowrap;
+                       color:{{ rag_text(m.status) }};border:1px solid currentColor;opacity:.85;">
+            {{ m.status_label }}
+          </span>
+        </div>
+        <p style="margin:.35rem 0 0;font-size:1.05rem;font-weight:700;color:{{ rag_text(m.status) }};">
+          {{ fmt_metric(m) }}
+        </p>
+        {% if m.target is not none and m.format in ('vnd', 'pct', 'count', 'days', 'ratio') %}
+        <p style="margin:.2rem 0 0;font-size:.68rem;color:#64748b;">Target: {{ fmt_metric({'value': m.target, 'format': m.format}) if m.format != 'count' else m.target }}</p>
+        {% endif %}
+        {% if m.delta_pct is not none %}
+        <p style="margin:.15rem 0 0;font-size:.68rem;color:#64748b;">So tuần trước: {{ m.delta_pct }}%</p>
+        {% endif %}
+        {% if m.trend_values %}
+        {{ sparkline(m.trend_values, '#6366f1' if block_key == 'cash' else '#2563eb' if block_key == 'sales' else '#059669' if block_key == 'efficiency' else '#dc2626') }}
+        {% endif %}
+        {% if m.note %}
+        <p style="margin:.25rem 0 0;font-size:.65rem;color:#94a3b8;font-style:italic;">{{ m.note }}</p>
+        {% endif %}
+        {% if m.drill_url %}
+        <a href="{{ m.drill_url }}" class="owd-drill-btn">Xem chi tiết →</a>
+        {% endif %}
+        {% if m.investigate and m.status != 'green' %}
+        <details style="margin-top:.45rem;font-size:.72rem;">
+          <summary style="cursor:pointer;color:#6366f1;font-weight:600;">Mở rộng điều tra</summary>
+          <p style="margin:.35rem 0 .25rem;color:#334155;font-weight:600;">{{ m.investigate.title }}</p>
+          {% if m.investigate.steps %}
+          <ul style="margin:0;padding-left:1rem;color:#475569;line-height:1.4;">
+            {% for step in m.investigate.steps %}
+            <li>{{ step }}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          {% if m.investigate.links %}
+          <p style="margin:.35rem 0 0;">
+            {% for link in m.investigate.links %}
+            <a href="{{ link.url }}" style="color:#6366f1;">{{ link.label }}</a>{% if not loop.last %} · {% endif %}
+            {% endfor %}
+          </p>
+          {% endif %}
+        </details>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+
+  <p style="margin-top:1rem;font-size:.7rem;color:#94a3b8;">
+    {% if cl.has_snapshot %}
+    Tiền đầu/cuối tuần từ <strong>sổ quỹ</strong> (snapshot + dòng tiền CRM).
+    {% else %}
+    Tiền đầu/cuối tuần đang dùng <strong>proxy</strong> (thu − chi lũy kế) — nhập snapshot tại mục Sổ quỹ bên dưới.
+    {% endif %}
+    KPI cohort tuần ISO · Churn WoW · sparkline {{ dashboard.trends.weeks if dashboard.trends else 8 }} tuần.
+  </p>
+
+  <div id="owner-cash-ledger" style="margin-top:1rem;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;scroll-margin-top:5rem;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin-bottom:.65rem;">
+      <div>
+        <h3 style="margin:0 0 .25rem;font-size:.9rem;font-weight:700;color:#334155;">🏦 Sổ quỹ — snapshot số dư</h3>
+        <p style="margin:0;font-size:.72rem;color:#64748b;">
+          Nhập số dư ngân hàng/tiền mặt cuối ngày để tiền đầu/cuối tuần chính xác.
+        </p>
+      </div>
+      <a href="{{ fin_url }}" class="owd-nav-btn">Xem thu/chi CRM →</a>
+    </div>
+
+    {% if can_configure %}
+    <form id="crm-owner-cash-snapshot-form" style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end;font-size:.78rem;margin-bottom:.75rem;padding:.65rem;background:#f8fafc;border-radius:8px;border:1px dashed #cbd5e1;">
+      <label style="display:flex;flex-direction:column;gap:.15rem;">
+        <span style="color:#64748b;font-size:.68rem;">Ngày snapshot</span>
+        <input name="snapshot_on" type="date" value="{{ dashboard.week.end }}"
+               style="padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;">
+      </label>
+      <label style="display:flex;flex-direction:column;gap:.15rem;">
+        <span style="color:#64748b;font-size:.68rem;">Số dư (VNĐ)</span>
+        <input name="balance_vnd" type="number" step="1" placeholder="50000000"
+               style="width:9rem;padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;">
+      </label>
+      <label style="display:flex;flex-direction:column;gap:.15rem;">
+        <span style="color:#64748b;font-size:.68rem;">Nguồn</span>
+        <select name="source" style="padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;">
+          <option value="manual">Nhập tay</option>
+          <option value="bank">Ngân hàng</option>
+        </select>
+      </label>
+      <label style="display:flex;flex-direction:column;gap:.15rem;flex:1;min-width:140px;">
+        <span style="color:#64748b;font-size:.68rem;">Ghi chú</span>
+        <input name="notes" type="text" placeholder="TK chính, …"
+               style="padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;">
+      </label>
+      <button type="submit"
+              style="padding:.3rem .7rem;background:#0d9488;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+        Lưu snapshot
+      </button>
+      <span id="crm-owner-cash-snapshot-msg" style="font-size:.72rem;color:#64748b;"></span>
+    </form>
+    {% else %}
+    <p style="margin:0 0 .75rem;font-size:.76rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:.5rem .65rem;">
+      Bạn chỉ có quyền xem. Liên hệ admin để được quyền <strong>configure</strong> trên Dashboard tuần nếu cần nhập sổ quỹ.
+    </p>
+    {% endif %}
+
+    {% if cl.snapshots %}
+    <div style="font-size:.72rem;color:#475569;">
+      <div style="font-weight:600;margin-bottom:.35rem;">Snapshot gần đây</div>
+      <ul style="margin:0;padding-left:1.1rem;line-height:1.5;">
+        {% for s in cl.snapshots %}
+        <li>
+          {{ s.snapshot_on }} —
+          {{ "{:,.0f}".format(s.balance_vnd|float).replace(",", ".") }} ₫
+          ({{ s.source }})
+          {% if s.notes %}· {{ s.notes }}{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+    {% set fc = cl.forecast or {} %}
+    {% if fc.ar_inflow_vnd is defined %}
+    <p style="margin:.65rem 0 0;font-size:.68rem;color:#94a3b8;">
+      Forecast 30 ngày: AR thu dự kiến {{ "{:,.0f}".format(fc.ar_inflow_vnd|float).replace(",", ".") }} ₫
+      · chi TB 30 ngày {{ "{:,.0f}".format(fc.projected_outflow_30d_vnd|float).replace(",", ".") }} ₫
+    </p>
+    {% endif %}
+  </div>
+
+  <div id="owner-targets" style="margin-top:1.5rem;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;scroll-margin-top:5rem;">
+    <h3 style="margin:0 0 .35rem;font-size:.9rem;font-weight:700;color:#334155;">⚙️ Target tuần (RAG)</h3>
+    {% if can_configure %}
+    <p style="margin:0 0 .75rem;font-size:.72rem;color:#64748b;">
+      Lưu vào DB (<code>owner_*</code>) · env fallback <code>PTT_OWNER_WEEKLY_*</code>
+    </p>
+    <form id="crm-owner-weekly-target-form">
+      {% for group_key, group_label, keys in target_groups %}
+      <div style="margin-bottom:.85rem;">
+        <div style="font-size:.78rem;font-weight:600;color:#475569;margin-bottom:.4rem;">{{ group_label }}</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.5rem;font-size:.78rem;">
+          {% for key in keys %}
+          <label style="display:flex;flex-direction:column;gap:.15rem;">
+            <span style="color:#64748b;font-size:.68rem;">{{ target_labels.get(key, key) }}</span>
+            <input name="{{ key }}" type="number" step="any" value="{{ targets.get(key, '') }}"
+                   style="padding:.25rem .4rem;border:1px solid #cbd5e1;border-radius:4px;">
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+      <div style="display:flex;align-items:center;gap:.5rem;margin-top:.35rem;">
+        <button type="submit"
+                style="padding:.3rem .7rem;background:#6366f1;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+          Lưu target
+        </button>
+        <span id="crm-owner-weekly-target-msg" style="font-size:.72rem;color:#64748b;"></span>
+      </div>
+    </form>
+    {% else %}
+    <p style="margin:.35rem 0 0;font-size:.76rem;color:#64748b;">
+      Target hiện tại (chỉ xem):
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.4rem;margin-top:.5rem;font-size:.74rem;">
+      {% for group_key, group_label, keys in target_groups %}
+        {% for key in keys %}
+        <div style="padding:.35rem .5rem;background:#f8fafc;border-radius:4px;border:1px solid #e2e8f0;">
+          <div style="color:#64748b;font-size:.65rem;">{{ target_labels.get(key, key) }}</div>
+          <div style="font-weight:700;color:#334155;">{{ targets.get(key, '—') }}</div>
+        </div>
+        {% endfor %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+<script>
+(function () {
+  const syncBtn = document.getElementById("crm-owner-weekly-inbox-sync");
+  const syncMsg = document.getElementById("crm-owner-weekly-inbox-msg");
+  if (syncBtn) {
+    syncBtn.addEventListener("click", async function () {
+      if (syncMsg) syncMsg.textContent = "Đang đồng bộ…";
+      try {
+        const res = await fetch("/api/crm/owner-weekly/inbox/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            year: {{ dashboard.week.iso_year }},
+            week: {{ dashboard.week.iso_week }},
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Lỗi");
+        if (syncMsg) {
+          syncMsg.textContent = "Đã đồng bộ " + (data.inbox && data.inbox.synced != null ? data.inbox.synced : 0) + " mục.";
+        }
+        window.location.reload();
+      } catch (e) {
+        if (syncMsg) syncMsg.textContent = e instanceof Error ? e.message : "Lỗi";
+      }
+    });
+  }
+
+  const form = document.getElementById("crm-owner-weekly-target-form");
+  const msg = document.getElementById("crm-owner-weekly-target-msg");
+  if (form) {
+  form.addEventListener("submit", async function (ev) {
+    ev.preventDefault();
+    const targets = {};
+    form.querySelectorAll("input[name]").forEach(function (inp) {
+      const v = inp.value.trim();
+      if (v !== "") targets[inp.name] = Number(v);
+    });
+    if (msg) msg.textContent = "Đang lưu…";
+    try {
+      const res = await fetch("/api/crm/owner-weekly/config", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targets: targets }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Lỗi");
+      if (msg) msg.textContent = "Đã lưu. Tải lại để cập nhật RAG.";
+      window.location.reload();
+    } catch (e) {
+      if (msg) msg.textContent = e instanceof Error ? e.message : "Lỗi";
+    }
+  });
+  }
+
+  const cashForm = document.getElementById("crm-owner-cash-snapshot-form");
+  const cashMsg = document.getElementById("crm-owner-cash-snapshot-msg");
+  if (cashForm) {
+    cashForm.addEventListener("submit", async function (ev) {
+      ev.preventDefault();
+      const fd = new FormData(cashForm);
+      const payload = {
+        snapshot_on: String(fd.get("snapshot_on") || ""),
+        balance_vnd: Number(fd.get("balance_vnd")),
+        source: String(fd.get("source") || "manual"),
+        notes: String(fd.get("notes") || ""),
+      };
+      if (cashMsg) cashMsg.textContent = "Đang lưu…";
+      try {
+        const res = await fetch("/api/crm/owner-weekly/cash-snapshots", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Lỗi");
+        if (cashMsg) cashMsg.textContent = "Đã lưu snapshot.";
+        window.location.reload();
+      } catch (e) {
+        if (cashMsg) cashMsg.textContent = e instanceof Error ? e.message : "Lỗi";
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

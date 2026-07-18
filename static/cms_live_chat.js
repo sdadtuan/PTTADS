@@ -6,6 +6,15 @@
   var _activeMsgMax = 0;
   var _filterStatus = 'open';
   var _pollTimer = null;
+  var _canReply = true;
+
+  try {
+    var initEl = qs('#lc-init-data');
+    if (initEl) {
+      var initData = JSON.parse(initEl.textContent || '{}');
+      _canReply = initData.can_reply !== false;
+    }
+  } catch (_) {}
 
   function qs(sel, ctx) { return (ctx || document).querySelector(sel); }
   function qsa(sel, ctx) { return Array.from((ctx || document).querySelectorAll(sel)); }
@@ -146,10 +155,14 @@
     if (titleEl) titleEl.textContent = name;
     if (metaEl)  metaEl.textContent = (conv.visitor_page || '') + (conv.created_at ? '  ·  ' + fmtTime(conv.created_at) : '');
     if (threadInner) threadInner.hidden = false;
-    if (threadEmpty) threadEmpty.style.display = 'none';
+    if (threadEmpty) threadEmpty.hidden = true;
+    var replyBox = qs('#lc-reply-box');
+    if (replyBox) replyBox.hidden = false;
 
     if (closeBtn)  { closeBtn.hidden  = conv.status === 'closed'; }
     if (reopenBtn) { reopenBtn.hidden = conv.status !== 'closed'; }
+
+    updateReplyBoxState(conv);
 
     var msgs = qs('#lc-messages');
     if (msgs) msgs.innerHTML = '';
@@ -163,8 +176,52 @@
   function showThreadEmpty() {
     var threadInner = qs('#lc-thread-inner');
     var threadEmpty = qs('#lc-thread-empty');
+    var replyBox = qs('#lc-reply-box');
     if (threadInner) threadInner.hidden = true;
-    if (threadEmpty) threadEmpty.style.display = '';
+    if (threadEmpty) threadEmpty.hidden = false;
+    if (replyBox) replyBox.hidden = true;
+    updateReplyBoxState(null);
+  }
+
+  function updateReplyBoxState(conv) {
+    var replyBox = qs('#lc-reply-box');
+    var replyHint = qs('#lc-reply-hint');
+    var replyInputEl = qs('#lc-reply-input');
+    var replySendEl = qs('#lc-reply-send');
+    if (!replyBox) return;
+
+    var closed = !!(conv && conv.status === 'closed');
+    var blocked = !_canReply;
+    var disabled = closed || blocked;
+
+    if (replyInputEl) {
+      replyInputEl.disabled = disabled;
+      if (closed) {
+        replyInputEl.placeholder = 'Hội thoại đã đóng — nhấn "Mở lại" để trả lời';
+      } else if (blocked) {
+        replyInputEl.placeholder = 'Tài khoản không có quyền trả lời chat';
+      } else {
+        replyInputEl.placeholder = 'Nhập phản hồi cho khách… (Enter gửi, Shift+Enter xuống dòng)';
+      }
+    }
+    if (replySendEl) replySendEl.disabled = disabled;
+    replyBox.classList.toggle('is-disabled', disabled);
+
+    if (replyHint) {
+      if (closed) {
+        replyHint.hidden = false;
+        replyHint.className = 'lc-reply-hint is-warn';
+        replyHint.textContent = 'Hội thoại đã đóng. Nhấn "Mở lại" để tiếp tục trả lời khách.';
+      } else if (blocked) {
+        replyHint.hidden = false;
+        replyHint.className = 'lc-reply-hint is-warn';
+        replyHint.textContent = 'Bạn chỉ có quyền xem — cần quyền tạo tin nhắn trên Live Chat để trả lời.';
+      } else {
+        replyHint.hidden = true;
+        replyHint.textContent = '';
+        replyHint.className = 'lc-reply-hint';
+      }
+    }
   }
 
   function loadMessages(convId, cb) {
@@ -218,6 +275,7 @@
       var reopenBtn = qs('#lc-reopen-conv-btn');
       if (closeBtn)  closeBtn.hidden  = status === 'closed';
       if (reopenBtn) reopenBtn.hidden = status !== 'closed';
+      updateReplyBoxState(conv);
       loadConversations();
     })
     .catch(function () {});
@@ -259,6 +317,15 @@
 
   function sendReply() {
     if (!_activeConvId || !replyInput) return;
+    if (!_canReply) {
+      showReplyMsg('Không có quyền trả lời chat', true);
+      return;
+    }
+    var conv = _convs.find(function (c) { return c.id === _activeConvId; });
+    if (conv && conv.status === 'closed') {
+      showReplyMsg('Hội thoại đã đóng — mở lại trước khi trả lời', true);
+      return;
+    }
     var content = replyInput.value.trim();
     if (!content) return;
     if (replySend) { replySend.disabled = true; replySend.textContent = '…'; }

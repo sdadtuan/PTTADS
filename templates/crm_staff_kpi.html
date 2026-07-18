@@ -1,0 +1,497 @@
+{% extends "admin_layout.html" %}
+{% block admin_main %}
+<div style="padding:1rem 1.5rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;">
+    <h2 style="margin:0;font-size:1.1rem;font-weight:700;color:#1e293b;">KPI Nhân sự</h2>
+    <a href="/crm/service-delivery" style="font-size:.8rem;color:#6366f1;text-decoration:none;">← Dịch vụ</a>
+  </div>
+
+  <form method="get" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;
+       padding:1rem;margin-bottom:1.5rem;display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;">
+    <div>
+      <label style="display:block;font-size:.75rem;color:#64748b;margin-bottom:.25rem;">Nhân viên</label>
+      <select name="staff_id" style="border:1px solid #cbd5e1;border-radius:6px;padding:.4rem .6rem;
+              font-size:.85rem;" onchange="this.form.submit()">
+        <option value="">-- Chọn nhân viên --</option>
+        {% for s in all_staff %}
+        <option value="{{ s.id }}" {% if selected_staff_id == s.id %}selected{% endif %}>{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label style="display:block;font-size:.75rem;color:#64748b;margin-bottom:.25rem;">Tháng</label>
+      <input type="number" name="month" min="1" max="12" value="{{ month }}"
+             style="border:1px solid #cbd5e1;border-radius:6px;padding:.4rem .6rem;font-size:.85rem;width:4rem;">
+    </div>
+    <div>
+      <label style="display:block;font-size:.75rem;color:#64748b;margin-bottom:.25rem;">Năm</label>
+      <input type="number" name="year" min="2020" max="2099" value="{{ year }}"
+             style="border:1px solid #cbd5e1;border-radius:6px;padding:.4rem .6rem;font-size:.85rem;width:5rem;">
+    </div>
+    <button type="submit" style="background:#6366f1;color:#fff;border:none;border-radius:6px;
+            padding:.4rem .9rem;font-size:.85rem;cursor:pointer;">Xem</button>
+  </form>
+
+  {% if not selected_staff %}
+  <div style="text-align:center;color:#9ca3af;padding:3rem 0;font-size:.9rem;">
+    Chọn nhân viên để xem KPI tháng {{ month }}/{{ year }}
+  </div>
+  {% else %}
+
+  {% if kpi_readiness and (kpi_readiness.show_gap_banner or kpi_readiness.pending_am_sync > 0 or (am_backfill_result and am_backfill_result.total_updated > 0)) %}
+  <div id="kpi-readiness-banner"
+       style="margin-bottom:1.25rem;border-radius:8px;padding:.85rem 1rem;font-size:.82rem;line-height:1.55;">
+    {% if am_backfill_result and am_backfill_result.total_updated > 0 %}
+    <div style="background:#ecfdf5;border:1px solid #99f6e4;color:#065f46;border-radius:8px;padding:.65rem .85rem;margin-bottom:.65rem;">
+      ✓ Đã đồng bộ <strong>{{ am_backfill_result.total_updated }}</strong> lifecycle
+      với AM từ owner lead (tự chạy khi mở trang).
+    </div>
+    {% endif %}
+    {% if kpi_readiness.show_gap_banner %}
+    <div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;padding:.75rem 1rem;">
+      <strong>⚠ Chưa có dữ liệu KPI:</strong>
+      NV có <strong>{{ kpi_readiness.leads_owned }}</strong> lead
+      nhưng <strong>0 lifecycle</strong> gán AM —
+      cần tạo <strong>Pre-sales</strong> và hoàn thành <strong>Intake</strong> trên từng lead
+      (hoặc gắn lifecycle draft với lead) thì metric Lead/AM mới có số.
+      {% if kpi_readiness.lead_ids %}
+      <div style="margin-top:.5rem;display:flex;flex-wrap:wrap;gap:.35rem .65rem;">
+        {% for lid in kpi_readiness.lead_ids %}
+        <a href="/crm/leads/{{ lid }}" style="color:#b45309;font-weight:600;">Lead #{{ lid }} →</a>
+        {% endfor %}
+        <a href="/crm/leads" style="color:#b45309;">Tất cả lead</a>
+      </div>
+      {% endif %}
+    </div>
+    {% elif kpi_readiness.pending_am_sync > 0 %}
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:8px;padding:.75rem 1rem;">
+      <strong>ℹ {{ kpi_readiness.pending_am_sync }} lifecycle</strong> đã gắn lead nhưng chưa khớp AM —
+      bấm <strong>Đồng bộ AM</strong> bên dưới hoặc tải lại trang.
+    </div>
+    {% endif %}
+    {% if kpi_readiness.show_presales_hint and not kpi_readiness.show_gap_banner %}
+    <div style="background:#fffbeb;border:1px solid #fde68a;color:#92400e;border-radius:8px;
+                padding:.65rem .85rem;margin-top:.65rem;">
+      Lead đã có nhưng chưa có Pre-sales / Intake hoàn thành — KPI Lead sẽ = 0 cho đến khi chạy quy trình.
+    </div>
+    {% endif %}
+    <div style="margin-top:.65rem;display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;">
+      <button type="button" onclick="kpiBackfillAm({{ selected_staff.id }})"
+              id="kpi-backfill-am-btn"
+              style="background:#6366f1;color:#fff;border:none;border-radius:6px;
+                     padding:.35rem .75rem;font-size:.78rem;cursor:pointer;">
+        Đồng bộ AM từ lead owner
+      </button>
+      <span id="kpi-backfill-am-status" style="font-size:.75rem;color:#64748b;"></span>
+      <span style="font-size:.72rem;color:#94a3b8;">
+        Lifecycle AM: {{ kpi_readiness.lifecycles_as_am }} ·
+        Lead: {{ kpi_readiness.leads_owned }} ·
+        Intake ✓: {{ kpi_readiness.intake_completed }}
+      </span>
+    </div>
+  </div>
+  {% endif %}
+
+  {% set _sid = selected_staff.id %}
+  {% set _y = year %}
+  {% set _m = month %}
+
+  {# ─── AM Section ─────────────────────────────────────────────────────── #}
+  <div style="margin-bottom:2.5rem;">
+    <h3 style="font-size:.9rem;color:#1d4ed8;font-weight:700;margin:0 0 1rem;
+        border-bottom:2px solid #bfdbfe;padding-bottom:.5rem;">
+      Account Manager — Tháng {{ month }}/{{ year }}
+    </h3>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1rem;">
+
+      {# Card: received_revenue #}
+      {% set am_recv = (am_metrics.received_revenue if am_metrics else 0)|int %}
+      {% set t_recv = (targets.get('received_revenue', 0))|int %}
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+        <div style="font-size:.7rem;color:#64748b;margin-bottom:.25rem;">Doanh thu thực nhận</div>
+        <div style="font-size:1.15rem;font-weight:700;color:#1e293b;">{{ "{:,.0f}".format(am_recv) }} ₫</div>
+        <div style="display:flex;align-items:center;gap:.4rem;margin-top:.5rem;">
+          <span style="font-size:.7rem;color:#94a3b8;">Target:</span>
+          <input type="number" min="0" step="500000" value="{{ t_recv }}"
+                 style="width:7rem;border:1px solid #cbd5e1;border-radius:4px;padding:.2rem .4rem;font-size:.75rem;"
+                 onblur="setTarget({{ _sid }}, 'am', 'received_revenue', {{ _y }}, {{ _m }}, this.value)">
+        </div>
+        {% if t_recv > 0 %}
+        <div style="margin-top:.25rem;font-size:.7rem;
+            color:{{ '#16a34a' if am_recv >= t_recv else '#dc2626' }}">
+          {% if am_recv >= t_recv %}✓ Đạt{% else %}✗ {{ "{:.0f}".format(am_recv / t_recv * 100) }}%{% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      {# Card: active_services #}
+      {% set am_svc = (am_metrics.active_services if am_metrics else 0)|int %}
+      {% set t_svc = (targets.get('active_services', 0))|int %}
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+        <div style="font-size:.7rem;color:#64748b;margin-bottom:.25rem;">Dịch vụ đang quản lý</div>
+        <div style="font-size:1.15rem;font-weight:700;color:#1e293b;">{{ am_svc }}</div>
+        <div style="display:flex;align-items:center;gap:.4rem;margin-top:.5rem;">
+          <span style="font-size:.7rem;color:#94a3b8;">Target:</span>
+          <input type="number" min="0" value="{{ t_svc }}"
+                 style="width:4rem;border:1px solid #cbd5e1;border-radius:4px;padding:.2rem .4rem;font-size:.75rem;"
+                 onblur="setTarget({{ _sid }}, 'am', 'active_services', {{ _y }}, {{ _m }}, this.value)">
+        </div>
+        {% if t_svc > 0 %}
+        <div style="margin-top:.25rem;font-size:.7rem;
+            color:{{ '#16a34a' if am_svc >= t_svc else '#dc2626' }}">
+          {{ '✓ Đạt' if am_svc >= t_svc else '✗ Chưa đạt' }}
+        </div>
+        {% endif %}
+      </div>
+
+      {# Card: avg_margin_pct #}
+      {% set am_margin = (am_metrics.avg_margin_pct if am_metrics else 0)|float %}
+      {% set t_margin = (targets.get('avg_margin_pct', 0))|float %}
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+        <div style="font-size:.7rem;color:#64748b;margin-bottom:.25rem;">Biên lợi nhuận TB</div>
+        <div style="font-size:1.15rem;font-weight:700;
+            color:{{ '#16a34a' if am_margin >= 30 else ('#f59e0b' if am_margin >= 15 else '#dc2626') }}">
+          {{ "%.1f"|format(am_margin) }}%
+        </div>
+        <div style="display:flex;align-items:center;gap:.4rem;margin-top:.5rem;">
+          <span style="font-size:.7rem;color:#94a3b8;">Target:</span>
+          <input type="number" min="0" max="100" step="1" value="{{ "%.1f"|format(t_margin) }}"
+                 style="width:4rem;border:1px solid #cbd5e1;border-radius:4px;padding:.2rem .4rem;font-size:.75rem;"
+                 onblur="setTarget({{ _sid }}, 'am', 'avg_margin_pct', {{ _y }}, {{ _m }}, this.value)">
+          <span style="font-size:.7rem;color:#94a3b8;">%</span>
+        </div>
+        {% if t_margin > 0 %}
+        <div style="margin-top:.25rem;font-size:.7rem;
+            color:{{ '#16a34a' if am_margin >= t_margin else '#dc2626' }}">
+          {{ '✓ Đạt' if am_margin >= t_margin else '✗ Chưa đạt' }}
+        </div>
+        {% endif %}
+      </div>
+
+      {# Card: outstanding (no target) #}
+      {% set am_out = (am_metrics.outstanding if am_metrics else 0)|int %}
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+        <div style="font-size:.7rem;color:#64748b;margin-bottom:.25rem;">Công nợ tồn đọng</div>
+        <div style="font-size:1.15rem;font-weight:700;
+            color:{{ '#dc2626' if am_out > 10000000 else '#1e293b' }}">
+          {{ "{:,.0f}".format(am_out) }} ₫
+        </div>
+        <div style="font-size:.7rem;color:#94a3b8;margin-top:.75rem;">Tổng dịch vụ active</div>
+      </div>
+
+    </div>
+
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:.75rem;">
+      <button onclick="kpiAiScan({{ _sid }}, 'am', {{ _y }}, {{ _m }})"
+              id="kpi-am-scan-btn"
+              style="background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8;border-radius:6px;
+                     padding:.4rem .8rem;font-size:.8rem;cursor:pointer;">
+        AI Phân tích AM
+      </button>
+      <span id="kpi-am-scan-status" style="font-size:.8rem;color:#6366f1;"></span>
+    </div>
+    {% if latest_am_scan %}
+    <div id="kpi-am-scan-output"
+         style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:.75rem;
+                font-size:.8rem;white-space:pre-wrap;line-height:1.6;">{{ latest_am_scan }}</div>
+    {% else %}
+    <div id="kpi-am-scan-output"
+         style="display:none;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;
+                padding:.75rem;font-size:.8rem;white-space:pre-wrap;line-height:1.6;"></div>
+    {% endif %}
+  </div>
+
+  {# ─── AM Lead (Pre-sales) Section ────────────────────────────────────── #}
+  <div style="margin-bottom:2.5rem;">
+    <h3 style="font-size:.9rem;color:#0f766e;font-weight:700;margin:0 0 .35rem;
+        border-bottom:2px solid #99f6e4;padding-bottom:.5rem;">
+      AM — Giai đoạn Lead (Pre-sales)
+    </h3>
+    <p style="font-size:.75rem;color:#64748b;margin:0 0 1rem;">
+      KPI nội bộ trước HĐ — tách khỏi doanh thu KH ở section trên.
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1rem;">
+
+      {% set lm = am_lead_metrics or {} %}
+
+      {% set li = (lm.lead_intake_completed if lm else 0)|int %}
+      {% set t_li = (targets.get('lead_intake_completed', 0))|int %}
+      <div style="background:#fff;border:1px solid #ccfbf1;border-radius:8px;padding:1rem;">
+        <div style="font-size:.7rem;color:#64748b;margin-bottom:.25rem;">Intake hoàn thành</div>
+        <div style="font-size:1.15rem;font-weight:700;color:#134e4a;">{{ li }}</div>
+        <div style="display:flex;align-items:center;gap:.4rem;margin-top:.5rem;">
+          <span style="font-size:.7rem;color:#94a3b8;">Target:</span>
+          <input type="number" min="0" value="{{ t_li }}"
+                 style="width:4rem;border:1px solid #cbd5e1;border-radius:4px;padding:.2rem .4rem;font-size:.75rem;"
+                 onblur="setTarget({{ _sid }}, 'am', 'lead_intake_completed', {{ _y }}, {{ _m }}, this.value)">
+        </div>
+        {% if t_li > 0 %}
+        <div style="margin-top:.25rem;font-size:.7rem;color:{{ '#16a34a' if li >= t_li else '#dc2626' }}">
+          {{ '✓ Đạt' if li >= t_li else '✗ Chưa đạt' }}
+        </div>
+        {% endif %}
+      </div>
+
+      {% set ph = (lm.lead_phone_within_48h_pct if lm else 0)|float %}
+      {% set t_ph = (targets.get('lead_phone_within_48h_pct', 0))|float %}
+      <div style="background:#fff;border:1px solid #ccfbf1;border-radius:8px;padding:1rem;">
+        <div style="font-size:.7rem;color:#64748b;margin-bottom:.25rem;">Intake gọi ≤48h</div>
+        <div style="font-size:1.15rem;font-weight:700;color:#134e4a;">{{ "%.1f"|format(ph) }}%</div>
+        <div style="font-size:.65rem;color:#94a3b8;margin-top:.15rem;">
+          {{ (lm.lead_phone_within_48h_num if lm else 0)|int }}/{{ (lm.lead_phone_within_48h_denom if lm else 0)|int }} lifecycle
+        </div>
+        <div style="display:flex;align-items:center;gap:.4rem;margin-top:.5rem;">
+          <span style="font-size:.7rem;color:#94a3b8;">Target:</span>
+          <input type="number" min="0" max="100" step="1" value="{{ "%.1f"|format(t_ph) }}"
+                 style="width:4rem;border:1px solid #cbd5e1;border-radius:4px;padding:.2rem .4rem;font-size:.75rem;"
+                 onblur="setTarget({{ _sid }}, 'am', 'lead_phone_within_48h_pct', {{ _y }}, {{ _m }}, this.value)">
+          <span style="font-size:.7rem;color:#94a3b8;">%</span>
+        </div>
+        {% if t_ph > 0 %}
+        <div style="margin-top:.25rem;font-size:.7rem;color:{{ '#16a34a' if ph >= t_ph else '#dc2626' }}">
+          {{ '✓ Đạt' if ph >= t_ph else '✗ Chưa đạt' }}
+        </div>
+        {% endif %}
+      </div>
+
+      {% set lc = (lm.lead_to_consult_pct if lm else 0)|float %}
+      {% set t_lc = (targets.get('lead_to_consult_pct', 0))|float %}
+      <div style="background:#fff;border:1px solid #ccfbf1;border-radius:8px;padding:1rem;">
+        <div style="font-size:.7rem;color:#64748b;margin-bottom:.25rem;">Go → Consult</div>
+        <div style="font-size:1.15rem;font-weight:700;color:#134e4a;">{{ "%.1f"|format(lc) }}%</div>
+        <div style="font-size:.65rem;color:#94a3b8;margin-top:.15rem;">
+          {{ (lm.lead_to_consult_num if lm else 0)|int }}/{{ (lm.lead_to_consult_denom if lm else 0)|int }} Go
+        </div>
+        <div style="display:flex;align-items:center;gap:.4rem;margin-top:.5rem;">
+          <span style="font-size:.7rem;color:#94a3b8;">Target:</span>
+          <input type="number" min="0" max="100" step="1" value="{{ "%.1f"|format(t_lc) }}"
+                 style="width:4rem;border:1px solid #cbd5e1;border-radius:4px;padding:.2rem .4rem;font-size:.75rem;"
+                 onblur="setTarget({{ _sid }}, 'am', 'lead_to_consult_pct', {{ _y }}, {{ _m }}, this.value)">
+          <span style="font-size:.7rem;color:#94a3b8;">%</span>
+        </div>
+        {% if t_lc > 0 %}
+        <div style="margin-top:.25rem;font-size:.7rem;color:{{ '#16a34a' if lc >= t_lc else '#dc2626' }}">
+          {{ '✓ Đạt' if lc >= t_lc else '✗ Chưa đạt' }}
+        </div>
+        {% endif %}
+      </div>
+
+      {% set pc = (lm.presales_cost_vnd if lm else 0)|int %}
+      {% set t_pc = (targets.get('presales_cost_vnd', 0))|int %}
+      <div style="background:#fff;border:1px solid #ccfbf1;border-radius:8px;padding:1rem;">
+        <div style="font-size:.7rem;color:#64748b;margin-bottom:.25rem;">Chi phí pre-sales</div>
+        <div style="font-size:1.15rem;font-weight:700;color:#134e4a;">{{ "{:,.0f}".format(pc) }} ₫</div>
+        <div style="display:flex;align-items:center;gap:.4rem;margin-top:.5rem;">
+          <span style="font-size:.7rem;color:#94a3b8;">Cap:</span>
+          <input type="number" min="0" step="100000" value="{{ t_pc }}"
+                 style="width:7rem;border:1px solid #cbd5e1;border-radius:4px;padding:.2rem .4rem;font-size:.75rem;"
+                 onblur="setTarget({{ _sid }}, 'am', 'presales_cost_vnd', {{ _y }}, {{ _m }}, this.value)">
+        </div>
+        {% if t_pc > 0 %}
+        <div style="margin-top:.25rem;font-size:.7rem;color:{{ '#16a34a' if pc <= t_pc else '#dc2626' }}">
+          {{ '✓ Trong cap' if pc <= t_pc else '✗ Vượt cap' }}
+        </div>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;">
+      <div style="background:#f0fdfa;border:1px solid #ccfbf1;border-radius:8px;padding:.75rem 1rem;">
+        <div style="font-size:.7rem;color:#64748b;">Quyết định Go</div>
+        <div style="font-size:1rem;font-weight:700;color:#134e4a;">{{ (lm.lead_go_decisions if lm else 0)|int }}</div>
+      </div>
+      <div style="background:#f0fdfa;border:1px solid #ccfbf1;border-radius:8px;padding:.75rem 1rem;">
+        <div style="font-size:.7rem;color:#64748b;">Task Lead ✓</div>
+        <div style="font-size:1rem;font-weight:700;color:#134e4a;">{{ (lm.lead_task_done if lm else 0)|int }}</div>
+      </div>
+      <div style="background:#f0fdfa;border:1px solid #ccfbf1;border-radius:8px;padding:.75rem 1rem;">
+        <div style="font-size:.7rem;color:#64748b;">TB phút gọi Intake</div>
+        <div style="font-size:1rem;font-weight:700;color:#134e4a;">{{ "%.1f"|format((lm.lead_avg_phone_minutes if lm else 0)|float) }} phút</div>
+      </div>
+    </div>
+
+    {% if am_lead_cap_alerts and am_lead_cap_alerts.over_cap_count > 0 %}
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:.75rem 1rem;
+                margin-top:1rem;font-size:.8rem;color:#991b1b;line-height:1.5;">
+      <strong>⚠ {{ am_lead_cap_alerts.over_cap_count }} lead pre-sales vượt cap:</strong>
+      {% for alert in am_lead_cap_alerts.alerts %}
+      <div style="margin-top:.35rem;">
+        {{ alert.lead_name or ('Lead #' ~ alert.lead_id) }}
+        — {{ "{:,.0f}".format(alert.total_presales_vnd) }} ₫ / cap {{ "{:,.0f}".format(alert.presales_cost_cap_vnd) }} ₫
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div style="display:flex;align-items:center;gap:1rem;margin-top:1rem;margin-bottom:.75rem;">
+      <button onclick="kpiAiScan({{ _sid }}, 'am_lead', {{ _y }}, {{ _m }})"
+              id="kpi-am-lead-scan-btn"
+              style="background:#ecfdf5;border:1px solid #99f6e4;color:#0f766e;border-radius:6px;
+                     padding:.4rem .8rem;font-size:.8rem;cursor:pointer;">
+        AI Phân tích Lead
+      </button>
+      <span id="kpi-am-lead-scan-status" style="font-size:.8rem;color:#0f766e;"></span>
+    </div>
+    {% if latest_am_lead_scan %}
+    <div id="kpi-am-lead-scan-output"
+         style="background:#ecfdf5;border:1px solid #99f6e4;border-radius:6px;padding:.75rem;
+                font-size:.8rem;white-space:pre-wrap;line-height:1.6;">{{ latest_am_lead_scan }}</div>
+    {% else %}
+    <div id="kpi-am-lead-scan-output"
+         style="display:none;background:#ecfdf5;border:1px solid #99f6e4;border-radius:6px;
+                padding:.75rem;font-size:.8rem;white-space:pre-wrap;line-height:1.6;"></div>
+    {% endif %}
+  </div>
+
+  {# ─── SP Section ─────────────────────────────────────────────────────── #}
+  <div>
+    <h3 style="font-size:.9rem;color:#6d28d9;font-weight:700;margin:0 0 1rem;
+        border-bottom:2px solid #ddd6fe;padding-bottom:.5rem;">
+      Specialist — Tháng {{ month }}/{{ year }}
+    </h3>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1rem;">
+
+      {# Card: tasks_completed #}
+      {% set sp_done = (sp_metrics.tasks_completed if sp_metrics else 0)|int %}
+      {% set t_done = (targets.get('tasks_completed', 0))|int %}
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+        <div style="font-size:.7rem;color:#64748b;margin-bottom:.25rem;">Tasks hoàn thành</div>
+        <div style="font-size:1.15rem;font-weight:700;color:#1e293b;">{{ sp_done }}</div>
+        <div style="display:flex;align-items:center;gap:.4rem;margin-top:.5rem;">
+          <span style="font-size:.7rem;color:#94a3b8;">Target:</span>
+          <input type="number" min="0" value="{{ t_done }}"
+                 style="width:4rem;border:1px solid #cbd5e1;border-radius:4px;padding:.2rem .4rem;font-size:.75rem;"
+                 onblur="setTarget({{ _sid }}, 'sp', 'tasks_completed', {{ _y }}, {{ _m }}, this.value)">
+        </div>
+        {% if t_done > 0 %}
+        <div style="margin-top:.25rem;font-size:.7rem;
+            color:{{ '#16a34a' if sp_done >= t_done else '#dc2626' }}">
+          {{ '✓ Đạt' if sp_done >= t_done else '✗ Chưa đạt' }}
+        </div>
+        {% endif %}
+      </div>
+
+      {# Card: tasks_pending (no target — lower is better) #}
+      {% set sp_pend = (sp_metrics.tasks_pending if sp_metrics else 0)|int %}
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+        <div style="font-size:.7rem;color:#64748b;margin-bottom:.25rem;">Tasks đang chờ</div>
+        <div style="font-size:1.15rem;font-weight:700;
+            color:{{ '#f59e0b' if sp_pend > 5 else '#1e293b' }}">{{ sp_pend }}</div>
+        <div style="font-size:.7rem;color:#94a3b8;margin-top:.75rem;">Backlog hiện tại</div>
+      </div>
+
+      {# Card: risks_resolved #}
+      {% set sp_risks = (sp_metrics.risks_resolved if sp_metrics else 0)|int %}
+      {% set t_risks = (targets.get('risks_resolved', 0))|int %}
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:1rem;">
+        <div style="font-size:.7rem;color:#64748b;margin-bottom:.25rem;">Rủi ro đã xử lý</div>
+        <div style="font-size:1.15rem;font-weight:700;color:#1e293b;">{{ sp_risks }}</div>
+        <div style="display:flex;align-items:center;gap:.4rem;margin-top:.5rem;">
+          <span style="font-size:.7rem;color:#94a3b8;">Target:</span>
+          <input type="number" min="0" value="{{ t_risks }}"
+                 style="width:4rem;border:1px solid #cbd5e1;border-radius:4px;padding:.2rem .4rem;font-size:.75rem;"
+                 onblur="setTarget({{ _sid }}, 'sp', 'risks_resolved', {{ _y }}, {{ _m }}, this.value)">
+        </div>
+        {% if t_risks > 0 %}
+        <div style="margin-top:.25rem;font-size:.7rem;
+            color:{{ '#16a34a' if sp_risks >= t_risks else '#dc2626' }}">
+          {{ '✓ Đạt' if sp_risks >= t_risks else '✗ Chưa đạt' }}
+        </div>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:.75rem;">
+      <button onclick="kpiAiScan({{ _sid }}, 'sp', {{ _y }}, {{ _m }})"
+              id="kpi-sp-scan-btn"
+              style="background:#f5f3ff;border:1px solid #ddd6fe;color:#6d28d9;border-radius:6px;
+                     padding:.4rem .8rem;font-size:.8rem;cursor:pointer;">
+        AI Phân tích SP
+      </button>
+      <span id="kpi-sp-scan-status" style="font-size:.8rem;color:#7c3aed;"></span>
+    </div>
+    {% if latest_sp_scan %}
+    <div id="kpi-sp-scan-output"
+         style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;padding:.75rem;
+                font-size:.8rem;white-space:pre-wrap;line-height:1.6;">{{ latest_sp_scan }}</div>
+    {% else %}
+    <div id="kpi-sp-scan-output"
+         style="display:none;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:6px;
+                padding:.75rem;font-size:.8rem;white-space:pre-wrap;line-height:1.6;"></div>
+    {% endif %}
+  </div>
+
+  {% endif %}
+</div>
+
+<script>
+function kpiBackfillAm(staffId) {
+  var btn = document.getElementById('kpi-backfill-am-btn');
+  var status = document.getElementById('kpi-backfill-am-status');
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'Đang đồng bộ...';
+  fetch('/api/crm/staff-kpi/' + staffId + '/backfill-am', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: '{}',
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.error) {
+      if (status) status.textContent = data.error;
+      if (btn) btn.disabled = false;
+      return;
+    }
+    var n = data.total_updated || 0;
+    if (status) {
+      status.textContent = n > 0
+        ? 'Đã sync ' + n + ' lifecycle — tải lại trang...'
+        : 'Không có lifecycle cần sync — tải lại...';
+    }
+    setTimeout(function() { window.location.reload(); }, 800);
+  }).catch(function(err) {
+    if (status) status.textContent = 'Lỗi: ' + err;
+    if (btn) btn.disabled = false;
+  });
+}
+
+function setTarget(staffId, role, metricKey, year, month, value) {
+  var val = parseFloat(value);
+  if (isNaN(val) || val < 0) return;
+  fetch('/api/crm/staff-kpi/' + staffId + '/targets', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({role: role, metric_key: metricKey, year: year, month: month, target_value: val}),
+  }).catch(function(err) { console.error('setTarget error:', err); });
+}
+
+function kpiAiScan(staffId, role, year, month) {
+  var btnId = 'kpi-' + role.replace('_', '-') + '-scan-btn';
+  if (role === 'am_lead') btnId = 'kpi-am-lead-scan-btn';
+  var outId = 'kpi-' + role.replace('_', '-') + '-scan-output';
+  if (role === 'am_lead') outId = 'kpi-am-lead-scan-output';
+  var statusId = 'kpi-' + role.replace('_', '-') + '-scan-status';
+  if (role === 'am_lead') statusId = 'kpi-am-lead-scan-status';
+  var btn = document.getElementById(btnId);
+  var out = document.getElementById(outId);
+  var status = document.getElementById(statusId);
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'AI đang phân tích...';
+  fetch('/api/crm/staff-kpi/' + staffId + '/ai-scan', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({role: role, year: year, month: month}),
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (out) {
+      out.textContent = data.ai_output || '(Không có kết quả)';
+      out.style.display = 'block';
+    }
+    if (status) status.textContent = '';
+    if (btn) btn.disabled = false;
+  }).catch(function(err) {
+    if (status) status.textContent = 'Lỗi: ' + err;
+    if (btn) btn.disabled = false;
+  });
+}
+</script>
+{% endblock %}

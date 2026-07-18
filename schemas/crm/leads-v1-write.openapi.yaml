@@ -1,0 +1,123 @@
+openapi: 3.1.0
+info:
+  title: PTT CRM Leads API v1 — Write
+  version: 1.0.0
+  description: |
+    **Phase 2 W3 — contract freeze.** NestJS writes PostgreSQL `crm_leads` OLTP primary after cutover.
+
+    Gated by `PTT_LEADS_WRITE_ENABLED=1` (default off on production until change window).
+
+    **Operations:**
+    - `POST /api/v1/leads` — create lead (staging id ≥ 900000000; prod via PTT_LEADS_CREATE_ID_MODE=prod)
+    - `PATCH /api/v1/leads/{lead_id}` — assign (`owner_id`), `status`, score stub (`score`)
+
+    **Events:** `LeadAssigned` outbox on assign via Nest (PG `domain_events`).
+
+    Breaking changes require API version bump (`v2`) + PR review.
+
+  contact:
+    name: PTT Agency Platform
+  license:
+    name: Proprietary
+  x-ptt-contract-status: frozen
+  x-ptt-contract-frozen-at: "2026-07-17"
+
+servers:
+  - url: https://staging.pttads.vn
+    description: Staging (write pilot)
+  - url: https://pttads.vn
+    description: Production (post cutover)
+  - url: http://127.0.0.1:3000
+    description: Local Nest CRM API
+
+tags:
+  - name: LeadsWrite
+    description: CRM lead write (PG OLTP)
+
+paths:
+  /api/v1/leads:
+    post:
+      operationId: createLeadV1
+      tags: [LeadsWrite]
+      summary: Create lead (PG OLTP)
+      description: Inserts into PG `crm_leads`. Staging uses id range ≥ 900000000. Prod uses crm_leads_prod_id_seq when PTT_LEADS_CREATE_ID_MODE=prod.
+      security:
+        - InternalKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "./create-lead-v1.schema.json"
+            example:
+              full_name: "Staging Lead"
+              phone: "0903333333"
+              channel: meta
+              client_id: "550e8400-e29b-41d4-a716-446655440000"
+              status: new
+              source: staging
+      responses:
+        "201":
+          description: Lead created
+          content:
+            application/json:
+              schema:
+                $ref: "./lead-v1.schema.json"
+        "403":
+          description: Write disabled (PTT_LEADS_WRITE_ENABLED=0)
+        "404":
+          description: Write endpoints hidden when disabled
+        "502":
+          description: PG unavailable
+
+  /api/v1/leads/{lead_id}:
+    patch:
+      operationId: patchLeadV1
+      tags: [LeadsWrite]
+      summary: Patch lead — assign, status, score stub
+      description: |
+        Updates PG `crm_leads`. When `owner_id` changes, emits `LeadAssigned` to outbox.
+        `score` stored in `meta_json.score` (stub — LeadScored deferred).
+      security:
+        - InternalKey: []
+      parameters:
+        - name: lead_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "./patch-lead-v1.schema.json"
+            examples:
+              assign:
+                summary: Assign owner
+                value:
+                  owner_id: 42
+                  assigned_by: "admin"
+              scoreStub:
+                summary: AI score stub
+                value:
+                  score: 78
+      responses:
+        "200":
+          description: Updated lead
+          content:
+            application/json:
+              schema:
+                $ref: "./lead-v1.schema.json"
+        "404":
+          description: Lead not found or write disabled
+        "400":
+          description: Invalid body
+
+components:
+  securitySchemes:
+    InternalKey:
+      type: apiKey
+      in: header
+      name: X-PTT-Internal-Key

@@ -1,0 +1,18 @@
+[Unit]
+Description=PTT Client Portal — Next.js standalone
+After=network.target ptt-crm-api.service
+
+[Service]
+Type=simple
+User=deploy
+Group=www-data
+WorkingDirectory=/var/www/ptt/services/portal-web
+Environment=NODE_ENV=production
+Environment=PORT=3100
+EnvironmentFile=-/var/www/ptt/.env
+ExecStart=/usr/bin/node .next/standalone/server.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -29,12 +29,58 @@ async function apiFetch(url, opts) {
   return r.json();
 }
 
+/** Upload ảnh CMS; purpose=hero_desktop|hero_mobile|project|… → server auto crop cover. */
+async function uploadMediaFile(file, purpose) {
+  const fd = new FormData();
+  fd.append('file', file);
+  if (purpose) fd.append('purpose', purpose);
+  const r = await fetch('/api/cms/media/upload', { method: 'POST', body: fd });
+  if (!r.ok) {
+    const j = await r.json().catch(() => ({}));
+    throw new Error(j.error || `HTTP ${r.status}`);
+  }
+  return r.json();
+}
+
+function formatUploadStatus(j) {
+  const parts = [];
+  if (j.cropped && j.width && j.height) {
+    const desktop = `${j.width}×${j.height}`;
+    const mobile = j.width_mobile && j.height_mobile ? ` + mobile ${j.width_mobile}×${j.height_mobile}` : '';
+    parts.push(`${desktop} cover${mobile}`);
+  }
+  if (j.optimized && j.size_before && j.size) {
+    const saved = Math.max(0, Math.round((1 - j.size / j.size_before) * 100));
+    parts.push(`tối ưu −${saved}%`);
+  }
+  if (j.video_codec) parts.push(String(j.video_codec).toUpperCase());
+  if (j.ext) parts.push(j.ext.toUpperCase());
+  if (j.size) {
+    const kb = j.size / 1024;
+    parts.push(kb >= 1024 ? `${Math.round(kb / 102.4) / 10} MB` : `${Math.round(kb)}KB`);
+  }
+  return parts.join(', ');
+}
+
 function imgOrPlaceholder(url) {
   return url ? `<img src="${escH(url)}" class="clp-thumb" alt="" loading="lazy" />` : '<span class="clp-no-img">—</span>';
 }
 
 function escH(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function stripHtml(s) {
+  const el = document.createElement('div');
+  el.innerHTML = String(s || '');
+  return (el.textContent || el.innerText || '').trim();
+}
+
+/** Plain-text excerpt for list cards (Quill HTML → text, truncated). */
+function excerptHtml(s, maxLen = 200) {
+  const text = stripHtml(s);
+  if (text.length <= maxLen) return text;
+  return text.slice(0, maxLen) + '…';
 }
 
 function fmtSize(bytes) {
@@ -58,9 +104,13 @@ function activateTab(name) {
     if (panel) panel.classList.toggle('is-hidden', t !== name);
   });
   if (name === 'media') loadMedia();
-  if (name === 'projects') loadProjects();
-  if (name === 'blog') loadBlog();
+  if (name === 'projects') { _initProjectQuill(); loadProjects(); }
+  if (name === 'blog') { _initBlogQuill(); loadBlog(); }
   if (name === 'services') loadServices();
+  if (name === 'content') {
+    renderPartnersEditor();
+    renderCapabilitiesEditor();
+  }
 }
 
 qsa('.clp-tab').forEach(btn => {
@@ -74,20 +124,28 @@ let _settings = {};
 async function loadSettings() {
   try {
     _settings = await apiFetch('/api/settings');
+    _partnerRows = [];
+    _capabilityRows = [];
     const form = qs('#content-form');
     if (!form) return;
     form.querySelectorAll('[name]').forEach(el => {
       const v = _settings[el.name];
       if (v !== undefined) el.value = v;
     });
+    renderPartnersEditor();
+    renderCapabilitiesEditor();
   } catch (e) {
     console.warn('loadSettings:', e);
+    renderPartnersEditor();
+    renderCapabilitiesEditor();
   }
 }
 
 qs('#content-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();
   const msg = qs('#content-save-msg');
+  syncPartnersJsonField();
+  syncCapabilitiesJsonField();
   const data = {};
   new FormData(e.target).forEach((v, k) => { data[k] = v; });
   try {
@@ -102,6 +160,364 @@ qs('#content-form')?.addEventListener('submit', async (e) => {
   }
 });
 
+// ── Partners editor (content tab) ─────────────────────────────────────────────
+
+let _partnerRows = [];
+
+function _normalizePartnerLogoUrl(url) {
+  const u = String(url || '').trim();
+  if (!u) return '';
+  if (u.startsWith('http') || u.startsWith('/')) return u;
+  return `/static/${u.replace(/^\//, '')}`;
+}
+
+function _parsePartnerRowList(data) {
+  if (!Array.isArray(data)) return [];
+  return data.map(item => ({
+    name: String(item?.name || '').trim(),
+    site: String(item?.site || '').trim(),
+    logo_url: _normalizePartnerLogoUrl(item?.logo_url || item?.logo_file),
+  })).filter(row => row.name && row.logo_url);
+}
+
+function _defaultPartnerRows() {
+  const fromApi = (_settings.partner_logos_effective_json || '').trim();
+  if (fromApi) {
+    try {
+      const rows = _parsePartnerRowList(JSON.parse(fromApi));
+      if (rows.length) return rows;
+    } catch (_) {
+      /* fall through */
+    }
+  }
+  const seed = window.CLP_PARTNER_LOGOS_SEED;
+  if (Array.isArray(seed) && seed.length) {
+    return _parsePartnerRowList(seed);
+  }
+  return [];
+}
+
+function _readPartnerRowsFromSettings() {
+  const raw = (_settings.partner_logos_json || qs('#partner-logos-json')?.value || '').trim();
+  if (raw) {
+    try {
+      const rows = _parsePartnerRowList(JSON.parse(raw));
+      if (rows.length) return rows;
+    } catch (_) {
+      /* fall through to defaults */
+    }
+  }
+  return _defaultPartnerRows();
+}
+
+function syncPartnersJsonField() {
+  const hidden = qs('#partner-logos-json');
+  if (!hidden) return;
+  const cleaned = _partnerRows
+    .map(row => ({
+      name: String(row.name || '').trim(),
+      site: String(row.site || '').trim() || '#',
+      logo_url: String(row.logo_url || '').trim(),
+    }))
+    .filter(row => row.name && row.logo_url);
+  hidden.value = cleaned.length ? JSON.stringify(cleaned) : '';
+}
+
+function renderPartnersEditor() {
+  const list = qs('#partners-editor-list');
+  if (!list) return;
+  if (!_partnerRows.length) _partnerRows = _readPartnerRowsFromSettings();
+  if (!_partnerRows.length) {
+    list.innerHTML = '<p class="muted">Chưa có logo đối tác. Nhấn + Thêm đối tác để bắt đầu.</p>';
+    syncPartnersJsonField();
+    return;
+  }
+  list.innerHTML = _partnerRows.map((row, idx) => `
+    <div class="clp-partner-row panel" data-idx="${idx}" style="margin-bottom:.75rem;padding:.75rem">
+      <div class="clp-form-row">
+        <label class="clp-label">Tên
+          <input type="text" class="partner-name-inp" data-idx="${idx}" value="${escH(row.name)}" placeholder="Tên đối tác" />
+        </label>
+        <label class="clp-label">Website
+          <input type="url" class="partner-site-inp" data-idx="${idx}" value="${escH(row.site)}" placeholder="https://..." />
+        </label>
+      </div>
+      <label class="clp-label">Logo URL
+        <div class="clp-img-actions">
+          <input type="text" class="partner-logo-inp" data-idx="${idx}" value="${escH(row.logo_url)}" placeholder="URL logo..." />
+          <button type="button" class="btn clp-pick-btn partner-pick-btn" data-idx="${idx}">Chọn từ Media</button>
+          <button type="button" class="btn clp-btn-sm clp-btn-danger partner-del-btn" data-idx="${idx}">Xóa</button>
+        </div>
+      </label>
+      ${row.logo_url ? `<img src="${escH(row.logo_url)}" alt="" class="clp-thumb" loading="lazy" style="margin-top:.5rem;max-height:48px" />` : ''}
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.partner-name-inp').forEach(inp => {
+    inp.addEventListener('input', () => {
+      _partnerRows[inp.dataset.idx].name = inp.value;
+      syncPartnersJsonField();
+    });
+  });
+  list.querySelectorAll('.partner-site-inp').forEach(inp => {
+    inp.addEventListener('input', () => {
+      _partnerRows[inp.dataset.idx].site = inp.value;
+      syncPartnersJsonField();
+    });
+  });
+  list.querySelectorAll('.partner-logo-inp').forEach(inp => {
+    inp.addEventListener('input', () => {
+      _partnerRows[inp.dataset.idx].logo_url = inp.value;
+      syncPartnersJsonField();
+    });
+  });
+  list.querySelectorAll('.partner-pick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx, 10);
+      openMediaPicker(url => {
+        _partnerRows[idx].logo_url = url;
+        renderPartnersEditor();
+        syncPartnersJsonField();
+      });
+    });
+  });
+  list.querySelectorAll('.partner-del-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _partnerRows.splice(parseInt(btn.dataset.idx, 10), 1);
+      renderPartnersEditor();
+      syncPartnersJsonField();
+    });
+  });
+  syncPartnersJsonField();
+}
+
+qs('#partner-add-btn')?.addEventListener('click', () => {
+  _partnerRows.push({ name: '', site: '', logo_url: '' });
+  renderPartnersEditor();
+});
+
+// ── Capabilities editor (content tab) ───────────────────────────────────────
+
+const CAPABILITY_ICON_PRESETS = [
+  { value: '0', label: 'Automation — mũi tên vòng' },
+  { value: '1', label: 'AI — bóng đèn' },
+  { value: '2', label: 'Dữ liệu — biểu đồ' },
+  { value: '3', label: 'CRM — nhóm người' },
+  { value: '4', label: 'Paid media — con trỏ' },
+  { value: '5', label: 'Chat — trải nghiệm' },
+];
+
+/** SVG preset — khớp partials/capability_icon.html trên landing */
+const CAPABILITY_PRESET_SVGS = [
+  '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>',
+  '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>',
+  '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>',
+  '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>',
+  '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>',
+  '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>',
+];
+
+let _capabilityRows = [];
+
+function _normalizeCapabilityIcon(iconRaw, index) {
+  const n = parseInt(String(iconRaw ?? ''), 10);
+  if (Number.isFinite(n) && n >= 0 && n <= 5) return String(n);
+  return String(((index % 6) + 6) % 6);
+}
+
+function _capabilityPresetOptions(selected) {
+  return CAPABILITY_ICON_PRESETS.map(
+    p => `<option value="${p.value}"${String(selected) === p.value ? ' selected' : ''}>${escH(p.label)}</option>`
+  ).join('');
+}
+
+function _capabilityIconPreviewHtml(icon, iconUrl) {
+  const url = String(iconUrl || '').trim();
+  if (url) {
+    return `<img src="${escH(url)}" alt="" class="clp-capability-icon-preview-img" loading="lazy" />`;
+  }
+  const idx = parseInt(String(icon ?? '0'), 10);
+  const safe = Number.isFinite(idx) ? ((idx % 6) + 6) % 6 : 0;
+  return CAPABILITY_PRESET_SVGS[safe] || CAPABILITY_PRESET_SVGS[0];
+}
+
+function _parseCapabilityRowList(data) {
+  if (!Array.isArray(data)) return [];
+  return data.map((item, i) => {
+    if (typeof item === 'string') {
+      return { title: item.trim(), icon: String(i % 6), icon_url: '' };
+    }
+    return {
+      title: String(item?.title || item?.text || '').trim(),
+      icon: _normalizeCapabilityIcon(item?.icon ?? item?.icon_preset, i),
+      icon_url: String(item?.icon_url || '').trim(),
+    };
+  }).filter(row => row.title);
+}
+
+function _defaultCapabilityRows() {
+  const fromApi = (_settings.capabilities_items_effective_json || '').trim();
+  if (fromApi) {
+    try {
+      const rows = _parseCapabilityRowList(JSON.parse(fromApi));
+      if (rows.length) return rows;
+    } catch (_) {
+      /* fall through */
+    }
+  }
+  const seed = window.CLP_CAPABILITIES_ITEMS_SEED;
+  if (Array.isArray(seed) && seed.length) {
+    return _parseCapabilityRowList(seed);
+  }
+  return _parseCapabilityRowList([
+    { title: 'Marketing Automation', icon: '0', icon_url: '' },
+    { title: 'AI Content & Personalization', icon: '1', icon_url: '' },
+    { title: 'Data Analytics & Business Intelligence', icon: '2', icon_url: '' },
+    { title: 'CRM & Lead Intelligence', icon: '3', icon_url: '' },
+    { title: 'Paid Media đa kênh & Tối ưu ROI', icon: '4', icon_url: '' },
+    { title: 'AI Agent & Customer Experience', icon: '5', icon_url: '' },
+  ]);
+}
+
+function _readCapabilityRowsFromSettings() {
+  const raw = (_settings.capabilities_items_json || qs('#capabilities-items-json')?.value || '').trim();
+  if (raw) {
+    try {
+      const rows = _parseCapabilityRowList(JSON.parse(raw));
+      if (rows.length) return rows;
+    } catch (_) {
+      /* fall through */
+    }
+  }
+  return _defaultCapabilityRows();
+}
+
+function _updateCapabilityIconPreview(list, idx) {
+  const row = _capabilityRows[idx];
+  const box = list?.querySelector(`.clp-capability-icon-preview[data-idx="${idx}"]`);
+  if (!row || !box) return;
+  box.innerHTML = _capabilityIconPreviewHtml(row.icon, row.icon_url);
+}
+
+function syncCapabilitiesJsonField() {
+  const hidden = qs('#capabilities-items-json');
+  if (!hidden) return;
+  const cleaned = _capabilityRows
+    .map((row, i) => ({
+      title: String(row.title || '').trim(),
+      icon: String(row.icon ?? i % 6),
+      icon_url: String(row.icon_url || '').trim(),
+    }))
+    .filter(row => row.title);
+  hidden.value = cleaned.length ? JSON.stringify(cleaned) : '';
+}
+
+function renderCapabilitiesEditor() {
+  const list = qs('#capabilities-editor-list');
+  if (!list) return;
+  if (!_capabilityRows.length) _capabilityRows = _readCapabilityRowsFromSettings();
+  if (!_capabilityRows.length) {
+    list.innerHTML = '<p class="muted">Chưa có mục năng lực. Nhấn + Thêm mục năng lực để bắt đầu.</p>';
+    syncCapabilitiesJsonField();
+    return;
+  }
+
+  list.innerHTML = _capabilityRows.map((row, idx) => `
+    <div class="clp-capability-row panel" data-idx="${idx}" style="margin-bottom:.75rem;padding:.75rem">
+      <div class="clp-capability-row-head">
+        <div class="clp-capability-icon-preview" data-idx="${idx}" aria-hidden="true">
+          ${_capabilityIconPreviewHtml(row.icon, row.icon_url)}
+        </div>
+        <div class="clp-capability-row-fields">
+          <div class="clp-form-row">
+            <label class="clp-label" style="flex:1">Tiêu đề
+              <input type="text" class="capability-title-inp" data-idx="${idx}" value="${escH(row.title)}" placeholder="VD: Marketing Automation" />
+            </label>
+            <label class="clp-label" style="min-width:220px">Icon có sẵn
+              <select class="capability-icon-inp" data-idx="${idx}">${_capabilityPresetOptions(row.icon)}</select>
+            </label>
+          </div>
+          <label class="clp-label">Icon tùy chỉnh (URL — ưu tiên hơn icon có sẵn)
+            <div class="clp-img-actions">
+              <input type="text" class="capability-icon-url-inp" data-idx="${idx}" value="${escH(row.icon_url)}" placeholder="https://... hoặc /static/uploads/..." />
+              <button type="button" class="btn clp-pick-btn capability-pick-btn" data-idx="${idx}">Chọn từ Media</button>
+              <button type="button" class="btn clp-btn-sm capability-up-btn" data-idx="${idx}" title="Lên">↑</button>
+              <button type="button" class="btn clp-btn-sm capability-down-btn" data-idx="${idx}" title="Xuống">↓</button>
+              <button type="button" class="btn clp-btn-sm clp-btn-danger capability-del-btn" data-idx="${idx}">Xóa</button>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.capability-title-inp').forEach(inp => {
+    inp.addEventListener('input', () => {
+      _capabilityRows[inp.dataset.idx].title = inp.value;
+      syncCapabilitiesJsonField();
+    });
+  });
+  list.querySelectorAll('.capability-icon-inp').forEach(sel => {
+    sel.addEventListener('change', () => {
+      _capabilityRows[sel.dataset.idx].icon = sel.value;
+      syncCapabilitiesJsonField();
+      _updateCapabilityIconPreview(list, sel.dataset.idx);
+    });
+  });
+  list.querySelectorAll('.capability-icon-url-inp').forEach(inp => {
+    inp.addEventListener('input', () => {
+      _capabilityRows[inp.dataset.idx].icon_url = inp.value;
+      syncCapabilitiesJsonField();
+      _updateCapabilityIconPreview(list, inp.dataset.idx);
+    });
+  });
+  list.querySelectorAll('.capability-pick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx, 10);
+      openMediaPicker(url => {
+        _capabilityRows[idx].icon_url = url;
+        renderCapabilitiesEditor();
+        syncCapabilitiesJsonField();
+      });
+    });
+  });
+  list.querySelectorAll('.capability-up-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.idx, 10);
+      if (i <= 0) return;
+      [_capabilityRows[i - 1], _capabilityRows[i]] = [_capabilityRows[i], _capabilityRows[i - 1]];
+      renderCapabilitiesEditor();
+      syncCapabilitiesJsonField();
+    });
+  });
+  list.querySelectorAll('.capability-down-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = parseInt(btn.dataset.idx, 10);
+      if (i >= _capabilityRows.length - 1) return;
+      [_capabilityRows[i], _capabilityRows[i + 1]] = [_capabilityRows[i + 1], _capabilityRows[i]];
+      renderCapabilitiesEditor();
+      syncCapabilitiesJsonField();
+    });
+  });
+  list.querySelectorAll('.capability-del-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _capabilityRows.splice(parseInt(btn.dataset.idx, 10), 1);
+      renderCapabilitiesEditor();
+      syncCapabilitiesJsonField();
+    });
+  });
+  syncCapabilitiesJsonField();
+}
+
+qs('#capability-add-btn')?.addEventListener('click', () => {
+  _capabilityRows.push({
+    title: '',
+    icon: String(_capabilityRows.length % 6),
+    icon_url: '',
+  });
+  renderCapabilitiesEditor();
+});
+
 // ── Hero Slides ───────────────────────────────────────────────────────────────
 
 let _slides = [];
@@ -110,129 +526,72 @@ function renderSlides() {
   const list = qs('#hero-slides-list');
   if (!list) return;
   if (!_slides.length) {
-    list.innerHTML = '<p class="muted">Chưa có slide nào.</p>';
+    list.innerHTML = '<p class="muted">Chưa có slide nào. Nhấn <strong>+ Thêm slide</strong> để bắt đầu.</p>';
     return;
   }
   list.innerHTML = _slides.map((s, i) => `
-    <div class="clp-slide-card" data-idx="${i}">
-      <div class="clp-slide-num">${i + 1}</div>
-      <div class="clp-slide-image-col">
-        <div class="clp-img-preview-wrap">
-          ${s.image_url
-            ? `<img src="${escH(s.image_url)}" class="clp-img-preview" alt="" />`
-            : `<span class="clp-img-placeholder">Chưa có ảnh</span>`}
-        </div>
-        <div class="clp-img-actions">
-          <input type="text" class="slide-image-url" value="${escH(s.image_url || '')}" placeholder="URL ảnh..." data-idx="${i}" />
-          <button type="button" class="btn clp-pick-btn" data-slide-idx="${i}">Media</button>
-        </div>
+    <div class="clp-slide-card" data-idx="${i}" style="display:flex;align-items:center;gap:.9rem;padding:.85rem 1rem;background:var(--panel-bg,#fff);border:1px solid var(--border,#e2e8f0);border-radius:8px;margin-bottom:.6rem">
+      <span style="font-size:.8rem;font-weight:700;color:var(--muted,#64748b);min-width:1.4rem">${i + 1}</span>
+      <div style="width:72px;height:48px;flex-shrink:0;border-radius:4px;overflow:hidden;background:#e2e8f0">
+        ${s.image_url
+          ? `<img src="${escH(s.image_url)}" style="width:100%;height:100%;object-fit:cover" alt="" loading="lazy" />`
+          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:.7rem;color:#94a3b8">${s.video_url ? '▶ video' : 'No img'}</div>`}
       </div>
-      <div class="clp-slide-fields">
-        <label class="clp-label">Kicker (nhỏ trên heading)
-          <input type="text" class="slide-kicker" value="${escH(s.kicker||'')}" placeholder="Creative Martech Platform..." data-idx="${i}" />
-        </label>
-        <label class="clp-label">Heading <span class="req">*</span>
-          <input type="text" class="slide-heading" value="${escH(s.heading||'')}" placeholder="Tiêu đề lớn..." data-idx="${i}" />
-        </label>
-        <label class="clp-label">Mô tả ngắn
-          <textarea class="slide-lead" rows="2" data-idx="${i}" placeholder="Mô tả dưới heading...">${escH(s.lead||'')}</textarea>
-        </label>
-        <div class="clp-form-row">
-          <label class="clp-label">Nút chính — nhãn
-            <input type="text" class="slide-cta-p-label" value="${escH(s.cta_primary_label||'')}" placeholder="Nhận tư vấn..." data-idx="${i}" />
-          </label>
-          <label class="clp-label">Nút chính — href
-            <input type="text" class="slide-cta-p-href" value="${escH(s.cta_primary_href||'#contact')}" placeholder="#contact" data-idx="${i}" />
-          </label>
-        </div>
-        <div class="clp-form-row">
-          <label class="clp-label">Nút phụ — nhãn (tùy chọn)
-            <input type="text" class="slide-cta-g-label" value="${escH(s.cta_ghost_label||'')}" placeholder="Xem case study" data-idx="${i}" />
-          </label>
-          <label class="clp-label">Nút phụ — href
-            <input type="text" class="slide-cta-g-href" value="${escH(s.cta_ghost_href||'')}" placeholder="#projects" data-idx="${i}" />
-          </label>
-        </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escH(s.heading || '(chưa có heading)')}</div>
+        <div style="font-size:.75rem;color:var(--muted,#64748b);margin-top:.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escH(s.kicker || '')}${s.image_url_mobile ? ' · 📱 mobile' : ''}</div>
       </div>
-      <div class="clp-slide-actions">
+      <div style="display:flex;gap:.4rem;flex-shrink:0">
         ${i > 0 ? `<button type="button" class="btn clp-btn-icon slide-move-up" data-idx="${i}" title="Lên">↑</button>` : ''}
         ${i < _slides.length - 1 ? `<button type="button" class="btn clp-btn-icon slide-move-down" data-idx="${i}" title="Xuống">↓</button>` : ''}
-        <button type="button" class="btn clp-btn-danger slide-delete" data-idx="${i}" title="Xóa slide này">✕</button>
+        <button type="button" class="btn slide-edit" data-idx="${i}">Sửa</button>
+        <button type="button" class="btn clp-btn-danger slide-delete" data-idx="${i}" title="Xóa">✕</button>
       </div>
     </div>
   `).join('');
 
-  // Bind input changes → _slides
-  list.querySelectorAll('input[data-idx], textarea[data-idx]').forEach(inp => {
-    inp.addEventListener('input', () => {
-      const idx = parseInt(inp.dataset.idx, 10);
-      const field = inp.className.replace('slide-','').replace(/-(\w)/g, (_,c) => c.toUpperCase());
-      const map = {
-        'imageUrl': 'image_url',
-        'kicker': 'kicker',
-        'heading': 'heading',
-        'lead': 'lead',
-        'ctaPLabel': 'cta_primary_label',
-        'ctaPHref': 'cta_primary_href',
-        'ctaGLabel': 'cta_ghost_label',
-        'ctaGHref': 'cta_ghost_href',
-      };
-      const key = inp.className.split(' ').find(c => c.startsWith('slide-'));
-      const fieldMap = {
-        'slide-image-url': 'image_url',
-        'slide-kicker': 'kicker',
-        'slide-heading': 'heading',
-        'slide-lead': 'lead',
-        'slide-cta-p-label': 'cta_primary_label',
-        'slide-cta-p-href': 'cta_primary_href',
-        'slide-cta-g-label': 'cta_ghost_label',
-        'slide-cta-g-href': 'cta_ghost_href',
-      };
-      const sk = fieldMap[key];
-      if (sk) _slides[idx][sk] = inp.value;
-      // Update image preview inline
-      if (sk === 'image_url') {
-        const card = inp.closest('.clp-slide-card');
-        const wrap = card?.querySelector('.clp-img-preview-wrap');
-        if (wrap) {
-          wrap.innerHTML = inp.value
-            ? `<img src="${escH(inp.value)}" class="clp-img-preview" alt="" />`
-            : `<span class="clp-img-placeholder">Chưa có ảnh</span>`;
-        }
-      }
+  list.querySelectorAll('.slide-edit').forEach(btn =>
+    btn.addEventListener('click', () => openSlideModal(parseInt(btn.dataset.idx, 10)))
+  );
+  list.querySelectorAll('.slide-delete').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Xóa slide này?')) return;
+      _slides.splice(parseInt(btn.dataset.idx, 10), 1);
+      await _saveSlides();
+      renderSlides();
     });
   });
-
   list.querySelectorAll('.slide-move-up').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const i = parseInt(btn.dataset.idx, 10);
       [_slides[i-1], _slides[i]] = [_slides[i], _slides[i-1]];
+      await _saveSlides();
       renderSlides();
     });
   });
   list.querySelectorAll('.slide-move-down').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const i = parseInt(btn.dataset.idx, 10);
       [_slides[i], _slides[i+1]] = [_slides[i+1], _slides[i]];
+      await _saveSlides();
       renderSlides();
     });
   });
-  list.querySelectorAll('.slide-delete').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (!confirm('Xóa slide này?')) return;
-      _slides.splice(parseInt(btn.dataset.idx, 10), 1);
-      renderSlides();
+}
+
+async function _saveSlides() {
+  const msg = qs('#hero-save-msg');
+  try {
+    await apiFetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hero_slides_json: JSON.stringify(_slides) }),
     });
-  });
-  list.querySelectorAll('.clp-pick-btn[data-slide-idx]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      openMediaPicker((url) => {
-        const idx = parseInt(btn.dataset.slideIdx, 10);
-        _slides[idx].image_url = url;
-        renderSlides();
-      });
-    });
-  });
+    showMsg(msg, '✓ Đã lưu');
+  } catch (err) {
+    showMsg(msg, '✗ ' + err.message, true);
+    throw err;
+  }
 }
 
 async function loadHeroSlides() {
@@ -246,33 +605,192 @@ async function loadHeroSlides() {
   renderSlides();
 }
 
-qs('#hero-add-slide')?.addEventListener('click', () => {
-  _slides.push({
-    image_url: '',
-    kicker: '',
-    heading: '',
-    lead: '',
-    cta_primary_label: 'Liên hệ ngay',
-    cta_primary_href: '#contact',
-    cta_ghost_label: '',
-    cta_ghost_href: '',
+// ── Slide modal ───────────────────────────────────────────────────────────────
+
+function openSlideModal(idx) {
+  const s = idx === null ? null : _slides[idx];
+  qs('#slide-modal-title').textContent = s ? `Sửa slide ${idx + 1}` : 'Thêm slide mới';
+  qs('#slide-edit-idx').value = idx === null ? '' : String(idx);
+
+  const imgUrl = s?.image_url || '';
+  const mobileUrl = s?.image_url_mobile || '';
+  qs('#slide-image-url').value = imgUrl;
+  qs('#slide-image-mobile-url').value = mobileUrl;
+  _updateSlideImagePreview({ url: imgUrl, thumbId: 'slide-desktop-thumb', previewId: 'slide-desktop-preview' });
+  _updateSlideImagePreview({ url: mobileUrl, thumbId: 'slide-mobile-thumb', previewId: 'slide-mobile-preview' });
+  const desktopStatus = qs('#slide-upload-desktop-status');
+  const mobileStatus = qs('#slide-upload-mobile-status');
+  if (desktopStatus) { desktopStatus.textContent = ''; desktopStatus.style.color = '#64748b'; }
+  if (mobileStatus) { mobileStatus.textContent = ''; mobileStatus.style.color = '#64748b'; }
+
+  qs('#slide-video-url').value = s?.video_url || '';
+  if (qs('#slide-alt-text')) qs('#slide-alt-text').value = s?.alt_text || '';
+  qs('#slide-kicker').value = s?.kicker || '';
+  qs('#slide-heading').value = s?.heading || '';
+  qs('#slide-lead').value = s?.lead || '';
+  qs('#slide-cta-p-label').value = s?.cta_primary_label || '';
+  qs('#slide-cta-p-href').value = s?.cta_primary_href || '#contact';
+  qs('#slide-cta-g-label').value = s?.cta_ghost_label || '';
+  qs('#slide-cta-g-href').value = s?.cta_ghost_href || '';
+  qs('#slide-modal-msg').textContent = '';
+  qs('#slide-modal').classList.remove('is-hidden');
+  qs('#slide-heading').focus();
+}
+
+function closeSlideModal() {
+  qs('#slide-modal').classList.add('is-hidden');
+}
+
+function _updateSlideImagePreview({ url, thumbId, previewId }) {
+  const thumb = qs(`#${thumbId}`);
+  const prev = qs(`#${previewId}`);
+  if (!thumb || !prev) return;
+  if (url) {
+    prev.src = url;
+    thumb.classList.remove('is-hidden');
+  } else {
+    prev.src = '';
+    thumb.classList.add('is-hidden');
+  }
+}
+
+function _wireSlideImageField({
+  urlInputId, fileInputId, uploadBtnId, pickBtnId, statusId, thumbId, previewId, purpose,
+}) {
+  const urlInput = qs(`#${urlInputId}`);
+  urlInput?.addEventListener('input', () => {
+    _updateSlideImagePreview({
+      url: urlInput.value.trim(),
+      thumbId,
+      previewId,
+    });
   });
-  renderSlides();
+
+  qs(`#${uploadBtnId}`)?.addEventListener('click', () => {
+    qs(`#${fileInputId}`)?.click();
+  });
+
+  qs(`#${fileInputId}`)?.addEventListener('change', async () => {
+    const inp = qs(`#${fileInputId}`);
+    if (!inp?.files?.length) return;
+    const file = inp.files[0];
+    const status = qs(`#${statusId}`);
+    if (status) {
+      status.textContent = 'Đang upload...';
+      status.style.color = '#64748b';
+    }
+    try {
+      const j = await uploadMediaFile(file, purpose);
+      if (!j.url) throw new Error('Upload thất bại — không có URL');
+      if (urlInput) urlInput.value = j.url;
+      _updateSlideImagePreview({ url: j.url, thumbId, previewId });
+      if (status) status.textContent = `✓ Đã crop & upload (${formatUploadStatus(j)})`;
+    } catch (e) {
+      if (status) {
+        status.textContent = '✗ ' + e.message;
+        status.style.color = '#dc2626';
+      }
+    }
+    inp.value = '';
+  });
+
+  qs(`#${pickBtnId}`)?.addEventListener('click', () => {
+    openMediaPicker((url) => {
+      if (urlInput) urlInput.value = url;
+      _updateSlideImagePreview({ url, thumbId, previewId });
+    }, purpose);
+  });
+}
+
+_wireSlideImageField({
+  urlInputId: 'slide-image-url',
+  fileInputId: 'slide-upload-desktop-input',
+  uploadBtnId: 'slide-upload-desktop-btn',
+  pickBtnId: 'slide-pick-desktop-btn',
+  statusId: 'slide-upload-desktop-status',
+  thumbId: 'slide-desktop-thumb',
+  previewId: 'slide-desktop-preview',
+  purpose: 'hero_desktop',
 });
 
-qs('#hero-save')?.addEventListener('click', async () => {
-  const msg = qs('#hero-save-msg');
-  try {
-    await apiFetch('/api/settings', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hero_slides_json: JSON.stringify(_slides) }),
-    });
-    showMsg(msg, '✓ Đã lưu slides');
-  } catch (err) {
-    showMsg(msg, '✗ ' + err.message, true);
-  }
+_wireSlideImageField({
+  urlInputId: 'slide-image-mobile-url',
+  fileInputId: 'slide-upload-mobile-input',
+  uploadBtnId: 'slide-upload-mobile-btn',
+  pickBtnId: 'slide-pick-mobile-btn',
+  statusId: 'slide-upload-mobile-status',
+  thumbId: 'slide-mobile-thumb',
+  previewId: 'slide-mobile-preview',
+  purpose: 'hero_mobile',
 });
+
+qs('#slide-video-upload-btn')?.addEventListener('click', () => {
+  qs('#slide-video-upload-input')?.click();
+});
+
+qs('#slide-video-upload-input')?.addEventListener('change', async () => {
+  const inp = qs('#slide-video-upload-input');
+  if (!inp?.files?.length) return;
+  const file = inp.files[0];
+  const status = qs('#slide-video-upload-status');
+  const maxBytes = 80 * 1024 * 1024;
+  if (status) {
+    status.textContent = 'Đang upload & tối ưu video...';
+    status.style.color = '#64748b';
+  }
+  if (file.size > maxBytes) {
+    if (status) {
+      status.textContent = '✗ Video quá lớn (tối đa 80 MB)';
+      status.style.color = '#dc2626';
+    }
+    inp.value = '';
+    return;
+  }
+  try {
+    const j = await uploadMediaFile(file, 'hero_video');
+    qs('#slide-video-url').value = j.url;
+    if (status) status.textContent = `✓ Đã upload video (${formatUploadStatus(j)})`;
+  } catch (e) {
+    if (status) { status.textContent = '✗ ' + e.message; status.style.color = '#dc2626'; }
+  }
+  inp.value = '';
+});
+
+qs('#slide-modal-close')?.addEventListener('click', closeSlideModal);
+qs('#slide-modal-cancel')?.addEventListener('click', closeSlideModal);
+qs('#slide-modal-backdrop')?.addEventListener('click', closeSlideModal);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSlideModal(); });
+
+qs('#slide-modal-save')?.addEventListener('click', async () => {
+  const msg = qs('#slide-modal-msg');
+  const heading = qs('#slide-heading').value.trim();
+  const slide = {
+    image_url: qs('#slide-image-url').value.trim(),
+    image_url_mobile: qs('#slide-image-mobile-url')?.value.trim() || '',
+    video_url: qs('#slide-video-url').value.trim(),
+    alt_text: qs('#slide-alt-text')?.value.trim() || '',
+    kicker: qs('#slide-kicker').value.trim(),
+    heading,
+    lead: qs('#slide-lead').value.trim(),
+    cta_primary_label: qs('#slide-cta-p-label').value.trim(),
+    cta_primary_href: qs('#slide-cta-p-href').value.trim() || '#contact',
+    cta_ghost_label: qs('#slide-cta-g-label').value.trim(),
+    cta_ghost_href: qs('#slide-cta-g-href').value.trim(),
+  };
+  const rawIdx = qs('#slide-edit-idx').value;
+  if (rawIdx === '') {
+    _slides.push(slide);
+  } else {
+    _slides[parseInt(rawIdx, 10)] = slide;
+  }
+  try {
+    await _saveSlides();
+    closeSlideModal();
+    renderSlides();
+  } catch (_) { /* error shown by _saveSlides */ }
+});
+
+qs('#hero-add-slide')?.addEventListener('click', () => openSlideModal(null));
 
 // ── Projects ─────────────────────────────────────────────────────────────────
 
@@ -296,15 +814,97 @@ function bindImgPreview(urlInputId, previewId, placeholderId) {
 bindImgPreview('project-image-url','project-img-preview','project-img-placeholder');
 bindImgPreview('blog-image-url','blog-img-preview','blog-img-placeholder');
 
+// ── Quill custom blots ────────────────────────────────────────────────────────
+
+(function _registerQuillBlots() {
+  if (typeof Quill === 'undefined') return;
+  const BlockEmbed = Quill.import('blots/block/embed');
+  class VideoFileBlot extends BlockEmbed {
+    static create(url) {
+      const node = super.create();
+      node.setAttribute('src', url);
+      node.setAttribute('controls', '');
+      node.setAttribute('style', 'max-width:100%;border-radius:4px;display:block;margin:.5rem 0');
+      return node;
+    }
+    static value(node) { return node.getAttribute('src'); }
+  }
+  VideoFileBlot.blotName = 'video-file';
+  VideoFileBlot.tagName = 'video';
+  try { Quill.register(VideoFileBlot); } catch (e) { /* already registered */ }
+})();
+
+async function _quillUploadFile(file) {
+  return uploadMediaFile(file, null);
+}
+
+let _projectQuill = null;
+
+function _initProjectQuill() {
+  if (_projectQuill) return;
+  const el = qs('#project-description-editor');
+  if (!el || typeof Quill === 'undefined') return;
+  _projectQuill = new Quill(el, {
+    theme: 'snow',
+    placeholder: 'Nội dung đầy đủ: bối cảnh, giải pháp, kết quả... (chỉ hiển thị trên trang chi tiết dự án)',
+    modules: {
+      toolbar: {
+        container: [
+          [{ header: [2, 3, false] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ list: 'ordered' }, { list: 'bullet' }, 'blockquote'],
+          ['link', 'image', 'video'],
+          ['clean'],
+        ],
+        handlers: {
+          image() {
+            const inp = document.createElement('input');
+            inp.type = 'file';
+            inp.accept = 'image/jpeg,image/png,image/webp,image/gif';
+            inp.onchange = async () => {
+              const file = inp.files[0];
+              if (!file) return;
+              try {
+                const j = await _quillUploadFile(file);
+                const range = _projectQuill.getSelection(true);
+                _projectQuill.insertEmbed(range.index, 'image', j.url);
+                _projectQuill.setSelection(range.index + 1);
+              } catch (e) { alert('Lỗi upload ảnh: ' + e.message); }
+            };
+            inp.click();
+          },
+          video() {
+            const inp = document.createElement('input');
+            inp.type = 'file';
+            inp.accept = 'video/mp4,video/webm,video/quicktime';
+            inp.onchange = async () => {
+              const file = inp.files[0];
+              if (!file) return;
+              try {
+                const j = await _quillUploadFile(file);
+                const range = _projectQuill.getSelection(true);
+                _projectQuill.insertEmbed(range.index, 'video-file', j.url);
+                _projectQuill.setSelection(range.index + 1);
+              } catch (e) { alert('Lỗi upload video: ' + e.message); }
+            };
+            inp.click();
+          },
+        },
+      },
+    },
+  });
+}
+
 function resetProjectForm() {
   _editProjectId = null;
   qs('#project-form-title').textContent = 'Thêm dự án mới';
   qs('#project-submit').textContent = 'Thêm dự án';
   qs('#project-cancel').classList.add('is-hidden');
-  ['project-edit-id','project-image-url','project-title','project-category','project-description'].forEach(id => {
+  ['project-edit-id','project-image-url','project-title','project-category','project-intro'].forEach(id => {
     const el = qs(`#${id}`);
     if (el) el.value = '';
   });
+  if (_projectQuill) _projectQuill.setContents([]);
   const prev = qs('#project-img-preview');
   if (prev) { prev.src = ''; prev.classList.add('is-hidden'); }
   const ph = qs('#project-img-placeholder');
@@ -317,20 +917,23 @@ async function loadProjects() {
   try {
     const items = await apiFetch('/api/projects');
     if (!items.length) { list.innerHTML = '<p class="muted">Chưa có dự án nào.</p>'; return; }
-    list.innerHTML = items.map(p => `
+    list.innerHTML = items.map(p => {
+      const excerpt = stripHtml(p.intro || p.description || '');
+      return `
       <div class="clp-item-card" data-id="${p.id}">
         <div class="clp-item-thumb">${imgOrPlaceholder(p.image_url)}</div>
         <div class="clp-item-info">
           <strong>${escH(p.title)}</strong>
           <span class="clp-item-sub">${escH(p.category)}</span>
-          <p class="clp-item-desc">${escH(p.description)}</p>
+          <p class="clp-item-desc">${escH(excerpt)}</p>
         </div>
         <div class="clp-item-actions">
           <button class="btn clp-btn-sm project-edit" data-id="${p.id}">Sửa</button>
           <button class="btn clp-btn-sm clp-btn-danger project-delete" data-id="${p.id}">Xóa</button>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     list.querySelectorAll('.project-edit').forEach(btn => {
       btn.addEventListener('click', () => editProject(items.find(p => p.id == btn.dataset.id)));
@@ -352,7 +955,8 @@ function editProject(p) {
   qs('#project-image-url').value = p.image_url || '';
   qs('#project-title').value = p.title || '';
   qs('#project-category').value = p.category || '';
-  qs('#project-description').value = p.description || '';
+  qs('#project-intro').value = p.intro || '';
+  if (_projectQuill) _projectQuill.root.innerHTML = p.description || '';
   const prev = qs('#project-img-preview');
   const ph = qs('#project-img-placeholder');
   if (p.image_url) {
@@ -372,9 +976,10 @@ qs('#project-submit')?.addEventListener('click', async () => {
   const title = qs('#project-title')?.value.trim();
   const category = qs('#project-category')?.value.trim();
   const image_url = qs('#project-image-url')?.value.trim();
-  const description = qs('#project-description')?.value.trim();
-  if (!title || !category) { showMsg(msg,'✗ Điền đủ tên và danh mục', true); return; }
-  const body = { title, category, image_url: image_url || '', description: description || '' };
+  const intro = qs('#project-intro')?.value.trim();
+  const description = _projectQuill ? _projectQuill.root.innerHTML.trim() : '';
+  if (!title || !category || !intro) { showMsg(msg,'✗ Điền đủ tên, danh mục và intro', true); return; }
+  const body = { title, category, image_url: image_url || '', intro, description: description || '' };
   try {
     if (_editProjectId) {
       await apiFetch(`/api/projects/${_editProjectId}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
@@ -402,6 +1007,63 @@ async function deleteProject(id) {
 
 // ── Blog / News ───────────────────────────────────────────────────────────────
 
+let _blogQuill = null;
+
+function _initBlogQuill() {
+  if (_blogQuill) return;
+  const el = qs('#blog-summary-editor');
+  if (!el || typeof Quill === 'undefined') return;
+  _blogQuill = new Quill(el, {
+    theme: 'snow',
+    placeholder: 'Nội dung tóm tắt hiển thị trên landing...',
+    modules: {
+      toolbar: {
+        container: [
+          [{ header: [2, 3, false] }],
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ list: 'ordered' }, { list: 'bullet' }, 'blockquote'],
+          ['link', 'image', 'video'],
+          ['clean'],
+        ],
+        handlers: {
+          image() {
+            const inp = document.createElement('input');
+            inp.type = 'file';
+            inp.accept = 'image/jpeg,image/png,image/webp,image/gif';
+            inp.onchange = async () => {
+              const file = inp.files[0];
+              if (!file) return;
+              try {
+                const j = await _quillUploadFile(file);
+                const range = _blogQuill.getSelection(true);
+                _blogQuill.insertEmbed(range.index, 'image', j.url);
+                _blogQuill.setSelection(range.index + 1);
+              } catch (e) { alert('Lỗi upload ảnh: ' + e.message); }
+            };
+            inp.click();
+          },
+          video() {
+            const inp = document.createElement('input');
+            inp.type = 'file';
+            inp.accept = 'video/mp4,video/webm,video/quicktime';
+            inp.onchange = async () => {
+              const file = inp.files[0];
+              if (!file) return;
+              try {
+                const j = await _quillUploadFile(file);
+                const range = _blogQuill.getSelection(true);
+                _blogQuill.insertEmbed(range.index, 'video-file', j.url);
+                _blogQuill.setSelection(range.index + 1);
+              } catch (e) { alert('Lỗi upload video: ' + e.message); }
+            };
+            inp.click();
+          },
+        },
+      },
+    },
+  });
+}
+
 let _editBlogId = null;
 
 function resetBlogForm() {
@@ -409,10 +1071,11 @@ function resetBlogForm() {
   qs('#blog-form-title').textContent = 'Thêm bài viết mới';
   qs('#blog-submit').textContent = 'Thêm bài viết';
   qs('#blog-cancel').classList.add('is-hidden');
-  ['blog-edit-id','blog-image-url','blog-title','blog-summary','blog-url'].forEach(id => {
+  ['blog-edit-id','blog-image-url','blog-title','blog-url'].forEach(id => {
     const el = qs(`#${id}`);
     if (el) el.value = '';
   });
+  if (_blogQuill) _blogQuill.setContents([]);
   const dp = qs('#blog-published-at');
   if (dp) dp.value = new Date().toISOString().slice(0,10);
   const prev = qs('#blog-img-preview');
@@ -427,20 +1090,23 @@ async function loadBlog() {
   try {
     const items = await apiFetch('/api/news');
     if (!items.length) { list.innerHTML = '<p class="muted">Chưa có bài viết nào.</p>'; return; }
-    list.innerHTML = items.map(n => `
+    list.innerHTML = items.map(n => {
+      const excerpt = excerptHtml(n.summary);
+      return `
       <div class="clp-item-card" data-id="${n.id}">
         <div class="clp-item-thumb">${imgOrPlaceholder(n.image_url)}</div>
         <div class="clp-item-info">
           <strong>${escH(n.title)}</strong>
           <span class="clp-item-sub">${escH(n.published_at || '')}</span>
-          <p class="clp-item-desc">${escH(n.summary)}</p>
+          <p class="clp-item-desc">${escH(excerpt)}</p>
         </div>
         <div class="clp-item-actions">
           <button class="btn clp-btn-sm blog-edit" data-id="${n.id}">Sửa</button>
           <button class="btn clp-btn-sm clp-btn-danger blog-delete" data-id="${n.id}">Xóa</button>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
 
     list.querySelectorAll('.blog-edit').forEach(btn => {
       btn.addEventListener('click', () => editBlog(items.find(n => n.id == btn.dataset.id)));
@@ -460,7 +1126,7 @@ function editBlog(n) {
   qs('#blog-cancel').classList.remove('is-hidden');
   qs('#blog-image-url').value = n.image_url || '';
   qs('#blog-title').value = n.title || '';
-  qs('#blog-summary').value = n.summary || '';
+  if (_blogQuill) _blogQuill.root.innerHTML = n.summary || '';
   qs('#blog-url').value = n.url || '';
   qs('#blog-published-at').value = n.published_at || '';
   const prev = qs('#blog-img-preview');
@@ -480,11 +1146,12 @@ qs('#blog-cancel')?.addEventListener('click', resetBlogForm);
 qs('#blog-submit')?.addEventListener('click', async () => {
   const msg = qs('#blog-msg');
   const title = qs('#blog-title')?.value.trim();
-  const summary = qs('#blog-summary')?.value.trim();
+  const summary = _blogQuill ? _blogQuill.root.innerHTML.trim() : '';
   const url = qs('#blog-url')?.value.trim();
   const image_url = qs('#blog-image-url')?.value.trim();
   const published_at = qs('#blog-published-at')?.value || new Date().toISOString().slice(0,10);
-  if (!title || !summary) { showMsg(msg,'✗ Điền đủ tiêu đề và tóm tắt', true); return; }
+  const summaryText = _blogQuill ? _blogQuill.getText().trim() : summary;
+  if (!title || !summaryText) { showMsg(msg,'✗ Điền đủ tiêu đề và tóm tắt', true); return; }
   const body = { title, summary, url: url || '#', image_url: image_url || '', published_at };
   try {
     if (_editBlogId) {
@@ -581,18 +1248,16 @@ function renderMediaGrid(grid, items, pickerMode, onPick) {
   }
 }
 
-async function uploadFiles(files, onDone) {
+async function uploadFiles(files, onDone, purpose) {
   const prog = qs('#media-upload-progress');
   const fill = qs('#media-progress-fill');
   const status = qs('#media-upload-status');
   if (prog) prog.classList.remove('is-hidden');
   let done = 0;
   for (const file of files) {
-    const fd = new FormData();
-    fd.append('file', file);
     try {
       if (status) status.textContent = `Đang tải: ${file.name}`;
-      await apiFetch('/api/cms/media/upload', { method: 'POST', body: fd });
+      await uploadMediaFile(file, purpose || null);
       done++;
       if (fill) fill.style.width = `${(done/files.length)*100}%`;
     } catch (e) {
@@ -629,9 +1294,16 @@ uploadZone?.addEventListener('drop', async (e) => {
 // ── Media Picker Modal ────────────────────────────────────────────────────────
 
 let _pickerCallback = null;
+let _pickerPurpose = null;
 
-function openMediaPicker(cb) {
+const PICK_TARGET_PURPOSE = {
+  'project-image-url': 'project',
+  'blog-image-url': 'news',
+};
+
+function openMediaPicker(cb, purpose) {
   _pickerCallback = cb;
+  _pickerPurpose = purpose || null;
   const modal = qs('#media-picker-modal');
   if (modal) modal.classList.remove('is-hidden');
   loadPickerMedia();
@@ -640,6 +1312,7 @@ function openMediaPicker(cb) {
 function closeMediaPicker() {
   qs('#media-picker-modal')?.classList.add('is-hidden');
   _pickerCallback = null;
+  _pickerPurpose = null;
 }
 
 async function loadPickerMedia() {
@@ -665,7 +1338,7 @@ const modalFileInput = qs('#modal-file-input');
 qs('#modal-upload-btn')?.addEventListener('click', () => modalFileInput?.click());
 modalFileInput?.addEventListener('change', async () => {
   if (!modalFileInput.files.length) return;
-  await uploadFiles(Array.from(modalFileInput.files), loadPickerMedia);
+  await uploadFiles(Array.from(modalFileInput.files), loadPickerMedia, _pickerPurpose);
   modalFileInput.value = '';
 });
 
@@ -685,7 +1358,7 @@ qsa('.clp-pick-btn:not([data-slide-idx])').forEach(btn => {
       const ph = qs(`#${phId}`);
       if (prev) { prev.src = url; prev.classList.remove('is-hidden'); }
       if (ph) ph.classList.add('is-hidden');
-    });
+    }, PICK_TARGET_PURPOSE[targetId] || null);
   });
 });
 
@@ -849,33 +1522,52 @@ function renderServices() {
             </div>
             <div class="clp-svc-item-form is-hidden" id="svc-item-form-${ci}-${ii}">
               <div class="clp-form-row">
-                <label class="clp-label">Tên dịch vụ <span class="req">*</span>
-                  <input type="text" class="svc-item-name-inp" value="${escH(item.name||'')}" data-ci="${ci}" data-ii="${ii}" placeholder="Dịch vụ quảng cáo Facebook..." />
+                <label class="clp-label">Tên dịch vụ (H1 hero) <span class="req">*</span>
+                  <input type="text" class="svc-item-name-inp" value="${escH(item.name||'')}" data-ci="${ci}" data-ii="${ii}" placeholder="Dịch vụ chạy quảng cáo Google..." />
                 </label>
                 <label class="clp-label">Slug (URL) <span class="req">*</span>
-                  <input type="text" class="svc-item-slug-inp" value="${escH(item.slug||'')}" data-ci="${ci}" data-ii="${ii}" placeholder="quang-cao-facebook" />
+                  <input type="text" class="svc-item-slug-inp" value="${escH(item.slug||'')}" data-ci="${ci}" data-ii="${ii}" placeholder="quang-cao-google" />
                 </label>
               </div>
-              <div class="clp-image-field">
-                <label class="clp-label">Ảnh banner dịch vụ</label>
-                <div class="clp-img-preview-wrap" id="svc-item-img-wrap-${ci}-${ii}">
-                  ${item.image_url
-                    ? `<img src="${escH(item.image_url)}" class="clp-img-preview" alt="" />`
-                    : `<span class="clp-img-placeholder">Chưa có ảnh</span>`}
+
+              <fieldset class="clp-fieldset clp-svc-hero-fieldset">
+                <legend>Hero đầu trang</legend>
+                <p class="muted" style="margin:0 0 .75rem;font-size:.85rem">Ảnh nền, dòng nhãn, mô tả và nút CTA ở đầu trang /services/${escH(item.slug||'…')}.</p>
+                <label class="clp-label">Dòng nhãn trên (eyebrow)
+                  <input type="text" class="svc-item-hero-eyebrow-inp" value="${escH(item.hero_eyebrow||'')}" data-ci="${ci}" data-ii="${ii}" placeholder="Dịch vụ · Quảng cáo kỹ thuật số (để trống = tự điền theo danh mục)" />
+                </label>
+                <div class="clp-image-field">
+                  <label class="clp-label">Ảnh nền hero</label>
+                  <div class="clp-img-preview-wrap" id="svc-item-img-wrap-${ci}-${ii}">
+                    ${item.image_url
+                      ? `<img src="${escH(item.image_url)}" class="clp-img-preview" alt="" />`
+                      : `<span class="clp-img-placeholder">Chưa có ảnh — hero dùng nền mặc định</span>`}
+                  </div>
+                  <div class="clp-img-actions">
+                    <input type="text" class="svc-item-img-inp" value="${escH(item.image_url||'')}" data-ci="${ci}" data-ii="${ii}" placeholder="Dán URL hoặc upload ảnh..." />
+                    <input type="file" class="svc-item-upload-input is-hidden" data-ci="${ci}" data-ii="${ii}" accept="image/jpeg,image/png,image/webp,image/gif" />
+                    <button type="button" class="btn svc-item-upload-img" data-ci="${ci}" data-ii="${ii}">⬆ Upload</button>
+                    <button type="button" class="btn svc-item-pick-img" data-ci="${ci}" data-ii="${ii}">Thư viện</button>
+                  </div>
                 </div>
-                <div class="clp-img-actions">
-                  <input type="text" class="svc-item-img-inp" value="${escH(item.image_url||'')}" data-ci="${ci}" data-ii="${ii}" placeholder="URL ảnh banner..." />
-                  <button type="button" class="btn svc-item-pick-img" data-ci="${ci}" data-ii="${ii}">Chọn từ Media</button>
+                <label class="clp-label">Tagline (dòng phụ dưới tiêu đề)
+                  <input type="text" class="svc-item-tagline-inp" value="${escH(item.tagline||'')}" data-ci="${ci}" data-ii="${ii}" placeholder="Tìm kiếm, hiển thị, Performance Max..." />
+                </label>
+                <label class="clp-label">Mô tả ngắn (đoạn lead hero) <span class="req">*</span>
+                  <textarea class="svc-item-summary-inp" rows="3" data-ci="${ci}" data-ii="${ii}" placeholder="Tìm kiếm, hiển thị, Performance Max và mạng lưới lớn...">${escH(item.summary||'')}</textarea>
+                </label>
+                <div class="clp-form-row">
+                  <label class="clp-label">Nút CTA chính
+                    <input type="text" class="svc-item-hero-cta-inp" value="${escH(item.hero_cta_primary_label||'')}" data-ci="${ci}" data-ii="${ii}" placeholder="Nhận đề xuất" />
+                  </label>
+                  <label class="clp-label">Nút gọi điện (nhãn hiển thị)
+                    <input type="text" class="svc-item-hero-phone-inp" value="${escH(item.hero_cta_phone_label||'')}" data-ci="${ci}" data-ii="${ii}" placeholder="Để trống = SĐT trong cài đặt liên hệ" />
+                  </label>
                 </div>
-              </div>
-              <label class="clp-label">Tagline (hiển thị dưới tên, tùy chọn)
-                <input type="text" class="svc-item-tagline-inp" value="${escH(item.tagline||'')}" data-ci="${ci}" data-ii="${ii}" placeholder="Tối ưu ngân sách · Đo lường minh bạch · Tăng trưởng bền vững" />
-              </label>
-              <label class="clp-label">Mô tả ngắn (summary) <span class="req">*</span>
-                <textarea class="svc-item-summary-inp" rows="2" data-ci="${ci}" data-ii="${ii}" placeholder="Giải pháp giúp...">${escH(item.summary||'')}</textarea>
-              </label>
+              </fieldset>
+
               <div class="clp-label">
-                <span class="clp-label-text">Mô tả chi tiết — hiển thị mục "Tổng quan dịch vụ"</span>
+                <span class="clp-label-text">Nội dung chi tiết — mục "Tổng quan dịch vụ"</span>
                 <div class="clp-quill-wrap">
                   <div id="svc-overview-editor-${ci}-${ii}" class="svc-overview-quill"></div>
                 </div>
@@ -884,10 +1576,10 @@ function renderServices() {
                 <textarea class="svc-item-highlights-inp" rows="4" data-ci="${ci}" data-ii="${ii}" placeholder="Điểm 1&#10;Điểm 2&#10;Điểm 3">${escH((item.highlights||[]).join('\n'))}</textarea>
               </label>
               <fieldset class="clp-fieldset">
-                <legend>Báo giá</legend>
+                <legend>Báo giá (sidebar)</legend>
                 <div class="clp-form-row">
-                  <label class="clp-label">Nhãn giá (hiển thị trong sidebar trang dịch vụ)
-                    <input type="text" class="svc-item-price-label-inp" value="${escH(item.price_label||'')}" data-ci="${ci}" data-ii="${ii}" placeholder="VD: Từ 15.000.000đ / tháng · hoặc Liên hệ theo dự án" />
+                  <label class="clp-label">Nhãn giá
+                    <input type="text" class="svc-item-price-label-inp" value="${escH(item.price_label||'')}" data-ci="${ci}" data-ii="${ii}" placeholder="VD: Từ 15.000.000đ / tháng" />
                   </label>
                 </div>
                 <label class="clp-label">Ghi chú báo giá
@@ -982,6 +1674,30 @@ function renderServices() {
       });
     });
   });
+  list.querySelectorAll('.svc-item-upload-img').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const ci = btn.dataset.ci;
+      const ii = btn.dataset.ii;
+      const fileInp = list.querySelector(`.svc-item-upload-input[data-ci="${ci}"][data-ii="${ii}"]`);
+      fileInp?.click();
+    });
+  });
+  list.querySelectorAll('.svc-item-upload-input').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      if (!inp.files?.length) return;
+      const ci = inp.dataset.ci;
+      const ii = inp.dataset.ii;
+      try {
+        const j = await uploadMediaFile(inp.files[0], 'service');
+        const form = qs(`#svc-item-form-${ci}-${ii}`);
+        const urlInp = form?.querySelector('.svc-item-img-inp');
+        if (urlInp) { urlInp.value = j.url; urlInp.dispatchEvent(new Event('input')); }
+      } catch (e) {
+        alert('Upload thất bại: ' + e.message);
+      }
+      inp.value = '';
+    });
+  });
   list.querySelectorAll('.svc-item-img-inp').forEach(inp => {
     inp.addEventListener('input', () => {
       const ci = parseInt(inp.dataset.ci, 10);
@@ -1018,8 +1734,11 @@ function renderServices() {
       const name = form.querySelector('.svc-item-name-inp')?.value.trim();
       const slug = form.querySelector('.svc-item-slug-inp')?.value.trim();
       const image_url = form.querySelector('.svc-item-img-inp')?.value.trim() || '';
+      const hero_eyebrow = form.querySelector('.svc-item-hero-eyebrow-inp')?.value.trim() || '';
       const tagline = form.querySelector('.svc-item-tagline-inp')?.value.trim() || '';
       const summary = form.querySelector('.svc-item-summary-inp')?.value.trim() || '';
+      const hero_cta_primary_label = form.querySelector('.svc-item-hero-cta-inp')?.value.trim() || '';
+      const hero_cta_phone_label = form.querySelector('.svc-item-hero-phone-inp')?.value.trim() || '';
       const quill = _quillInstances.get(`${ci}-${ii}`);
       const overviewHtml = quill ? quill.root.innerHTML.trim() : '';
       const overview = (overviewHtml && overviewHtml !== '<p><br></p>') ? overviewHtml : '';
@@ -1030,7 +1749,8 @@ function renderServices() {
       if (!name || !slug) { alert('Điền tên và slug trước khi lưu.'); return; }
       _services[ci].items[ii] = {
         ...(_services[ci].items[ii]||{}),
-        name, slug, image_url, tagline, summary,
+        name, slug, image_url, hero_eyebrow, tagline, summary,
+        hero_cta_primary_label, hero_cta_phone_label,
         overview: overview || (_services[ci].items[ii]?.overview || ''),
         highlights, price_label, price_note,
       };

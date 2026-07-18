@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pttads.vn/schemas/crm/create-lead-v1.schema.json",
+  "title": "CreateLeadV1",
+  "description": "Lead create — Nest writes PG OLTP (Phase 2 write contract v1.0.0).",
+  "type": "object",
+  "required": ["full_name"],
+  "properties": {
+    "full_name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "phone": { "type": "string", "maxLength": 32 },
+    "email": { "type": "string", "maxLength": 200 },
+    "status": { "type": "string", "maxLength": 64 },
+    "source": { "type": "string", "maxLength": 64 },
+    "channel": { "type": "string", "maxLength": 64 },
+    "client_id": { "type": ["string", "null"], "format": "uuid" },
+    "campaign_id": { "type": ["string", "null"], "maxLength": 128 },
+    "external_lead_id": { "type": ["string", "null"], "maxLength": 128 },
+    "owner_id": { "type": ["integer", "null"], "minimum": 1 }
+  },
+  "additionalProperties": false
+}

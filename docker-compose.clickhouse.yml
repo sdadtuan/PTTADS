@@ -1,0 +1,26 @@
+# Phase 4 F4 — ClickHouse analytics (domain_events)
+# Usage: docker compose -f docker-compose.clickhouse.yml up -d
+# HTTP: http://127.0.0.1:8123
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: ptt-clickhouse
+    environment:
+      CLICKHOUSE_DB: ptt
+      CLICKHOUSE_USER: ptt
+      CLICKHOUSE_PASSWORD: ptt_dev
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - ptt_clickhouse_data:/var/lib/clickhouse
+      - ./deploy/clickhouse/init-domain-events.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+volumes:
+  ptt_clickhouse_data:

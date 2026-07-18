@@ -213,6 +213,8 @@
             ${careLabel}
             ${issuesOpen ? `<span class="crm-cu-issue-badge">${issuesOpen}</span>` : ""}
             ${casesOpen ? `<span class="crm-cu-card-cases muted">${casesOpen} HS</span>` : ""}
+            <button class="btn btn--sm" onclick="event.stopPropagation();window.openBriefPanel(${c.id},${JSON.stringify(esc(name))})" title="Meeting Brief" style="padding:.2rem .4rem;font-size:.75rem;">📋</button>
+            <a href="/crm/customers/${c.id}/lifecycle/new" onclick="event.stopPropagation()" class="btn btn--sm" title="Tạo Lifecycle" style="padding:.2rem .4rem;font-size:.75rem;text-decoration:none;">⚡ LC</a>
           </div>
         </div>
       </article>
@@ -712,6 +714,10 @@
 
   async function openCustomer(id) {
     activeCustomerId = id;
+    window._lcCid = id;
+    if (detailPanel) detailPanel.dataset.customerId = String(id);
+    const lcLink = document.getElementById("crm-cu-lc-open");
+    if (lcLink) lcLink.href = `/crm/customers/${id}/lifecycle/new`;
     const data = await reqJson(`/api/crm/customers/${id}`);
     activeCustomer = data.customer;
     const cu = data.customer || {};

@@ -1,0 +1,114 @@
+.crm-catalog-page .crm-catalog-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.crm-catalog-panel--full {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 1100px) {
+  .crm-catalog-page .crm-catalog-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+}
+
+.crm-catalog-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.crm-catalog-panel-head h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+.crm-catalog-table-wrap {
+  overflow-x: auto;
+}
+
+.crm-catalog-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.crm-catalog-table th,
+.crm-catalog-table td {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--border-soft, rgba(57, 139, 67, 0.1));
+  text-align: left;
+  vertical-align: middle;
+}
+
+.crm-catalog-table code {
+  font-size: 0.85em;
+}
+
+.crm-catalog-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.crm-catalog-badge.is-active {
+  background: var(--success-soft, #eaf8f1);
+  color: var(--primary-800, #245a2c);
+}
+
+.crm-catalog-badge.is-inactive {
+  background: var(--danger-soft, #ffebeb);
+  color: #9b1c1c;
+}
+
+.crm-catalog-form-field {
+  margin-bottom: 0.85rem;
+}
+
+.crm-catalog-form-field label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+
+.crm-catalog-form-field input,
+.crm-catalog-form-field textarea {
+  width: 100%;
+}
+
+.crm-catalog-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.crm-catalog-form-modal {
+  max-width: 520px;
+}
+
+.crm-catalog-traits-wrap {
+  margin-top: 0.75rem;
+}
+
+.crm-catalog-traits-json {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+}
+
+.crm-catalog-traits-hint {
+  font-size: 0.75rem;
+  margin-top: 0.35rem;
+}
+
+.crm-catalog-addon-count {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--primary-700, #2f7238);
+}

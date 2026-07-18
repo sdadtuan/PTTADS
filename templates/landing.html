@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 {% import '_macros_static.html' as ras %}
+{% from 'partials/brand_logo_lockup.html' import render as brand_logo_lockup %}
+{% from 'partials/capability_icon.html' import render as capability_icon %}
 
 {% block title %}{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Creative Martech Platform{% endblock %}
 {% block head %}
@@ -19,6 +21,20 @@
   <meta name="twitter:title" content="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Creative Martech Platform" />
   <meta name="twitter:description" content="Nền tảng Creative Martech, marketing đa kênh, tư vấn chiến lược cho doanh nghiệp tại Việt Nam." />
   <meta name="twitter:image" content="{{ request.url_root.rstrip('/') }}{{ url_for('static', filename='images/ptt-logo.png') }}" />
+  {% set _first = hero_slides[0] if hero_slides else none %}
+  {% if _first and _first.video_url %}
+    {% set _poster = _first.image_url_mobile or _first.image_url %}
+    {% if _poster %}
+  <link rel="preload" as="image" href="{{ _poster | e }}" fetchpriority="high" />
+    {% endif %}
+  {% elif _first and _first.image_url %}
+  <link rel="preload" as="image" href="{{ _first.image_url | e }}" fetchpriority="high" media="(min-width: 901px)" />
+    {% if _first.image_url_mobile %}
+  <link rel="preload" as="image" href="{{ _first.image_url_mobile | e }}" fetchpriority="high" media="(max-width: 900px)" />
+    {% else %}
+  <link rel="preload" as="image" href="{{ _first.image_url | e }}" fetchpriority="high" media="(max-width: 900px)" />
+    {% endif %}
+  {% endif %}
 {% endblock %}
 {% block structured_data %}
   <script type="application/ld+json">
@@ -57,10 +73,7 @@
 {% block header %}
 <header class="topbar landing-topbar">
   <div class="container nav-wrap">
-    <a href="/" class="logo logo-landing brand-logo" aria-label="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Trang chủ">
-      {{- ras.raster_static_picture('images/ptt-logo.png', (settings.brand_name if settings else 'PTT Advertising Solutions') ~ ' — logo', 60, 60, 'brand-logo-img', loading='eager') -}}
-      <span class="brand-logo-text logo-landing-text">{{ settings.brand_name if settings else "PTT Advertising Solutions" }}</span>
-    </a>
+    {{ brand_logo_lockup('/', 'header', 'eager') }}
     <button class="menu-toggle" type="button" aria-label="Mở hoặc đóng menu" data-menu-toggle>
       <span></span><span></span><span></span>
     </button>
@@ -155,7 +168,7 @@
         </div>
       </div>
       <a class="landing-nav-item" href="#projects">Dự án</a>
-      <a class="landing-nav-item" href="#news">Tin tức</a>
+      <a class="landing-nav-item" href="#news">Tin tức &amp; Kiến thức</a>
       <a class="landing-nav-item" href="#careers">Tuyển dụng</a>
       <a class="landing-nav-item landing-nav-item-cta" href="#contact">Liên hệ</a>
     </nav>
@@ -164,9 +177,8 @@
   <div class="nav-mega-backdrop" data-nav-mega-backdrop hidden aria-hidden="true"></div>
 
   <div class="mobile-menu" data-mobile-menu>
-    <a href="#main" class="mobile-dv-landing">Dịch vụ</a>
     <details class="mobile-nav-dd">
-      <summary class="mobile-nav-dd-summary">Dịch vụ theo từng nhóm</summary>
+      <summary class="mobile-nav-dd-summary">Dịch vụ</summary>
       <div class="mobile-nav-dd-body">
         {% set _mb_img = (settings.get('nav_mega_banner_image') or '')|trim %}
         {% set _mb_href = (settings.get('nav_mega_banner_href') or '#contact')|trim or '#contact' %}
@@ -201,12 +213,14 @@
           </ul>
         </div>
         {% endfor %}
-        <a href="#main" class="mobile-nav-dd-cta">Vào nội dung trang</a>
+        <a href="#main" class="mobile-nav-dd-cta">Xem tất cả dịch vụ trên trang</a>
       </div>
     </details>
-    <a class="mobile-menu-link" href="#projects">Dự án</a>
-    <a class="mobile-menu-link" href="#news">Tin tức</a>
-    <a class="mobile-menu-link" href="#careers">Tuyển dụng</a>
+    <div class="mobile-menu-nav-grid">
+      <a class="mobile-menu-link" href="#projects">Dự án</a>
+      <a class="mobile-menu-link" href="#news">Tin tức &amp; Kiến thức</a>
+      <a class="mobile-menu-link" href="#careers">Tuyển dụng</a>
+    </div>
     <a class="mobile-menu-link mobile-menu-link-cta" href="#contact">Liên hệ</a>
   </div>
   </header>
@@ -228,16 +242,51 @@
       {% for slide in hero_slides %}
       <article
         class="home-slider-slide{% if loop.first %} is-active{% endif %}"
-        style="--home-slide-bg: url({{ slide.image_url | e }})"
         aria-roledescription="slide"
         aria-label="{{ loop.index }} / {{ _total }}"
       >
+        {% if slide.image_url and not slide.video_url %}
+        {% set _hero_mobile = slide.image_url_mobile or slide.image_url %}
+        {% set _hero_alt = (slide.alt_text or slide.heading or '') | e %}
+        <picture class="home-slide-bg-picture">
+          <source media="(max-width: 900px)" srcset="{{ _hero_mobile | e }}" />
+          <img
+            class="home-slide-bg-img"
+            src="{{ slide.image_url | e }}"
+            alt="{{ _hero_alt }}"
+            {% if loop.first %}fetchpriority="high" loading="eager"{% else %}loading="lazy"{% endif %}
+          />
+        </picture>
+        {% endif %}
+        {% if slide.video_url %}
+        {% set _vpath = slide.video_url | lower %}
+        {% set _vmime = 'video/webm' if _vpath.endswith('.webm') else ('video/quicktime' if _vpath.endswith('.mov') else 'video/mp4') %}
+        {% set _poster = slide.image_url_mobile or slide.image_url or '' %}
+        <video
+          class="home-slide-video"
+          muted
+          loop
+          playsinline
+          disablepictureinpicture
+          {% if _poster %}poster="{{ _poster | e }}"{% endif %}
+          preload="{{ 'metadata' if loop.first else 'none' }}"
+          {% if not loop.first %}data-lazy-video{% endif %}
+        >
+          {% if loop.first %}
+          <source src="{{ slide.video_url | e }}" type="{{ _vmime }}">
+          {% else %}
+          <source data-src="{{ slide.video_url | e }}" type="{{ _vmime }}">
+          {% endif %}
+        </video>
+        {% endif %}
         <div class="container home-slider-slide-inner">
           {% if slide.kicker %}<p class="home-slider-kicker">{{ slide.kicker | e }}</p>{% endif %}
+          {% if slide.heading %}
           {% if loop.first %}
           <h1>{{ slide.heading | e }}</h1>
           {% else %}
           <h2 class="home-slider-heading">{{ slide.heading | e }}</h2>
+          {% endif %}
           {% endif %}
           {% if slide.lead %}<p class="home-slider-lead">{{ slide.lead | e }}</p>{% endif %}
           <div class="home-slider-actions">
@@ -267,45 +316,36 @@
 <section id="capabilities" class="section capabilities-section capabilities-section--modern">
   <div class="container capabilities-inner">
     <p class="capabilities-intro">
-      PTT là nền tảng Creative Martech đa ngành — tích hợp tự động hóa, AI và dữ liệu vào toàn bộ quy trình marketing: từ sáng tạo nội dung, cá nhân hóa trải nghiệm khách hàng đến tối ưu hóa hiệu suất chiến dịch theo thời gian thực.
+      {{ (settings.get('capabilities_intro') or '') | e }}
     </p>
     <ul class="capabilities-grid">
+      {% for item in capabilities_items %}
+      {% if item is mapping %}
+        {% set cap_title = item.get('title', '') %}
+        {% set icon_url = (item.get('icon_url') or '') | trim %}
+        {% set icon_preset = (item.get('icon') or loop.index0)|int %}
+      {% else %}
+        {% set cap_title = item %}
+        {% set icon_url = '' %}
+        {% set icon_preset = loop.index0 %}
+      {% endif %}
       <li class="capabilities-item">
         <div class="capabilities-icon" aria-hidden="true">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+          {% if icon_url %}
+          <img
+            class="capabilities-icon-img"
+            src="{{ icon_url | e }}"
+            alt=""
+            loading="lazy"
+            decoding="async"
+          />
+          {% else %}
+          {{ capability_icon(icon_preset) }}
+          {% endif %}
         </div>
-        <p class="capabilities-text">Marketing Automation</p>
+        <p class="capabilities-text">{{ cap_title | e }}</p>
       </li>
-      <li class="capabilities-item">
-        <div class="capabilities-icon" aria-hidden="true">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-        </div>
-        <p class="capabilities-text">AI Content &amp; Personalization</p>
-      </li>
-      <li class="capabilities-item">
-        <div class="capabilities-icon" aria-hidden="true">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-        </div>
-        <p class="capabilities-text">Data Analytics &amp; Business Intelligence</p>
-      </li>
-      <li class="capabilities-item">
-        <div class="capabilities-icon" aria-hidden="true">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-        </div>
-        <p class="capabilities-text">CRM &amp; Lead Intelligence</p>
-      </li>
-      <li class="capabilities-item">
-        <div class="capabilities-icon" aria-hidden="true">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"/></svg>
-        </div>
-        <p class="capabilities-text">Paid Media đa kênh &amp; Tối ưu ROI</p>
-      </li>
-      <li class="capabilities-item">
-        <div class="capabilities-icon" aria-hidden="true">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
-        </div>
-        <p class="capabilities-text">AI Agent &amp; Customer Experience</p>
-      </li>
+      {% endfor %}
     </ul>
   </div>
 </section>
@@ -335,8 +375,8 @@
           aria-label="Xem chi tiết dự án: {{ project.title | e }}"
         >
           <img
-            src="{{ project.image_url }}"
-            alt=""
+            src="{{ project.image_url or url_for('static', filename='images/ptt-logo.png') }}"
+            alt="{{ project.title | e }}"
             width="640"
             height="480"
             loading="lazy"
@@ -345,7 +385,10 @@
         </a>
         <div class="saga-work-card-body">
           <h3 class="visually-hidden">{{ project.title }}</h3>
-          <p class="saga-work-card-intro">{{ project.description }}</p>
+          {% set _project_intro = project.intro or project.description %}
+          {% if _project_intro %}
+          <p class="saga-work-card-intro">{{ _project_intro | striptags | truncate(180, True, '…') }}</p>
+          {% endif %}
         </div>
       </article>
       {% endfor %}
@@ -374,19 +417,28 @@
   <div class="partners-shell">
     <div class="partner-slider" aria-label="Danh sách logo đối tác">
       <div class="partner-slider-track">
-        {% for _ in range(2) %}
-          {% for partner in partner_logos %}
-          <a
-            class="partner-slide"
-            href="{{ partner['site'] }}"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="{{ partner['name'] }}"
-          >
-            {{- ras.raster_static_picture(partner['logo_file'], '', 188, 58, loading='lazy', partner_slide_onerror=True, aria_hidden=True) -}}
-            <span>{{ partner["name"] }}</span>
-          </a>
-          {% endfor %}
+        {% for partner in partner_logos %}
+        <a
+          class="partner-slide"
+          href="{{ partner['site'] }}"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="{{ partner['name'] }}"
+        >
+          {% if partner.get('logo_url') %}
+          <img
+            src="{{ partner['logo_url'] | e }}"
+            alt="{{ partner['name'] | e }}"
+            width="188"
+            height="58"
+            loading="lazy"
+            decoding="async"
+          />
+          {% else %}
+          {{- ras.raster_static_picture(partner['logo_file'], partner['name'], 188, 58, loading='lazy', partner_slide_onerror=True, aria_hidden=True) -}}
+          {% endif %}
+          <span>{{ partner["name"] }}</span>
+        </a>
         {% endfor %}
       </div>
     </div>
@@ -395,11 +447,12 @@
 
 <section id="news" class="section container">
   <div class="section-head">
-    <h2>Tin tức</h2>
+    <h2>Tin tức &amp; Kiến thức</h2>
     <p>Cập nhật các chiến dịch và hoạt động truyền thông mới nhất.</p>
   </div>
   <div class="news-list">
     {% for item in news %}
+    {% set news_thumb = item.image_url or ('https://picsum.photos/seed/pttnews' ~ item.id ~ '/560/320') %}
     <article class="news-item">
       <a
         class="news-item-link"
@@ -408,8 +461,8 @@
       >
         <div class="news-item-media">
           <img
-            src="https://picsum.photos/seed/pttnews{{ item.id }}/560/320"
-            alt=""
+            src="{{ news_thumb | e }}"
+            alt="{{ item.title | e }}"
             width="560"
             height="320"
             loading="lazy"
@@ -418,7 +471,7 @@
         </div>
         <div class="news-item-body">
           <h3>{{ item.title }}</h3>
-          <p class="news-item-summary">{{ item.summary | e }}</p>
+          <p class="news-item-summary">{{ item.summary | striptags | truncate(180, True, '…') }}</p>
         </div>
         <span class="news-item-cta" aria-hidden="true">Chi tiết</span>
       </a>
@@ -485,13 +538,27 @@
         data-landing-contact="{{ url_for('landing_contact') }}"
       >
         <label class="visually-hidden" for="contact-name">Họ và tên</label>
-        <input id="contact-name" name="name" type="text" placeholder="Họ và tên" autocomplete="name" inputmode="text" required maxlength="200" />
+        <input id="contact-name" name="name" type="text" placeholder="Họ và tên *" autocomplete="name" inputmode="text" required maxlength="200" />
         <label class="visually-hidden" for="contact-email">Email</label>
-        <input id="contact-email" name="email" type="email" placeholder="Email" autocomplete="email" inputmode="email" required />
+        <input id="contact-email" name="email" type="email" placeholder="Email *" autocomplete="email" inputmode="email" required />
         <label class="visually-hidden" for="contact-tel">Số điện thoại</label>
-        <input id="contact-tel" name="phone" type="tel" placeholder="Số điện thoại" autocomplete="tel" inputmode="tel" maxlength="40" />
-        <label class="visually-hidden" for="contact-need">Nhu cầu doanh nghiệp</label>
-        <input id="contact-need" name="message" type="text" placeholder="Nhu cầu của doanh nghiệp" autocomplete="off" maxlength="2000" />
+        <input id="contact-tel" name="phone" type="tel" placeholder="Số điện thoại *" autocomplete="tel" inputmode="tel" required maxlength="40" />
+        <label class="visually-hidden" for="contact-budget">Ngân sách Marketing</label>
+        <select id="contact-budget" name="budget" required>
+          <option value="">Ngân sách Marketing *</option>
+          <option value="Duoi 100 trieu">Dưới 100 triệu</option>
+          <option value="100-300 trieu">100 - 300 triệu</option>
+          <option value="300-500 trieu">300 - 500 triệu</option>
+          <option value="Tren 500 trieu">Trên 500 triệu</option>
+        </select>
+        <label class="visually-hidden" for="contact-company">Tên công ty</label>
+        <input id="contact-company" name="company" type="text" placeholder="Tên công ty *" autocomplete="organization" maxlength="200" required />
+        <label class="visually-hidden" for="contact-goal">Mục tiêu dự án</label>
+        <input id="contact-goal" name="goal" type="text" placeholder="Mục tiêu cho dự án sắp tới (tuỳ chọn)" autocomplete="off" maxlength="500" />
+        <label class="visually-hidden" for="contact-help">Hỗ trợ dự án</label>
+        <input id="contact-help" name="help_request" type="text" placeholder="Chúng tôi có thể hỗ trợ gì cho dự án của bạn (tuỳ chọn)" autocomplete="off" maxlength="500" />
+        <label class="visually-hidden" for="contact-additional">Thông tin thêm</label>
+        <textarea id="contact-additional" name="additional_info" rows="3" placeholder="Thông tin thêm (tuỳ chọn)" maxlength="2000"></textarea>
         <button type="submit" class="btn" id="contact-submit">
           <span class="contact-submit-label">Gửi tới PTT Advertising Solutions</span>
         </button>
@@ -505,29 +572,11 @@
 {% endblock %}
 
 {% block footer %}
-<footer class="footer">
-  <div class="container footer-default-grid">
-    <a href="/" class="footer-default-brand" aria-label="{{ (settings.brand_name if settings else 'PTT Advertising Solutions') | e }} — Trang chủ">
-      {{- ras.raster_static_picture(
-          'images/ptt-logo.png',
-          'PTT Advertising Solutions Logo',
-          120,
-          120,
-          'footer-default-logo',
-          loading='lazy') -}}
-    </a>
-    <p class="footer-default-copy">© {{ settings.brand_name if settings else "PTT Advertising Solutions" }} 2026</p>
-    <nav class="footer-default-links" aria-label="Pháp lý">
-      <a href="{{ url_for('privacy_policy') }}">Chính sách bảo mật</a>
-    </nav>
-  </div>
-</footer>
+{% include 'partials/site_footer.html' %}
 {% include "_career_modal.html" %}
 <script type="application/json" id="career-recruitment-json">{{ recruitment_positions|tojson }}</script>
 {% set _js_career = static_js_file('career-modal.js') %}
-{% set _js_land = static_js_file('landing.js') %}
 <script defer src="{{ url_for('static', filename=_js_career) }}?v={{ static_v(_js_career) }}"></script>
-<script defer src="{{ url_for('static', filename=_js_land) }}?v={{ static_v(_js_land) }}"></script>
 {% endblock %}
 
 {% block floating_contact %}

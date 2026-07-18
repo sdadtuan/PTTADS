@@ -36,7 +36,15 @@
     "care_contact_labels": crm_care_contact_labels | default({}),
     "care_status_types": crm_care_status_types | default([]),
     "care_status_labels": crm_care_status_labels | default({}),
-    "care_pipeline_stages": crm_care_pipeline_stages | default([])
+    "care_pipeline_stages": crm_care_pipeline_stages | default([]),
+    "presales_on_lead": crm_presales_on_lead | default(false),
+    "presales_stage_labels": crm_presales_stage_labels | default({}),
+    "service_slugs": crm_service_slugs | default([]),
+    "service_labels": crm_service_labels | default({}),
+    "industry_slugs": crm_industry_slugs | default([]),
+    "industry_labels": crm_industry_labels | default({}),
+    "hide_re_lead_fields": crm_hide_re_lead_fields | default(true),
+    "can_manage_review_queue": crm_leads_can_manage_review_queue | default(false)
   } | tojson }}</script>
 {% endblock %}
 
@@ -51,6 +59,7 @@
 {% block admin_page_actions %}
   <button type="button" class="btn-secondary" id="crm-leads-rules-btn" hidden data-admin-section-allow data-admin-btn="crm_leads__btn_rules">Quy tắc điểm & hạng</button>
   <button type="button" class="btn-secondary" id="crm-leads-config-btn" hidden data-admin-section-allow data-admin-btn="crm_leads__btn_config">Cấu hình phân lead</button>
+  <a href="{{ url_for('crm_catalog_page') }}" class="btn-secondary" id="crm-leads-catalog-btn" hidden data-admin-section-allow data-admin-btn="crm_leads__btn_catalog">Danh mục DV &amp; Ngành</a>
   <button type="button" class="btn-secondary" id="crm-leads-export-xlsx" data-admin-btn="crm_leads__btn_export_xlsx">Excel</button>
   <button type="button" class="btn-secondary" id="crm-leads-export-pdf" data-admin-btn="crm_leads__btn_export_pdf">PDF</button>
   <button type="button" class="btn-secondary" id="crm-leads-import-btn" data-admin-btn="crm_leads__btn_import">Import CSV</button>
@@ -59,14 +68,23 @@
 {% endblock %}
 
 {% block admin_main %}
-<div class="crm-app crm-leads-app" data-admin-section="crm_leads">
+<div class="crm-app crm-leads-app" data-lead-page="list" data-admin-section="crm_leads">
   <div class="crm-leads-notify-stack" id="crm-leads-notify-stack" aria-live="polite" aria-atomic="false"></div>
+  <div class="crm-leads-review-inbox" id="crm-leads-review-inbox" hidden>
+    <div class="crm-leads-review-inbox-inner">
+      <div class="crm-leads-review-inbox-text">
+        <strong>Inbox tra soát (GDKD)</strong>
+        <span class="muted"><span id="crm-leads-review-inbox-count">0</span> lead quá hạn B2 — cần phân lại AM</span>
+      </div>
+      <button type="button" class="btn btn-sm" id="crm-leads-review-inbox-open">Xem danh sách</button>
+    </div>
+  </div>
   {% if crm_staff_portal | default(false) or not _leads_only %}
   <div class="crm-leads-stats" id="crm-leads-stats" aria-label="Thống kê"></div>
   {% endif %}
   <section class="panel crm-leads-owner-panel" id="crm-leads-owner-panel" hidden aria-label="Hiệu suất theo owner">
     <h3 class="crm-leads-subtitle">{% if crm_staff_portal | default(false) or _leads_only %}Hiệu suất của tôi{% else %}Hiệu suất theo Owner{% endif %}</h3>
-    <p class="muted crm-leads-owner-desc">Tổng hợp lead được phân công trên <strong>mọi dự án</strong> nhân viên tham gia (dùng bộ lọc «Dự án BĐS» để xem từng dự án). Cột B1–B8: số lead theo bước chăm sóc.</p>
+    <p class="muted crm-leads-owner-desc">Tổng hợp lead được phân công{% if not crm_hide_re_lead_fields | default(true) %} trên <strong>mọi dự án</strong> nhân viên tham gia{% endif %}. Cột B2: lead đang ở bước liên hệ lần đầu.</p>
     <div class="crm-staff-table-wrap crm-leads-owner-scroll">
       <table class="crm-staff-table crm-leads-owner-table">
         <thead>
@@ -74,9 +92,7 @@
             <th>Owner</th>
             <th>Tổng</th>
             <th>Theo dự án</th>
-            {% for st in crm_care_pipeline_stages %}
-            <th class="crm-leads-owner-stage-col" title="{{ st.label }}">B{{ loop.index }}</th>
-            {% endfor %}
+            <th class="crm-leads-owner-stage-col" title="{{ crm_care_pipeline_stages[0].label if crm_care_pipeline_stages else 'Liên hệ lần đầu' }}">B2</th>
             <th>Đang mở</th>
             <th>Mất</th>
             <th>Chốt</th>
@@ -101,10 +117,13 @@
         <select id="crm-leads-filter-status"><option value="">Trạng thái</option></select>
         <select id="crm-leads-filter-level"><option value="">Phân loại</option></select>
         <select id="crm-leads-filter-source"><option value="">Nguồn</option></select>
+        {% if not crm_hide_re_lead_fields | default(true) %}
         <select id="crm-leads-filter-project"><option value="">Dự án BĐS (tất cả)</option></select>
         <select id="crm-leads-filter-line"><option value="">Dòng SP</option></select>
         <select id="crm-leads-filter-zone"><option value="">Phân khu</option></select>
+        {% endif %}
         <label class="crm-leads-sla-check"><input type="checkbox" id="crm-leads-sla-only" /> Quá hạn SLA</label>
+        <label class="crm-leads-sla-check crm-leads-review-filter" id="crm-leads-review-wrap" hidden data-admin-section-allow><input type="checkbox" id="crm-leads-review-only" /> Inbox tra soát</label>
         {% if not _leads_only %}
         <button type="button" class="btn-secondary" id="crm-leads-filter-fb-only">Facebook</button>
         {% endif %}
@@ -125,141 +144,6 @@
       <div id="crm-leads-ai-search-result" class="crm-leads-ai-box"></div>
     </section>
     {% endif %}
-  </div>
-</div>
-
-<div class="crm-modal-root" id="crm-leads-view-modal" hidden>
-  <div class="crm-modal-backdrop" data-close-view-modal></div>
-  <div class="crm-modal-panel crm-modal-panel--wide crm-leads-view-modal" role="dialog" aria-modal="true" aria-labelledby="crm-leads-detail-name">
-    <header class="crm-modal-head crm-leads-detail-head">
-      <div>
-        <p class="crm-modal-kicker">Chi tiết lead</p>
-        <h2 id="crm-leads-detail-name">—</h2>
-        <div class="crm-leads-badges" id="crm-leads-detail-badges"></div>
-      </div>
-      <div class="crm-leads-detail-actions">
-        {% if not _leads_only %}
-        <button type="button" class="btn-secondary" id="crm-leads-convert-btn" title="Tạo Khách hàng + Case CSKH" data-admin-btn="crm_leads__btn_convert">→ Case/KH</button>
-        {% if not crm_staff_portal | default(false) %}
-        <button type="button" class="btn-secondary" id="crm-leads-assign-btn" title="Phân lại owner" data-admin-btn="crm_leads__btn_assign">Phân lại</button>
-        <button type="button" class="btn-secondary" id="crm-leads-merge-btn" title="Gộp lead trùng" hidden data-admin-btn="crm_leads__btn_merge">Gộp trùng</button>
-        {% endif %}
-        <button type="button" class="btn-secondary" id="crm-leads-ai-summary" data-admin-btn="crm_leads__btn_ai_summary">AI Tóm tắt</button>
-        <button type="button" class="btn-secondary" id="crm-leads-ai-classify" data-admin-btn="crm_leads__btn_ai_classify">AI Phân loại</button>
-        <button type="button" class="btn-secondary" id="crm-leads-ai-recommend" data-admin-btn="crm_leads__btn_ai_recommend">Gợi ý</button>
-        <button type="button" class="btn-secondary" id="crm-leads-hold-product" hidden>Giữ chỗ SP</button>
-        <button type="button" class="btn-secondary" id="crm-leads-release-product" hidden>Hủy giữ chỗ</button>
-        {% endif %}
-        <button type="button" class="btn-secondary" id="crm-leads-edit-btn" data-admin-btn="crm_leads__btn_edit">Sửa</button>
-        {% if not _leads_only %}
-        <button type="button" class="btn-secondary crm-leads-btn-danger" id="crm-leads-delete-btn" hidden title="Xóa lead vĩnh viễn" data-admin-btn="crm_leads__btn_delete">Xóa</button>
-        {% endif %}
-        <button type="button" class="crm-modal-close" data-close-view-modal aria-label="Đóng">×</button>
-      </div>
-    </header>
-    <div class="crm-modal-body crm-leads-view-body">
-      <div class="crm-leads-detail-grid" id="crm-leads-detail-info"></div>
-      <div class="crm-leads-score-panel panel-inset" id="crm-leads-score-panel">
-        <div class="crm-leads-score-head">
-          <h3 class="crm-leads-subtitle">Chi tiết chấm điểm</h3>
-          {% if not _leads_only %}
-          <button type="button" class="btn-secondary btn-sm" id="crm-leads-rescore-btn" data-admin-btn="crm_leads__btn_rescore">Chấm lại</button>
-          {% endif %}
-        </div>
-        <div id="crm-leads-score-breakdown" class="crm-leads-score-breakdown muted">—</div>
-      </div>
-      <div class="crm-leads-dup-panel panel-inset" id="crm-leads-dup-panel" hidden>
-        <h3 class="crm-leads-subtitle">Lead trùng lặp</h3>
-        <div id="crm-leads-dup-list" class="muted">—</div>
-      </div>
-      <div class="crm-leads-ai-box" id="crm-leads-ai-result" hidden></div>
-
-      <div class="crm-leads-care panel-inset crm-timeline-wrap" id="crm-leads-care-panel">
-        <div class="crm-leads-care-pipeline-head">
-          <h3 class="crm-panel-title">Quy trình chăm sóc (8 bước)</h3>
-          <p class="muted crm-leads-care-pipeline-desc">Chọn bước trên thanh pipeline — ghi <strong>báo cáo theo từng bước</strong>, sau đó hoàn thành để chuyển tiếp (bước xong được tô xanh).</p>
-        </div>
-        <div class="crm-leads-care-pipeline" id="crm-leads-care-pipeline" aria-label="Quy trình chăm sóc 8 bước"></div>
-        <div class="crm-leads-care-stage-panel" id="crm-leads-care-stage-panel" hidden>
-          <div class="crm-leads-care-stage-panel-head">
-            <span class="crm-leads-care-stage-badge" id="crm-leads-care-stage-num">1</span>
-            <div>
-              <p class="crm-leads-care-stage-panel-kicker">Bước đang thực hiện</p>
-              <h4 class="crm-leads-care-stage-panel-title" id="crm-leads-care-stage-name">—</h4>
-            </div>
-          </div>
-          <p class="crm-leads-care-stage-panel-hint" id="crm-leads-care-stage-hint">—</p>
-          <div class="crm-leads-care-stage-reports" id="crm-leads-care-stage-reports" aria-live="polite"></div>
-          <div class="crm-leads-care-stage-report-wrap" id="crm-leads-care-stage-report-wrap">
-            <h5 class="crm-leads-care-report-title" id="crm-leads-care-report-title">Báo cáo bước</h5>
-            <form id="crm-leads-care-form" class="crm-care-report-form crm-leads-care-stage-form">
-              <input type="hidden" id="crm-leads-care-stage-key" name="care_stage_key" value="" />
-              <div class="crm-form-grid-2">
-                <label for="crm-leads-care-contact">Hình thức liên hệ
-                  <select name="contact_type" id="crm-leads-care-contact" required></select>
-                </label>
-                <label for="crm-leads-care-status">Tình trạng chăm sóc
-                  <select name="care_status" id="crm-leads-care-status" required></select>
-                </label>
-              </div>
-              <label for="crm-leads-care-summary">Nội dung báo cáo bước này *
-                <textarea id="crm-leads-care-summary" name="summary" rows="3" required placeholder="Ghi theo hướng dẫn bước ở trên…"></textarea>
-              </label>
-              <label for="crm-leads-care-next">Việc tiếp theo (trong bước / trước khi chốt bước)
-                <input type="text" id="crm-leads-care-next" name="next_action" placeholder="Ví dụ: Gửi báo giá + follow-up Zalo ngày 28/05" />
-              </label>
-              <label for="crm-leads-care-next-at">Nhắc lúc
-                <input type="datetime-local" id="crm-leads-care-next-at" name="next_action_at" />
-              </label>
-              <button type="submit" class="btn" data-admin-btn="crm_leads__btn_activity">Gửi báo cáo bước này</button>
-              <p class="crm-form-msg is-error" id="crm-leads-care-err" hidden></p>
-              <p class="crm-form-msg is-success" id="crm-leads-care-ok" hidden>Đã lưu báo cáo cho bước.</p>
-            </form>
-            <p class="muted crm-leads-care-report-readonly" id="crm-leads-care-report-readonly" hidden>
-              Báo cáo chỉ ghi ở <strong>bước đang thực hiện</strong>. Chọn bước hiện tại trên thanh pipeline để ghi mới.
-            </p>
-          </div>
-          <div class="crm-leads-care-stage-complete-wrap">
-            <label class="crm-leads-care-stage-note-label" for="crm-leads-care-stage-note">Ghi chú khi hoàn thành bước (tuỳ chọn)</label>
-            <input type="text" id="crm-leads-care-stage-note" class="crm-leads-care-stage-note" placeholder="Tóm tắt kết quả bước trước khi chuyển tiếp…" />
-            <div class="crm-leads-care-stage-actions">
-              <button type="button" class="btn btn-secondary" id="crm-leads-care-stage-complete" data-admin-btn="crm_leads__btn_care_stage">✓ Hoàn thành &amp; chuyển bước tiếp</button>
-              <p class="crm-form-msg is-error" id="crm-leads-care-stage-err" hidden></p>
-              <p class="crm-form-msg is-success" id="crm-leads-care-stage-ok" hidden>Đã chuyển sang bước tiếp theo.</p>
-            </div>
-          </div>
-        </div>
-        <h3 class="crm-panel-title crm-panel-title--spaced">Lịch sử tổng hợp</h3>
-        <p class="crm-timeline-intro muted">Báo cáo theo từng bước, chuyển trạng thái pipeline và ghi chú nội bộ.</p>
-        <ol class="crm-timeline" id="crm-leads-care-timeline">
-          <li class="crm-ev-muted crm-ev-empty">Chọn lead để xem lịch sử.</li>
-        </ol>
-        <form id="crm-leads-note-form" class="crm-note-form">
-          <label for="crm-leads-note-body" class="crm-note-label">Thêm ghi chú</label>
-          <textarea id="crm-leads-note-body" name="body" rows="3" placeholder="Ví dụ: Đã gọi xác nhận — khách hẹn phản hồi email trước thứ Sáu."></textarea>
-          <button type="submit" class="btn btn-secondary">Thêm ghi chú</button>
-        </form>
-      </div>
-
-      {% if not _leads_only %}
-      <div class="crm-leads-audit panel-inset">
-        <h3 class="crm-leads-subtitle">Truy xuất thay đổi</h3>
-        <div class="crm-leads-audit-grid">
-          <div>
-            <h4 class="crm-leads-audit-head">Lịch sử trạng thái</h4>
-            <div id="crm-leads-status-logs" class="crm-leads-audit-list muted">—</div>
-          </div>
-          <div>
-            <h4 class="crm-leads-audit-head">Lịch sử phân công</h4>
-            <div id="crm-leads-assignment-logs" class="crm-leads-audit-list muted">—</div>
-          </div>
-        </div>
-      </div>
-      {% else %}
-      <div id="crm-leads-status-logs" hidden></div>
-      <div id="crm-leads-assignment-logs" hidden></div>
-      {% endif %}
-    </div>
   </div>
 </div>
 
@@ -305,6 +189,7 @@
             <label for="crm-leads-f-source">Nguồn lead <span class="crm-leads-req">*</span></label>
             <select id="crm-leads-f-source" required></select>
           </div>
+          {% if not crm_hide_re_lead_fields | default(true) %}
           <div class="crm-leads-form-field">
             <label for="crm-leads-f-project">Dự án BĐS</label>
             <select id="crm-leads-f-project"><option value="">— Chưa gán dự án —</option></select>
@@ -324,9 +209,14 @@
               <input type="search" id="crm-leads-f-product-q" placeholder="Tìm mã căn…" autocomplete="off" />
             </div>
           </div>
+          {% endif %}
           <div class="crm-leads-form-field">
-            <label for="crm-leads-f-product">Sản phẩm quan tâm (text)</label>
-            <input type="text" id="crm-leads-f-product" placeholder="Shophouse block B, căn 2PN…" />
+            <label for="crm-leads-f-industry">Ngành khách hàng *</label>
+            <select id="crm-leads-f-industry" required><option value="">— Chọn ngành —</option></select>
+          </div>
+          <div class="crm-leads-form-field">
+            <label for="crm-leads-f-product">Dịch vụ quan tâm</label>
+            <select id="crm-leads-f-product"><option value="">— Chọn dịch vụ —</option></select>
           </div>
         </div>
         <div class="crm-leads-form-field crm-leads-form-field--full">
@@ -494,6 +384,19 @@
             <input type="checkbox" id="crm-leads-cfg-act-sla" />
             <span>Cảnh báo khi lead không có activity trong thời hạn SLA trạng thái</span>
           </label>
+        </section>
+
+        <section class="crm-leads-form-section">
+          <h3 class="crm-leads-form-section-title">B2 — Lead phải tra soát</h3>
+          <p class="muted crm-leads-rules-hint">Quá hạn chưa có báo cáo 「Liên hệ OK» — AM không thấy; GDKD phân lại.</p>
+          <label class="crm-leads-config-check">
+            <input type="checkbox" id="crm-leads-cfg-b2-review-enabled" checked />
+            <span>Bật thu hồi lead quá hạn B2 vào danh mục Phải tra soát</span>
+          </label>
+          <div class="crm-leads-config-field">
+            <label for="crm-leads-cfg-b2-deadline-hours">Thời hạn (giờ, tính từ lúc phân công AM)</label>
+            <input type="number" id="crm-leads-cfg-b2-deadline-hours" min="1" max="168" step="1" value="24" />
+          </div>
         </section>
       </div>
 
@@ -797,6 +700,16 @@
 {% if not crm_staff_portal | default(false) %}
 {% include 'partials/admin_grants_bootstrap.html' %}
 {% endif %}
+{% set _ws = static_js_file('crm/lead-workspace.js') %}
+{% set _rv = static_js_file('crm/lead-review.js') %}
+{% set _ad = static_js_file('crm/lead-addon.js') %}
+<script src="{{ url_for('static', filename=_ws) }}?v={{ static_v(_ws) }}" defer></script>
+<script src="{{ url_for('static', filename=_rv) }}?v={{ static_v(_rv) }}" defer></script>
+<script src="{{ url_for('static', filename=_ad) }}?v={{ static_v(_ad) }}" defer></script>
 {% set _js = static_js_file('crm_leads.js') %}
 <script src="{{ url_for('static', filename=_js) }}?v={{ static_v(_js) }}" defer></script>
+{% if crm_presales_on_lead | default(false) %}
+{% set _psjs = static_js_file('crm_lead_presales.js') %}
+<script src="{{ url_for('static', filename=_psjs) }}?v={{ static_v(_psjs) }}" defer></script>
+{% endif %}
 {% endblock %}
