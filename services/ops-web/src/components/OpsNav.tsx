@@ -12,83 +12,66 @@ interface OpsNavProps {
   emailPendingApprovals?: number;
 }
 
+type NavLink = { href: string; label: string };
+type NavSection = { label: string; links: NavLink[] };
+
 const PAGE_TITLES: Record<string, string> = {
-  '/': 'Dashboard',
-  '/crm': 'CRM Board',
-  '/crm/leads': 'CRM Leads',
+  '/': 'Bảng điều khiển',
+  '/crm': 'Bảng CSKH',
+  '/crm/leads': 'Quản lý Lead',
   '/crm/catalog': 'CRM Catalog',
-  '/crm/customers': 'CRM Customers',
+  '/crm/customers': 'Khách hàng',
   '/crm/intake': 'Lead Intake',
-  '/crm/marketing-plan': 'Marketing Plan',
-  '/crm/service-delivery': 'Service Delivery',
-  '/crm/sop': 'SOP',
-  '/crm/sales': 'Sales',
+  '/crm/marketing-plan': 'Kế hoạch marketing',
+  '/crm/service-delivery': 'Triển khai dịch vụ',
+  '/crm/sop': 'Quy trình SOP',
+  '/crm/sales': 'Kinh doanh',
   '/crm/kpi': 'KPI',
-  '/crm/staff-kpi': 'Staff KPI',
-  '/crm/staff': 'Staff',
-  '/crm/proposals': 'Proposals',
-  '/crm/re-projects': 'RE Projects',
-  '/crm/payroll': 'Payroll',
-  '/crm/business-dashboard': 'Business Dashboard',
-  '/crm/owner-weekly': 'Owner Weekly',
-  '/crm/financials': 'Financials',
+  '/crm/staff-kpi': 'KPI AM/SP',
+  '/crm/staff': 'Nhân viên',
+  '/crm/proposals': 'Đề xuất dịch vụ',
+  '/crm/re-projects': 'Dự án BĐS',
+  '/crm/payroll': 'Chấm công & lương',
+  '/crm/business-dashboard': 'Dashboard kinh doanh',
+  '/crm/owner-weekly': 'Báo cáo tuần chủ DN',
+  '/crm/financials': 'Tài chính',
   '/agency': 'Agency',
-  '/meta/facebook-ads': 'Meta Ads Hub',
-  '/crm/hub': 'Hub Campaign Map',
+  '/meta/facebook-ads': 'Meta Ads',
+  '/crm/hub': 'Hub · Hợp đồng',
   '/seo/hub': 'SEO/AEO Hub',
   '/seo/clients': 'SEO Clients',
   '/email/hub': 'Email Hub',
   '/email/clients': 'Email Clients',
-  '/email/contacts': 'Email Contacts',
-  '/email/consent': 'Email Consent',
-  '/email/suppression': 'Email Suppression',
-  '/email/governance': 'Email Governance',
-  '/email/segments': 'Email Segments',
-  '/email/templates': 'Email Templates',
-  '/email/campaigns': 'Email Campaigns',
-  '/email/journeys': 'Email Journeys',
-  '/email/deliverability': 'Email Deliverability',
-  '/email/reports': 'Email Reports',
+  '/email/contacts': 'Contacts',
+  '/email/consent': 'Consent',
+  '/email/suppression': 'Suppression',
+  '/email/governance': 'Governance',
+  '/email/segments': 'Segments',
+  '/email/templates': 'Templates',
+  '/email/campaigns': 'Campaigns',
+  '/email/journeys': 'Journeys',
+  '/email/deliverability': 'Deliverability',
+  '/email/reports': 'Reports',
 };
 
 function pageTitleFor(pathname: string): string {
-  if (pathname.startsWith('/crm/leads/') && pathname !== '/crm/leads') {
-    return 'Lead detail';
-  }
-  if (pathname.startsWith('/crm/customers/') && pathname !== '/crm/customers') {
-    return 'Customer detail';
-  }
+  if (pathname.startsWith('/crm/leads/') && pathname !== '/crm/leads') return 'Chi tiết lead';
+  if (pathname.startsWith('/crm/customers/') && pathname !== '/crm/customers') return 'Chi tiết khách hàng';
   if (pathname.startsWith('/crm/marketing-plan/') && pathname !== '/crm/marketing-plan') {
-    return 'Marketing plan detail';
+    return 'Chi tiết kế hoạch';
   }
   if (pathname.startsWith('/crm/service-delivery/') && pathname !== '/crm/service-delivery') {
     return 'Service lifecycle';
   }
-  if (pathname.startsWith('/crm/staff/') && pathname !== '/crm/staff') {
-    return 'Staff workspace';
-  }
-  if (pathname.startsWith('/crm/re-projects/') && pathname !== '/crm/re-projects') {
-    return 'RE project detail';
-  }
-  if (pathname.startsWith('/agency/clients/')) {
-    return 'Client detail';
-  }
-  if (pathname.startsWith('/email/templates/') && pathname !== '/email/templates') {
-    return 'Template editor';
-  }
-  if (pathname.startsWith('/email/campaigns/') && pathname.endsWith('/review')) {
-    return 'Campaign review';
-  }
-  if (pathname.startsWith('/email/campaigns/') && pathname !== '/email/campaigns') {
-    return 'Campaign detail';
-  }
-  if (pathname.startsWith('/email/journeys/') && pathname !== '/email/journeys') {
-    return 'Journey canvas';
-  }
-  if (pathname.startsWith('/email/clients/') && pathname !== '/email/clients') {
-    return 'Client workspace';
-  }
-  return PAGE_TITLES[pathname] ?? 'Ops';
+  if (pathname.startsWith('/crm/staff/') && pathname !== '/crm/staff') return 'Workspace nhân viên';
+  if (pathname.startsWith('/crm/re-projects/') && pathname !== '/crm/re-projects') return 'Chi tiết dự án BĐS';
+  if (pathname.startsWith('/agency/clients/')) return 'Chi tiết client';
+  if (pathname.startsWith('/email/templates/') && pathname !== '/email/templates') return 'Template editor';
+  if (pathname.startsWith('/email/campaigns/') && pathname.endsWith('/review')) return 'Campaign review';
+  if (pathname.startsWith('/email/campaigns/') && pathname !== '/email/campaigns') return 'Campaign detail';
+  if (pathname.startsWith('/email/journeys/') && pathname !== '/email/journeys') return 'Journey canvas';
+  if (pathname.startsWith('/email/clients/') && pathname !== '/email/clients') return 'Client workspace';
+  return PAGE_TITLES[pathname] ?? 'PTT CRM';
 }
 
 function navBadge(count: number | undefined): string {
@@ -96,67 +79,93 @@ function navBadge(count: number | undefined): string {
   return count > 99 ? ' (99+)' : ` (${count})`;
 }
 
-export function OpsNav({ user, onLogout, emailPendingApprovals }: OpsNavProps) {
-  const pathname = usePathname();
-  const links = [{ href: '/', label: 'Dashboard' }];
+function isActive(pathname: string, href: string): boolean {
+  return pathname === href || (href !== '/' && pathname.startsWith(`${href}/`));
+}
+
+function buildSections(user: StoredStaffUser | null, emailPendingApprovals?: number): NavSection[] {
+  const sections: NavSection[] = [];
+
+  const overview: NavLink[] = [{ href: '/', label: 'Bảng điều khiển' }];
   if (hasCap(user, 'crm_board', 'view')) {
-    links.push({ href: '/crm', label: 'CRM Board' });
+    overview.push({ href: '/crm', label: 'Bảng CSKH' });
   }
+  if (overview.length) sections.push({ label: 'Tổng quan', links: overview });
+
+  const care: NavLink[] = [];
   if (hasCap(user, 'crm_leads', 'view')) {
-    links.push({ href: '/crm/leads', label: 'Leads' });
-    links.push({ href: '/crm/catalog', label: 'Catalog' });
+    care.push({ href: '/crm/leads', label: 'Quản lý Lead' });
+    care.push({ href: '/crm/catalog', label: 'Catalog' });
   }
   if (hasCap(user, 'crm_board_customers', 'view')) {
-    links.push({ href: '/crm/customers', label: 'Customers' });
+    care.push({ href: '/crm/customers', label: 'Khách hàng' });
+  }
+  if (care.length) sections.push({ label: 'CRM · Chăm sóc KH', links: care });
+
+  const marketing: NavLink[] = [];
+  if (hasCap(user, 'crm_agency', 'view')) {
+    marketing.push({ href: '/crm/hub', label: 'Hub · Hợp đồng' });
   }
   if (hasCap(user, 'crm_board', 'view')) {
-    links.push({ href: '/crm/marketing-plan', label: 'Mkt plan' });
-    links.push({ href: '/crm/service-delivery', label: 'Delivery' });
-    links.push({ href: '/crm/sop', label: 'SOP' });
+    marketing.push({ href: '/crm/marketing-plan', label: 'Kế hoạch marketing' });
+    marketing.push({ href: '/crm/sop', label: 'Quy trình SOP' });
+    marketing.push({ href: '/crm/service-delivery', label: 'Triển khai DV' });
   }
+  if (marketing.length) sections.push({ label: 'CRM · Marketing', links: marketing });
+
+  const sales: NavLink[] = [];
   if (hasCap(user, 'crm_sales_overview', 'view') || hasCap(user, 'crm_sales_plans', 'view')) {
-    links.push({ href: '/crm/sales', label: 'Sales' });
+    sales.push({ href: '/crm/sales', label: 'Kinh doanh' });
   }
   if (hasCap(user, 'crm_board', 'view')) {
-    links.push({ href: '/crm/proposals', label: 'Proposals' });
+    sales.push({ href: '/crm/proposals', label: 'Đề xuất' });
   }
   if (hasCap(user, 'crm_re_projects', 'view') || hasCap(user, 'crm_re_projects_products', 'view')) {
-    links.push({ href: '/crm/re-projects', label: 'RE' });
+    sales.push({ href: '/crm/re-projects', label: 'Dự án BĐS' });
+  }
+  if (sales.length) sections.push({ label: 'CRM · Kinh doanh', links: sales });
+
+  const hr: NavLink[] = [];
+  if (hasCap(user, 'crm_staff_roster', 'view')) {
+    hr.push({ href: '/crm/staff', label: 'Nhân viên' });
+  }
+  if (hasCap(user, 'crm_kpi_records', 'view')) {
+    hr.push({ href: '/crm/kpi', label: 'KPI' });
+  }
+  if (hasCap(user, 'crm_staff_kpi_am_sp', 'view')) {
+    hr.push({ href: '/crm/staff-kpi', label: 'KPI AM/SP' });
   }
   if (
     hasCap(user, 'crm_payroll_salary', 'view') ||
     hasCap(user, 'crm_payroll_attendance', 'view') ||
     hasCap(user, 'crm_staff_roster', 'view')
   ) {
-    links.push({ href: '/crm/payroll', label: 'Payroll' });
+    hr.push({ href: '/crm/payroll', label: 'Chấm công & lương' });
   }
+  if (hr.length) sections.push({ label: 'CRM · Nhân sự', links: hr });
+
+  const finance: NavLink[] = [];
   if (hasCap(user, 'crm_business_dashboard', 'view')) {
-    links.push({ href: '/crm/business-dashboard', label: 'Business' });
-    links.push({ href: '/crm/financials', label: 'Financials' });
+    finance.push({ href: '/crm/business-dashboard', label: 'Dashboard KD' });
+    finance.push({ href: '/crm/financials', label: 'Tài chính' });
   }
   if (hasCap(user, 'crm_owner_weekly_dashboard', 'view')) {
-    links.push({ href: '/crm/owner-weekly', label: 'Owner weekly' });
+    finance.push({ href: '/crm/owner-weekly', label: 'BC tuần chủ DN' });
   }
-  if (hasCap(user, 'crm_staff_roster', 'view')) {
-    links.push({ href: '/crm/staff', label: 'Staff' });
-  }
-  if (hasCap(user, 'crm_kpi_records', 'view')) {
-    links.push({ href: '/crm/kpi', label: 'KPI' });
-  }
-  if (hasCap(user, 'crm_staff_kpi_am_sp', 'view')) {
-    links.push({ href: '/crm/staff-kpi', label: 'AM/SP KPI' });
-  }
+  if (finance.length) sections.push({ label: 'Quản trị', links: finance });
+
+  const agency: NavLink[] = [];
   if (hasCap(user, 'crm_agency', 'view')) {
-    links.push({ href: '/agency', label: 'Agency' });
-    links.push({ href: '/crm/hub', label: 'Hub map' });
+    agency.push({ href: '/agency', label: 'Agency' });
   }
   if (hasCap(user, 'crm_facebook_ads', 'view') || hasCap(user, 'crm_agency', 'view')) {
-    links.push({ href: '/meta/facebook-ads', label: 'Meta hub' });
+    agency.push({ href: '/meta/facebook-ads', label: 'Meta Ads' });
   }
   if (hasCap(user, 'crm_seo', 'view') || hasCap(user, 'crm_agency', 'view')) {
-    links.push({ href: '/seo/hub', label: 'SEO hub' });
-    links.push({ href: '/seo/clients', label: 'SEO clients' });
+    agency.push({ href: '/seo/hub', label: 'SEO/AEO Hub' });
+    agency.push({ href: '/seo/clients', label: 'SEO Clients' });
   }
+  if (agency.length) sections.push({ label: 'Agency & Hub', links: agency });
 
   const emailView = hasCap(user, 'crm_email_mkt', 'view') || hasCap(user, 'crm_agency', 'view');
   const emailWrite = hasCap(user, 'crm_email_mkt', 'write') || hasCap(user, 'crm_agency', 'create');
@@ -170,65 +179,84 @@ export function OpsNav({ user, onLogout, emailPendingApprovals }: OpsNavProps) {
     hasCap(user, 'crm_agency', 'view');
 
   if (emailView && emailModuleEnabled()) {
-    links.push({ href: '/email/hub', label: `Email hub${navBadge(emailPendingApprovals)}` });
-    links.push({ href: '/email/clients', label: 'Email clients' });
-    links.push({ href: '/email/contacts', label: 'Contacts' });
-    links.push({ href: '/email/consent', label: 'Consent' });
-    links.push({ href: '/email/suppression', label: 'Suppress' });
-    links.push({ href: '/email/governance', label: 'Email gov' });
+    const email: NavLink[] = [
+      { href: '/email/hub', label: `Email Hub${navBadge(emailPendingApprovals)}` },
+      { href: '/email/clients', label: 'Email Clients' },
+      { href: '/email/contacts', label: 'Contacts' },
+      { href: '/email/consent', label: 'Consent' },
+      { href: '/email/suppression', label: 'Suppression' },
+      { href: '/email/governance', label: 'Governance' },
+    ];
     if (emailWrite) {
-      links.push({ href: '/email/segments', label: 'Segments' });
-      links.push({ href: '/email/templates', label: 'Templates' });
-      links.push({ href: '/email/campaigns', label: `Campaigns${navBadge(emailPendingApprovals)}` });
+      email.push({ href: '/email/segments', label: 'Segments' });
+      email.push({ href: '/email/templates', label: 'Templates' });
+      email.push({ href: '/email/campaigns', label: `Campaigns${navBadge(emailPendingApprovals)}` });
     }
     if (emailJourneysEnabled() && emailWrite) {
-      links.push({ href: '/email/journeys', label: 'Journeys' });
+      email.push({ href: '/email/journeys', label: 'Journeys' });
     }
     if (emailDeliverability) {
-      links.push({ href: '/email/deliverability', label: 'Deliver' });
+      email.push({ href: '/email/deliverability', label: 'Deliverability' });
     }
     if (emailReports) {
-      links.push({ href: '/email/reports', label: 'Reports' });
+      email.push({ href: '/email/reports', label: 'Reports' });
     }
+    sections.push({ label: 'Email Marketing', links: email });
   }
 
+  return sections;
+}
+
+export function OpsNav({ user, onLogout, emailPendingApprovals }: OpsNavProps) {
+  const pathname = usePathname();
+  const sections = buildSections(user, emailPendingApprovals);
   const pageTitle = pageTitleFor(pathname);
 
   return (
-    <header
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '1.5rem',
-        gap: '1rem',
-        flexWrap: 'wrap',
-      }}
-    >
-      <div>
-        <p className="badge">PTT Ops</p>
-        <h1 style={{ margin: '0.35rem 0 0', fontSize: '1.35rem' }}>{pageTitle}</h1>
-        <p className="muted" style={{ margin: '0.25rem 0 0' }}>
-          {user?.display_name ?? user?.email}
-          {user?.position_id ? ` · position #${user.position_id}` : ''}
-        </p>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-        <nav style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`nav-link${pathname === link.href || pathname.startsWith(`${link.href}/`) ? ' active' : ''}`}
-            >
-              {link.label}
-            </Link>
+    <>
+      <aside className="ops-sidebar" aria-label="Điều hướng chính">
+        <div className="ops-sidebar-brand">
+          <span className="ops-sidebar-brand-mark">PTT</span>
+          <div>
+            <strong>PTT CRM</strong>
+            <span>Staff console</span>
+          </div>
+        </div>
+        <nav className="ops-sidebar-nav">
+          {sections.map((section) => (
+            <div key={section.label} className="ops-nav-group">
+              <p className="ops-nav-group-label">{section.label}</p>
+              <div className="ops-nav-group-links">
+                {section.links.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className={`ops-nav-link${isActive(pathname, link.href) ? ' is-active' : ''}`}
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
-        <button type="button" className="btn btn-secondary" onClick={onLogout}>
-          Đăng xuất
-        </button>
-      </div>
-    </header>
+      </aside>
+
+      <header className="ops-topbar">
+        <div className="ops-topbar-strip" aria-hidden="true" />
+        <div className="ops-topbar-inner">
+          <div className="ops-topbar-title">
+            <h1>{pageTitle}</h1>
+            <p className="muted">
+              {user?.display_name ?? user?.email}
+              {user?.position_id ? ` · Chức vụ #${user.position_id}` : ''}
+            </p>
+          </div>
+          <button type="button" className="btn btn-topbar-logout" onClick={onLogout}>
+            Đăng xuất
+          </button>
+        </div>
+      </header>
+    </>
   );
 }

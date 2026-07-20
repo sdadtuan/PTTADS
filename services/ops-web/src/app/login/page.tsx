@@ -28,21 +28,14 @@ export default function LoginPage() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        display: 'grid',
-        placeItems: 'center',
-        padding: '1.5rem',
-      }}
-    >
-      <div className="card" style={{ width: '100%', maxWidth: 420 }}>
+    <main className="login-page">
+      <div className="card login-card">
         <p className="badge" style={{ marginBottom: '0.75rem' }}>
-          Internal Ops
+          PTT CRM
         </p>
-        <h1 style={{ margin: '0 0 0.35rem', fontSize: '1.5rem' }}>PTT Ops</h1>
+        <h1 style={{ margin: '0 0 0.35rem', fontSize: '1.5rem' }}>Đăng nhập nhân viên</h1>
         <p className="muted" style={{ marginTop: 0, marginBottom: '1.25rem' }}>
-          Đăng nhập nhân viên — thay Flask admin dần theo migration plan
+          Staff console — rs.pttads.vn
         </p>
         <form onSubmit={onSubmit}>
           <div className="field">
@@ -72,10 +65,6 @@ export default function LoginPage() {
             {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
           </button>
         </form>
-        <p className="muted" style={{ marginTop: '1rem', marginBottom: 0 }}>
-          Dev: <code>staff@demo.local</code> / <code>demo123</code> ·{' '}
-          <code>./scripts/local_ops_up.sh</code>
-        </p>
       </div>
     </main>
   );
