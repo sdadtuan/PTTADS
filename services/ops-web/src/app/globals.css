@@ -24,8 +24,9 @@
   --topbar-height: 56px;
   --shadow-green-sm: 0 4px 16px rgba(47, 114, 56, 0.08);
   --shadow-green-md: 0 10px 32px rgba(47, 114, 56, 0.12);
-  --font: var(--font-inter), system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-heading: var(--font-manrope), var(--font-inter), sans-serif;
+  /* System stack — no Google Fonts fetch at build (VPS may block fonts.gstatic.com) */
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-heading: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 * {
