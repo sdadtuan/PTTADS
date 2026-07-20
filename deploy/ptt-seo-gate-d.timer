@@ -1,0 +1,12 @@
+[Unit]
+Description=PTT — timer SEO Gate D hàng tuần Chủ nhật 06:00 ICT
+
+[Timer]
+OnBootSec=50min
+OnCalendar=Sun *-*-* 06:00:00
+Timezone=Asia/Ho_Chi_Minh
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

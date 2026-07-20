@@ -1,0 +1,13 @@
+[Unit]
+Description=PTT Wave 1 CRM leads soak snapshot
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/pttads
+Environment=PYTHONPATH=/opt/pttads
+Environment=PTT_ARTIFACTS_DIR=/var/lib/ptt/artifacts
+ExecStart=/opt/pttads/scripts/wave1_leads_soak_record.sh
+
+[Install]
+WantedBy=multi-user.target

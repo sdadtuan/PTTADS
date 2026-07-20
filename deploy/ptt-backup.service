@@ -6,8 +6,7 @@
 
 [Unit]
 Description=PTT — backup ptt.db + pg_dump (một lần)
-After=network.target ptt.service
-Wants=ptt.service
+After=network.target ptt-crm-api.service
 
 [Service]
 Type=oneshot

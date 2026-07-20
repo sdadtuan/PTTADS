@@ -38,6 +38,14 @@ export class TemporalClientService implements OnModuleDestroy {
     return `campaign-write-${requestId}`;
   }
 
+  emailCampaignWorkflowId(campaignId: string): string {
+    return `email-campaign-${campaignId}`;
+  }
+
+  emailJourneyWorkflowId(journeyId: string): string {
+    return `email-journey-${journeyId}`;
+  }
+
   async startWorkflow(
     workflowType: string,
     workflowId: string,

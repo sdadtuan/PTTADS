@@ -24,10 +24,10 @@ def _sqlite_path() -> Path:
 
 
 def _ensure_schemas(conn: sqlite3.Connection) -> None:
-    from app import _ensure_crm_hub_schema, _ensure_crm_sop_schema
+    from ptt_crm.crm_hub_sop_schema import ensure_crm_hub_schema, ensure_crm_sop_schema
 
-    _ensure_crm_hub_schema(conn)
-    _ensure_crm_sop_schema(conn)
+    ensure_crm_hub_schema(conn)
+    ensure_crm_sop_schema(conn)
     conn.commit()
 
 

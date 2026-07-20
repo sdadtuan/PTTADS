@@ -33,30 +33,33 @@ def _now_ts() -> str:
 
 def ensure_cross_module_schema(conn: sqlite3.Connection) -> None:
     """Migration cột phục vụ liên kết cross-module."""
-    issue_cols = {r[1] for r in conn.execute("PRAGMA table_info(crm_customer_issues)").fetchall()}
-    for col, ddl in (
-        ("lead_id", "ALTER TABLE crm_customer_issues ADD COLUMN lead_id INTEGER REFERENCES crm_leads(id) ON DELETE SET NULL"),
-        ("sla_due_at", "ALTER TABLE crm_customer_issues ADD COLUMN sla_due_at TEXT NOT NULL DEFAULT ''"),
-        ("escalated_at", "ALTER TABLE crm_customer_issues ADD COLUMN escalated_at TEXT NOT NULL DEFAULT ''"),
-    ):
-        if col not in issue_cols:
-            try:
-                conn.execute(ddl)
-            except sqlite3.Error:
-                pass
-    prod_cols = {r[1] for r in conn.execute("PRAGMA table_info(crm_re_project_products)").fetchall()}
-    for col, ddl in (
-        ("sold_lead_id", "ALTER TABLE crm_re_project_products ADD COLUMN sold_lead_id INTEGER REFERENCES crm_leads(id) ON DELETE SET NULL"),
-        ("sold_at", "ALTER TABLE crm_re_project_products ADD COLUMN sold_at TEXT NOT NULL DEFAULT ''"),
-    ):
-        if col not in prod_cols:
-            try:
-                conn.execute(ddl)
-            except sqlite3.Error:
-                pass
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_crm_cu_issue_lead ON crm_customer_issues(lead_id)"
-    )
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    if "crm_customer_issues" in tables:
+        issue_cols = {r[1] for r in conn.execute("PRAGMA table_info(crm_customer_issues)").fetchall()}
+        for col, ddl in (
+            ("lead_id", "ALTER TABLE crm_customer_issues ADD COLUMN lead_id INTEGER REFERENCES crm_leads(id) ON DELETE SET NULL"),
+            ("sla_due_at", "ALTER TABLE crm_customer_issues ADD COLUMN sla_due_at TEXT NOT NULL DEFAULT ''"),
+            ("escalated_at", "ALTER TABLE crm_customer_issues ADD COLUMN escalated_at TEXT NOT NULL DEFAULT ''"),
+        ):
+            if col not in issue_cols:
+                try:
+                    conn.execute(ddl)
+                except sqlite3.Error:
+                    pass
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_crm_cu_issue_lead ON crm_customer_issues(lead_id)"
+        )
+    if "crm_re_project_products" in tables:
+        prod_cols = {r[1] for r in conn.execute("PRAGMA table_info(crm_re_project_products)").fetchall()}
+        for col, ddl in (
+            ("sold_lead_id", "ALTER TABLE crm_re_project_products ADD COLUMN sold_lead_id INTEGER REFERENCES crm_leads(id) ON DELETE SET NULL"),
+            ("sold_at", "ALTER TABLE crm_re_project_products ADD COLUMN sold_at TEXT NOT NULL DEFAULT ''"),
+        ):
+            if col not in prod_cols:
+                try:
+                    conn.execute(ddl)
+                except sqlite3.Error:
+                    pass
 
 
 def sync_lead_to_linked_case(

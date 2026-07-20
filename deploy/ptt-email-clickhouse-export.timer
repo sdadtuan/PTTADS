@@ -1,0 +1,12 @@
+[Unit]
+Description=PTT — timer Email Marketing daily facts → ClickHouse (EM-7)
+
+[Timer]
+OnBootSec=30min
+OnCalendar=*-*-* 04:30:00
+Timezone=Asia/Ho_Chi_Minh
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

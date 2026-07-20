@@ -1,0 +1,12 @@
+[Unit]
+Description=PTT — timer SEO freshness scan hàng tuần Chủ nhật 04:00 ICT (Phase 4B)
+
+[Timer]
+OnBootSec=30min
+OnCalendar=Sun *-*-* 04:00:00
+Timezone=Asia/Ho_Chi_Minh
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

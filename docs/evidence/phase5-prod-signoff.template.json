@@ -1,0 +1,52 @@
+{
+  "phase": "5",
+  "component": "seo_aeo_governance_portal_experiments",
+  "environment": "production",
+  "cutover_started_at": null,
+  "signed_at": null,
+  "pilot": {
+    "customer_id": null,
+    "portal_client_uuid": null,
+    "content_id_client_review": null
+  },
+  "flags_applied": {
+    "PTT_SEO_GOVERNANCE_ENABLED": false,
+    "PTT_PORTAL_SEO_ENABLED": false,
+    "PTT_SEO_EXPERIMENTS_ENABLED": false
+  },
+  "staged_steps": {
+    "B1_governance": false,
+    "B2_portal": false,
+    "B3_experiments": false
+  },
+  "gates": {
+    "phase5_gate_report_ok": false,
+    "pytest_phase5_14_pass": false,
+    "portal_playwright_e2e": false,
+    "soak_7d_ok": false,
+    "soak_span_days": null,
+    "soak_sample_count": null,
+    "soak_failure_count": null,
+    "rollback_drill": false
+  },
+  "manual_uat": {
+    "governance_modal": false,
+    "governance_override_admin": false,
+    "portal_viewer_read_only": false,
+    "portal_approver_client_review": false,
+    "experiments_create_to_decision": false
+  },
+  "artifacts": {
+    "phase5_gate_report": ".local-dev/phase5-gate-report.json",
+    "portal_uat_signoff": ".local-dev/phase5-portal-seo-uat-signoff.json",
+    "soak_evidence": ".local-dev/phase5-soak-evidence.jsonl"
+  },
+  "signoffs": {
+    "head_seo_aeo": null,
+    "qa_compliance": null,
+    "am_pilot": null,
+    "client_approver": null,
+    "devops": null
+  },
+  "notes": ""
+}

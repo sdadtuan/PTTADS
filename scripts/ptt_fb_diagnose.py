@@ -87,7 +87,7 @@ def main() -> int:
         facebook_verify_token,
         facebook_webhook_callback_url,
     )
-    from app import _crm_ts, get_connection
+    from ptt_crm.crm_sqlite import crm_ts, get_connection
 
     if args.reset_sync_cursor:
         _section("Reset sync cursor")
@@ -105,7 +105,7 @@ def main() -> int:
                 conn,
                 config={"facebook_config": fb},
                 updated_by="diagnose:reset",
-                ts=_crm_ts(),
+                ts=crm_ts(),
             )
             clear_graph_rate_limit(conn)
             conn.commit()
@@ -269,7 +269,7 @@ def main() -> int:
             result = run_facebook_ingest_cycle(
                 conn,
                 created_by="diagnose:facebook",
-                ts=_crm_ts(),
+                ts=crm_ts(),
                 recent_only=recent_only,
                 limit_per_form=limit,
             )

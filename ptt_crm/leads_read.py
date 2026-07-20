@@ -1,4 +1,4 @@
-"""Lead read API — SQLite CRM with v1 response shape."""
+"""Lead read API — PG primary (Phase 1) or SQLite fallback."""
 from __future__ import annotations
 
 import json
@@ -74,6 +74,39 @@ def list_leads_v1(
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[dict[str, Any]], int]:
+    from ptt_crm.config import leads_read_source_pg
+
+    if leads_read_source_pg():
+        return _list_leads_v1_pg(
+            client_id=client_id,
+            status=status,
+            source=source,
+            channel=channel,
+            q=q,
+            limit=limit,
+            offset=offset,
+        )
+    return _list_leads_v1_sqlite(
+        client_id=client_id,
+        status=status,
+        source=source,
+        channel=channel,
+        q=q,
+        limit=limit,
+        offset=offset,
+    )
+
+
+def _list_leads_v1_sqlite(
+    *,
+    client_id: str | None = None,
+    status: str | None = None,
+    source: str | None = None,
+    channel: str | None = None,
+    q: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[dict[str, Any]], int]:
     clauses: list[str] = ["COALESCE(l.is_duplicate, 0) = 0"]
     params: list[Any] = []
 
@@ -126,6 +159,10 @@ def list_leads_v1(
 
 
 def get_lead_v1(lead_id: int) -> dict[str, Any] | None:
+    from ptt_crm.config import leads_read_source_pg
+
+    if leads_read_source_pg():
+        return _get_lead_v1_pg(lead_id)
     conn = _connect()
     try:
         row = conn.execute(
@@ -140,3 +177,90 @@ def get_lead_v1(lead_id: int) -> dict[str, Any] | None:
         return lead_row_to_v1(row) if row else None
     finally:
         conn.close()
+
+
+def _list_leads_v1_pg(
+    *,
+    client_id: str | None = None,
+    status: str | None = None,
+    source: str | None = None,
+    channel: str | None = None,
+    q: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[dict[str, Any]], int]:
+    from ptt_crm.pg_schema import pg_row_to_v1
+    from ptt_jobs.db import pg_connection
+
+    clauses = ["l.is_duplicate IS NOT TRUE"]
+    params: list[Any] = []
+
+    if client_id:
+        clauses.append("l.agency_client_id = %s::uuid")
+        params.append(client_id.strip())
+    if status:
+        clauses.append("l.status = %s")
+        params.append(status.strip())
+    if source:
+        clauses.append("l.source = %s")
+        params.append(source.strip())
+    if channel:
+        clauses.append("lower(l.channel) = %s")
+        params.append(channel.strip().lower())
+    if q:
+        like = f"%{q.strip()}%"
+        base = len(params)
+        clauses.append(
+            f"(l.full_name ILIKE ${base + 1} OR l.phone ILIKE ${base + 2} OR l.email ILIKE ${base + 3})"
+        )
+        params.extend([like, like, like])
+
+    where = " WHERE " + " AND ".join(clauses)
+    lim = max(1, min(int(limit), 200))
+    off = max(0, int(offset))
+
+    with pg_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(f"SELECT COUNT(*) FROM crm_leads l{where}", params)
+            total = int(cur.fetchone()[0] or 0)
+            list_params = [*params, lim, off]
+            cur.execute(
+                f"""
+                SELECT l.sqlite_lead_id, l.full_name, l.phone, l.email, l.status, l.source,
+                       l.owner_id, l.is_duplicate, l.agency_client_id, l.channel,
+                       l.external_lead_id, l.campaign_id, l.received_at, l.created_at,
+                       l.meta_json
+                FROM crm_leads l
+                {where}
+                ORDER BY l.sqlite_lead_id DESC
+                LIMIT ${len(list_params) - 1} OFFSET ${len(list_params)}
+                """,
+                list_params,
+            )
+            cols = [d[0] for d in cur.description]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
+    return [pg_row_to_v1(row) for row in rows], total
+
+
+def _get_lead_v1_pg(lead_id: int) -> dict[str, Any] | None:
+    from ptt_crm.pg_schema import pg_row_to_v1
+    from ptt_jobs.db import pg_connection
+
+    with pg_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT l.sqlite_lead_id, l.full_name, l.phone, l.email, l.status, l.source,
+                       l.owner_id, l.is_duplicate, l.agency_client_id, l.channel,
+                       l.external_lead_id, l.campaign_id, l.received_at, l.created_at,
+                       l.meta_json
+                FROM crm_leads l
+                WHERE l.sqlite_lead_id = %s
+                """,
+                (lead_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            cols = [d[0] for d in cur.description]
+            return pg_row_to_v1(dict(zip(cols, row)))

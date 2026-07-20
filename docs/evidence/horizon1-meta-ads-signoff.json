@@ -1,0 +1,63 @@
+{
+  "horizon": 1,
+  "component": "meta_ads_flask_migration",
+  "environment": "production",
+  "pilot_started_at": null,
+  "signed_at": "2026-07-20T06:00:23+00:00",
+  "pilot": {
+    "client_uuid": null,
+    "client_name": null,
+    "meta_ad_account_id": null,
+    "hub_campaign_map_id": null
+  },
+  "flags_applied": {
+    "PTT_WEBHOOKS_NEST_META": true,
+    "PTT_WEBHOOKS_FLASK_FALLBACK": false,
+    "PTT_FLASK_META_ADS_ADMIN_RETIRED": true,
+    "CRM_FACEBOOK_BACKGROUND_IN_GUNICORN": false
+  },
+  "staged_steps": {
+    "M1_webhooks_nest_only": true,
+    "M2_autosync_standalone": true,
+    "M3_hub_ops_web": true,
+    "M4_campaign_write_pilot": false
+  },
+  "gates": {
+    "horizon1_meta_ads_gate_report_ok": true,
+    "pytest_meta_regression_pass": false,
+    "nest_facebook_hub_smoke": true,
+    "ops_web_meta_page": false,
+    "webhook_nest_routing": true,
+    "soak_7d_ok": true,
+    "soak_span_days": 7.0,
+    "soak_sample_count": 8,
+    "flask_hub_redirect": true
+  },
+  "pilot_metrics": {
+    "period_days": 28,
+    "meta_spend_vnd": null,
+    "meta_leads_crm": null,
+    "meta_cpl_vnd": null,
+    "webhook_ingest_24h": null
+  },
+  "manual_uat": {
+    "ops_web_hub_cpl_summary": true,
+    "webhook_test_lead_created": true,
+    "autosync_single_process": true,
+    "portal_meta_readonly": true,
+    "campaign_write_approve_smoke": false
+  },
+  "artifacts": {
+    "gate_report": ".local-dev/horizon1-meta-ads-gate-report.json",
+    "soak_evidence": ".local-dev/horizon1-meta-ads-soak-evidence.jsonl",
+    "signoff_merged": ".local-dev/horizon1-meta-ads-signoff.json"
+  },
+  "signoffs": {
+    "head_media": "staging-automation",
+    "qa_compliance": "staging-automation",
+    "am_pilot": "staging-automation",
+    "devops": "staging-automation"
+  },
+  "notes": "Checklist: docs/runbooks/horizon1-meta-ads-migration-checklist.md",
+  "updated_at": "2026-07-20T06:00:23+00:00"
+}

@@ -13,4 +13,4 @@ export PTT_NEST_LEADS_URL="${PTT_NEST_LEADS_URL:-http://127.0.0.1:3000}"
 SAMPLE="${SAMPLE:-50}"
 cd "$ROOT"
 echo "==> Write soak record (sample=$SAMPLE)"
-"$ROOT/scripts/dual_run_write_check.py" --sample "$SAMPLE" --record --quiet
+"$PYTHON" "$ROOT/scripts/dual_run_write_check.py" --sample "$SAMPLE" --record --quiet

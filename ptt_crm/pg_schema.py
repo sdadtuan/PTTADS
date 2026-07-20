@@ -17,6 +17,7 @@ DDL_V3_LAUNCH_QA_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v3-launch-qa.s
 DDL_V3_GOOGLE_SYNC_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v3-google-sync.sql")
 DDL_V4_HUB_SOP_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v4-hub-sop.sql")
 DDL_V5_CAMPAIGN_WRITES_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v5-campaign-writes.sql")
+DDL_V3_INGEST_CONFIG_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v3-leads-ingest-config.sql")
 KPI_DICTIONARY_SEED_REL = Path("docs/specs/2026-07-17-kpi-dictionary-seed.sql")
 MIGRATION_VERSION = "2026-07-17-v2-leads"
 MIGRATION_V3_OLTP = "2026-07-17-v3-leads-oltp"
@@ -28,6 +29,7 @@ MIGRATION_V3_LAUNCH_QA = "2026-07-17-v3-launch-qa"
 MIGRATION_V3_GOOGLE_SYNC = "2026-07-17-v3-google-sync"
 MIGRATION_V4_HUB_SOP = "2026-07-17-v4-hub-sop"
 MIGRATION_V5_CAMPAIGN_WRITES = "2026-07-17-v5-campaign-writes"
+MIGRATION_V3_INGEST_CONFIG = "2026-07-17-v3-ingest"
 
 CRM_LEADS_COLUMNS: tuple[str, ...] = (
     "sqlite_lead_id",
@@ -98,6 +100,11 @@ def ddl_v4_hub_sop_path() -> Path:
 def ddl_v5_campaign_writes_path() -> Path:
     base = Path(__file__).resolve().parents[1]
     return base / DDL_V5_CAMPAIGN_WRITES_REL
+
+
+def ddl_v3_leads_ingest_config_path() -> Path:
+    base = Path(__file__).resolve().parents[1]
+    return base / DDL_V3_INGEST_CONFIG_REL
 
 
 def _apply_sql_file(path: Path) -> None:
@@ -384,6 +391,29 @@ def pg_sprint0_migration_applied() -> bool:
 def apply_ddl_v3_sprint0(*, ddl_path: Path | None = None) -> bool:
     """Apply Sprint 0 DDL — W5 prod id seq + portal_client_users."""
     _apply_sql_file(ddl_path or ddl_v3_sprint0_path())
+    return True
+
+
+def pg_ingest_rules_migration_applied() -> bool:
+    try:
+        from ptt_jobs.db import pg_available, pg_connection
+
+        if not pg_available():
+            return False
+        with pg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM schema_migrations WHERE version = %s LIMIT 1",
+                    (MIGRATION_V3_INGEST_CONFIG,),
+                )
+                return cur.fetchone() is not None
+    except Exception:
+        return False
+
+
+def apply_ddl_v3_leads_ingest_config(*, ddl_path: Path | None = None) -> bool:
+    """Apply PG snapshot table for lead ingest rules (Phase 2 cutover)."""
+    _apply_sql_file(ddl_path or ddl_v3_leads_ingest_config_path())
     return True
 
 

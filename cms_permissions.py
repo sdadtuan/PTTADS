@@ -11,6 +11,7 @@ CMS_ACTIONS: tuple[str, ...] = (
     "delete",
     "export",
     "configure",
+    "approve",
 )
 
 CMS_ACTION_LABELS_VI: dict[str, str] = {
@@ -20,6 +21,7 @@ CMS_ACTION_LABELS_VI: dict[str, str] = {
     "delete": "Xóa",
     "export": "Xuất file",
     "configure": "Cấu hình",
+    "approve": "Duyệt / phê duyệt",
 }
 
 # Mục menu CRM (sidebar trái) — id trùng data-admin-nav / ma trận chức vụ
@@ -147,147 +149,21 @@ CMS_CRM_NAV_MODULES: tuple[dict[str, Any], ...] = (
 
 CMS_CRM_NAV_MODULE_IDS: frozenset[str] = frozenset(m["id"] for m in CMS_CRM_NAV_MODULES)
 
-# Hạng mục CMS / Admin — map với menu sidebar trái và API
-CMS_CORE_MODULES: tuple[dict[str, Any], ...] = (
-    {
-        "id": "admin_dashboard",
-        "label": "Bảng điều khiển",
-        "group": "Tổng quan",
-        "description": "Menu → /admin — dự án, tin tức, kênh CRM.",
-        "routes": ["/admin"],
-    },
-    {
-        "id": "landing_settings",
-        "label": "Cài đặt trang",
-        "group": "Website",
-        "description": "Menu → /cms — thương hiệu, hero, liên hệ, chân trang.",
-        "routes": ["/cms", "PUT /api/settings"],
-    },
-    {
-        "id": "services_builder",
-        "label": "Dịch vụ",
-        "group": "Website",
-        "description": "Menu → /cms — category và item dịch vụ landing.",
-        "routes": ["/cms", "PUT /api/services"],
-    },
-    {
-        "id": "mk_chat_config",
-        "label": "Chat Marketing",
-        "group": "Website",
-        "description": "Menu → /cms — bật/tắt chat, tiêu đề, lời chào.",
-        "routes": ["/cms", "PUT /api/settings (mk_chat_*)"],
-    },
-    {
-        "id": "mk_chat_conversation",
-        "label": "↳ Hội thoại chatbox",
-        "group": "Website — Chi tiết Chat Marketing",
-        "description": "Gửi tin, module 7 bước, chiến lược marketing.",
-        "routes": ["POST /api/cms/marketing-chat/send"],
-    },
-    {
-        "id": "mk_chat_export",
-        "label": "↳ Xuất tài liệu chat",
-        "group": "Website — Chi tiết Chat Marketing",
-        "description": "Export Markdown, HTML, JSON hội thoại.",
-        "routes": ["POST /api/cms/marketing-chat/export"],
-    },
-    {
-        "id": "mk_chat_excel",
-        "label": "↳ Excel kế hoạch marketing",
-        "group": "Website — Chi tiết Chat Marketing",
-        "description": "Tuần (XLS), đa kênh (ĐK), KPI chiến lược.",
-        "routes": [
-            "GET /api/cms/marketing-chat/weekly-plan.xlsx",
-            "GET /api/cms/marketing-chat/multichannel-plan.xlsx",
-            "GET /api/cms/marketing-chat/kpi-strategy.xlsx",
-        ],
-    },
-    {
-        "id": "mk_chat_campaign_kit",
-        "label": "↳ Bộ KHMKT + KPI chiến dịch",
-        "group": "Website — Chi tiết Chat Marketing",
-        "description": "Tạo và tải bộ file chiến dịch (KHMKT, KPI.xlsx).",
-        "routes": [
-            "POST /api/cms/marketing-chat/campaign-kit",
-            "GET /api/cms/marketing-chat/campaign-kit/*/khmkt.xlsx",
-            "GET /api/cms/marketing-chat/campaign-kit/*/kpi.xlsx",
-        ],
-    },
+# Admin ops-web only (public landing/CMS site removed)
+CMS_ADMIN_MODULES: tuple[dict[str, Any], ...] = (
     {
         "id": "permissions_matrix",
         "label": "Phân quyền",
-        "group": "Website",
-        "description": "Menu → /cms — ma trận quyền vai trò và chức vụ.",
-        "routes": ["/cms#cms-permissions", "GET/PATCH /api/cms/permissions"],
-    },
-    {
-        "id": "landing_content",
-        "label": "Nội dung Landing page",
-        "group": "Nội dung site",
-        "description": "Menu → /cms/landing — hero slides, capabilities, CTA strip.",
-        "routes": ["/cms/landing", "PUT /api/settings"],
-    },
-    {
-        "id": "landing_media",
-        "label": "Media Library",
-        "group": "Nội dung site",
-        "description": "Menu → /cms/landing#media — upload và quản lý ảnh.",
-        "routes": [
-            "POST /api/cms/media/upload",
-            "GET /api/cms/media",
-            "DELETE /api/cms/media/<filename>",
-        ],
-    },
-    {
-        "id": "live_chat",
-        "label": "Live Chat",
-        "group": "Website",
-        "description": "Menu → /cms/live-chat — hộp thư chat khách truy cập, trả lời nhân viên / AI.",
-        "routes": [
-            "GET /cms/live-chat",
-            "GET /api/cms/live-chat/conversations",
-            "GET /api/cms/live-chat/messages/<id>",
-            "POST /api/cms/live-chat/reply",
-            "PUT /api/cms/live-chat/conversation/<id>",
-            "PUT /api/cms/live-chat/settings",
-        ],
-    },
-    {
-        "id": "projects",
-        "label": "Dự án portfolio",
-        "group": "Nội dung site",
-        "description": "Menu → /cms/landing — dự án hiển thị landing.",
-        "routes": ["/cms/landing", "POST/DELETE /api/projects"],
-    },
-    {
-        "id": "news",
-        "label": "Blog / Tin tức",
-        "group": "Nội dung site",
-        "description": "Menu → /cms/landing — tin tức và blog landing.",
-        "routes": ["/cms/landing", "POST/DELETE /api/news"],
-    },
-    {
-        "id": "crm_lead_channels",
-        "label": "Kênh CRM",
-        "group": "Nội dung site",
-        "description": "Menu → /admin — danh mục kênh dropdown CSKH.",
-        "routes": ["/admin", "POST/PATCH /api/crm/channels"],
-    },
-    {
-        "id": "recruitment_jobs",
-        "label": "Tuyển dụng",
-        "group": "Nội dung site",
-        "description": "Menu → /cms/recruitment — quản lý vị trí tuyển dụng.",
-        "routes": [
-            "GET /api/cms/recruitment",
-            "POST /api/cms/recruitment",
-            "PUT /api/cms/recruitment/<id>",
-            "DELETE /api/cms/recruitment/<id>",
-        ],
+        "group": "Hệ thống",
+        "description": "Ma trận quyền vai trò và chức vụ — ops-web staff settings.",
+        "routes": ["GET/PATCH /api/cms/permissions"],
     },
 )
 
-CMS_MODULES: tuple[dict[str, Any], ...] = CMS_CORE_MODULES + CMS_CRM_NAV_MODULES
+# Public landing/CMS site retired — no core website modules
+CMS_CORE_MODULES: tuple[dict[str, Any], ...] = ()
+
+CMS_MODULES: tuple[dict[str, Any], ...] = CMS_ADMIN_MODULES + CMS_CRM_NAV_MODULES
 
 CMS_MODULE_IDS: frozenset[str] = frozenset(m["id"] for m in CMS_MODULES)
 
@@ -301,26 +177,26 @@ CMS_ROLES: tuple[dict[str, Any], ...] = (
     },
     {
         "code": "cms_admin",
-        "name": "Quản trị CMS",
-        "description": "Full CMS landing + marketing chat; không chỉnh phân quyền.",
+        "name": "Quản trị ops-web",
+        "description": "Toàn quyền CRM ops-web; không chỉnh ma trận phân quyền.",
         "is_system": True,
     },
     {
         "code": "content_editor",
-        "name": "Biên tập nội dung",
-        "description": "Settings, dịch vụ, dự án, tin tức — không chat AI / export Excel.",
+        "name": "Biên tập CRM",
+        "description": "Xem/sửa module CRM ops-web (legacy role id).",
         "is_system": True,
     },
     {
         "code": "marketing_lead",
         "name": "Trưởng nhóm Marketing",
-        "description": "Toàn bộ marketing chat + xem nội dung; không xóa dự án/tin.",
+        "description": "Toàn quyền module CRM marketing trên ops-web.",
         "is_system": True,
     },
     {
         "code": "marketing_staff",
         "name": "Nhân viên Marketing",
-        "description": "Chat, export, Excel; không cấu hình chatbox / settings.",
+        "description": "Module CRM marketing ops-web (không cấu hình hệ thống).",
         "is_system": True,
     },
     {
@@ -374,46 +250,14 @@ _DEFAULT_GRANTS: dict[str, dict[str, frozenset[str]]] = {
         "permissions_matrix": frozenset({"view"}),
     },
     "content_editor": {
-        "admin_dashboard": frozenset({"view"}),
-        "landing_settings": frozenset({"view", "edit"}),
-        "services_builder": frozenset({"view", "edit", "create", "delete"}),
-        "projects": frozenset({"view", "create", "delete"}),
-        "news": frozenset({"view", "create", "delete"}),
-        "mk_chat_config": frozenset({"view"}),
-        "mk_chat_conversation": frozenset({"view"}),
-        "mk_chat_export": frozenset(),
-        "mk_chat_excel": frozenset(),
-        "mk_chat_campaign_kit": frozenset(),
-        "crm_lead_channels": frozenset({"view"}),
         "permissions_matrix": frozenset({"view"}),
+        **_CRM_NAV_VIEW,
     },
     "marketing_lead": {
-        "admin_dashboard": frozenset({"view"}),
-        "landing_settings": frozenset({"view"}),
-        "services_builder": frozenset({"view"}),
-        "mk_chat_config": frozenset({"view", "edit", "configure"}),
-        "mk_chat_conversation": frozenset({"view", "create", "edit"}),
-        "mk_chat_export": frozenset({"view", "export"}),
-        "mk_chat_excel": frozenset({"view", "export"}),
-        "mk_chat_campaign_kit": frozenset({"view", "create", "export"}),
-        "projects": frozenset({"view"}),
-        "news": frozenset({"view"}),
-        "crm_lead_channels": frozenset({"view"}),
         "permissions_matrix": frozenset({"view"}),
         **_CRM_NAV_MARKETING_LEAD,
     },
     "marketing_staff": {
-        "admin_dashboard": frozenset({"view"}),
-        "landing_settings": frozenset({"view"}),
-        "services_builder": frozenset({"view"}),
-        "mk_chat_config": frozenset({"view"}),
-        "mk_chat_conversation": frozenset({"view", "create", "edit"}),
-        "mk_chat_export": frozenset({"view", "export"}),
-        "mk_chat_excel": frozenset({"view", "export"}),
-        "mk_chat_campaign_kit": frozenset({"view", "create", "export"}),
-        "projects": frozenset({"view"}),
-        "news": frozenset({"view"}),
-        "crm_lead_channels": frozenset({"view"}),
         "permissions_matrix": frozenset({"view"}),
         **_CRM_NAV_MARKETING_STAFF,
     },

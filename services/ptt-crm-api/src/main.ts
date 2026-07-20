@@ -5,9 +5,9 @@ import { initSentry } from './observability/sentry.init';
 
 async function bootstrap(): Promise<void> {
   initSentry('ptt-crm-api');
-  const app = await NestFactory.create(AppModule, { logger: ['log', 'warn', 'error'] });
+  const app = await NestFactory.create(AppModule, { logger: ['log', 'warn', 'error'], rawBody: true });
   const config = app.get(AppConfigService);
-  const origins = config.portalCorsOrigins;
+  const origins = [...new Set([...config.portalCorsOrigins, ...config.opsCorsOrigins])];
   if (origins.length > 0) {
     app.enableCors({
       origin: origins,

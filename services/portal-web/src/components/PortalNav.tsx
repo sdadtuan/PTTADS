@@ -7,23 +7,42 @@ import type { StoredUser } from '@/lib/auth';
 interface PortalNavProps {
   user: StoredUser | null;
   onLogout: () => void;
+  seoEnabled?: boolean;
+  emailEnabled?: boolean;
 }
 
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Performance',
   '/meta': 'Meta Performance',
   '/creatives': 'Creative inbox',
+  '/seo': 'SEO/AEO',
+  '/seo/reports': 'SEO Reports',
+  '/seo/content': 'SEO Content review',
+  '/email': 'Email dashboard',
+  '/email/approvals': 'Email approvals',
 };
 
-export function PortalNav({ user, onLogout }: PortalNavProps) {
+export function PortalNav({ user, onLogout, seoEnabled = true, emailEnabled = true }: PortalNavProps) {
   const pathname = usePathname();
   const links = [
     { href: '/dashboard', label: 'Performance' },
     { href: '/meta', label: 'Meta (Facebook)' },
     { href: '/creatives', label: 'Creative inbox' },
   ];
+  if (seoEnabled) {
+    links.push({ href: '/seo', label: 'SEO/AEO' });
+    links.push({ href: '/seo/reports', label: 'SEO reports' });
+    links.push({ href: '/seo/content', label: 'SEO review' });
+  }
+  if (emailEnabled) {
+    links.push({ href: '/email', label: 'Email' });
+    if (user?.role === 'approver') {
+      links.push({ href: '/email/approvals', label: 'Email approvals' });
+    }
+  }
 
-  const pageTitle = PAGE_TITLES[pathname] ?? 'Dashboard';
+  const pageTitle =
+    pathname.startsWith('/email/campaigns/') ? 'Campaign performance' : PAGE_TITLES[pathname] ?? 'Dashboard';
 
   return (
     <header

@@ -1,6 +1,14 @@
 """Phân quyền menu sidebar admin theo vai trò CMS + chức vụ CRM."""
 from __future__ import annotations
 
+
+import os
+import unittest
+
+if os.environ.get("PTT_RUN_FLASK_TESTS") != "1":
+    raise unittest.SkipTest(
+        "Flask HTTP removed — set PTT_RUN_FLASK_TESTS=1 to run integration tests"
+    )
 import json
 import unittest
 
@@ -78,6 +86,7 @@ class AdminMenuPermissionsTest(unittest.TestCase):
 
     def test_role_matrix_includes_all_sidebar_nav_modules(self) -> None:
         """Ma trận vai trò CMS phải có đủ mục menu trái (CRM nav + dashboard)."""
+
         self.assertIn("admin_dashboard", CMS_MODULE_IDS)
         for sid in SIDEBAR_CRM_NAV_SECTIONS:
             self.assertIn(sid, CMS_MODULE_IDS, msg=f"Thiếu menu CRM: {sid}")

@@ -1,0 +1,25 @@
+# SEO GA4 OAuth → seo_aeo.seo_ga4_daily_stats (Phase 4)
+#
+# VPS:
+#   sudo cp deploy/ptt-seo-ga4-sync.service deploy/ptt-seo-ga4-sync.timer /etc/systemd/system/
+#   # .env: DATABASE_URL, PTT_GA4_OAUTH_*, PTT_GA4_SYNC_ENABLED=1, SEO_AEO_DB=pg
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ptt-seo-ga4-sync.timer
+#   sudo systemctl start ptt-seo-ga4-sync.service
+#   journalctl -u ptt-seo-ga4-sync.service -n 50 --no-pager
+
+[Unit]
+Description=PTT — SEO GA4 OAuth sync (một lần, tất cả client đã kết nối)
+After=network.target ptt-crm-api.service
+
+[Service]
+Type=oneshot
+User=deploy
+Group=www-data
+Environment=PTT_APP_DIR=/var/www/ptt
+Environment=PTT_GA4_SYNC_ENABLED=1
+EnvironmentFile=-/var/www/ptt/.env
+ExecStart=/var/www/ptt/scripts/sync_seo_ga4_daily.sh
+
+[Install]
+WantedBy=multi-user.target

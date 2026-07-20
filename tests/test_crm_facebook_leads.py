@@ -1,6 +1,14 @@
 """Tests — nghiệp vụ Facebook Lead → tối ưu → chấm điểm → phân hạng → phân công."""
 from __future__ import annotations
 
+
+import os
+import unittest
+
+if os.environ.get("PTT_RUN_FLASK_TESTS") != "1":
+    raise unittest.SkipTest(
+        "Flask HTTP removed — set PTT_RUN_FLASK_TESTS=1 to run integration tests"
+    )
 import json
 import sqlite3
 import unittest
@@ -47,6 +55,7 @@ class FacebookLeadsTestBase(unittest.TestCase):
         ensure_lead_schema(self.conn)
         self.conn.execute(
             """
+
             CREATE TABLE IF NOT EXISTS crm_staff (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,

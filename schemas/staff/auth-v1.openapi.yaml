@@ -1,0 +1,99 @@
+openapi: 3.0.3
+info:
+  title: PTT Staff Auth API
+  version: 0.1.0
+  description: |
+    Internal staff authentication for ops-web (Phase 0).
+    Stub users via PTT_STAFF_STUB_USERS; production uses staff_users PG table.
+paths:
+  /api/v1/staff/auth/login:
+    post:
+      summary: Staff login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: JWT pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffLoginResult'
+        '401':
+          description: Invalid credentials
+  /api/v1/staff/auth/refresh:
+    post:
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        '200':
+          description: New JWT pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffLoginResult'
+  /api/v1/staff/auth/me:
+    get:
+      summary: Current staff profile + caps
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StaffMeResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    StaffSectionCap:
+      type: object
+      properties:
+        section: { type: string }
+        action: { type: string }
+    StaffUserProfile:
+      type: object
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        display_name: { type: string }
+        position_id: { type: integer }
+    StaffLoginResult:
+      type: object
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        token_type: { type: string, enum: [Bearer] }
+        expires_in: { type: integer }
+        refresh_expires_in: { type: integer }
+        user:
+          $ref: '#/components/schemas/StaffUserProfile'
+    StaffMeResponse:
+      allOf:
+        - $ref: '#/components/schemas/StaffUserProfile'
+        - type: object
+          properties:
+            caps:
+              type: array
+              items:
+                $ref: '#/components/schemas/StaffSectionCap'

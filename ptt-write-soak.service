@@ -8,8 +8,8 @@
 
 [Unit]
 Description=PTT — write dual-run soak sample (một lần)
-After=network.target ptt.service
-Wants=ptt.service
+After=network.target ptt-crm-api.service
+Wants=ptt-crm-api.service
 
 [Service]
 Type=oneshot

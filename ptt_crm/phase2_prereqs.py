@@ -38,10 +38,35 @@ def ensure_shadow_sync_repair(*, limit: int = 500) -> dict[str, Any]:
     return sync_shadow_repair_gaps(limit=limit)
 
 
+def ensure_ingest_rules_snapshot(*, sync_from_sqlite: bool = True) -> dict[str, Any]:
+    """Ensure PG ingest rules snapshot exists and is populated."""
+    from ptt_crm.lead_ingest_config import (
+        fetch_pg_ingest_rules_snapshot,
+        pg_ingest_rules_ready,
+        snapshot_has_rules,
+        sync_ingest_rules_from_sqlite,
+    )
+    from ptt_crm.pg_schema import apply_ddl_v3_leads_ingest_config, pg_ingest_rules_migration_applied
+
+    if not pg_ingest_rules_ready():
+        apply_ddl_v3_leads_ingest_config()
+    snap = fetch_pg_ingest_rules_snapshot()
+    if sync_from_sqlite and not snapshot_has_rules(snap):
+        out = sync_ingest_rules_from_sqlite()
+        out["applied_ddl"] = not pg_ingest_rules_migration_applied()
+        return out
+    return {
+        "ok": True,
+        "populated": snapshot_has_rules(snap),
+        "migration_applied": pg_ingest_rules_migration_applied(),
+    }
+
+
 def ensure_phase2_write_gates(*, repair_shadow: bool = True) -> dict[str, Any]:
     """Run all automated fixes before write dual-run / UAT gates."""
     steps: dict[str, Any] = {}
     steps["domain_events_idempotency"] = ensure_domain_events_idempotency(apply=True)
+    steps["ingest_rules_snapshot"] = ensure_ingest_rules_snapshot(sync_from_sqlite=True)
     if repair_shadow:
         steps["shadow_repair"] = ensure_shadow_sync_repair()
     failed = [name for name, result in steps.items() if not result.get("ok")]

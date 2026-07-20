@@ -71,7 +71,7 @@ def main() -> int:
         facebook_verify_token,
         facebook_webhook_callback_url,
     )
-    from app import get_connection
+    from ptt_crm.crm_sqlite import get_connection
 
     ok = True
     cb = facebook_webhook_callback_url()

@@ -115,6 +115,25 @@ Checklist tiếp nhận lead tại stage **Lead** — gọi điện (PHẦN A) v
 
 ---
 
+## SEO/AEO Enterprise Operating System
+
+Hệ điều hành vòng đời SEO + AEO (delivery platform) — tách khỏi spec dịch vụ đơn lẻ.
+
+| Tài liệu | Đường dẫn |
+|----------|-----------|
+| Master spec | [`SPEC_SEO_AEO_OPERATING_SYSTEM.md`](../../SPEC_SEO_AEO_OPERATING_SYSTEM.md) |
+| Kiến trúc hệ thống | [`2026-07-19-seo-aeo-architecture.md`](../2026-07-19-seo-aeo-architecture.md) |
+| **Chính sách PG-only** | [`2026-07-19-seo-aeo-pg-cutover-policy.md`](../2026-07-19-seo-aeo-pg-cutover-policy.md) |
+| PG cutover plan | [`superpowers/plans/2026-07-19-seo-aeo-phase3.5-pg-cutover.md`](../../superpowers/plans/2026-07-19-seo-aeo-phase3.5-pg-cutover.md) |
+| UI/UX | [`SPEC_UI_UX_SEO_AEO.md`](../../SPEC_UI_UX_SEO_AEO.md) |
+| AEO MVP (Phase 0) | [`superpowers/specs/2026-06-23-aeo-tooling-design.md`](../../superpowers/specs/2026-06-23-aeo-tooling-design.md) |
+
+**Phase 0 đã có:** `/crm/aeo` · `crm_aeo.py` · `templates/crm_aeo.html`
+
+**Storage (2026-07-19):** Không thêm schema SEO/AEO trên SQLite. Phase 3.5 PG cutover là gate trước Phase 4.
+
+---
+
 ## AI Modules tham chiếu
 
 | Module | Vai trò |

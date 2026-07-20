@@ -14,7 +14,9 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { InternalKeyGuard } from '../auth/internal-key.guard';
+import { StaffOrInternalKeyGuard } from '../staff-auth/staff-or-internal-key.guard';
 import { WriteEnabledGuard } from './guards/write-enabled.guard';
+import { StaffLeadsWriteGuard } from './guards/staff-leads-write.guard';
 import { LeadsService } from './leads.service';
 import { LeadsWriteService } from './leads-write.service';
 import {
@@ -25,7 +27,6 @@ import {
 } from './leads.types';
 
 @Controller('api/v1/leads')
-@UseGuards(InternalKeyGuard)
 export class LeadsController {
   constructor(
     private readonly leadsService: LeadsService,
@@ -34,13 +35,13 @@ export class LeadsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @UseGuards(WriteEnabledGuard)
+  @UseGuards(InternalKeyGuard, WriteEnabledGuard)
   async createLead(@Body() body: CreateLeadV1Body): Promise<LeadV1> {
     return this.leadsWriteService.createLead(body);
   }
 
   @Patch(':id')
-  @UseGuards(WriteEnabledGuard)
+  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard, WriteEnabledGuard)
   async patchLead(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: PatchLeadV1Body,
@@ -50,6 +51,7 @@ export class LeadsController {
   }
 
   @Get()
+  @UseGuards(StaffOrInternalKeyGuard)
   async listLeads(
     @Query('client_id') clientId?: string,
     @Query('status') status?: string,
@@ -71,6 +73,7 @@ export class LeadsController {
   }
 
   @Get(':id')
+  @UseGuards(StaffOrInternalKeyGuard)
   async getLead(@Param('id', ParseIntPipe) id: number): Promise<LeadV1> {
     const lead = await this.leadsService.getLead(id);
     if (!lead) {

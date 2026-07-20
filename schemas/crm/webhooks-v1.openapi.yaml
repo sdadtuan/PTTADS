@@ -1,0 +1,48 @@
+openapi: 3.0.3
+info:
+  title: PTT Channel Webhooks v1
+  version: 0.1.0
+  description: |
+    Unified channel webhook ingress (Phase 0 P0-4).
+    Meta handled natively in Nest; other channels may proxy to Flask during migration.
+paths:
+  /api/v1/channels:
+    get:
+      summary: List supported channels and routing
+      responses:
+        '200':
+          description: Channel registry
+  /api/v1/webhooks/{channel}:
+    get:
+      summary: Webhook verify handshake (Meta hub.mode=subscribe)
+      parameters:
+        - in: path
+          name: channel
+          required: true
+          schema: { type: string, enum: [meta, facebook, zalo, google, email] }
+      responses:
+        '200':
+          description: Challenge string (text/plain) or JSON status
+    post:
+      summary: Ingest channel webhook payload
+      parameters:
+        - in: path
+          name: channel
+          required: true
+          schema: { type: string }
+        - in: header
+          name: X-PTT-Client-Id
+          schema: { type: string, format: uuid }
+        - in: header
+          name: X-Correlation-Id
+          schema: { type: string }
+        - in: header
+          name: X-Hub-Signature-256
+          schema: { type: string }
+      responses:
+        '200':
+          description: Accepted (queue mode) or empty lead batch
+        '401':
+          description: Signature / verify token failed
+        '503':
+          description: Queue unavailable

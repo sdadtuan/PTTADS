@@ -47,6 +47,7 @@
 | `crm_staff` | HR | Phase 2 |
 | `crm_re_projects` | RE | Phase 3 |
 | `crm_kpi_*` | KPI | Phase 2 |
+| `seo_*` (PTTADS) | SEO/AEO Ops | **Phase 3.5** — freeze SQLite 2026-07-19 |
 | CMS tables | CMS | Phase 4 |
 
 ---
@@ -90,6 +91,7 @@ Cron: POST /api/crm/agency/lead-sync-cron?mode=incremental|full|reconcile
 | 2 | `crm_leads` read replica PG | Medium |
 | **3** | `crm_leads` write dual-run → PG OLTP primary | High | [`2026-07-17-postgresql-ddl-v3-leads-oltp.sql`](2026-07-17-postgresql-ddl-v3-leads-oltp.sql) |
 | **3b** | `daily_performance` + closed-loop | Medium | [`2026-07-17-postgresql-ddl-v3-performance.sql`](2026-07-17-postgresql-ddl-v3-performance.sql) |
+| **3.5** | **SEO/AEO domain** (`seo_aeo.*`) | Medium | [`2026-07-19-seo-aeo-pg-cutover-policy.md`](2026-07-19-seo-aeo-pg-cutover-policy.md) — **no new SQLite SEO schema** |
 | 4 | Hub, SOP | Medium |
 | 5 | Staff, KPI | Medium |
 | 6 | CMS | Low |

@@ -12,7 +12,11 @@
 > - [`specs/2026-07-16-channel-adapter-design.md`](specs/2026-07-16-channel-adapter-design.md) — ChannelAdapter Phase 0  
 > - [`../PTT/docs/facebook_ads_agency_architecture.md`](../PTT/docs/facebook_ads_agency_architecture.md) — kiến trúc agency 7 lớp  
 > - [`../PTT/docs/facebook_ads_agency_techservice.txt`](../PTT/docs/facebook_ads_agency_techservice.txt) — 15 core services  
-> - [`schemas/channel/README.md`](../schemas/channel/README.md) — JSON Schema normalized models
+> - [`schemas/channel/README.md`](../schemas/channel/README.md) — JSON Schema normalized models  
+> - [`SPEC_SEO_AEO_OPERATING_SYSTEM.md`](SPEC_SEO_AEO_OPERATING_SYSTEM.md) — SEO/AEO Enterprise OS (delivery module)  
+> - [`SPEC_EMAIL_MARKETING_OPERATING_SYSTEM.md`](SPEC_EMAIL_MARKETING_OPERATING_SYSTEM.md) — Email Marketing Enterprise OS (greenfield Next/Nest)  
+> - [`SPEC_MIGRATION_FLASK_EXECUTION_PLAN.md`](SPEC_MIGRATION_FLASK_EXECUTION_PLAN.md) — **Kế hoạch thực thi bỏ Flask (EXECUTING)**  
+> - [`specs/2026-07-19-seo-aeo-pg-cutover-policy.md`](specs/2026-07-19-seo-aeo-pg-cutover-policy.md) — SEO/AEO PostgreSQL-only policy (active)
 
 ---
 

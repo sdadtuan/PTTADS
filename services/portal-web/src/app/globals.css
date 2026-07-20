@@ -216,3 +216,164 @@ input {
 .perf-table tbody tr:hover {
   background: rgba(255, 255, 255, 0.02);
 }
+
+.btn-sm {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.seo-widgets-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.seo-widgets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.seo-widget-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.seo-widget-link:hover .seo-widget-card {
+  border-color: var(--accent);
+}
+
+.seo-widget-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 96px;
+}
+
+.seo-widget-card--featured {
+  grid-column: span 2;
+  min-height: 112px;
+}
+
+@media (max-width: 520px) {
+  .seo-widget-card--featured {
+    grid-column: span 1;
+  }
+}
+
+.seo-widget-card--warn {
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.seo-widget-card--ok {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
+.seo-widget-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.seo-widget-value {
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+.seo-sparkline {
+  color: #60a5fa;
+  margin-top: 0.15rem;
+}
+
+/* Wave 3b — email approvals + toast */
+.email-toast-stack {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: min(360px, calc(100vw - 2rem));
+}
+
+.email-toast {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-size: 0.875rem;
+}
+
+.email-toast--success { border-color: rgba(34, 197, 94, 0.45); }
+.email-toast--error { border-color: rgba(239, 68, 68, 0.45); }
+.email-toast--info { border-color: var(--accent); }
+
+.email-status-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.email-status-pending_approval { background: rgba(254, 243, 199, 0.15); color: #fcd34d; }
+.email-status-pending { background: rgba(254, 243, 199, 0.15); color: #fcd34d; }
+
+.email-approval-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.email-approval-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.email-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.email-modal {
+  width: min(480px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.email-preview-modal {
+  width: min(720px, 100%);
+}
+
+.email-preview-frame {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  min-height: 280px;
+  overflow: auto;
+}
+
+.email-preview-frame iframe {
+  width: 100%;
+  min-height: 280px;
+  border: none;
+}

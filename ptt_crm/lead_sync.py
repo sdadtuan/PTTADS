@@ -94,7 +94,9 @@ def sqlite_row_to_pg_record(row: sqlite3.Row | dict[str, Any]) -> dict[str, Any]
     }
 
 
-def upsert_pg_lead(record: dict[str, Any]) -> None:
+def upsert_pg_lead(record: dict[str, Any], *, write_source: str = "sync") -> None:
+    ws = (write_source or "sync")[:32]
+    payload = {**record, "write_source": ws}
     with pg_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -111,7 +113,7 @@ def upsert_pg_lead(record: dict[str, Any]) -> None:
                     %(meta_json)s::jsonb,
                     %(agency_client_id)s::uuid,
                     %(channel)s, %(external_lead_id)s, %(campaign_id)s,
-                    %(received_at)s, %(created_at)s, NOW(), 1, 'sync'
+                    %(received_at)s, %(created_at)s, NOW(), 1, %(write_source)s
                 )
                 ON CONFLICT (sqlite_lead_id) DO UPDATE SET
                     full_name = EXCLUDED.full_name,
@@ -130,9 +132,12 @@ def upsert_pg_lead(record: dict[str, Any]) -> None:
                     created_at = EXCLUDED.created_at,
                     synced_at = NOW(),
                     sync_version = crm_leads.sync_version + 1,
-                    write_source = 'sync'
+                    write_source = CASE
+                        WHEN EXCLUDED.write_source <> 'sync' THEN EXCLUDED.write_source
+                        ELSE crm_leads.write_source
+                    END
                 """,
-                record,
+                payload,
             )
         conn.commit()
 
@@ -208,12 +213,35 @@ def sync_lead_ids(lead_ids: list[int]) -> dict[str, Any]:
     synced = 0
     max_id = _get_watermark()
     for row in rows:
-        upsert_pg_lead(sqlite_row_to_pg_record(row))
+        upsert_pg_lead(sqlite_row_to_pg_record(row), write_source="sync")
         synced += 1
         max_id = max(max_id, int(row["id"]))
     if synced:
         _update_sync_state(last_sqlite_id=max_id)
     return {"ok": True, "synced": synced, "last_sqlite_id": max_id}
+
+
+def sync_lead_ids_worker(lead_ids: list[int]) -> dict[str, Any]:
+    """Upsert ingest leads to PG with write_source=worker (Sprint 0 PG-primary path)."""
+    if not lead_ids:
+        return {"ok": True, "synced": 0, "skipped": True, "reason": "no_ids"}
+    if not pg_leads_replica_ready():
+        return {"ok": False, "synced": 0, "error": "pg_replica_not_ready"}
+
+    rows = _fetch_sqlite_rows(lead_ids=[int(i) for i in lead_ids])
+    if len(rows) != len(lead_ids):
+        missing = set(int(i) for i in lead_ids) - {int(r["id"]) for r in rows}
+        return {"ok": False, "synced": 0, "error": "sqlite_rows_missing", "missing": sorted(missing)}
+
+    synced = 0
+    max_id = _get_watermark()
+    for row in rows:
+        upsert_pg_lead(sqlite_row_to_pg_record(row), write_source="worker")
+        synced += 1
+        max_id = max(max_id, int(row["id"]))
+    if synced:
+        _update_sync_state(last_sqlite_id=max_id)
+    return {"ok": True, "synced": synced, "write_source": "worker", "last_sqlite_id": max_id}
 
 
 def sync_incremental(*, batch_size: int = 200) -> dict[str, Any]:
@@ -228,7 +256,7 @@ def sync_incremental(*, batch_size: int = 200) -> dict[str, Any]:
     synced = 0
     max_id = watermark
     for row in rows:
-        upsert_pg_lead(sqlite_row_to_pg_record(row))
+        upsert_pg_lead(sqlite_row_to_pg_record(row), write_source="sync")
         synced += 1
         max_id = max(max_id, int(row["id"]))
     if synced:
@@ -256,7 +284,7 @@ def sync_full_backfill(*, batch_size: int = 500, max_batches: int = 100) -> dict
         if not rows:
             break
         for row in rows:
-            upsert_pg_lead(sqlite_row_to_pg_record(row))
+            upsert_pg_lead(sqlite_row_to_pg_record(row), write_source="sync")
             watermark = max(watermark, int(row["id"]))
             total += 1
         _update_sync_state(last_sqlite_id=watermark)
@@ -343,9 +371,15 @@ def reconcile_leads(*, sample_size: int = 50) -> dict[str, Any]:
 
 def sync_after_ingest(created_ids: list[int]) -> None:
     """Fast path after ingest_lead — sync new leads immediately."""
-    if not created_ids or not lead_replica_sync_enabled():
+    if not created_ids:
         return
     try:
+        from ptt_crm.config import leads_write_source_pg
+
+        if leads_write_source_pg():
+            return
+        if not lead_replica_sync_enabled():
+            return
         result = sync_lead_ids(created_ids)
         if not result.get("ok"):
             logger.warning("lead replica sync after ingest failed: %s", result)

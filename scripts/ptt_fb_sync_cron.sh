@@ -41,7 +41,7 @@ if [ -z "$SECRET" ]; then
 fi
 
 PTT_SYNC_URL=$(env_get PTT_SYNC_URL "")
-PTT_GUNICORN_PORT=$(env_get PTT_GUNICORN_PORT "8002")
+PTT_NEST_API_URL=$(env_get PTT_NEST_API_URL "")
 
 probe_ok() {
   _url="$1"
@@ -55,17 +55,15 @@ USE_NGINX_HOST=0
 if [ -n "$PTT_SYNC_URL" ]; then
   SYNC_URL="$PTT_SYNC_URL"
 else
-  for PORT in $PTT_GUNICORN_PORT 8002 5050; do
-    [ -n "$PORT" ] || continue
-    if probe_ok "http://${HOST}:${PORT}/healthz"; then
-      SYNC_URL="http://${HOST}:${PORT}${PATH_SUFFIX}"
-      break
-    fi
-  done
+  NEST_BASE="${PTT_NEST_API_URL:-http://${HOST}:3000}"
+  NEST_BASE="${NEST_BASE%/}"
+  if probe_ok "${NEST_BASE}/health"; then
+    SYNC_URL="${NEST_BASE}${PATH_SUFFIX}"
+  fi
 
   if [ -z "$SYNC_URL" ]; then
     for PORT in 80 8080; do
-      if probe_ok "http://${HOST}:${PORT}/healthz" -H "Host: ${DOMAIN}"; then
+      if probe_ok "http://${HOST}:${PORT}/health" -H "Host: ${DOMAIN}"; then
         SYNC_URL="http://${HOST}:${PORT}${PATH_SUFFIX}"
         USE_NGINX_HOST=1
         break
@@ -75,15 +73,15 @@ else
 
   if [ -z "$SYNC_URL" ]; then
     BASE="${PUBLIC_BASE%/}"
-    if probe_ok "${BASE}/healthz"; then
+    if probe_ok "${BASE}/health"; then
       SYNC_URL="${BASE}${PATH_SUFFIX}"
     fi
   fi
 fi
 
 if [ -z "$SYNC_URL" ]; then
-  echo "ptt_fb_sync_cron: không gọi được /healthz." >&2
-  echo "Kiểm tra: systemctl status ptt | journalctl -u ptt -n 30" >&2
+  echo "ptt_fb_sync_cron: không gọi được Nest /health." >&2
+  echo "Kiểm tra: systemctl status ptt-crm-api | journalctl -u ptt-crm-api -n 30" >&2
   echo "Gợi ý .env: PTT_SYNC_URL=https://pttads.vn${PATH_SUFFIX}" >&2
   exit 1
 fi

@@ -1,0 +1,24 @@
+# Email Marketing — enqueue scheduled campaign prepare (oneshot; timer every 1 min)
+#
+# VPS:
+#   sudo cp scripts/email_campaign_schedule_due_cron.sh /var/www/ptt/scripts/
+#   sudo chmod +x /var/www/ptt/scripts/email_campaign_schedule_due_cron.sh
+#   sudo cp deploy/ptt-email-campaign-schedule.service deploy/ptt-email-campaign-schedule.timer /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ptt-email-campaign-schedule.timer
+
+[Unit]
+Description=PTT — email scheduled campaigns due (oneshot)
+After=network.target postgresql.service ptt-worker.service
+Wants=ptt-worker.service
+
+[Service]
+Type=oneshot
+User=deploy
+Group=www-data
+Environment=PTT_APP_DIR=/var/www/ptt
+EnvironmentFile=-/var/www/ptt/.env
+ExecStart=/var/www/ptt/scripts/email_campaign_schedule_due_cron.sh
+
+[Install]
+WantedBy=multi-user.target

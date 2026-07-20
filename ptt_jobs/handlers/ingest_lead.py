@@ -1,4 +1,4 @@
-"""Ingest normalized lead into SQLite CRM."""
+"""Ingest normalized lead into CRM (SQLite business logic + optional PG-primary sync)."""
 from __future__ import annotations
 
 import logging
@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from ptt_channel.mappers import normalized_lead_to_legacy
+from ptt_crm.config import leads_write_source_pg
 from ptt_jobs.config import sqlite_db_path
 from ptt_jobs.events import emit_domain_event
 from ptt_jobs.store import JOB_STATUS_DEAD, mark_job_done, mark_job_failed
@@ -30,6 +31,11 @@ def process_ingest_lead_payload(
     *,
     correlation_id: str | None = None,
 ) -> dict[str, Any]:
+    if leads_write_source_pg():
+        from ptt_crm.lead_ingest_pg import process_ingest_lead_payload_pg
+
+        return process_ingest_lead_payload_pg(payload, correlation_id=correlation_id)
+
     lead_dict = payload.get("lead") if isinstance(payload.get("lead"), dict) else payload
     channel = str(payload.get("channel") or lead_dict.get("channel") or "meta")
     client_id = str(payload.get("client_id") or lead_dict.get("client_id") or "")
@@ -55,9 +61,28 @@ def process_ingest_lead_payload(
             ts=_utc_ts(),
             webhook_slug=f"v1_{channel}",
         )
+
+        created_ids = list(result.get("created_ids") or [])
+        if leads_write_source_pg() and created_ids:
+            from ptt_crm.lead_sync import sync_lead_ids_worker
+            from ptt_jobs.db import pg_available
+
+            if not pg_available():
+                conn.rollback()
+                return {"ok": False, "error": "pg_unavailable_for_primary_write"}
+            sync_result = sync_lead_ids_worker(created_ids)
+            if not sync_result.get("ok") or int(sync_result.get("synced") or 0) != len(created_ids):
+                conn.rollback()
+                return {
+                    "ok": False,
+                    "error": "pg_primary_sync_failed",
+                    "sync": sync_result,
+                    "created_ids": created_ids,
+                }
+
         conn.commit()
 
-        for lead_id in result.get("created_ids") or []:
+        for lead_id in created_ids:
             emit_domain_event(
                 "LeadCreated",
                 "lead",

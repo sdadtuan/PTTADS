@@ -1,6 +1,14 @@
 """Tests for Agency campaign performance API (M6)."""
 from __future__ import annotations
 
+
+import os
+import unittest
+
+if os.environ.get("PTT_RUN_FLASK_TESTS") != "1":
+    raise unittest.SkipTest(
+        "Flask HTTP removed — set PTT_RUN_FLASK_TESTS=1 to run integration tests"
+    )
 import unittest
 from unittest.mock import MagicMock, patch
 

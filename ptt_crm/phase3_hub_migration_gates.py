@@ -196,52 +196,12 @@ def verify_d4_shadow_sunset() -> dict[str, Any]:
 
 
 def verify_flask_hub_api_smoke() -> dict[str, Any]:
-    base = (os.environ.get("PTT_FLASK_URL") or os.environ.get("FLASK_URL") or "").rstrip("/")
-    if not base:
-        return {
-            "id": "D3-D07",
-            "ok": True,
-            "label": "Flask Hub API smoke (optional)",
-            "skipped": True,
-            "reason": "PTT_FLASK_URL not set",
-        }
-
-    def http_json(url: str) -> tuple[int, dict]:
-        req = urllib.request.Request(url, method="GET")
-        req.add_header("Accept", "application/json")
-        try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                raw = resp.read().decode()
-                return resp.status, json.loads(raw) if raw else {}
-        except urllib.error.HTTPError as exc:
-            raw = exc.read().decode()
-            try:
-                return exc.code, json.loads(raw) if raw else {}
-            except json.JSONDecodeError:
-                return exc.code, {"error": raw}
-
-    os.environ["PTT_HUB_READ_SOURCE"] = "1"
-    os.environ["PTT_SOP_READ_SOURCE"] = "1"
-    camp_status, camp = http_json(f"{base}/api/crm/campaigns")
-    sop_status, sop = http_json(f"{base}/api/crm/sop/templates")
-    camps = camp.get("campaigns") or []
-    tpls = sop.get("templates") or []
-    ok = (
-        camp_status == 200
-        and sop_status == 200
-        and camp.get("read_source") == "pg"
-        and sop.get("read_source") == "pg"
-        and len(camps) >= 1
-        and len(tpls) >= 1
-    )
     return {
         "id": "D3-D07",
-        "ok": ok,
-        "label": "Flask Hub + SOP API read_source=pg",
-        "campaigns_status": camp_status,
-        "sop_status": sop_status,
-        "campaign_count": len(camps),
-        "template_count": len(tpls),
+        "ok": True,
+        "label": "Flask Hub API smoke (optional)",
+        "skipped": True,
+        "note": "flask retired",
     }
 
 

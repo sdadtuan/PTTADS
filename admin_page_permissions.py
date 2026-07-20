@@ -12,23 +12,8 @@ from ptt_ui_button_permissions import (
     CRM_UI_BUTTON_IDS,
 )
 
-# Section bổ sung (ngoài CMS_MODULES gốc) — map UI + API CRM/Admin
+# Section bổ sung (ngoài CMS_MODULES gốc) — map UI + API CRM ops-web
 ADMIN_CRM_SECTIONS: tuple[dict[str, Any], ...] = (
-    # —— Admin Dashboard ——
-    {
-        "id": "admin_projects",
-        "label": "Admin — Dự án portfolio",
-        "group": "Admin Dashboard",
-        "page": "/admin",
-        "description": "Tạo và quản lý dự án landing.",
-    },
-    {
-        "id": "admin_news",
-        "label": "Admin — Tin tức",
-        "group": "Admin Dashboard",
-        "page": "/admin",
-        "description": "Tạo và quản lý tin tức landing.",
-    },
     # —— Bảng CSKH ——
     {
         "id": "crm_board_funnel",
@@ -374,6 +359,48 @@ ADMIN_CRM_SECTIONS: tuple[dict[str, Any], ...] = (
         "page": "/crm/facebook-ads",
         "description": "Hub Meta/Facebook — token, CPL, map Hub, truy cập nhanh Lead Ads.",
     },
+    {
+        "id": "crm_seo_aeo",
+        "label": "SEO/AEO Ops — Tổng quan",
+        "group": "CRM · SEO/AEO",
+        "page": "/crm/seo",
+        "description": "Hub cross-client — overview, health, alerts.",
+    },
+    {
+        "id": "crm_seo_aeo_write",
+        "label": "SEO/AEO — Nội dung & Nghiên cứu",
+        "group": "CRM · SEO/AEO",
+        "page": "/crm/seo",
+        "description": "Research CRUD, content pipeline create/edit.",
+    },
+    {
+        "id": "crm_seo_aeo_approve",
+        "label": "SEO/AEO — Phê duyệt",
+        "group": "CRM · SEO/AEO",
+        "page": "/crm/seo",
+        "description": "Approval stages, publish CMS.",
+    },
+    {
+        "id": "crm_seo_aeo_technical",
+        "label": "SEO/AEO — Kỹ thuật",
+        "group": "CRM · SEO/AEO",
+        "page": "/crm/seo/technical",
+        "description": "Technical issues, crawl import, CRM tasks.",
+    },
+    {
+        "id": "crm_seo_aeo_settings",
+        "label": "SEO/AEO — Cài đặt client",
+        "group": "CRM · SEO/AEO",
+        "page": "/crm/seo/clients",
+        "description": "Client settings, OAuth GSC/GA4, CMS, schedules.",
+    },
+    {
+        "id": "crm_seo_aeo_reports",
+        "label": "SEO/AEO — Báo cáo",
+        "group": "CRM · SEO/AEO",
+        "page": "/crm/seo/reports",
+        "description": "Export PDF, BI, scheduled reports.",
+    },
 )
 
 ADMIN_CRM_SECTION_IDS: frozenset[str] = frozenset(s["id"] for s in ADMIN_CRM_SECTIONS)
@@ -399,6 +426,7 @@ SIDEBAR_CRM_NAV_SECTIONS: tuple[str, ...] = (
     "crm_payroll_attendance",
     "crm_agency",
     "crm_facebook_ads",
+    "crm_seo_aeo",
 )
 
 # Map section → nhóm trang (để gating nav)
@@ -445,6 +473,9 @@ _POSITION_DEFAULT: dict[str, dict[str, frozenset[str]]] = {
         "crm_hdsd": frozenset({"view", "export"}),
         "crm_agency": frozenset({"view", "edit", "create", "configure"}),
         "crm_facebook_ads": frozenset({"view", "edit", "create", "configure"}),
+        "crm_seo_aeo": frozenset({"view"}),
+        "crm_seo_aeo_settings": frozenset({"view", "edit", "configure"}),
+        "crm_seo_aeo_reports": frozenset({"view", "export"}),
     },
     "MKT-01": {
         "crm_hub_campaigns": frozenset({"view", "edit", "create", "delete"}),
@@ -478,6 +509,13 @@ _POSITION_DEFAULT: dict[str, dict[str, frozenset[str]]] = {
         "crm_hdsd": frozenset({"view", "export"}),
         "crm_agency": frozenset({"view", "edit", "create", "configure"}),
         "crm_facebook_ads": frozenset({"view", "edit", "create", "configure"}),
+        "crm_seo_aeo": frozenset({"view", "edit", "create", "approve", "configure", "export"}),
+        "crm_seo_aeo_write": frozenset({"view", "edit", "create"}),
+        "crm_seo_aeo_approve": frozenset({"approve"}),
+        "crm_seo_aeo_technical": frozenset({"view", "edit", "create"}),
+        "crm_seo_aeo_settings": frozenset({"view", "edit", "configure"}),
+        "crm_seo_aeo_reports": frozenset({"view", "export"}),
+        "crm_email_mkt": frozenset({"view", "write", "settings", "compliance", "approve", "deliverability", "reports"}),
     },
     "MKT-02": {
         "crm_hub_campaigns": frozenset({"view", "edit", "create"}),
@@ -496,6 +534,10 @@ _POSITION_DEFAULT: dict[str, dict[str, frozenset[str]]] = {
         "crm_re_projects_kpi": frozenset({"view", "edit"}),
         "crm_daily_work_report": frozenset({"view", "create"}),
         "crm_hdsd": frozenset({"view", "export"}),
+        "crm_seo_aeo": frozenset({"view"}),
+        "crm_seo_aeo_write": frozenset({"view", "edit", "create"}),
+        "crm_seo_aeo_reports": frozenset({"view"}),
+        "crm_email_mkt": frozenset({"view", "write", "reports"}),
     },
     "VH-01": {
         "crm_board_kanban": frozenset({"view"}),

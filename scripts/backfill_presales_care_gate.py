@@ -24,7 +24,8 @@ from dotenv import load_dotenv
 
 load_dotenv(ROOT / ".env")
 
-from app import get_connection, init_db  # noqa: E402
+from ptt_crm.crm_sqlite import get_connection  # noqa: E402
+from crm_lead_store import ensure_lead_schema  # noqa: E402
 from crm_lead_care_pipeline import (  # noqa: E402
     admin_backfill_presales_care_gate,
     list_leads_needing_presales_care_backfill,
@@ -52,11 +53,11 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    init_db()
     limit = args.limit if args.limit > 0 else None
     lead_id = args.lead_id if args.lead_id > 0 else None
 
     with get_connection() as conn:
+        ensure_lead_schema(conn)
         ensure_presales_schema(conn)
         pending = list_leads_needing_presales_care_backfill(
             conn,

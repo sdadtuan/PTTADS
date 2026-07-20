@@ -1,0 +1,26 @@
+{
+  "name": "ptt-ops-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PTT Internal Ops — Next.js (Phase 0 migration)",
+  "scripts": {
+    "dev": "next dev -p ${OPS_PORT:-3200}",
+    "build": "next build",
+    "start": "next start -p ${OPS_PORT:-3200}",
+    "lint": "next lint"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "next": "^14.2.28",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "typescript": "^5.7.3"
+  }
+}

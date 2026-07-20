@@ -1,0 +1,28 @@
+# SEO daily facts PG/SQLite → ClickHouse (Phase 5D BI)
+#
+# VPS:
+#   sudo cp deploy/ptt-seo-clickhouse-export.service deploy/ptt-seo-clickhouse-export.timer /etc/systemd/system/
+#   # .env: CLICKHOUSE_URL, CLICKHOUSE_USER, CLICKHOUSE_PASSWORD, SEO_AEO_DB=pg
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ptt-seo-clickhouse-export.timer
+#   sudo systemctl start ptt-seo-clickhouse-export.service
+#   journalctl -u ptt-seo-clickhouse-export.service -n 50 --no-pager
+
+[Unit]
+Description=PTT — export SEO daily facts → ClickHouse (Phase 5D)
+After=network.target docker.service
+Wants=ptt-clickhouse.service
+
+[Service]
+Type=oneshot
+User=deploy
+Group=www-data
+WorkingDirectory=/var/www/ptt
+EnvironmentFile=-/var/www/ptt/.env
+Environment=CLICKHOUSE_URL=http://127.0.0.1:8123
+Environment=CLICKHOUSE_USER=ptt
+Environment=CLICKHOUSE_PASSWORD=ptt_dev
+ExecStart=/var/www/ptt/scripts/export_seo_facts_clickhouse.sh
+
+[Install]
+WantedBy=multi-user.target

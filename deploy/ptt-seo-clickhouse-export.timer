@@ -1,0 +1,12 @@
+[Unit]
+Description=PTT — timer SEO daily facts → ClickHouse (Phase 5D)
+
+[Timer]
+OnBootSec=25min
+OnCalendar=*-*-* 04:00:00
+Timezone=Asia/Ho_Chi_Minh
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

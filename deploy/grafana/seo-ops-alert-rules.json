@@ -1,0 +1,61 @@
+{
+  "apiVersion": 1,
+  "groups": [
+    {
+      "orgId": 1,
+      "name": "PTT SEO/AEO",
+      "folder": "SEO Ops",
+      "interval": "1h",
+      "rules": [
+        {
+          "uid": "ptt-seo-critical-issues",
+          "title": "SEO critical issues open",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "datasourceUid": "${CLICKHOUSE_DS_UID}",
+              "model": {
+                "queryType": "sql",
+                "rawSql": "SELECT sum(metric_value) AS critical\nFROM ptt.seo_daily_facts\nWHERE metric_name = 'critical_issues_open'\n  AND fact_date = today()"
+              }
+            },
+            {
+              "refId": "C",
+              "model": { "type": "classic_conditions", "conditions": [{ "evaluator": { "params": [1], "type": "gte" }, "operator": { "type": "and" }, "query": { "params": ["A"] }, "type": "query" }] }
+            }
+          ],
+          "for": "0m",
+          "annotations": {
+            "summary": "Có critical technical issues SEO mở — kiểm tra /crm/seo/technical"
+          },
+          "labels": { "team": "seo", "severity": "critical" }
+        },
+        {
+          "uid": "ptt-seo-aeo-coverage-low",
+          "title": "AEO coverage below 50%",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "datasourceUid": "${CLICKHOUSE_DS_UID}",
+              "model": {
+                "queryType": "sql",
+                "rawSql": "SELECT min(metric_value) AS min_cov\nFROM ptt.seo_daily_facts\nWHERE metric_name = 'aeo_coverage_pct'\n  AND fact_date >= today() - 1"
+              }
+            },
+            {
+              "refId": "C",
+              "model": { "type": "classic_conditions", "conditions": [{ "evaluator": { "params": [50], "type": "lt" }, "operator": { "type": "and" }, "query": { "params": ["A"] }, "type": "query" }] }
+            }
+          ],
+          "for": "2h",
+          "annotations": {
+            "summary": "AEO coverage thấp — chạy batch scan hoặc tạo content gap"
+          },
+          "labels": { "team": "seo", "severity": "warning" }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+[Unit]
+Description=PTT — timer enqueue email scheduled campaigns every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

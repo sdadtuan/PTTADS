@@ -96,11 +96,15 @@ def verify_phase3_prerequisite() -> dict[str, Any]:
         return {"id": "F4-G01", "ok": False, "label": "Phase 3 QA prerequisite", "error": "missing_report"}
     data = json.loads(path.read_text(encoding="utf-8"))
     ok = bool(data.get("ok"))
+    try:
+        rel_path = str(path.relative_to(ROOT))
+    except ValueError:
+        rel_path = str(path)
     return {
         "id": "F4-G01",
         "ok": ok,
         "label": "Phase 3 QA prerequisite",
-        "path": str(path.relative_to(ROOT)),
+        "path": rel_path,
         "generated_at": data.get("generated_at"),
     }
 

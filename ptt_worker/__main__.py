@@ -96,6 +96,82 @@ def run_worker(*, poll_interval: float = 1.0, once: bool = False) -> int:
                 from ptt_jobs.handlers.capi_dispatch import run_capi_dispatch_job
 
                 run_capi_dispatch_job(job)
+            elif job_type == "seo_gsc_sync":
+                from ptt_jobs.handlers.seo_gsc_sync import run_seo_gsc_sync_job
+
+                run_seo_gsc_sync_job(job)
+            elif job_type == "seo_ga4_sync":
+                from ptt_jobs.handlers.seo_ga4_sync import run_seo_ga4_sync_job
+
+                run_seo_ga4_sync_job(job)
+            elif job_type == "seo_aeo_scan":
+                from ptt_jobs.handlers.seo_aeo_scan import run_seo_aeo_scan_job
+
+                run_seo_aeo_scan_job(job)
+            elif job_type == "seo_freshness_scan":
+                from ptt_jobs.handlers.seo_freshness_scan import run_seo_freshness_scan_job
+
+                run_seo_freshness_scan_job(job)
+            elif job_type == "seo_report_schedules":
+                from ptt_jobs.handlers.seo_report_schedule import run_seo_report_schedules_job
+
+                run_seo_report_schedules_job(job)
+            elif job_type == "email_campaign_prepare":
+                from ptt_jobs.handlers.email_campaign_prepare import run_email_campaign_prepare_job
+
+                run_email_campaign_prepare_job(job)
+            elif job_type == "email_campaign_schedule_due":
+                from ptt_jobs.handlers.email_campaign_schedule_due import run_email_campaign_schedule_due_job
+
+                run_email_campaign_schedule_due_job(job)
+            elif job_type == "email_journey_enroll_scan":
+                from ptt_jobs.handlers.email_journey_enroll_scan import run_email_journey_enroll_scan_job
+
+                run_email_journey_enroll_scan_job(job)
+            elif job_type == "email_journey_tick":
+                from ptt_jobs.handlers.email_journey_tick import run_email_journey_tick_job
+
+                run_email_journey_tick_job(job)
+            elif job_type == "email_journey_trigger_events":
+                from ptt_jobs.handlers.email_journey_trigger_events import run_email_journey_trigger_events_job
+
+                run_email_journey_trigger_events_job(job)
+            elif job_type == "email_experiment_rollup":
+                from ptt_jobs.handlers.email_experiment_rollup import run_email_experiment_rollup_job
+
+                run_email_experiment_rollup_job(job)
+            elif job_type == "email_send_batch":
+                from ptt_jobs.handlers.email_send_batch import run_email_send_batch_job
+
+                run_email_send_batch_job(job)
+            elif job_type == "email_engagement_ingest":
+                from ptt_jobs.handlers.email_engagement_ingest import run_email_engagement_ingest_job
+
+                run_email_engagement_ingest_job(job)
+            elif job_type == "email_clickhouse_export":
+                from ptt_jobs.handlers.email_clickhouse_export import run_email_clickhouse_export_job
+
+                run_email_clickhouse_export_job(job)
+            elif job_type == "email_attribution_rollup":
+                from ptt_jobs.handlers.email_attribution_rollup import run_email_attribution_rollup_job
+
+                run_email_attribution_rollup_job(job)
+            elif job_type in ("email_deliverability_scan", "email_bounce_process", "email_complaint_process"):
+                from ptt_jobs.handlers.email_deliverability_scan import run_email_deliverability_scan_job
+
+                run_email_deliverability_scan_job(job)
+            elif job_type == "email_dns_verify":
+                from ptt_jobs.handlers.email_dns_verify import run_email_dns_verify_job
+
+                run_email_dns_verify_job(job)
+            elif job_type == "email_warm_up_tick":
+                from ptt_jobs.handlers.email_warm_up_tick import run_email_warm_up_tick_job
+
+                run_email_warm_up_tick_job(job)
+            elif job_type == "email_report_schedules":
+                from ptt_jobs.handlers.email_report_schedules import run_email_report_schedules_job
+
+                run_email_report_schedules_job(job)
             else:
                 from ptt_jobs.store import mark_job_failed
 

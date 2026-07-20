@@ -57,6 +57,9 @@ _ensure_nest() {
 }
 
 if [[ "$REFRESH" -eq 1 ]]; then
+  echo "==> Seed portal gate users (PG auth for cross-tenant check)"
+  "$PYTHON" scripts/seed_portal_gate_users.py
+
   echo "==> Refresh Phase 3 track gates"
   if command -v docker >/dev/null 2>&1; then
     docker compose up -d postgres 2>/dev/null || true

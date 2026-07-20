@@ -1,9 +1,11 @@
 # Hướng dẫn vận hành PTT Agency trên VPS production
 
 > **Phiên bản:** 1.2 · **Cập nhật:** 2026-07-18  
+> **⚠️ Deploy greenfield / stack mới (Nest + ops-web, Flask retired):** dùng **[`vps-full-system-deploy.md`](./vps-full-system-deploy.md)** — tài liệu này giữ chi tiết phase cũ, một số mục Flask đã lỗi thời.  
 > **Repo trên VPS:** `/var/www/ptt`  
 > **Domain production (client-facing):** **`https://portal.pttads.vn`** — Portal Next.js + Nest API (`/api/v1`, `/health`) cùng origin qua Nginx  
-> **Agency nội bộ (tuỳ chọn):** `pttads.vn` → Flask `:8002` (AM/Admin, Facebook Ads hub, Agency Ops)
+> **Staff console:** **`https://ops.pttads.vn`** — ops-web `:3200` + Nest `/api/`  
+> **Legacy rs:** **`https://rs.pttads.vn`** → redirect ops-web (sau Phase 5 cutover)
 
 Tài liệu này là **runbook tổng hợp** để triển khai, cutover và vận hành hàng ngày trên VPS thật. Chi tiết từng phase xem các runbook con được liên kết ở cuối mục.
 
@@ -42,7 +44,7 @@ flowchart TB
         NG_A["/api/ /health → Nest :3000"]
     end
     subgraph nginx_internal [Nginx nội bộ — tuỳ chọn]
-        NG_F[pttads.vn → Flask :8002]
+        NG_F[rs.pttads.vn → Flask :8002]
     end
     subgraph app [Application layer]
         FLASK[Flask Gunicorn ptt.service]
@@ -74,7 +76,7 @@ flowchart TB
 | `https://portal.pttads.vn/` | `/`, `/login`, `/dashboard`, `/meta`, `/creatives` | Next `:3100` | Client portal |
 | `https://portal.pttads.vn/api/v1/*` | `/api/v1/...` | Nest `:3000` | Auth, performance, creatives |
 | `https://portal.pttads.vn/health` | `/health` | Nest `:3000` | Health check |
-| `https://pttads.vn/` *(tuỳ chọn)* | Agency UI | Flask `:8002` | AM/Admin nội bộ |
+| `https://rs.pttads.vn/` | Agency UI | Flask `:8002` | AM/Admin nội bộ |
 
 **Port nội bộ (chỉ localhost):**
 
@@ -102,7 +104,7 @@ flowchart TB
 
 **Nav portal:** Performance · Meta (Facebook) · Creative inbox
 
-### 2.2. Agency CRM nội bộ (`pttads.vn` → Flask) — AM / Media Buyer / CSKH
+### 2.2. Agency CRM nội bộ (`rs.pttads.vn` → Flask) — AM / Media Buyer / CSKH
 
 | URL | Màn hình | Ghi chú |
 |-----|----------|---------|
@@ -143,7 +145,7 @@ flowchart TB
 | Record | Trỏ tới | Bắt buộc |
 |--------|---------|----------|
 | **`portal.pttads.vn`** | VPS IP | **Có** — Portal + API công khai |
-| `pttads.vn` | VPS IP | Tuỳ chọn — Agency Ops nội bộ (AM) |
+| **`rs.pttads.vn`** | VPS IP | **Có** — Agency CRM nội bộ (AM/Admin) |
 
 > **Không cần** subdomain `api.pttads.vn` khi dùng same-origin: Nest được proxy tại `https://portal.pttads.vn/api/`.
 
@@ -245,12 +247,14 @@ sudo ln -sf /etc/nginx/sites-available/portal.pttads.vn /etc/nginx/sites-enabled
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-**Agency Flask (tuỳ chọn, nội bộ):**
+**Agency Flask (`rs.pttads.vn`):**
 
 ```bash
-# Chỉ khi cần pttads.vn cho AM — không liên quan client portal
-sudo cp /var/www/ptt/deploy/nginx-leads-v1-cutover.conf /etc/nginx/snippets/ptt-leads.conf
-sudo ./scripts/apply_leads_read_upstream.sh
+sudo cp /var/www/ptt/deploy/nginx-agency.conf /etc/nginx/sites-available/rs.pttads.vn
+sudo ln -sf /etc/nginx/sites-available/rs.pttads.vn /etc/nginx/sites-enabled/
+# Lần đầu: dùng HTTP-only (comment block ssl) → certbot → copy lại file đầy đủ
+sudo certbot --nginx -d rs.pttads.vn
+sudo nginx -t && sudo systemctl reload nginx
 ```
 
 ### 4.6. TLS (Let's Encrypt) — portal.pttads.vn
@@ -467,8 +471,26 @@ Cài Phase 4 ClickHouse: `close_phase4_prod_cutover.sh` (APPLY=1)
 | Timer | Lịch (ICT) | Chức năng |
 |-------|------------|----------|
 | `ptt-google-insights.timer` | 02:30 | Google → `daily_performance` |
-| `ptt-clickhouse-export.timer` | 03:15 | PG `domain_events` → ClickHouse |
+| `ptt-seo-gsc-sync.timer` | 03:00 | GSC OAuth → `seo_aeo.seo_gsc_daily_stats` |
+| `ptt-seo-ga4-sync.timer` | 03:30 | GA4 OAuth → `seo_aeo.seo_ga4_daily_stats` |
+| `ptt-seo-freshness-scan.timer` | CN 04:00 | Content decay → `refresh_required` |
+| `ptt-seo-gate-d.timer` | CN 06:00 | Gate D: CWV + AEO schedule + crawl reminders |
+| `ptt-seo-serp-capture.timer` | CN 05:00 | SERP scheduled capture (Gate B) |
+| `ptt-seo-clickhouse-export.timer` | 04:00 | SEO facts → ClickHouse |
 | `ptt-backup.timer` | (xem unit) | Backup PG + SQLite |
+
+**SEO GSC sync** — cần `.env`: `SEO_AEO_DB=pg`, `DATABASE_URL`, `PTT_GSC_OAUTH_*`, `PTT_GSC_SYNC_ENABLED=1`. Dev stub: `PTT_GSC_SYNC_STUB=1`.
+
+**SEO GA4 sync** — cần `.env`: `SEO_AEO_DB=pg`, `DATABASE_URL`, `PTT_GA4_OAUTH_*` (hoặc dùng chung `PTT_GSC_OAUTH_*`), `PTT_GA4_SYNC_ENABLED=1`. Dev stub: `PTT_GA4_SYNC_STUB=1`. Redirect URI riêng: `/api/v1/seo/ga4/oauth/callback`.
+
+**SEO Freshness scan** — `PTT_FRESHNESS_SCAN_ENABLED=1`, threshold mặc định decay ≥60 → `refresh_required`. Cần GSC/GA4 stats + content `published`/`monitoring`.
+
+```bash
+sudo systemctl start ptt-seo-gsc-sync.service
+sudo systemctl start ptt-seo-ga4-sync.service
+sudo systemctl start ptt-seo-freshness-scan.service
+journalctl -u ptt-seo-freshness-scan.service -n 30 --no-pager
+```
 
 ---
 
@@ -481,6 +503,7 @@ Cài Phase 4 ClickHouse: `close_phase4_prod_cutover.sh` (APPLY=1)
 ```
 Phase 2 (Leads write PG)     →  soak ≥30 ngày
 Phase 3 (Portal + Temporal)  →  soak ≥7 ngày
+SEO/AEO PG + GSC/GA4 OAuth   →  sau Phase 3 soak (xem §8.6)
 Phase 4 (Flask readonly)     →  soak readonly ≥14 ngày
 Lead shadow off              →  sau Phase 2 soak
 Hub PG primary               →  sau Phase 3 soak 7 ngày
@@ -712,6 +735,65 @@ Chi tiết: [`phase4-prod-cutover-checklist.md`](./phase4-prod-cutover-checklist
 
 ---
 
+### 8.7. SEO/AEO — PostgreSQL cutover + GSC/GA4 OAuth UAT
+
+Chi tiết đầy đủ: [`seo-aeo-pg-oauth-uat-cutover.md`](./seo-aeo-pg-oauth-uat-cutover.md)
+
+```bash
+cd /var/www/ptt
+export DATABASE_URL=postgresql://ptt:***@127.0.0.1:5432/ptt_agency
+export PILOT_CUSTOMER_ID=<seo-pilot-customer-id>
+
+# Dry-run backfill + verify
+APPLY=0 ./scripts/seo_aeo_prod_cutover.sh
+
+# Pre-flight env + PG schema
+python3 scripts/verify_seo_aeo_oauth_uat.py --customer-id "$PILOT_CUSTOMER_ID"
+
+# Cutover thật
+sudo -E APPLY=1 PILOT_CUSTOMER_ID="$PILOT_CUSTOMER_ID" ./scripts/seo_aeo_prod_cutover.sh
+```
+
+**UAT OAuth (browser):** Technical Console → Kết nối Google (GSC + GA4) → Sync OAuth → verify `seo_gsc_daily_stats` / `seo_ga4_daily_stats`.
+
+**Smoke timers:**
+
+```bash
+sudo systemctl start ptt-seo-gsc-sync.service ptt-seo-ga4-sync.service
+journalctl -u ptt-seo-gsc-sync.service -n 30 --no-pager
+```
+
+**Rollback:** `SEO_AEO_DB=sqlite` trong `.env` + `sudo systemctl restart ptt`.
+
+---
+
+### 8.8. SEO/AEO Phase 5 — Governance, Portal SEO, Experiments
+
+Chi tiết: [`seo-aeo-pg-oauth-uat-cutover.md`](./seo-aeo-pg-oauth-uat-cutover.md) §10
+
+```bash
+cd /var/www/ptt
+export DATABASE_URL=postgresql://ptt:***@127.0.0.1:5432/ptt_agency
+export SEO_AEO_DB=pg
+
+# Gate trước cutover
+./scripts/phase5_prod_cutover_gate.sh
+
+# Staged flags (governance → portal → experiments)
+APPLY=1 PHASE5_ENABLE_GOVERNANCE=1 sudo -E ./scripts/close_phase5_prod_cutover.sh
+
+# Soak hàng ngày ≥7 ngày
+./scripts/phase5_soak_record.sh
+```
+
+**Env template:** `deploy/env.phase5-prod.example`
+
+**Sign-off checklist:** [`phase5-prod-signoff-checklist.md`](./phase5-prod-signoff-checklist.md)
+
+**Rollback:** tắt từng flag (`PTT_SEO_GOVERNANCE_ENABLED=0`, `PTT_PORTAL_SEO_ENABLED=0`, `PTT_SEO_EXPERIMENTS_ENABLED=0`) + restart services.
+
+---
+
 ## 9. Gate & kiểm tra sau deploy
 
 Chạy trên VPS (hoặc staging mirror) sau mỗi deploy lớn:
@@ -723,7 +805,10 @@ Chạy trên VPS (hoặc staging mirror) sau mỗi deploy lớn:
 | Phase 3 portal MVP | `./scripts/phase3_portal_mvp_gate.sh` | cập nhật QA report |
 | Phase 3 E2E (4 test) | `./scripts/phase3_playwright_e2e_gate.sh` | cập nhật sign-off |
 | Phase 4 (7 gate) | `./scripts/phase4_gate.sh` | `.local-dev/phase4-gate-report.json` |
+| **Phase 5 SEO/AEO** | `./scripts/phase5_prod_cutover_gate.sh` | `.local-dev/phase5-gate-report.json` |
 | **Closure pack** | `SKIP_CUTOVER=0 ./scripts/run_phase_closure.sh` | `.local-dev/phase-closure-run.log` |
+
+**Checklist sign-off thủ công:** [`phase5-prod-signoff-checklist.md`](./phase5-prod-signoff-checklist.md)
 
 **Gate mới (Meta / Facebook Ads):**
 
@@ -749,8 +834,8 @@ cd /var/www/ptt
 # HTTP
 curl -sf https://portal.pttads.vn/health
 curl -sfI https://portal.pttads.vn/login
-# Agency nội bộ (nếu có pttads.vn):
-# curl -sfI https://pttads.vn/
+# Agency nội bộ:
+curl -sfI https://rs.pttads.vn/admin
 
 # Systemd
 systemctl is-active ptt ptt-crm-api ptt-portal-web ptt-temporal-worker
@@ -979,7 +1064,8 @@ docker ps | grep clickhouse
 | `https://portal.pttads.vn/creatives` | Next `:3100` | Creative inbox |
 | `https://portal.pttads.vn/api/v1/*` | Nest `:3000` | API OLTP — auth, performance, campaign-writes |
 | `https://portal.pttads.vn/health` | Nest `:3000` | Health check |
-| `https://pttads.vn/crm/facebook-ads` *(tuỳ chọn)* | Flask `:8002` | Facebook Ads hub (AM/Media Buyer) |
+| `https://rs.pttads.vn/admin` | Flask `:8002` | Admin / CMS / CRM |
+| `https://rs.pttads.vn/crm/facebook-ads` | Flask `:8002` | Facebook Ads hub (AM/Media Buyer) |
 | `http://127.0.0.1:8088` | Temporal UI | SSH tunnel only |
 
 ## Phụ lục B — Checklist go-live tổng hợp

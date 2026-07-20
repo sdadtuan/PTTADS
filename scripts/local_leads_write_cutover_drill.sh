@@ -72,7 +72,7 @@ else
 fi
 
 echo "==> Write dual-run check"
-if "$ROOT/scripts/dual_run_write_check.py" --sample 10 --no-nest --quiet; then
+if "$PYTHON" "$ROOT/scripts/dual_run_write_check.py" --sample 10 --no-nest --quiet; then
   echo "OK  write dual-run"
 else
   echo "WARN write dual-run mismatches — review before prod cutover" >&2

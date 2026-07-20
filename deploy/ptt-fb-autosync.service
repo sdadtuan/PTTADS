@@ -1,0 +1,31 @@
+# Facebook Lead — pending webhook + Graph autosync (Sprint 0)
+#
+# VPS:
+#   sudo cp deploy/ptt-fb-autosync.service /etc/systemd/system/
+#   # .env: CRM_FACEBOOK_BACKGROUND=1, CRM_FACEBOOK_BACKGROUND_IN_GUNICORN=0
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ptt-fb-autosync
+#
+# Verify single process:
+#   ps aux | rg run_fb_autosync_daemon
+
+[Unit]
+Description=PTT — Facebook Lead autosync daemon
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=deploy
+Group=www-data
+WorkingDirectory=/var/www/ptt
+Environment=PATH=/var/www/ptt/.venv/bin
+Environment=CRM_FACEBOOK_BACKGROUND=1
+Environment=CRM_FACEBOOK_BACKGROUND_IN_GUNICORN=0
+EnvironmentFile=-/var/www/ptt/.env
+ExecStart=/var/www/ptt/.venv/bin/python /var/www/ptt/scripts/run_fb_autosync_daemon.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

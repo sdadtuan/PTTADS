@@ -13,6 +13,12 @@ UNITS=(
   ptt-temporal-worker.service
   ptt-google-insights.service
   ptt-google-insights.timer
+  ptt-seo-gsc-sync.service
+  ptt-seo-gsc-sync.timer
+  ptt-seo-ga4-sync.service
+  ptt-seo-ga4-sync.timer
+  ptt-seo-freshness-scan.service
+  ptt-seo-freshness-scan.timer
 )
 
 for unit in "${UNITS[@]}"; do
@@ -29,7 +35,10 @@ for unit in "${UNITS[@]}"; do
 done
 
 systemctl daemon-reload
-systemctl enable ptt-portal-web.service ptt-temporal-worker.service ptt-google-insights.timer
+systemctl enable ptt-portal-web.service ptt-temporal-worker.service ptt-google-insights.timer ptt-seo-gsc-sync.timer ptt-seo-ga4-sync.timer ptt-seo-freshness-scan.timer
 echo "OK  Phase 3 units installed. Start:"
 echo "    systemctl start ptt-portal-web ptt-temporal-worker"
 echo "    systemctl start ptt-google-insights.timer"
+echo "    systemctl start ptt-seo-gsc-sync.timer"
+echo "    systemctl start ptt-seo-ga4-sync.timer"
+echo "    systemctl start ptt-seo-freshness-scan.timer"

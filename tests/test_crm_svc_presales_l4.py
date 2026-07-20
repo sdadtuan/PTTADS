@@ -69,6 +69,22 @@ class TestLifecycleMeta(unittest.TestCase):
 
 
 class TestPresalesCapAlert(unittest.TestCase):
+    def setUp(self) -> None:
+        self._cap_env = os.environ.get("PTT_PRESALES_COST_CAP_VND")
+        self._strict_env = os.environ.get("PTT_PRESALES_CAP_STRICT")
+        os.environ.pop("PTT_PRESALES_COST_CAP_VND", None)
+        os.environ.pop("PTT_PRESALES_CAP_STRICT", None)
+
+    def tearDown(self) -> None:
+        if self._cap_env is None:
+            os.environ.pop("PTT_PRESALES_COST_CAP_VND", None)
+        else:
+            os.environ["PTT_PRESALES_COST_CAP_VND"] = self._cap_env
+        if self._strict_env is None:
+            os.environ.pop("PTT_PRESALES_CAP_STRICT", None)
+        else:
+            os.environ["PTT_PRESALES_CAP_STRICT"] = self._strict_env
+
     def test_no_cap_no_alert(self):
         conn = _setup_conn()
         alert = get_presales_cap_alert(conn, 1)

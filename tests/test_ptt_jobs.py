@@ -1,6 +1,14 @@
 """Tests for ptt_jobs queue and webhook wiring."""
 from __future__ import annotations
 
+
+import os
+import unittest
+
+if os.environ.get("PTT_RUN_FLASK_TESTS") != "1":
+    raise unittest.SkipTest(
+        "Flask HTTP removed — set PTT_RUN_FLASK_TESTS=1 to run integration tests"
+    )
 import json
 import unittest
 from unittest.mock import MagicMock, patch

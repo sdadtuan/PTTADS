@@ -219,3 +219,286 @@ export async function rejectCreative(
   }
   return body;
 }
+
+export interface PortalSeoSummaryResponse {
+  seo_enabled: boolean;
+  customer_id?: number;
+  pending_client_review?: number;
+  executive?: Record<string, unknown>;
+  error?: string;
+}
+
+export interface PortalSeoWidgetMetric {
+  label: string;
+  value: unknown;
+  unit?: string;
+  sparkline?: number[];
+}
+
+export interface PortalSeoWidgetsResponse {
+  ok: boolean;
+  customer_id: number;
+  widgets: Record<string, PortalSeoWidgetMetric>;
+}
+
+export type PortalSeoReportType = 'executive' | 'seo' | 'aeo' | 'technical' | 'content';
+
+export interface PortalSeoExecutiveReportResponse {
+  ok: boolean;
+  customer_id: number;
+  dashboard_type: PortalSeoReportType;
+  report: Record<string, unknown>;
+  generated_at: string;
+}
+
+export async function portalSeoSummary(token: string): Promise<PortalSeoSummaryResponse> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/seo/summary`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await parseJson<PortalSeoSummaryResponse & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'SEO summary failed', res.status);
+  }
+  return body;
+}
+
+export async function portalSeoWidgets(token: string): Promise<PortalSeoWidgetsResponse> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/seo/widgets`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await parseJson<PortalSeoWidgetsResponse & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'SEO widgets failed', res.status);
+  }
+  return body;
+}
+
+export async function portalSeoExecutiveReport(
+  token: string,
+  type: PortalSeoReportType = 'executive',
+): Promise<PortalSeoExecutiveReportResponse> {
+  const qs = type !== 'executive' ? `?type=${encodeURIComponent(type)}` : '';
+  const res = await fetch(`${API_BASE}/api/v1/portal/seo/reports/executive${qs}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await parseJson<PortalSeoExecutiveReportResponse & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Executive report failed', res.status);
+  }
+  return body;
+}
+
+export async function portalSeoPendingContent(
+  token: string,
+): Promise<{ ok: boolean; items: Array<{ id: number; title: string; content_type: string }> }> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/seo/content/pending`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await parseJson<
+    { ok: boolean; items: Array<{ id: number; title: string; content_type: string }> } & {
+      error?: string;
+      message?: string;
+    }
+  >(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Pending content failed', res.status);
+  }
+  return body;
+}
+
+export async function portalSeoContentDetail(
+  token: string,
+  contentId: string,
+): Promise<Record<string, unknown>> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/seo/content/${encodeURIComponent(contentId)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await parseJson<Record<string, unknown> & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Content detail failed', res.status);
+  }
+  return body;
+}
+
+export async function portalSeoReviewContent(
+  token: string,
+  contentId: string,
+  payload: { approved: boolean; notes?: string },
+): Promise<Record<string, unknown>> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/seo/content/${encodeURIComponent(contentId)}/review`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  const body = await parseJson<Record<string, unknown> & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Review failed', res.status);
+  }
+  return body;
+}
+
+export interface PortalEmailDashboard {
+  ok: boolean;
+  email_enabled: boolean;
+  client_id: string;
+  pending_approvals: number;
+  campaigns_sent_28d: number;
+  open_rate_pct: number;
+  revenue_attrib: number;
+  recent_campaigns: Array<{
+    id: string;
+    name: string;
+    status: string;
+    audience_count: number | null;
+    updated_at: string;
+  }>;
+}
+
+export interface PortalEmailApprovalRow {
+  campaign_id: string;
+  name: string;
+  audience_count: number | null;
+  template_name: string;
+  requested_at: string;
+  status: string;
+}
+
+export interface PortalEmailApprovalPreview {
+  ok: boolean;
+  campaign_id: string;
+  name: string;
+  subject_template: string;
+  html_body: string;
+  audience_count: number | null;
+  scheduled_at: string | null;
+  template_name: string;
+  status: string;
+}
+
+export interface PortalEmailCampaignStats {
+  ok: boolean;
+  campaign_id: string;
+  campaign_name: string;
+  status: string;
+  audience_count: number | null;
+  sent: number;
+  opens: number;
+  clicks: number;
+  open_rate_pct: number;
+  click_rate_pct: number;
+  revenue_attrib: number;
+}
+
+export async function portalEmailDashboard(token: string): Promise<PortalEmailDashboard> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/email/dashboard`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await parseJson<PortalEmailDashboard & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Email dashboard failed', res.status);
+  }
+  return body;
+}
+
+export async function portalEmailPendingApprovals(
+  token: string,
+): Promise<{ ok: boolean; items: PortalEmailApprovalRow[] }> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/email/approvals/pending`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await parseJson<
+    { ok: boolean; items: PortalEmailApprovalRow[] } & { error?: string; message?: string }
+  >(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Pending approvals failed', res.status);
+  }
+  return body;
+}
+
+export async function portalEmailApprovalPreview(
+  token: string,
+  campaignId: string,
+): Promise<PortalEmailApprovalPreview> {
+  const res = await fetch(
+    `${API_BASE}/api/v1/portal/email/approvals/${encodeURIComponent(campaignId)}/preview`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    },
+  );
+  const body = await parseJson<PortalEmailApprovalPreview & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Approval preview failed', res.status);
+  }
+  return body;
+}
+
+export async function portalEmailApproveCampaign(
+  token: string,
+  campaignId: string,
+): Promise<{ ok: boolean; campaign: { id: string; status: string; name: string } }> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/email/approvals/${encodeURIComponent(campaignId)}/approve`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = await parseJson<
+    { ok: boolean; campaign: { id: string; status: string; name: string } } & {
+      error?: string;
+      message?: string;
+    }
+  >(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Approve failed', res.status);
+  }
+  return body;
+}
+
+export async function portalEmailRejectCampaign(
+  token: string,
+  campaignId: string,
+  note?: string,
+): Promise<{ ok: boolean; campaign: { id: string; status: string; name: string } }> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/email/approvals/${encodeURIComponent(campaignId)}/reject`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ note: note?.trim() || undefined }),
+  });
+  const body = await parseJson<
+    { ok: boolean; campaign: { id: string; status: string; name: string } } & {
+      error?: string;
+      message?: string;
+    }
+  >(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Reject failed', res.status);
+  }
+  return body;
+}
+
+export async function portalEmailCampaignStats(
+  token: string,
+  campaignId: string,
+): Promise<PortalEmailCampaignStats> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/email/campaigns/${encodeURIComponent(campaignId)}/stats`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await parseJson<PortalEmailCampaignStats & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Campaign stats failed', res.status);
+  }
+  return body;
+}

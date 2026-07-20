@@ -144,12 +144,12 @@ def proxy_assign_lead(
             return {"error": msg}, status
 
     patch_body = {
-        "owner_id": int(to_user_id),
-        "assigned_by": assigned_by[:120],
+        "to_user_id": int(to_user_id),
+        "reason": reason,
     }
     status, body, err = request_nest_json(
-        f"/api/v1/leads/{lead_id}",
-        method="PATCH",
+        f"/api/crm/leads/{lead_id}/assign",
+        method="POST",
         body=patch_body,
         actor=assigned_by[:120],
     )
@@ -160,24 +160,14 @@ def proxy_assign_lead(
         return body or {"error": err or "Nest assign failed", "upstream": "nest"}, status or 502
 
     with _sqlite_connection() as conn:
-        _sync_sqlite_after_nest_assign(
-            conn,
-            lead_id,
-            to_user_id=to_user_id,
-            assigned_by=assigned_by,
-            ts=ts,
-        )
-        try:
-            out = _mirror_sqlite_assign_audit(
-                conn,
-                lead_id=lead_id,
-                from_user_id=from_id,
-                to_user_id=int(to_user_id),
-                reason=reason,
-                assigned_by=assigned_by,
-                ts=ts,
-            )
-        except ValueError as exc:
-            return {"error": str(exc)}, 404
+        from crm_lead_store import fetch_lead_by_id, lead_row_to_dict
+
+        row = fetch_lead_by_id(conn, lead_id)
+        if row is None:
+            nest_lead = body.get("lead") if isinstance(body, dict) else None
+            if nest_lead:
+                return {"lead": nest_lead, "upstream": "nest"}, 200
+            return {"error": "Không tìm thấy lead sau assign."}, 404
+        out = lead_row_to_dict(row, conn)
 
     return {"lead": out, "upstream": "nest"}, 200

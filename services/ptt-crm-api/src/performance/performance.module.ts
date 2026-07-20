@@ -8,5 +8,6 @@ import { PerformanceService } from './performance.service';
   imports: [PortalModule],
   controllers: [PerformanceController],
   providers: [PerformanceRepository, PerformanceService],
+  exports: [PerformanceService],
 })
 export class PerformanceModule {}

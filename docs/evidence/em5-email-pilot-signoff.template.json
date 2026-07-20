@@ -1,0 +1,70 @@
+{
+  "phase": "em-5",
+  "component": "email_marketing_prod_pilot",
+  "environment": "production",
+  "pilot_started_at": null,
+  "signed_at": null,
+  "pilot": {
+    "client_uuid": null,
+    "client_name": null,
+    "workspace_id": null,
+    "approver_email": null
+  },
+  "flags_applied": {
+    "PTT_EMAIL_ENABLED": false,
+    "PTT_EMAIL_SEND_ENABLED": false,
+    "PTT_EMAIL_JOURNEYS_ENABLED": false,
+    "PTT_EMAIL_PORTAL_ENABLED": false
+  },
+  "staged_steps": {
+    "B1_ops_admin": false,
+    "B2_send_mvp": false,
+    "B3_enterprise": false,
+    "B4_portal": false
+  },
+  "gates": {
+    "phase5_email_gate_report_ok": false,
+    "phase9_wave4_gate_report_ok": false,
+    "em0_em4_reports_ok": false,
+    "wave1_3b_reports_ok": false,
+    "pytest_email_pass": false,
+    "nest_hub_smoke": false,
+    "ops_web_build": false,
+    "portal_web_build": false,
+    "soak_7d_ok": false,
+    "soak_span_days": null,
+    "soak_sample_count": null
+  },
+  "manual_uat": {
+    "staff_hub_kpi": false,
+    "segment_compute_consent": false,
+    "campaign_preflight_submit": false,
+    "portal_approver_inbox": false,
+    "deliverability_verify_domain": false,
+    "public_preferences_unsub": false
+  },
+  "artifacts": {
+    "phase5_gate_report": ".local-dev/phase5-email-pilot-gate-report.json",
+    "soak_evidence": ".local-dev/em5-soak-evidence.jsonl",
+    "phase_reports": [
+      "phase0-email-hub-kickoff-report.json",
+      "phase1-email-ops-report.json",
+      "phase2-email-send-mvp-report.json",
+      "phase3-email-enterprise-report.json",
+      "phase4-email-portal-report.json",
+      "phase6-email-send-platform-report.json",
+      "phase7-email-wave2-report.json",
+      "phase8-email-wave3-report.json",
+      "phase8b-email-wave3b-report.json",
+      "phase9-email-wave4-report.json"
+    ]
+  },
+  "signoffs": {
+    "head_email_coe": null,
+    "compliance": null,
+    "am_pilot": null,
+    "client_approver": null,
+    "devops": null
+  },
+  "notes": "Complete manual checklist in docs/runbooks/email-marketing-prod-pilot-checklist.md"
+}

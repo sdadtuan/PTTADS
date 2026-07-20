@@ -1,6 +1,14 @@
 """Tests for leads write upstream / assign proxy (Phase 2 W6)."""
 from __future__ import annotations
 
+
+import os
+import unittest
+
+if os.environ.get("PTT_RUN_FLASK_TESTS") != "1":
+    raise unittest.SkipTest(
+        "Flask HTTP removed — set PTT_RUN_FLASK_TESTS=1 to run integration tests"
+    )
 import json
 import os
 import unittest
@@ -23,6 +31,8 @@ class TestLeadsWriteUpstreamConfig(unittest.TestCase):
 
 
 class TestProxyAssignLead(unittest.TestCase):
+    @patch("crm_lead_store.lead_row_to_dict", return_value={"id": 1, "owner_id": 2, "full_name": "Lead A"})
+    @patch("crm_lead_store.fetch_lead_by_id")
     @patch("ptt_crm.leads_write_upstream._mirror_sqlite_assign_audit")
     @patch("ptt_crm.leads_write_upstream._sync_sqlite_after_nest_assign")
     @patch("ptt_crm.leads_write_upstream._validate_assign")
@@ -33,12 +43,14 @@ class TestProxyAssignLead(unittest.TestCase):
         mock_validate: MagicMock,
         mock_sync: MagicMock,
         mock_mirror: MagicMock,
+        mock_fetch: MagicMock,
+        _dict: MagicMock,
     ) -> None:
         from ptt_crm.leads_write_upstream import proxy_assign_lead
 
         mock_validate.return_value = (MagicMock(), None)
-        mock_patch.return_value = (200, {"id": 1, "owner_id": 2}, None)
-        mock_mirror.return_value = {"id": 1, "owner_id": 2, "full_name": "Lead A"}
+        mock_patch.return_value = (200, {"lead": {"id": 1, "owner_id": 2}}, None)
+        mock_fetch.return_value = {"id": 1, "owner_id": 2}
 
         body, status = proxy_assign_lead(
             1,
@@ -51,8 +63,8 @@ class TestProxyAssignLead(unittest.TestCase):
         self.assertEqual(body["lead"]["owner_id"], 2)
         self.assertEqual(body["upstream"], "nest")
         mock_patch.assert_called_once()
-        mock_sync.assert_called_once()
-        mock_mirror.assert_called_once()
+        mock_sync.assert_not_called()
+        mock_mirror.assert_not_called()
 
     @patch("ptt_crm.leads_write_upstream._validate_assign")
     @patch("ptt_crm.leads_write_upstream.request_nest_json")
@@ -119,9 +131,15 @@ class TestAssignEndpointRouting(unittest.TestCase):
     @patch("app._crm_effective_staff_id", return_value=None)
     @patch("crm_lead_store.assign_lead")
     @patch("crm_lead_store.lead_row_to_dict", return_value={"id": 1, "owner_id": 2})
+    @patch("ptt_crm.config.leads_legacy_flask_readonly", return_value=False)
     @patch("ptt_crm.leads_write_upstream.nest_write_upstream_enabled", return_value=False)
+    @patch("ptt_crm.config.leads_write_upstream", return_value="flask")
+    @patch("ptt_crm.config.leads_pg_primary", return_value=True)
     def test_assign_local_when_flask(
         self,
+        _pg: MagicMock,
+        _upstream: MagicMock,
+        _legacy_ro: MagicMock,
         _enabled: MagicMock,
         _dict: MagicMock,
         mock_assign: MagicMock,

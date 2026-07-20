@@ -1,0 +1,85 @@
+{
+  "apiVersion": 1,
+  "groups": [
+    {
+      "orgId": 1,
+      "name": "PTT Email Ops",
+      "folder": "PTT",
+      "interval": "5m",
+      "rules": [
+        {
+          "uid": "ptt-email-complaint-rate",
+          "title": "Email complaint rate high",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "datasourceUid": "${DS_CLICKHOUSE}",
+              "model": {
+                "queryType": "sql",
+                "rawSql": "SELECT\n  metric_date AS time,\n  if(sent_count > 0, 100.0 * complaint_count / sent_count, 0) AS complaint_pct\nFROM ptt.email_deliverability_daily\nWHERE metric_date >= today() - 1\nORDER BY metric_date DESC\nLIMIT 1"
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "-100",
+              "model": {
+                "type": "classic_conditions",
+                "conditions": [
+                  {
+                    "evaluator": { "params": [0.3], "type": "gt" },
+                    "operator": { "type": "and" },
+                    "query": { "params": ["A"] },
+                    "reducer": { "params": [], "type": "last" },
+                    "type": "query"
+                  }
+                ]
+              }
+            }
+          ],
+          "for": "10m",
+          "labels": { "severity": "warning", "product": "email" },
+          "annotations": {
+            "summary": "Email complaint rate exceeded 0.3% — check domain pause automation"
+          }
+        },
+        {
+          "uid": "ptt-email-send-drop",
+          "title": "Email sends dropped vs 7d avg",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "datasourceUid": "${DS_CLICKHOUSE}",
+              "model": {
+                "queryType": "sql",
+                "rawSql": "SELECT\n  fact_date AS time,\n  sum(metric_value) AS sent\nFROM ptt.email_daily_facts\nWHERE metric_name = 'emails_sent'\n  AND fact_date >= today() - 8\nGROUP BY fact_date\nORDER BY fact_date"
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "-100",
+              "model": {
+                "type": "classic_conditions",
+                "conditions": [
+                  {
+                    "evaluator": { "params": [0.5], "type": "lt" },
+                    "operator": { "type": "and" },
+                    "query": { "params": ["A"] },
+                    "reducer": { "params": [], "type": "last" },
+                    "type": "query"
+                  }
+                ]
+              }
+            }
+          ],
+          "for": "1h",
+          "labels": { "severity": "info", "product": "email" },
+          "annotations": {
+            "summary": "Yesterday email sends below 50% of recent daily volume"
+          }
+        }
+      ]
+    }
+  ]
+}

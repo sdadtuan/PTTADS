@@ -1,0 +1,10 @@
+[Unit]
+Description=PTT — timer Horizon 1 Meta Ads soak daily at 06:05 UTC
+
+[Timer]
+OnCalendar=*-*-* 06:05:00
+Persistent=true
+AccuracySec=1h
+
+[Install]
+WantedBy=timers.target

@@ -7,8 +7,7 @@
 
 [Unit]
 Description=PTT — Google Ads insights sync (một lần)
-After=network.target ptt.service
-Wants=ptt.service
+After=network.target ptt-crm-api.service
 
 [Service]
 Type=oneshot

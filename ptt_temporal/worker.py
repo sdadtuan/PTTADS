@@ -28,16 +28,29 @@ from ptt_temporal.activities.onboarding import (
     check_onboarding_progress,
     notify_am_onboarding,
 )
+from ptt_temporal.activities.seo_content import (
+    notify_am_seo_content_decision,
+    notify_am_seo_content_pending,
+)
 from ptt_temporal.config import task_queue, temporal_address, temporal_namespace
 from ptt_temporal.workflows.campaign_write_approval import CampaignWriteApprovalWorkflow
 from ptt_temporal.workflows.client_onboarding import ClientOnboardingWorkflow
 from ptt_temporal.workflows.creative_approval import CreativeApprovalWorkflow
 from ptt_temporal.workflows.launch_qa import LaunchQAWorkflow
+from ptt_temporal.workflows.seo_content_approval import SeoContentApprovalWorkflow
+from ptt_temporal.workflows.email_campaign_approval import EmailCampaignApprovalWorkflow
+from ptt_temporal.workflows.email_journey import EmailJourneyWorkflow
 from ptt_temporal.activities.campaign_write import (
     execute_campaign_write,
     mark_campaign_write_executed,
     notify_am_campaign_write,
 )
+
+from ptt_temporal.activities.email_campaign import (
+    enqueue_email_campaign_prepare,
+    notify_email_campaign_pending,
+)
+from ptt_temporal.activities.email_journey import bootstrap_email_journey
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("ptt_temporal.worker")
@@ -52,10 +65,20 @@ async def main() -> None:
     worker = Worker(
         client,
         task_queue=queue,
-        workflows=[CreativeApprovalWorkflow, ClientOnboardingWorkflow, LaunchQAWorkflow, CampaignWriteApprovalWorkflow],
+        workflows=[
+            CreativeApprovalWorkflow,
+            ClientOnboardingWorkflow,
+            LaunchQAWorkflow,
+            CampaignWriteApprovalWorkflow,
+            SeoContentApprovalWorkflow,
+            EmailCampaignApprovalWorkflow,
+            EmailJourneyWorkflow,
+        ],
         activities=[
             notify_am_creative_pending,
             notify_am_creative_decision,
+            notify_am_seo_content_pending,
+            notify_am_seo_content_decision,
             check_onboarding_progress,
             activate_client_onboarding,
             notify_am_onboarding,
@@ -65,9 +88,12 @@ async def main() -> None:
             notify_am_campaign_write,
             execute_campaign_write,
             mark_campaign_write_executed,
+            notify_email_campaign_pending,
+            enqueue_email_campaign_prepare,
+            bootstrap_email_journey,
         ],
     )
-    logger.info("Worker started (creative + onboarding + launch QA + campaign write)")
+    logger.info("Worker started (creative + onboarding + launch QA + campaign write + seo content + email)")
     await worker.run()
 
 

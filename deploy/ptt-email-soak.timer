@@ -1,0 +1,10 @@
+[Unit]
+Description=PTT — timer EM-5 email soak daily at 06:00 UTC
+
+[Timer]
+OnCalendar=*-*-* 06:00:00
+Persistent=true
+AccuracySec=1h
+
+[Install]
+WantedBy=timers.target

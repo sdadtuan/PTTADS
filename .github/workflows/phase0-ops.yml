@@ -1,0 +1,88 @@
+# Phase 0 ops-web + staff-auth — build, e2e, Flask route freeze
+name: phase0-ops
+
+on:
+  push:
+    paths:
+      - 'services/ops-web/**'
+      - 'services/ptt-crm-api/src/staff-auth/**'
+      - 'services/ptt-crm-api/src/webhooks/**'
+      - 'services/ptt-crm-api/src/config/**'
+      - 'services/ptt-crm-api/test/staff-auth.e2e-spec.ts'
+      - 'services/ptt-crm-api/test/webhooks.e2e-spec.ts'
+      - 'schemas/staff/**'
+      - 'schemas/crm/webhooks-v1.openapi.yaml'
+      - 'scripts/check_flask_route_freeze.py'
+      - 'deploy/flask_route_baseline.txt'
+      - '.github/workflows/phase0-ops.yml'
+  pull_request:
+    paths:
+      - 'services/ops-web/**'
+      - 'services/ptt-crm-api/**'
+      - 'schemas/staff/**'
+      - 'scripts/check_flask_route_freeze.py'
+      - '.github/workflows/phase0-ops.yml'
+
+jobs:
+  flask-freeze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Block new Flask routes (Sprint 0 freeze)
+        run: python3 scripts/check_flask_route_freeze.py
+
+  nest-staff-auth:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ptt
+          POSTGRES_PASSWORD: ptt_dev
+          POSTGRES_DB: ptt_agency
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ptt -d ptt_agency"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply PG DDL (minimal)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y postgresql-client
+          export DATABASE_URL=postgresql://ptt:ptt_dev@127.0.0.1:5432/ptt_agency
+          for f in docs/specs/2026-07-17-postgresql-ddl-v1.sql \
+                   docs/specs/2026-07-17-postgresql-ddl-v3-leads-oltp.sql \
+                   docs/specs/2026-07-20-postgresql-ddl-staff-auth.sql; do
+            psql "$DATABASE_URL" -f "$f" || true
+          done
+      - name: Nest build + staff-auth + webhooks e2e
+        working-directory: services/ptt-crm-api
+        env:
+          DATABASE_URL: postgresql://ptt:ptt_dev@127.0.0.1:5432/ptt_agency
+        run: |
+          npm ci
+          npm run build
+          npm test -- --testPathPattern=meta-webhook.parser
+          npm run test:e2e -- --testPathPattern='staff-auth|webhooks'
+
+  ops-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Ops web build
+        working-directory: services/ops-web
+        run: |
+          npm ci
+          npm run build

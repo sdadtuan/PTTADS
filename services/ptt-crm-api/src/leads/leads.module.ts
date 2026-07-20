@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EventsModule } from '../events/events.module';
+import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { LeadsController } from './leads.controller';
 import { LeadsRepository } from './leads.repository';
 import { LeadsService } from './leads.service';
@@ -7,10 +8,12 @@ import { LeadsWriteService } from './leads-write.service';
 import { PgLeadsRepository } from './pg-leads.repository';
 import { PgLeadsWriteRepository } from './pg-leads-write.repository';
 import { SqliteLeadsRepository } from './sqlite-leads.repository';
+import { StaffLeadsWriteGuard } from './guards/staff-leads-write.guard';
+import { StaffLeadsViewGuard } from './guards/staff-leads-view.guard';
 import { WriteEnabledGuard } from './guards/write-enabled.guard';
 
 @Module({
-  imports: [EventsModule],
+  imports: [EventsModule, StaffAuthModule],
   controllers: [LeadsController],
   providers: [
     LeadsService,
@@ -20,7 +23,9 @@ import { WriteEnabledGuard } from './guards/write-enabled.guard';
     PgLeadsRepository,
     PgLeadsWriteRepository,
     WriteEnabledGuard,
+    StaffLeadsWriteGuard,
+    StaffLeadsViewGuard,
   ],
-  exports: [LeadsRepository],
+  exports: [LeadsRepository, LeadsWriteService, StaffLeadsViewGuard, StaffLeadsWriteGuard],
 })
 export class LeadsModule {}

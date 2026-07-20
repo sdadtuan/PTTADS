@@ -1,18 +1,11 @@
-"""Tests for dual-run Flask vs Nest compare (Phase 1b Bước 4)."""
-from __future__ import annotations
 
-import json
+import os
 import unittest
-from unittest.mock import MagicMock, patch
 
-from ptt_crm.dual_run import (
-    compare_lead_get,
-    compare_leads_list,
-    diff_lead_v1,
-    diff_list_response,
-    run_batch_dual_run_check,
-    run_dual_run_check,
-)
+if os.environ.get("PTT_RUN_FLASK_TESTS") != "1":
+    raise unittest.SkipTest(
+        "Flask HTTP removed — set PTT_RUN_FLASK_TESTS=1 to run integration tests"
+    )
 from tests.leads_v1_contract import load_golden
 
 

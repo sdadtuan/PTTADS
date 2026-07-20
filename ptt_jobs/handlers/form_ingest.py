@@ -11,11 +11,12 @@ def process_form_ingest_payload(payload: dict[str, Any]) -> dict[str, Any]:
     conn = sqlite3.connect(sqlite_db_path())
     conn.row_factory = sqlite3.Row
     try:
-        import app as application
         from datetime import datetime, timezone
 
+        from ptt_crm.form_lead_ingest import ingest_lead_from_form
+
         ts = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-        lead_id = application._crm_ingest_lead_from_form(
+        lead_id = ingest_lead_from_form(
             conn,
             full_name=str(payload.get("full_name") or ""),
             phone=str(payload.get("phone") or ""),

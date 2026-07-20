@@ -52,12 +52,22 @@ def _release_file_lock(fh: Any | None) -> None:
         pass
 
 
+def _crm_ts() -> str:
+    from ptt_crm.crm_sqlite import crm_ts
+
+    return crm_ts()
+
+
+def _crm_conn():
+    from ptt_crm.crm_sqlite import crm_connection
+
+    return crm_connection()
+
+
 def run_facebook_pending_once() -> dict[str, Any]:
     """Retry hàng đợi webhook — chạy cả khi auto_sync Graph tắt."""
     from crm_facebook_config import fetch_facebook_config
     from crm_facebook_pending import process_pending_facebook_leads
-
-    from app import _crm_ts, get_connection
 
     fh, locked = _try_file_lock(_PENDING_LOCK_PATH)
     if not locked:
@@ -68,7 +78,7 @@ def run_facebook_pending_once() -> dict[str, Any]:
             "created_count": 0,
         }
     try:
-        with get_connection() as conn:
+        with _crm_conn() as conn:
             fb_cfg = fetch_facebook_config(conn)
             if not fb_cfg.get("enabled"):
                 return {
@@ -113,8 +123,6 @@ def run_facebook_autosync_once() -> dict[str, Any]:
     from crm_facebook_config import fetch_facebook_config
     from crm_facebook_leads import run_facebook_ingest_cycle
 
-    from app import _crm_ts, get_connection
-
     fh, locked = _try_file_lock(_LOCK_PATH)
     if not locked:
         return {
@@ -124,7 +132,7 @@ def run_facebook_autosync_once() -> dict[str, Any]:
             "created_count": 0,
         }
     try:
-        with get_connection() as conn:
+        with _crm_conn() as conn:
             fb_cfg = fetch_facebook_config(conn)
             if not fb_cfg.get("enabled"):
                 return {
@@ -160,10 +168,8 @@ def run_facebook_autosync_once() -> dict[str, Any]:
 def _autosync_sleep_seconds() -> float:
     from crm_facebook_config import fetch_facebook_config
 
-    from app import get_connection
-
     try:
-        with get_connection() as conn:
+        with _crm_conn() as conn:
             fb_cfg = fetch_facebook_config(conn)
     except Exception:
         fb_cfg = {}
@@ -205,6 +211,10 @@ def start_facebook_autosync_worker(app: Any) -> None:
         return
     if os.getenv("CRM_FACEBOOK_BACKGROUND", "1").strip().lower() in ("0", "false", "no", "off"):
         return
+    from ptt_crm.config import facebook_background_in_gunicorn
+
+    if not facebook_background_in_gunicorn():
+        return
     _worker_started = True
 
     def _runner() -> None:
@@ -214,3 +224,9 @@ def start_facebook_autosync_worker(app: Any) -> None:
     t = threading.Thread(target=_runner, name="ptt-fb-background", daemon=True)
     t.start()
     _log.info("Facebook background worker started (pending=%ss)", _PENDING_INTERVAL_SEC)
+
+
+def run_facebook_background_daemon() -> None:
+    """Blocking loop for standalone systemd service (Sprint 0 — outside Gunicorn)."""
+    _log.info("Facebook background daemon starting (pending=%ss)", _PENDING_INTERVAL_SEC)
+    _background_worker_loop()

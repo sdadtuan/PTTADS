@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 
 load_dotenv(ROOT / ".env")
 
-from app import get_connection  # noqa: E402
+from ptt_crm.crm_sqlite import get_connection  # noqa: E402
 from crm_lead_store import ensure_lead_schema  # noqa: E402
 from crm_project_leads import add_project_staff, ensure_project_leads_schema  # noqa: E402
 from crm_project_webhooks import save_project_lead_config  # noqa: E402

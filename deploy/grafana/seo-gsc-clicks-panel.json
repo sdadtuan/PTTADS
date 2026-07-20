@@ -1,0 +1,32 @@
+{
+  "title": "SEO GSC clicks (daily facts)",
+  "description": "Sample Grafana panel — import into dashboard, set ClickHouse datasource UID.",
+  "type": "timeseries",
+  "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+  "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${CLICKHOUSE_DS_UID}" },
+  "targets": [
+    {
+      "refId": "A",
+      "format": 1,
+      "queryType": "sql",
+      "rawSql": "SELECT\n  fact_date AS time,\n  sum(metric_value) AS clicks\nFROM ptt.seo_daily_facts\nWHERE metric_name = 'gsc_clicks'\n  AND customer_id = $customer_id\n  AND fact_date >= today() - 28\nGROUP BY fact_date\nORDER BY fact_date"
+    }
+  ],
+  "fieldConfig": {
+    "defaults": {
+      "color": { "mode": "palette-classic" },
+      "custom": {
+        "drawStyle": "line",
+        "lineWidth": 2,
+        "fillOpacity": 10,
+        "showPoints": "auto"
+      },
+      "unit": "short"
+    },
+    "overrides": []
+  },
+  "options": {
+    "legend": { "displayMode": "list", "placement": "bottom" },
+    "tooltip": { "mode": "single" }
+  }
+}
