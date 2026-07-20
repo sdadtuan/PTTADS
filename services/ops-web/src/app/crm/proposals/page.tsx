@@ -79,11 +79,11 @@ export default function CrmProposalsPage() {
       setLoading(true);
       setError('');
       try {
-        const out = await fetchCustomers(access, { limit: 200 });
-        setCustomers(out.customers ?? []);
+        const data = await fetchCustomers(access, { limit: 200 });
+        setCustomers(data);
         const prefill = searchParams.get('customer_id') ?? '';
         if (prefill) setCustomerId(prefill);
-        else if (out.customers?.[0]) setCustomerId(String(out.customers[0].id));
+        else if (data[0]) setCustomerId(String(data[0].id));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Tải khách hàng thất bại');
       } finally {
