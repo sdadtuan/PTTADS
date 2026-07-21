@@ -356,8 +356,8 @@ export class AgencyRepository implements OnModuleDestroy {
     values.push(params.limit);
 
     const result = await this.db.query(
-      `SELECT hcm.hub_campaign_id, hcm.channel, hcm.external_campaign_id, hcm.external_campaign_name,
-              hcm.target_cpl_vnd, hcm.active, hcm.updated_at,
+      `SELECT hcm.id::text AS map_id, hcm.hub_campaign_id, hcm.channel, hcm.external_campaign_id,
+              hcm.external_campaign_name, hcm.target_cpl_vnd, hcm.active, hcm.updated_at,
               hcm.client_id::text, c.code AS client_code, c.name AS client_name
        FROM hub_campaign_map hcm
        JOIN clients c ON c.id = hcm.client_id
@@ -371,6 +371,7 @@ export class AgencyRepository implements OnModuleDestroy {
       const hubId =
         row.hub_campaign_id != null ? Math.trunc(Number(row.hub_campaign_id)) : null;
       return {
+        map_id: String(row.map_id),
         hub_campaign_id: hubId,
         channel: row.channel ?? 'meta',
         external_campaign_id: row.external_campaign_id ?? null,
@@ -385,6 +386,218 @@ export class AgencyRepository implements OnModuleDestroy {
         client_name: row.client_name ?? null,
       };
     });
+  }
+
+  async updateClient(
+    clientId: string,
+    fields: {
+      name?: string;
+      industry_slug?: string;
+      owner_am_id?: string;
+      notes?: string;
+      status?: string;
+    },
+  ): Promise<AgencyClientRow | null> {
+    const allowed: Record<string, string | null | undefined> = {
+      name: fields.name?.trim(),
+      industry_slug: fields.industry_slug?.trim(),
+      owner_am_id: fields.owner_am_id?.trim(),
+      notes: fields.notes?.trim(),
+      status: fields.status?.trim(),
+    };
+    const sets: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+    for (const [key, val] of Object.entries(allowed)) {
+      if (val === undefined) continue;
+      sets.push(`${key} = $${idx++}`);
+      values.push(val || null);
+    }
+    if (!sets.length) {
+      const existing = await this.fetchClient(clientId);
+      return existing;
+    }
+    sets.push('updated_at = NOW()');
+    values.push(clientId);
+    const result = await this.db.query(
+      `UPDATE clients SET ${sets.join(', ')} WHERE id = $${idx}::uuid
+       RETURNING id::text, code, name, industry_slug, status, owner_am_id, notes, created_at, updated_at`,
+      values,
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      id: String(row.id),
+      code: row.code ?? '',
+      name: row.name ?? '',
+      industry_slug: row.industry_slug ?? null,
+      status: row.status ?? '',
+      owner_am_id: row.owner_am_id ?? null,
+      notes: row.notes ?? null,
+      created_at: iso(row.created_at),
+      updated_at: iso(row.updated_at),
+      channels: '',
+    };
+  }
+
+  async listOnboardingItems(clientId: string): Promise<
+    Array<{
+      id: string;
+      item_key: string;
+      label: string;
+      sort_order: number;
+      completed: boolean;
+      completed_at: string | null;
+      completed_by: string | null;
+      note: string | null;
+    }>
+  > {
+    const result = await this.db.query(
+      `SELECT id::text, item_key, label, sort_order, completed, completed_at, completed_by, note
+       FROM client_onboarding_items
+       WHERE client_id = $1::uuid
+       ORDER BY sort_order ASC, item_key ASC`,
+      [clientId],
+    );
+    return result.rows.map((row) => ({
+      id: String(row.id),
+      item_key: row.item_key ?? '',
+      label: row.label ?? '',
+      sort_order: Number(row.sort_order ?? 0),
+      completed: Boolean(row.completed),
+      completed_at: iso(row.completed_at),
+      completed_by: row.completed_by ?? null,
+      note: row.note ?? null,
+    }));
+  }
+
+  async setOnboardingItem(
+    clientId: string,
+    itemKey: string,
+    params: { completed: boolean; completed_by?: string; note?: string },
+  ): Promise<boolean> {
+    const result = await this.db.query(
+      `UPDATE client_onboarding_items
+       SET completed = $3,
+           completed_at = CASE WHEN $3 THEN NOW() ELSE NULL END,
+           completed_by = CASE WHEN $3 THEN $4 ELSE NULL END,
+           note = COALESCE(NULLIF($5, ''), note)
+       WHERE client_id = $1::uuid AND item_key = $2
+       RETURNING id`,
+      [
+        clientId,
+        itemKey,
+        params.completed,
+        params.completed_by?.trim() || null,
+        params.note?.trim() ?? '',
+      ],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async addChannelAccount(
+    clientId: string,
+    params: { channel: string; external_account_id: string; display_name?: string },
+  ): Promise<AgencyChannelAccount> {
+    const channel = params.channel.trim().toLowerCase();
+    let ext = params.external_account_id.trim();
+    if (channel === 'meta') {
+      ext = ext.replace(/\D/g, '') || ext;
+    }
+    const result = await this.db.query(
+      `INSERT INTO client_channel_accounts (
+         client_id, channel, external_account_id, display_name, status
+       ) VALUES ($1::uuid, $2, $3, $4, 'active')
+       ON CONFLICT (client_id, channel, external_account_id)
+       DO UPDATE SET
+         display_name = COALESCE(NULLIF(EXCLUDED.display_name, ''), client_channel_accounts.display_name),
+         status = 'active',
+         updated_at = NOW()
+       RETURNING id::text, channel, external_account_id, display_name, status`,
+      [clientId, channel, ext, params.display_name?.trim() || null],
+    );
+    const row = result.rows[0];
+    return {
+      id: String(row.id),
+      channel: row.channel ?? '',
+      external_account_id: row.external_account_id ?? null,
+      display_name: row.display_name ?? null,
+      status: row.status ?? null,
+    };
+  }
+
+  async replayJob(jobId: string): Promise<{ id: string; status: string; replayed: boolean } | null> {
+    const result = await this.db.query(
+      `UPDATE job_queue
+       SET status = 'pending', scheduled_at = NOW(), started_at = NULL,
+           finished_at = NULL, last_error = NULL, updated_at = NOW()
+       WHERE id = $1::uuid AND status = 'dead'
+       RETURNING id::text, status`,
+      [jobId],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return { id: String(row.id), status: String(row.status), replayed: true };
+  }
+
+  async markNotificationRead(notificationId: string, recipientId: string): Promise<boolean> {
+    const result = await this.db.query(
+      `UPDATE notification_inbox SET read_at = NOW()
+       WHERE id = $1::uuid AND recipient_id = $2 AND read_at IS NULL`,
+      [notificationId, recipientId],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async markAllNotificationsRead(recipientId: string): Promise<number> {
+    const result = await this.db.query(
+      `UPDATE notification_inbox SET read_at = NOW()
+       WHERE recipient_id = $1 AND read_at IS NULL`,
+      [recipientId],
+    );
+    return result.rowCount ?? 0;
+  }
+
+  async listKpiDefinitions(): Promise<
+    Array<{
+      code: string;
+      name: string;
+      formula: string;
+      granularity: string | null;
+      description: string | null;
+    }>
+  > {
+    const result = await this.db.query(
+      `SELECT code, name, formula, granularity, description
+       FROM kpi_definitions ORDER BY code`,
+    );
+    return result.rows.map((row) => ({
+      code: row.code ?? '',
+      name: row.name ?? '',
+      formula: row.formula ?? '',
+      granularity: row.granularity ?? null,
+      description: row.description ?? null,
+    }));
+  }
+
+  async updateHubCampaignMap(params: {
+    clientId: string;
+    hubCampaignId: number;
+    externalCampaignId: string;
+  }): Promise<{ map_id: string; external_campaign_id: string } | null> {
+    const result = await this.db.query(
+      `UPDATE hub_campaign_map
+       SET external_campaign_id = $3, updated_at = NOW()
+       WHERE client_id = $1::uuid AND hub_campaign_id = $2
+       RETURNING id::text, external_campaign_id`,
+      [params.clientId, params.hubCampaignId, params.externalCampaignId],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      map_id: String(row.id),
+      external_campaign_id: String(row.external_campaign_id),
+    };
   }
 
   async facebookHubSummary(params: {

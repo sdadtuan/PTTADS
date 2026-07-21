@@ -1685,6 +1685,13 @@ export interface AgencyClient {
   status: string;
   owner_am_id: string | null;
   channels?: string;
+  channel_accounts?: Array<{
+    id: string;
+    channel: string;
+    external_account_id: string | null;
+    display_name: string | null;
+    status: string | null;
+  }>;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -1735,6 +1742,7 @@ export interface FacebookHubResponse {
 }
 
 export interface HubMapRow {
+  map_id?: string;
   hub_campaign_id: number | null;
   channel: string;
   external_campaign_id: string | null;
@@ -1750,6 +1758,26 @@ async function agencyFetch<T>(token: string, path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: authHeaders(token),
     cache: 'no-store',
+  });
+  const body = await parseJson<T & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Agency API failed', res.status);
+  }
+  return body;
+}
+
+async function agencyMutate<T>(
+  token: string,
+  path: string,
+  init: RequestInit,
+): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      ...authHeaders(token),
+      'Content-Type': 'application/json',
+      ...(init.headers ?? {}),
+    },
   });
   const body = await parseJson<T & { error?: string; message?: string }>(res);
   if (!res.ok) {
@@ -1852,19 +1880,116 @@ export async function createAgencyClient(
   token: string,
   body: CreateClientBody,
 ): Promise<AgencyClient> {
-  const res = await fetch(`${API_BASE}/api/v1/clients`, {
-    method: 'POST',
-    headers: {
-      ...authHeaders(token),
-      'Content-Type': 'application/json',
-    },
+  return agencyMutate(token, '/api/v1/clients', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export interface OnboardingItem {
+  id: string;
+  item_key: string;
+  label: string;
+  sort_order: number;
+  completed: boolean;
+  completed_at: string | null;
+  completed_by: string | null;
+  note: string | null;
+}
+
+export interface OnboardingResponse {
+  items: OnboardingItem[];
+  progress: { total: number; completed: number; percent: number };
+}
+
+export async function fetchClientOnboarding(
+  token: string,
+  clientId: string,
+): Promise<OnboardingResponse> {
+  return agencyFetch(token, `/api/v1/clients/${clientId}/onboarding`);
+}
+
+export async function patchClientOnboardingItem(
+  token: string,
+  clientId: string,
+  itemKey: string,
+  body: { completed: boolean; completed_by?: string; note?: string },
+): Promise<OnboardingResponse> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/onboarding/${encodeURIComponent(itemKey)}`, {
+    method: 'PATCH',
     body: JSON.stringify(body),
   });
-  const out = await parseJson<AgencyClient & { error?: string }>(res);
-  if (!res.ok) {
-    throw new ApiError(out.error ?? 'Create client failed', res.status);
-  }
-  return out;
+}
+
+export async function activateAgencyClient(
+  token: string,
+  clientId: string,
+  force = false,
+): Promise<AgencyClient> {
+  const qs = force ? '?force=1' : '';
+  return agencyMutate(token, `/api/v1/clients/${clientId}/activate${qs}`, { method: 'POST', body: '{}' });
+}
+
+export async function addClientChannelAccount(
+  token: string,
+  clientId: string,
+  body: { channel: string; external_account_id: string; display_name?: string },
+): Promise<AgencyClient> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/channel-accounts`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function replayAgencyJob(
+  token: string,
+  jobId: string,
+): Promise<{ id: string; status: string; replayed: boolean }> {
+  return agencyMutate(token, `/api/v1/jobs/${jobId}/replay`, { method: 'POST', body: '{}' });
+}
+
+export async function markAgencyNotificationRead(
+  token: string,
+  notificationId: string,
+  recipientId = 'ops',
+): Promise<{ ok: boolean }> {
+  const qs = recipientId ? `?recipient_id=${encodeURIComponent(recipientId)}` : '';
+  return agencyMutate(token, `/api/v1/notifications/${notificationId}/read${qs}`, {
+    method: 'PATCH',
+    body: '{}',
+  });
+}
+
+export async function markAllAgencyNotificationsRead(
+  token: string,
+  recipientId = 'ops',
+): Promise<{ marked: number }> {
+  const qs = recipientId ? `?recipient_id=${encodeURIComponent(recipientId)}` : '';
+  return agencyMutate(token, `/api/v1/notifications/mark-all-read${qs}`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export interface KpiDefinition {
+  code: string;
+  name: string;
+  formula: string;
+  granularity: string | null;
+  description: string | null;
+}
+
+export async function fetchKpiDefinitions(
+  token: string,
+): Promise<{ definitions: KpiDefinition[] }> {
+  return agencyFetch(token, '/api/v1/kpi-definitions');
+}
+
+export async function patchHubCampaignMap(
+  token: string,
+  body: { client_id: string; hub_campaign_id: number; external_campaign_id: string },
+): Promise<{ ok: boolean; map_id: string; external_campaign_id: string }> {
+  return agencyMutate(token, '/api/v1/crm/hub-campaign-maps', {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
 }
 
 export interface SeoHubClientRow {

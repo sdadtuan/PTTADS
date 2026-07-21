@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
-import { fetchHubCampaignMaps, staffMe, staffRefresh } from '@/lib/api';
+import { fetchHubCampaignMaps, patchHubCampaignMap, staffMe, staffRefresh } from '@/lib/api';
 import type { HubMapRow } from '@/lib/api';
 import {
   clearSession,
@@ -17,6 +17,10 @@ import {
   type StoredStaffUser,
 } from '@/lib/auth';
 
+function normalizeMetaId(raw: string): string {
+  return raw.replace(/\D/g, '').trim();
+}
+
 export function CrmHubContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -24,8 +28,13 @@ export function CrmHubContent() {
 
   const [user, setUser] = useState<StoredStaffUser | null>(null);
   const [maps, setMaps] = useState<HubMapRow[]>([]);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
+  const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(true);
+  const [savingKey, setSavingKey] = useState('');
+
+  const canWrite = hasCap(user, 'crm_agency', 'create');
 
   const ensureAuth = useCallback(async (): Promise<string | null> => {
     let access = getAccessToken();
@@ -57,23 +66,63 @@ export function CrmHubContent() {
     }
   }, [router]);
 
+  const reload = useCallback(
+    async (access: string) => {
+      const out = await fetchHubCampaignMaps(access, {
+        campaign_id: campaignFilter || undefined,
+      });
+      setMaps(out.maps);
+      const nextDrafts: Record<string, string> = {};
+      for (const m of out.maps) {
+        const key = `${m.client_id}-${m.hub_campaign_id}`;
+        nextDrafts[key] = m.external_campaign_id ?? '';
+      }
+      setDrafts(nextDrafts);
+    },
+    [campaignFilter],
+  );
+
   useEffect(() => {
     void (async () => {
       const access = await ensureAuth();
       if (!access) return;
       setLoading(true);
       try {
-        const out = await fetchHubCampaignMaps(access, {
-          campaign_id: campaignFilter || undefined,
-        });
-        setMaps(out.maps);
+        await reload(access);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Tải hub map thất bại');
       } finally {
         setLoading(false);
       }
     })();
-  }, [ensureAuth, campaignFilter]);
+  }, [ensureAuth, reload]);
+
+  async function saveMap(row: HubMapRow) {
+    const access = getAccessToken();
+    if (!access || !canWrite || !row.client_id || row.hub_campaign_id == null) return;
+    const key = `${row.client_id}-${row.hub_campaign_id}`;
+    const externalId = normalizeMetaId(drafts[key] ?? '');
+    if (!/^[0-9]{5,20}$/.test(externalId)) {
+      setError('Meta Campaign ID phải là số 5–20 chữ số');
+      return;
+    }
+    setSavingKey(key);
+    setError('');
+    setMsg('');
+    try {
+      await patchHubCampaignMap(access, {
+        client_id: row.client_id,
+        hub_campaign_id: row.hub_campaign_id,
+        external_campaign_id: externalId,
+      });
+      setMsg('Đã lưu Meta Campaign ID');
+      await reload(access);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lưu map thất bại');
+    } finally {
+      setSavingKey('');
+    }
+  }
 
   function logout() {
     clearSession();
@@ -93,10 +142,11 @@ export function CrmHubContent() {
       <OpsNav user={user} onLogout={logout} />
       <div className="card">
         <p className="muted" style={{ marginTop: 0 }}>
-          Hub campaign map (PG) · Phase 2
+          Hub campaign map (PG) · chỉnh Meta Campaign ID inline
           {campaignFilter ? ` · filter campaign_id=${campaignFilter}` : ''}
         </p>
         {error ? <p className="error">{error}</p> : null}
+        {msg ? <p className="muted">{msg}</p> : null}
 
         <div style={{ overflowX: 'auto' }}>
           <table className="perf-table">
@@ -104,36 +154,69 @@ export function CrmHubContent() {
               <tr>
                 <th>Client</th>
                 <th>Hub ID</th>
-                <th>Meta campaign</th>
+                <th>Campaign name</th>
+                <th>Meta Campaign ID</th>
                 <th>Target CPL</th>
-                <th>Active</th>
+                <th>Mapped</th>
+                <th />
               </tr>
             </thead>
             <tbody>
-              {maps.map((m, i) => (
-                <tr key={`${m.client_id}-${m.external_campaign_id}-${i}`}>
-                  <td>
-                    {m.client_id ? (
-                      <Link href={`/agency/clients/${m.client_id}`} className="nav-link">
-                        {m.client_code || m.client_name || m.client_id.slice(0, 8)}
-                      </Link>
-                    ) : (
-                      '—'
-                    )}
-                  </td>
-                  <td>{m.hub_campaign_id ?? '—'}</td>
-                  <td>{m.external_campaign_name || m.external_campaign_id || '—'}</td>
-                  <td>
-                    {m.target_cpl_vnd != null
-                      ? Math.round(m.target_cpl_vnd).toLocaleString('vi-VN') + ' ₫'
-                      : '—'}
-                  </td>
-                  <td>{m.active ? '✓' : '—'}</td>
-                </tr>
-              ))}
+              {maps.map((m, i) => {
+                const key = `${m.client_id}-${m.hub_campaign_id}`;
+                const mapped = Boolean(m.external_campaign_id);
+                return (
+                  <tr key={`${m.client_id}-${m.external_campaign_id}-${i}`}>
+                    <td>
+                      {m.client_id ? (
+                        <Link href={`/agency/clients/${m.client_id}`} className="nav-link">
+                          {m.client_code || m.client_name || m.client_id.slice(0, 8)}
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td>{m.hub_campaign_id ?? '—'}</td>
+                    <td>{m.external_campaign_name || '—'}</td>
+                    <td>
+                      {canWrite && m.client_id && m.hub_campaign_id != null ? (
+                        <input
+                          className="hub-meta-campaign-id"
+                          value={drafts[key] ?? ''}
+                          onChange={(e) =>
+                            setDrafts((d) => ({ ...d, [key]: e.target.value }))
+                          }
+                          placeholder="120210334455667"
+                          style={{ width: '100%', minWidth: 160, padding: '0.35rem 0.5rem' }}
+                        />
+                      ) : (
+                        m.external_campaign_id || '—'
+                      )}
+                    </td>
+                    <td>
+                      {m.target_cpl_vnd != null
+                        ? Math.round(m.target_cpl_vnd).toLocaleString('vi-VN') + ' ₫'
+                        : '—'}
+                    </td>
+                    <td>{mapped ? '✓' : '—'}</td>
+                    <td>
+                      {canWrite && m.client_id && m.hub_campaign_id != null ? (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          disabled={savingKey === key}
+                          onClick={() => void saveMap(m)}
+                        >
+                          Lưu
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
               {!loading && maps.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="muted">
+                  <td colSpan={7} className="muted">
                     Chưa có map — chạy ./scripts/sync_hub_campaign_map.sh
                   </td>
                 </tr>

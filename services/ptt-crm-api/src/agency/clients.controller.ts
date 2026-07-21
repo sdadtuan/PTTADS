@@ -6,6 +6,7 @@ import {
   HttpException,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -19,6 +20,9 @@ import {
   AgencyClientsListResponse,
   CreateClientBody,
   HubCampaignMapsResponse,
+  OnboardingResponse,
+  UpdateClientBody,
+  AddChannelAccountBody,
 } from './agency.types';
 import { StaffAgencyViewGuard } from './guards/staff-agency-view.guard';
 import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
@@ -86,5 +90,49 @@ export class ClientsController {
       }
       throw new HttpException({ error: String(err) }, HttpStatus.SERVICE_UNAVAILABLE);
     }
+  }
+
+  @Patch(':id')
+  @UseGuards(StaffAgencyWriteGuard)
+  async patchClient(
+    @Param('id') id: string,
+    @Body() body: UpdateClientBody,
+  ): Promise<AgencyClientDetail> {
+    return this.agency.updateClient(id, body);
+  }
+
+  @Post(':id/activate')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(StaffAgencyWriteGuard)
+  async activateClient(
+    @Param('id') id: string,
+    @Query('force') force?: string,
+  ): Promise<AgencyClientDetail> {
+    return this.agency.activateClient(id, force === '1' || force === 'true');
+  }
+
+  @Get(':id/onboarding')
+  async getOnboarding(@Param('id') id: string): Promise<OnboardingResponse> {
+    return this.agency.getOnboarding(id);
+  }
+
+  @Patch(':id/onboarding/:itemKey')
+  @UseGuards(StaffAgencyWriteGuard)
+  async patchOnboardingItem(
+    @Param('id') id: string,
+    @Param('itemKey') itemKey: string,
+    @Body() body: { completed: boolean; completed_by?: string; note?: string },
+  ): Promise<OnboardingResponse> {
+    return this.agency.patchOnboardingItem(id, itemKey, body);
+  }
+
+  @Post(':id/channel-accounts')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(StaffAgencyWriteGuard)
+  async addChannelAccount(
+    @Param('id') id: string,
+    @Body() body: AddChannelAccountBody,
+  ): Promise<AgencyClientDetail> {
+    return this.agency.addChannelAccount(id, body);
   }
 }

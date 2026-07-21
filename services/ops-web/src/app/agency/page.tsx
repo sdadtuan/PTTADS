@@ -4,7 +4,13 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
-import { fetchAgencyClients, fetchAgencyStats, staffMe, staffRefresh } from '@/lib/api';
+import {
+  fetchAgencyClients,
+  fetchAgencyNotifications,
+  fetchAgencyStats,
+  staffMe,
+  staffRefresh,
+} from '@/lib/api';
 import type { AgencyClient } from '@/lib/api';
 import {
   clearSession,
@@ -23,6 +29,7 @@ export default function AgencyPage() {
   const [token, setToken] = useState('');
   const [clients, setClients] = useState<AgencyClient[]>([]);
   const [stats, setStats] = useState<{ pg_ready: boolean; clients: Record<string, number>; jobs: Record<string, number> } | null>(null);
+  const [unread, setUnread] = useState(0);
   const [q, setQ] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -69,12 +76,14 @@ export default function AgencyPage() {
       setLoading(true);
       setError('');
       try {
-        const [st, list] = await Promise.all([
+        const [st, list, notif] = await Promise.all([
           fetchAgencyStats(access),
           fetchAgencyClients(access, { q: q.trim() || undefined }),
+          fetchAgencyNotifications(access).catch(() => ({ notifications: [], unread: 0 })),
         ]);
         setStats(st);
         setClients(list.clients);
+        setUnread(notif.unread);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Tải agency thất bại');
       } finally {
@@ -98,23 +107,60 @@ export default function AgencyPage() {
 
   const clientTotal = Object.values(stats?.clients ?? {}).reduce((a, b) => a + b, 0);
   const pendingJobs = stats?.jobs?.pending ?? 0;
+  const deadJobs = stats?.jobs?.dead ?? 0;
+  const onboardingCount = stats?.clients?.onboarding ?? 0;
+  const activeCount = stats?.clients?.active ?? 0;
 
   return (
     <main style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem' }}>
-      <OpsNav user={user} onLogout={logout} />
+      <OpsNav user={user} onLogout={logout} agencyUnread={unread} />
+      {deadJobs > 0 ? (
+        <div className="agency-dlq-banner" role="alert">
+          <strong>DLQ:</strong> {deadJobs} job dead —{' '}
+          <Link href="/agency/jobs?status=dead" className="nav-link">
+            xem ingest pipeline
+          </Link>
+        </div>
+      ) : null}
+
       <div className="card" style={{ marginBottom: '1rem' }}>
         <p className="muted" style={{ marginTop: 0 }}>
-          Phase 2 — Agency ops trên ops-web · PG primary · Nest API
+          Agency ops · PG primary · Nest API
         </p>
-        <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
-          <div>
+        <div className="agency-stat-grid">
+          <div className="agency-stat-card">
             <strong>{stats?.pg_ready ? clientTotal : '—'}</strong>
-            <span className="muted"> clients</span>
+            <span className="muted">Clients</span>
           </div>
-          <div>
+          <div className="agency-stat-card">
+            <strong>{activeCount}</strong>
+            <span className="muted">Active</span>
+          </div>
+          <div className="agency-stat-card">
+            <strong>{onboardingCount}</strong>
+            <span className="muted">Onboarding</span>
+          </div>
+          <div className="agency-stat-card">
             <strong>{pendingJobs}</strong>
-            <span className="muted"> jobs pending</span>
+            <span className="muted">Jobs pending</span>
           </div>
+        </div>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+          <Link href="/agency/clients/new" className="btn btn-sm">
+            + Client
+          </Link>
+          <Link href="/agency/ingest" className="btn btn-secondary btn-sm">
+            Ingest
+          </Link>
+          <Link href="/agency/notifications" className="btn btn-secondary btn-sm">
+            Thông báo{unread > 0 ? ` (${unread})` : ''}
+          </Link>
+          <Link href="/agency/kpi-definitions" className="btn btn-secondary btn-sm">
+            KPI definitions
+          </Link>
+          <Link href="/crm/hub" className="btn btn-secondary btn-sm">
+            Hub map
+          </Link>
         </div>
       </div>
 
@@ -126,12 +172,6 @@ export default function AgencyPage() {
           }}
           style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}
         >
-          <Link href="/agency/clients/new" className="btn btn-sm">
-            + Client
-          </Link>
-          <Link href="/agency/jobs" className="btn btn-secondary btn-sm">
-            Jobs
-          </Link>
           <input
             type="search"
             placeholder="Tìm code, tên client…"
@@ -173,14 +213,18 @@ export default function AgencyPage() {
                     </Link>
                   </td>
                   <td>{c.name}</td>
-                  <td>{c.status}</td>
+                  <td>
+                    <span className={`agency-status-badge badge-${c.status === 'active' ? 'active' : c.status === 'onboarding' ? 'onboarding' : 'prospect'}`}>
+                      {c.status}
+                    </span>
+                  </td>
                   <td>{c.channels || '—'}</td>
                   <td>{c.owner_am_id || '—'}</td>
                 </tr>
               ))}
               {!loading && clients.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="muted">
+                  <td colSpan={5} className="muted agency-empty">
                     Không có client
                   </td>
                 </tr>

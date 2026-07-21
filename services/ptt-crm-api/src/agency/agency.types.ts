@@ -61,9 +61,60 @@ export interface HubCampaignMapsResponse {
 }
 
 export interface HubCampaignGlobalRow extends HubCampaignMapRow {
+  map_id: string;
   client_id: string;
   client_code: string | null;
   client_name: string | null;
+}
+
+export interface OnboardingItemRow {
+  id: string;
+  item_key: string;
+  label: string;
+  sort_order: number;
+  completed: boolean;
+  completed_at: string | null;
+  completed_by: string | null;
+  note: string | null;
+}
+
+export interface OnboardingProgress {
+  total: number;
+  completed: number;
+  percent: number;
+}
+
+export interface OnboardingResponse {
+  items: OnboardingItemRow[];
+  progress: OnboardingProgress;
+}
+
+export interface KpiDefinitionRow {
+  code: string;
+  name: string;
+  formula: string;
+  granularity: string | null;
+  description: string | null;
+}
+
+export interface UpdateClientBody {
+  name?: string;
+  industry_slug?: string;
+  owner_am_id?: string;
+  notes?: string;
+  status?: string;
+}
+
+export interface AddChannelAccountBody {
+  channel: string;
+  external_account_id: string;
+  display_name?: string;
+}
+
+export interface PatchHubCampaignMapBody {
+  client_id: string;
+  hub_campaign_id: number;
+  external_campaign_id: string;
 }
 
 export interface JobRow {

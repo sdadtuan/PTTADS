@@ -10,6 +10,7 @@ interface OpsNavProps {
   user: StoredStaffUser | null;
   onLogout: () => void;
   emailPendingApprovals?: number;
+  agencyUnread?: number;
 }
 
 type NavLink = { href: string; label: string };
@@ -36,6 +37,10 @@ const PAGE_TITLES: Record<string, string> = {
   '/crm/owner-weekly': 'Báo cáo tuần chủ DN',
   '/crm/financials': 'Tài chính',
   '/agency': 'Agency',
+  '/agency/ingest': 'Pipeline ingest',
+  '/agency/jobs': 'Pipeline ingest',
+  '/agency/notifications': 'Thông báo Agency',
+  '/agency/kpi-definitions': 'Định nghĩa KPI',
   '/meta/facebook-ads': 'Meta Ads',
   '/crm/hub': 'Hub · Hợp đồng',
   '/seo/hub': 'SEO/AEO Hub',
@@ -83,7 +88,11 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || (href !== '/' && pathname.startsWith(`${href}/`));
 }
 
-function buildSections(user: StoredStaffUser | null, emailPendingApprovals?: number): NavSection[] {
+function buildSections(
+  user: StoredStaffUser | null,
+  emailPendingApprovals?: number,
+  agencyUnread?: number,
+): NavSection[] {
   const sections: NavSection[] = [];
 
   const overview: NavLink[] = [{ href: '/', label: 'Bảng điều khiển' }];
@@ -157,6 +166,12 @@ function buildSections(user: StoredStaffUser | null, emailPendingApprovals?: num
   const agency: NavLink[] = [];
   if (hasCap(user, 'crm_agency', 'view')) {
     agency.push({ href: '/agency', label: 'Agency' });
+    agency.push({ href: '/agency/ingest', label: 'Ingest' });
+    agency.push({
+      href: '/agency/notifications',
+      label: `Thông báo${navBadge(agencyUnread)}`,
+    });
+    agency.push({ href: '/agency/kpi-definitions', label: 'KPI definitions' });
   }
   if (hasCap(user, 'crm_facebook_ads', 'view') || hasCap(user, 'crm_agency', 'view')) {
     agency.push({ href: '/meta/facebook-ads', label: 'Meta Ads' });
@@ -207,9 +222,9 @@ function buildSections(user: StoredStaffUser | null, emailPendingApprovals?: num
   return sections;
 }
 
-export function OpsNav({ user, onLogout, emailPendingApprovals }: OpsNavProps) {
+export function OpsNav({ user, onLogout, emailPendingApprovals, agencyUnread }: OpsNavProps) {
   const pathname = usePathname();
-  const sections = buildSections(user, emailPendingApprovals);
+  const sections = buildSections(user, emailPendingApprovals, agencyUnread);
   const pageTitle = pageTitleFor(pathname);
 
   return (
