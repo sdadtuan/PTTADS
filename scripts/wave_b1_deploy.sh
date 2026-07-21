@@ -6,7 +6,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-OPS_API_URL="${NEXT_PUBLIC_PTT_API_URL:-https://ops.pttads.vn}"
+OPS_API_URL="${NEXT_PUBLIC_PTT_API_URL:-https://rs.pttads.vn}"
 
 echo "== Wave B1 deploy =="
 echo "ROOT=$ROOT"
@@ -51,4 +51,4 @@ fi
 
 echo ""
 echo "Next: ./scripts/wave_b1_smoke.sh"
-echo "UI:  https://ops.pttads.vn/agency (or rs.pttads.vn redirect)"
+echo "UI:  https://rs.pttads.vn/agency"

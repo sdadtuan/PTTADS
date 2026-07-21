@@ -10,6 +10,14 @@
 | `PTT_LEADS_WRITE_ENABLED=1` | Trong `/var/www/ptt/.env` (lead write — P0) |
 | Staff login | `admin@pttads.vn` + `ADMIN_PASSWORD` trong `.env` |
 | Cap ghi Agency | `crm_agency` → `create` (seed super admin) |
+| Domain staff | **`https://rs.pttads.vn`** — ops-web + `/api/` cùng host (nginx `deploy/nginx-rs-flask-retired.conf`) |
+
+Trong `/var/www/ptt/.env` (nếu chưa có):
+
+```bash
+PTT_OPS_CORS_ORIGINS=https://rs.pttads.vn
+PTT_OPS_WEB_URL=https://rs.pttads.vn
+```
 
 ## 1. Đưa code lên VPS
 
@@ -33,6 +41,8 @@ Nếu chưa push được — `scp` thư mục `services/ptt-crm-api/src/agency`
 
 ```bash
 cd /var/www/ptt
+git pull origin main
+export NEXT_PUBLIC_PTT_API_URL=https://rs.pttads.vn
 ./scripts/wave_b1_deploy.sh
 ```
 
@@ -52,7 +62,9 @@ set -a && source .env && set +a
 
 ## 4. UI test checklist (staff browser)
 
-Đăng nhập https://ops.pttads.vn/login (hoặc rs.pttads.vn redirect).
+Đăng nhập **https://rs.pttads.vn/login** (staff console chính thức).
+
+> `ops.pttads.vn` chỉ redirect 301 → `rs.pttads.vn` — không dùng làm URL chính.
 
 | # | URL | Kiểm tra |
 |---|-----|----------|
@@ -72,7 +84,7 @@ Redirect Spec: `/crm/agency/*` → `/agency/*`.
 |-------------|--------|
 | 403 missing_cap | Chạy `python3 scripts/seed_super_admin_full_access.py --sqlite /var/www/ptt/ptt.db --username admin --email admin@pttads.vn --apply-pg` |
 | 503 pg_not_ready | Kiểm tra `DATABASE_URL`, `curl http://127.0.0.1:3000/health` |
-| UI cũ, API mới | Hard refresh; rebuild ops-web với `NEXT_PUBLIC_PTT_API_URL=https://ops.pttads.vn` |
+| UI cũ, API mới | Hard refresh; rebuild ops-web: `NEXT_PUBLIC_PTT_API_URL=https://rs.pttads.vn ./scripts/wave_b1_deploy.sh` |
 | Replay 400 | Chỉ job `status=dead` |
 
 Logs:
