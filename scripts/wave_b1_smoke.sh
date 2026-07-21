@@ -18,6 +18,20 @@ fail=0
 ok() { echo "OK  $*"; }
 bad() { echo "FAIL $*"; fail=1; }
 
+http_get() {
+  local path="$1"
+  local label="$2"
+  local code body
+  body="$(mktemp)"
+  code="$(curl -s -o "$body" -w "%{http_code}" "$BASE$path" "${AUTH[@]}")"
+  if [[ "$code" =~ ^2 ]]; then
+    ok "$label (HTTP $code)"
+  else
+    bad "$label (HTTP $code) $(head -c 200 "$body" | tr '\n' ' ')"
+  fi
+  rm -f "$body"
+}
+
 echo "== Wave B1 smoke BASE=$BASE =="
 
 TOKEN="$(
@@ -38,10 +52,10 @@ health="$(curl -sf "$BASE/health" || true)"
 echo "$health" | grep -q '"ok"' && ok "health" || bad "health"
 
 curl -sf "$BASE/api/v1/agency/stats" "${AUTH[@]}" >/dev/null && ok "GET agency/stats" || bad "GET agency/stats"
-curl -sf "$BASE/api/v1/kpi-definitions" "${AUTH[@]}" >/dev/null && ok "GET kpi-definitions" || bad "GET kpi-definitions"
-curl -sf "$BASE/api/v1/notifications?limit=5" "${AUTH[@]}" >/dev/null && ok "GET notifications" || bad "GET notifications"
-curl -sf "$BASE/api/v1/jobs?limit=5" "${AUTH[@]}" >/dev/null && ok "GET jobs" || bad "GET jobs"
-curl -sf "$BASE/api/v1/crm/hub-campaign-maps?limit=5" "${AUTH[@]}" >/dev/null && ok "GET hub-campaign-maps" || bad "GET hub-campaign-maps"
+http_get "/api/v1/kpi-definitions" "GET kpi-definitions"
+http_get "/api/v1/notifications?limit=5" "GET notifications"
+http_get "/api/v1/jobs?limit=5" "GET jobs"
+http_get "/api/v1/crm/hub-campaign-maps?limit=5" "GET hub-campaign-maps"
 
 CLIENT_ID="$(
   curl -sf "$BASE/api/v1/clients?limit=1" "${AUTH[@]}" \
@@ -49,8 +63,7 @@ CLIENT_ID="$(
 )"
 if [[ -n "$CLIENT_ID" ]]; then
   ok "clients list (id=$CLIENT_ID)"
-  curl -sf "$BASE/api/v1/clients/$CLIENT_ID/onboarding" "${AUTH[@]}" >/dev/null \
-    && ok "GET onboarding" || bad "GET onboarding"
+  http_get "/api/v1/clients/$CLIENT_ID/onboarding" "GET onboarding"
 else
   echo "SKIP client onboarding — no clients in PG"
 fi

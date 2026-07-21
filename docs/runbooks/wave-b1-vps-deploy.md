@@ -37,7 +37,18 @@ chmod +x scripts/wave_b1_deploy.sh scripts/wave_b1_smoke.sh
 
 Nếu chưa push được — `scp` thư mục `services/ptt-crm-api/src/agency`, `services/ops-web/src/app/agency`, `scripts/wave_b1_*.sh`.
 
-## 2. Build & restart
+## 2. PG bootstrap (nếu smoke FAIL kpi-definitions / onboarding)
+
+```bash
+cd /var/www/ptt
+set -a && source .env && set +a
+chmod +x scripts/wave_b1_pg_bootstrap.sh
+./scripts/wave_b1_pg_bootstrap.sh
+```
+
+Script apply idempotent **DDL v1** (`client_onboarding_items`, `seed_client_onboarding()`) + **KPI seed**.
+
+## 3. Build & restart
 
 ```bash
 cd /var/www/ptt
@@ -52,7 +63,7 @@ Nếu không có quyền `systemctl restart`:
 sudo systemctl restart ptt-crm-api ptt-ops-web
 ```
 
-## 3. API smoke (localhost)
+## 4. API smoke (localhost)
 
 ```bash
 cd /var/www/ptt
@@ -60,7 +71,7 @@ set -a && source .env && set +a
 ./scripts/wave_b1_smoke.sh
 ```
 
-## 4. UI test checklist (staff browser)
+## 5. UI test checklist (staff browser)
 
 Đăng nhập **https://rs.pttads.vn/login** (staff console chính thức).
 
@@ -78,10 +89,11 @@ set -a && source .env && set +a
 
 Redirect Spec: `/crm/agency/*` → `/agency/*`.
 
-## 5. Troubleshooting
+## 6. Troubleshooting
 
 | Triệu chứng | Xử lý |
 |-------------|--------|
+| FAIL kpi-definitions / onboarding | Chạy `./scripts/wave_b1_pg_bootstrap.sh` |
 | 403 missing_cap | Chạy `python3 scripts/seed_super_admin_full_access.py --sqlite /var/www/ptt/ptt.db --username admin --email admin@pttads.vn --apply-pg` |
 | 503 pg_not_ready | Kiểm tra `DATABASE_URL`, `curl http://127.0.0.1:3000/health` |
 | UI cũ, API mới | Hard refresh; rebuild ops-web: `NEXT_PUBLIC_PTT_API_URL=https://rs.pttads.vn ./scripts/wave_b1_deploy.sh` |
