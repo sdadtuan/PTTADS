@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
 import { AgencyReadOnlyBadge, canAgencyWrite } from '@/components/AgencyReadOnlyBadge';
 import { fetchAgencyJobs, replayAgencyJob, staffMe, staffRefresh } from '@/lib/api';
+import { formatJobTypeCell, jobStatusLabel, jobTypeLabel } from '@/lib/job-labels';
 import type { JobRow } from '@/lib/api';
 import {
   clearSession,
@@ -77,7 +78,7 @@ export default function AgencyJobsPage() {
 
   async function handleReplay(job: JobRow) {
     if (!canWrite || job.status !== 'dead') return;
-    if (!window.confirm(`Replay job ${job.job_type} (${job.id.slice(0, 8)}…)?`)) return;
+    if (!window.confirm(`Replay job ${jobTypeLabel(job.job_type)} (${job.id.slice(0, 8)}…)?`)) return;
     const access = getAccessToken();
     if (!access) return;
     setBusyId(job.id);
@@ -136,7 +137,7 @@ export default function AgencyJobsPage() {
               className={`agency-tab${filter === st ? ' is-active' : ''}`}
               onClick={() => setFilter(st)}
             >
-              {st === '' ? 'Tất cả' : st}
+              {st === '' ? 'Tất cả' : jobStatusLabel(st)}
             </button>
           ))}
         </div>
@@ -157,11 +158,18 @@ export default function AgencyJobsPage() {
             </tr>
           </thead>
           <tbody>
-            {jobs.map((j) => (
+            {jobs.map((j) => {
+              const typeCell = formatJobTypeCell(j.job_type);
+              return (
               <tr key={j.id}>
-                <td>{j.job_type}</td>
+                <td title={typeCell.code}>
+                  {typeCell.label}
+                  <span className="muted" style={{ display: 'block', fontSize: '0.75rem' }}>{typeCell.code}</span>
+                </td>
                 <td>
-                  <span className={`job-status-pill job-status-${j.status}`}>{j.status}</span>
+                  <span className={`job-status-pill job-status-${j.status}`} title={j.status}>
+                    {jobStatusLabel(j.status)}
+                  </span>
                 </td>
                 <td>{j.client_code ?? '—'}</td>
                 <td>{j.channel ?? '—'}</td>
@@ -180,7 +188,8 @@ export default function AgencyJobsPage() {
                   ) : null}
                 </td>
               </tr>
-            ))}
+            );
+            })}
             {jobs.length === 0 ? (
               <tr>
                 <td colSpan={7} className="muted agency-empty">

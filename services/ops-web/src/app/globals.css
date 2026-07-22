@@ -90,6 +90,13 @@ input {
   box-shadow: var(--shadow-green-md);
 }
 
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: var(--shadow-green-sm);
+}
+
 .btn-secondary {
   background: var(--surface-soft);
   border: 1px solid var(--border);

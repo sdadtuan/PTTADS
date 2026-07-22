@@ -20,6 +20,7 @@ import {
   staffRefresh,
   syncClientInsights,
 } from '@/lib/api';
+import { jobTypeLabel } from '@/lib/job-labels';
 import type {
   AgencyClient,
   ClientLeadSummary,
@@ -211,7 +212,7 @@ export function AgencyClientDetailContent() {
       const fx = updated.side_effects;
       if (fx?.jobs_enqueued?.length) {
         setActionMsg(
-          `Client đã kích hoạt · ${fx.jobs_enqueued.length} job (${fx.jobs_enqueued.map((j) => j.job_type).join(', ')})`,
+          `Client đã kích hoạt · ${fx.jobs_enqueued.length} job (${fx.jobs_enqueued.map((j) => jobTypeLabel(j.job_type)).join(', ')})`,
         );
       } else {
         setActionMsg('Client đã kích hoạt');
@@ -303,7 +304,7 @@ export function AgencyClientDetailContent() {
     setError('');
     try {
       const out = await syncClientInsights(access, clientId);
-      setActionMsg(`Đã enqueue ${out.jobs_enqueued?.length ?? 0} meta_insights_sync job`);
+      setActionMsg(`Đã enqueue job: ${jobTypeLabel('meta_insights_sync')}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sync insights thất bại');
     } finally {
@@ -518,29 +519,40 @@ export function AgencyClientDetailContent() {
                     </li>
                   ))}
                 </ul>
-                <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    className="btn btn-sm"
-                    disabled={activateDisabled || busy}
-                    onClick={() => void handleActivate(false)}
-                  >
-                    Kích hoạt client
-                  </button>
-                  {canWrite && progress.percent < 100 ? (
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      disabled={busy || client.status === 'active'}
-                      onClick={() => {
-                        if (window.confirm('Bỏ qua checklist và kích hoạt (force)?')) {
-                          void handleActivate(true);
-                        }
-                      }}
-                    >
-                      Force activate
-                    </button>
-                  ) : null}
+                <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {client.status === 'active' ? (
+                    <p className="muted" style={{ margin: 0 }}>
+                      Client đã <strong>active</strong> — không cần kích hoạt lại.{' '}
+                      <Link href="/agency/jobs" className="nav-link">
+                        Xem jobs
+                      </Link>
+                    </p>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        disabled={activateDisabled || busy}
+                        onClick={() => void handleActivate(false)}
+                      >
+                        Kích hoạt client
+                      </button>
+                      {canWrite && progress.percent < 100 ? (
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          disabled={busy}
+                          onClick={() => {
+                            if (window.confirm('Bỏ qua checklist và kích hoạt (force)?')) {
+                              void handleActivate(true);
+                            }
+                          }}
+                        >
+                          Force activate
+                        </button>
+                      ) : null}
+                    </>
+                  )}
                 </div>
                 {activateDisabled && client.status !== 'active' && !canWrite ? (
                   <p className="muted">Chế độ chỉ xem — không thể sửa checklist hoặc kích hoạt.</p>
