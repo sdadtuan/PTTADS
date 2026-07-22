@@ -6,11 +6,11 @@ After=network.target ptt-crm-api.service
 Type=simple
 User=deploy
 Group=www-data
-WorkingDirectory=/var/www/ptt/services/ops-web
+WorkingDirectory=/var/www/ptt/services/ops-web/.next/standalone
 Environment=NODE_ENV=production
 Environment=PORT=3200
 EnvironmentFile=-/var/www/ptt/.env
-ExecStart=/usr/bin/node .next/standalone/server.js
+ExecStart=/usr/bin/node server.js
 Restart=always
 RestartSec=5
 

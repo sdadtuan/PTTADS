@@ -27,8 +27,10 @@ npm ci
 export NEXT_PUBLIC_PTT_API_URL="$OPS_API_URL"
 npm run build
 mkdir -p .next/standalone/.next
+rm -rf .next/standalone/.next/static
 cp -r .next/static .next/standalone/.next/static
 if [[ -d public ]]; then
+  rm -rf .next/standalone/public
   cp -r public .next/standalone/public
 fi
 

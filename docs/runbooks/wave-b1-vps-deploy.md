@@ -96,7 +96,7 @@ Redirect Spec: `/crm/agency/*` → `/agency/*`.
 | FAIL kpi-definitions / onboarding | Chạy `./scripts/wave_b1_pg_bootstrap.sh` |
 | 403 missing_cap | Chạy `python3 scripts/seed_super_admin_full_access.py --sqlite /var/www/ptt/ptt.db --username admin --email admin@pttads.vn --apply-pg` |
 | 503 pg_not_ready | Kiểm tra `DATABASE_URL`, `curl http://127.0.0.1:3000/health` |
-| UI cũ, API mới | Hard refresh; rebuild ops-web: `NEXT_PUBLIC_PTT_API_URL=https://rs.pttads.vn ./scripts/wave_b1_deploy.sh` |
+| UI trắng / không hiển thị trang | **404 trên `/_next/static/*`** — chạy `./scripts/wave_b1_rebuild_ops_web.sh` + cập nhật `ptt-ops-web.service` (WorkingDirectory=`.next/standalone`) |
 | Replay 400 | Chỉ job `status=dead` |
 
 Logs:
