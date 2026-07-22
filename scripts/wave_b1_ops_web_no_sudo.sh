@@ -62,6 +62,7 @@ fi
 
 if ! ss -tlnp 2>/dev/null | grep -q ":$PORT "; then
   echo "Start node từ $STANDALONE ..."
+  mkdir -p "$ROOT/logs"
   cd "$STANDALONE"
   export PORT NODE_ENV=production
   nohup node server.js >> "$ROOT/logs/ops-web-manual.log" 2>&1 &
