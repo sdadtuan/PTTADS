@@ -124,6 +124,12 @@ export interface AddChannelAccountBody {
   display_name?: string;
 }
 
+export interface UpdateChannelAccountBody {
+  display_name?: string;
+  external_account_id?: string;
+  status?: string;
+}
+
 export interface SetChannelTokenBody {
   access_token?: string;
   credential_ref?: string;

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpException,
@@ -23,6 +24,7 @@ import {
   OnboardingResponse,
   UpdateClientBody,
   AddChannelAccountBody,
+  UpdateChannelAccountBody,
   SetChannelTokenBody,
 } from './agency.types';
 import { StaffAgencyViewGuard } from './guards/staff-agency-view.guard';
@@ -145,6 +147,26 @@ export class ClientsController {
     @Body() body: AddChannelAccountBody,
   ): Promise<AgencyClientDetail> {
     return this.agency.addChannelAccount(id, body);
+  }
+
+  @Patch(':id/channel-accounts/:accountId')
+  @UseGuards(StaffAgencyWriteGuard)
+  async patchChannelAccount(
+    @Param('id') id: string,
+    @Param('accountId') accountId: string,
+    @Body() body: UpdateChannelAccountBody,
+  ): Promise<AgencyClientDetail> {
+    return this.agency.updateChannelAccount(id, accountId, body);
+  }
+
+  @Delete(':id/channel-accounts/:accountId')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(StaffAgencyWriteGuard)
+  async deleteChannelAccount(
+    @Param('id') id: string,
+    @Param('accountId') accountId: string,
+  ): Promise<{ ok: boolean }> {
+    return this.agency.deleteChannelAccount(id, accountId);
   }
 
   @Patch(':id/channel-accounts/:accountId/token')

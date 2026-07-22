@@ -14,6 +14,7 @@ import {
   OnboardingResponse,
   KpiDefinitionRow,
   AddChannelAccountBody,
+  UpdateChannelAccountBody,
   UpdateClientBody,
   PatchHubCampaignMapBody,
   SetChannelTokenBody,
@@ -26,6 +27,7 @@ import { WorkflowsService } from '../workflows/workflows.service';
 
 const META_CAMPAIGN_ID_RE = /^[0-9]{5,20}$/;
 const VALID_CHANNELS = new Set(['meta', 'zalo', 'google', 'email']);
+const VALID_CHANNEL_STATUSES = new Set(['active', 'inactive', 'revoked', 'error']);
 
 function strictOnboardingEnabled(): boolean {
   const raw = (process.env.PTT_CLIENT_STRICT_ONBOARDING ?? '1').trim().toLowerCase();
@@ -330,6 +332,55 @@ export class AgencyService {
       display_name: body.display_name,
     });
     return this.getClient(clientId);
+  }
+
+  async updateChannelAccount(
+    clientId: string,
+    accountId: string,
+    body: UpdateChannelAccountBody,
+  ): Promise<AgencyClientDetail> {
+    await this.ensurePg();
+    const client = await this.repo.fetchClient(clientId);
+    if (!client) {
+      throw new NotFoundException({ error: 'Not found' });
+    }
+    if (body.status !== undefined && !VALID_CHANNEL_STATUSES.has(body.status.trim())) {
+      throw new BadRequestException({ error: 'invalid_status' });
+    }
+    try {
+      const updated = await this.repo.updateChannelAccount(clientId, accountId, {
+        display_name: body.display_name,
+        external_account_id: body.external_account_id,
+        status: body.status?.trim(),
+      });
+      if (!updated) {
+        throw new NotFoundException({ error: 'account_not_found' });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const pgCode = err && typeof err === 'object' && 'code' in err ? String((err as { code?: string }).code) : '';
+      if (msg === 'external_account_id_required') {
+        throw new BadRequestException({ error: msg });
+      }
+      if (pgCode === '23505' || msg.includes('unique') || msg.includes('duplicate')) {
+        throw new BadRequestException({ error: 'channel_account_conflict' });
+      }
+      throw err;
+    }
+    return this.getClient(clientId);
+  }
+
+  async deleteChannelAccount(clientId: string, accountId: string): Promise<{ ok: boolean }> {
+    await this.ensurePg();
+    const client = await this.repo.fetchClient(clientId);
+    if (!client) {
+      throw new NotFoundException({ error: 'Not found' });
+    }
+    const deleted = await this.repo.deleteChannelAccount(clientId, accountId);
+    if (!deleted) {
+      throw new NotFoundException({ error: 'account_not_found' });
+    }
+    return { ok: true };
   }
 
   async setChannelAccountToken(

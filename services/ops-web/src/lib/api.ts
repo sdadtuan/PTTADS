@@ -1967,6 +1967,29 @@ export async function addClientChannelAccount(
   });
 }
 
+export async function patchClientChannelAccount(
+  token: string,
+  clientId: string,
+  accountId: string,
+  body: { display_name?: string; external_account_id?: string; status?: string },
+): Promise<AgencyClient> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/channel-accounts/${accountId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteClientChannelAccount(
+  token: string,
+  clientId: string,
+  accountId: string,
+): Promise<{ ok: boolean }> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/channel-accounts/${accountId}`, {
+    method: 'DELETE',
+    body: '{}',
+  });
+}
+
 export async function setClientChannelToken(
   token: string,
   clientId: string,

@@ -8,12 +8,14 @@ import { AgencyReadOnlyBadge, canAgencyWrite } from '@/components/AgencyReadOnly
 import {
   activateAgencyClient,
   addClientChannelAccount,
+  deleteClientChannelAccount,
   fetchAgencyClient,
   fetchClientLeads,
   fetchClientOnboarding,
   fetchClientPerformance,
   fetchOnboardingWorkflowStatus,
   patchAgencyClient,
+  patchClientChannelAccount,
   patchClientOnboardingItem,
   setClientChannelToken,
   staffMe,
@@ -94,6 +96,12 @@ export function AgencyClientDetailContent() {
   const [clientLeads, setClientLeads] = useState<ClientLeadSummary[]>([]);
   const [tokenAccountId, setTokenAccountId] = useState('');
   const [tokenValue, setTokenValue] = useState('');
+  const [editChannelId, setEditChannelId] = useState<string | null>(null);
+  const [editChannelForm, setEditChannelForm] = useState({
+    external_account_id: '',
+    display_name: '',
+    status: 'active',
+  });
 
   const canWrite = canAgencyWrite(user);
 
@@ -236,8 +244,79 @@ export function AgencyClientDetailContent() {
       setClient(updated);
       setChannelForm({ channel: 'meta', external_account_id: '', display_name: '' });
       setActionMsg('Đã thêm channel account');
+      const metaAcc = (updated.channel_accounts ?? []).find((a) => a.channel === 'meta');
+      if (metaAcc) setTokenAccountId(metaAcc.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Thêm channel thất bại');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startEditChannel(acc: NonNullable<AgencyClient['channel_accounts']>[number]) {
+    setEditChannelId(acc.id);
+    setEditChannelForm({
+      external_account_id: acc.external_account_id ?? '',
+      display_name: acc.display_name ?? '',
+      status: acc.status ?? 'active',
+    });
+    setActionMsg('');
+    setError('');
+  }
+
+  async function handleUpdateChannel(e: React.FormEvent) {
+    e.preventDefault();
+    const access = getAccessToken();
+    if (!access || !canWrite || !editChannelId) return;
+    setBusy(true);
+    setActionMsg('');
+    setError('');
+    try {
+      const updated = await patchClientChannelAccount(access, clientId, editChannelId, editChannelForm);
+      setClient(updated);
+      setEditChannelId(null);
+      setActionMsg('Đã cập nhật channel account');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Cập nhật channel thất bại');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDeleteChannel(accountId: string, label: string) {
+    const access = getAccessToken();
+    if (!access || !canWrite) return;
+    if (!window.confirm(`Xóa channel account ${label}? Token vault cũng bị xóa.`)) return;
+    setBusy(true);
+    setActionMsg('');
+    setError('');
+    try {
+      await deleteClientChannelAccount(access, clientId, accountId);
+      const updated = await fetchAgencyClient(access, clientId);
+      setClient(updated);
+      if (tokenAccountId === accountId) setTokenAccountId('');
+      if (editChannelId === accountId) setEditChannelId(null);
+      setActionMsg('Đã xóa channel account');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Xóa channel thất bại');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRevokeToken(accountId: string) {
+    const access = getAccessToken();
+    if (!access || !canWrite) return;
+    if (!window.confirm('Thu hồi token Meta trên account này?')) return;
+    setBusy(true);
+    setActionMsg('');
+    setError('');
+    try {
+      const updated = await setClientChannelToken(access, clientId, accountId, { revoke: true });
+      setClient(updated);
+      setActionMsg('Đã thu hồi token');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Thu hồi token thất bại');
     } finally {
       setBusy(false);
     }
@@ -565,70 +644,8 @@ export function AgencyClientDetailContent() {
 
             {tab === 'channels' ? (
               <div style={{ marginTop: '1rem' }}>
-                <table className="perf-table">
-                  <thead>
-                    <tr>
-                      <th>Channel</th>
-                      <th>External ID</th>
-                      <th>Tên hiển thị</th>
-                      <th>Token</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(client.channel_accounts ?? []).map((acc) => (
-                      <tr key={acc.id}>
-                        <td>{acc.channel}</td>
-                        <td>{acc.external_account_id ?? '—'}</td>
-                        <td>{acc.display_name ?? '—'}</td>
-                        <td>{acc.token_status ?? (acc.has_token ? 'ok' : '—')}</td>
-                        <td>{acc.status ?? '—'}</td>
-                      </tr>
-                    ))}
-                    {(client.channel_accounts ?? []).length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="muted">
-                          Chưa có channel account
-                        </td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
-
                 {canWrite ? (
-                  <form onSubmit={(e) => void handleConnectToken(e)} style={{ marginTop: '1.25rem', display: 'grid', gap: '0.75rem', maxWidth: 480 }}>
-                    <h3 style={{ fontSize: '1rem', margin: 0 }}>Connect Meta token (vault)</h3>
-                    <select
-                      value={tokenAccountId}
-                      onChange={(e) => setTokenAccountId(e.target.value)}
-                      required
-                      style={{ padding: '0.5rem' }}
-                    >
-                      <option value="">Chọn Meta account…</option>
-                      {(client.channel_accounts ?? [])
-                        .filter((a) => a.channel === 'meta')
-                        .map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.external_account_id} · {a.display_name || a.id.slice(0, 8)}
-                          </option>
-                        ))}
-                    </select>
-                    <input
-                      type="password"
-                      placeholder="Meta access token"
-                      value={tokenValue}
-                      onChange={(e) => setTokenValue(e.target.value)}
-                      required
-                      style={{ padding: '0.5rem' }}
-                    />
-                    <button type="submit" className="btn btn-sm" disabled={busy}>
-                      Lưu token + enqueue sync
-                    </button>
-                  </form>
-                ) : null}
-
-                {canWrite ? (
-                  <form onSubmit={(e) => void handleAddChannel(e)} style={{ marginTop: '1.25rem', display: 'grid', gap: '0.75rem', maxWidth: 480 }}>
+                  <form onSubmit={(e) => void handleAddChannel(e)} style={{ display: 'grid', gap: '0.75rem', maxWidth: 480, marginBottom: '1.25rem' }}>
                     <h3 style={{ fontSize: '1rem', margin: 0 }}>Thêm channel account</h3>
                     <select
                       value={channelForm.channel}
@@ -654,9 +671,139 @@ export function AgencyClientDetailContent() {
                       style={{ padding: '0.5rem' }}
                     />
                     <button type="submit" className="btn btn-sm" disabled={busy}>
-                      Lưu channel
+                      Thêm channel
                     </button>
                   </form>
+                ) : null}
+
+                {editChannelId && canWrite ? (
+                  <form
+                    onSubmit={(e) => void handleUpdateChannel(e)}
+                    style={{ display: 'grid', gap: '0.75rem', maxWidth: 480, marginBottom: '1.25rem' }}
+                  >
+                    <h3 style={{ fontSize: '1rem', margin: 0 }}>Sửa channel account</h3>
+                    <input
+                      placeholder="External account ID"
+                      value={editChannelForm.external_account_id}
+                      onChange={(e) => setEditChannelForm((f) => ({ ...f, external_account_id: e.target.value }))}
+                      required
+                      style={{ padding: '0.5rem' }}
+                    />
+                    <input
+                      placeholder="Tên hiển thị"
+                      value={editChannelForm.display_name}
+                      onChange={(e) => setEditChannelForm((f) => ({ ...f, display_name: e.target.value }))}
+                      style={{ padding: '0.5rem' }}
+                    />
+                    <select
+                      value={editChannelForm.status}
+                      onChange={(e) => setEditChannelForm((f) => ({ ...f, status: e.target.value }))}
+                      style={{ padding: '0.5rem' }}
+                    >
+                      <option value="active">active</option>
+                      <option value="inactive">inactive</option>
+                      <option value="revoked">revoked</option>
+                      <option value="error">error</option>
+                    </select>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button type="submit" className="btn btn-sm" disabled={busy}>
+                        Lưu thay đổi
+                      </button>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditChannelId(null)}>
+                        Hủy
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+
+                <table className="perf-table">
+                  <thead>
+                    <tr>
+                      <th>Channel</th>
+                      <th>External ID</th>
+                      <th>Tên hiển thị</th>
+                      <th>Token</th>
+                      <th>Status</th>
+                      {canWrite ? <th /> : null}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(client.channel_accounts ?? []).map((acc) => (
+                      <tr key={acc.id}>
+                        <td>{acc.channel}</td>
+                        <td>{acc.external_account_id ?? '—'}</td>
+                        <td>{acc.display_name ?? '—'}</td>
+                        <td>{acc.token_status ?? (acc.has_token ? 'ok' : '—')}</td>
+                        <td>{acc.status ?? '—'}</td>
+                        {canWrite ? (
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => startEditChannel(acc)}>
+                              Sửa
+                            </button>{' '}
+                            {acc.channel === 'meta' && (acc.has_token || acc.token_status === 'valid') ? (
+                              <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void handleRevokeToken(acc.id)}>
+                                Thu hồi token
+                              </button>
+                            ) : null}{' '}
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              disabled={busy}
+                              onClick={() => void handleDeleteChannel(acc.id, acc.external_account_id ?? acc.id.slice(0, 8))}
+                            >
+                              Xóa
+                            </button>
+                          </td>
+                        ) : null}
+                      </tr>
+                    ))}
+                    {(client.channel_accounts ?? []).length === 0 ? (
+                      <tr>
+                        <td colSpan={canWrite ? 6 : 5} className="muted">
+                          Chưa có channel account — thêm Meta act_… ở form trên
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+
+                {canWrite && (client.channel_accounts ?? []).some((a) => a.channel === 'meta') ? (
+                  <form onSubmit={(e) => void handleConnectToken(e)} style={{ marginTop: '1.25rem', display: 'grid', gap: '0.75rem', maxWidth: 480 }}>
+                    <h3 style={{ fontSize: '1rem', margin: 0 }}>Connect Meta token (vault)</h3>
+                    <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+                      Chọn account Meta rồi dán access token.
+                    </p>
+                    <select
+                      value={tokenAccountId}
+                      onChange={(e) => setTokenAccountId(e.target.value)}
+                      required
+                      style={{ padding: '0.5rem' }}
+                    >
+                      <option value="">Chọn Meta account…</option>
+                      {(client.channel_accounts ?? [])
+                        .filter((a) => a.channel === 'meta')
+                        .map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.external_account_id} · {a.display_name || a.id.slice(0, 8)}
+                          </option>
+                        ))}
+                    </select>
+                    <input
+                      type="password"
+                      placeholder="Meta access token"
+                      value={tokenValue}
+                      onChange={(e) => setTokenValue(e.target.value)}
+                      required
+                      style={{ padding: '0.5rem' }}
+                    />
+                    <button type="submit" className="btn btn-sm" disabled={busy || !tokenAccountId}>
+                      Lưu token + enqueue sync
+                    </button>
+                  </form>
+                ) : canWrite ? (
+                  <p className="muted" style={{ marginTop: '1rem' }}>
+                    Thêm Meta channel account trước khi lưu token.
+                  </p>
                 ) : null}
               </div>
             ) : null}

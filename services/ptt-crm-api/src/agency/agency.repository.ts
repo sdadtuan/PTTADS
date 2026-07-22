@@ -676,6 +676,54 @@ export class AgencyRepository implements OnModuleDestroy {
     };
   }
 
+  async updateChannelAccount(
+    clientId: string,
+    accountId: string,
+    params: { display_name?: string; external_account_id?: string; status?: string },
+  ): Promise<AgencyChannelAccount | null> {
+    const existing = await this.fetchChannelAccount(clientId, accountId);
+    if (!existing) return null;
+
+    const sets: string[] = [];
+    const values: unknown[] = [clientId, accountId];
+    let idx = 3;
+
+    if (params.display_name !== undefined) {
+      sets.push(`display_name = $${idx++}`);
+      values.push(params.display_name.trim() || null);
+    }
+    if (params.external_account_id !== undefined) {
+      let ext = params.external_account_id.trim();
+      if (!ext) throw new Error('external_account_id_required');
+      if (existing.channel === 'meta') {
+        ext = ext.replace(/\D/g, '') || ext;
+      }
+      sets.push(`external_account_id = $${idx++}`);
+      values.push(ext);
+    }
+    if (params.status !== undefined) {
+      sets.push(`status = $${idx++}`);
+      values.push(params.status.trim());
+    }
+    if (!sets.length) return existing;
+
+    sets.push('updated_at = NOW()');
+    await this.db.query(
+      `UPDATE client_channel_accounts SET ${sets.join(', ')}
+       WHERE client_id = $1::uuid AND id = $2::uuid`,
+      values,
+    );
+    return this.fetchChannelAccount(clientId, accountId);
+  }
+
+  async deleteChannelAccount(clientId: string, accountId: string): Promise<boolean> {
+    const result = await this.db.query(
+      `DELETE FROM client_channel_accounts WHERE client_id = $1::uuid AND id = $2::uuid`,
+      [clientId, accountId],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
   async replayJob(jobId: string): Promise<{ id: string; status: string; replayed: boolean } | null> {
     const result = await this.db.query(
       `UPDATE job_queue
