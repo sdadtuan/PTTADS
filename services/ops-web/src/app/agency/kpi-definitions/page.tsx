@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
+import { AgencyReadOnlyBadge } from '@/components/AgencyReadOnlyBadge';
 import { fetchKpiDefinitions, staffMe, staffRefresh } from '@/lib/api';
 import type { KpiDefinition } from '@/lib/api';
 import {
@@ -78,8 +79,11 @@ export default function AgencyKpiDefinitionsPage() {
       </p>
 
       <div className="card">
-        <h2 style={{ marginTop: 0 }}>Định nghĩa KPI</h2>
-        <p className="muted">Dictionary seed từ PostgreSQL · document-only (Phase 1)</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h2 style={{ margin: 0, flex: '1 1 auto' }}>Định nghĩa KPI</h2>
+          <AgencyReadOnlyBadge user={user} />
+        </div>
+        <p className="muted">Dictionary seed từ PostgreSQL · chỉ xem (CRUD → Wave B2)</p>
         {error ? <p className="error">{error}</p> : null}
 
         <div style={{ overflowX: 'auto' }}>

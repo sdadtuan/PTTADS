@@ -34,10 +34,8 @@ echo "ExecStart=$(systemctl show ptt-ops-web -p ExecStart --value)"
 node_code="$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:3200/_next/static/css/$CSS")"
 echo "node :3200/_next/static/css/$CSS → HTTP $node_code"
 
-echo "-- nginx rs.pttads.vn static alias --"
-cp "$ROOT/deploy/nginx-rs-flask-retired.conf" /etc/nginx/sites-available/rs.pttads.vn
-nginx -t
-systemctl reload nginx
+echo "-- nginx rs.pttads.vn (TLS /etc/nginx/ssl + static alias) --"
+"$ROOT/scripts/apply_nginx_rs_vps_ssl.sh"
 
 pub_code="$(curl -sk -o /dev/null -w "%{http_code}" "https://rs.pttads.vn/_next/static/css/$CSS")"
 echo "https rs.pttads.vn/_next/static/css/$CSS → HTTP $pub_code"

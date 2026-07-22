@@ -4,12 +4,14 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
+import { AgencyReadOnlyBadge, canAgencyWrite } from '@/components/AgencyReadOnlyBadge';
 import {
   activateAgencyClient,
   addClientChannelAccount,
   fetchAgencyClient,
   fetchClientOnboarding,
   fetchClientPerformance,
+  patchAgencyClient,
   patchClientOnboardingItem,
   staffMe,
   staffRefresh,
@@ -27,6 +29,16 @@ import {
 } from '@/lib/auth';
 
 type TabId = 'overview' | 'checklist' | 'channels';
+
+const CLIENT_STATUSES = ['prospect', 'onboarding', 'active', 'paused'] as const;
+
+interface ClientEditForm {
+  name: string;
+  industry_slug: string;
+  owner_am_id: string;
+  notes: string;
+  status: string;
+}
 
 function fmtVnd(n: number | null | undefined): string {
   if (n == null) return '—';
@@ -60,8 +72,15 @@ export function AgencyClientDetailContent() {
     external_account_id: '',
     display_name: '',
   });
+  const [editForm, setEditForm] = useState<ClientEditForm>({
+    name: '',
+    industry_slug: '',
+    owner_am_id: '',
+    notes: '',
+    status: 'prospect',
+  });
 
-  const canWrite = hasCap(user, 'crm_agency', 'create');
+  const canWrite = canAgencyWrite(user);
 
   const ensureAuth = useCallback(async (): Promise<string | null> => {
     let access = getAccessToken();
@@ -107,6 +126,13 @@ export function AgencyClientDetailContent() {
       setClient(detail);
       setPerfRows(perf.rows ?? []);
       setOnboarding(ob);
+      setEditForm({
+        name: detail.name ?? '',
+        industry_slug: detail.industry_slug ?? '',
+        owner_am_id: detail.owner_am_id ?? '',
+        notes: detail.notes ?? '',
+        status: detail.status ?? 'prospect',
+      });
     },
     [clientId],
   );
@@ -191,6 +217,37 @@ export function AgencyClientDetailContent() {
     }
   }
 
+  async function handleSaveClient(e: React.FormEvent) {
+    e.preventDefault();
+    const access = getAccessToken();
+    if (!access || !canWrite) return;
+    setBusy(true);
+    setActionMsg('');
+    setError('');
+    try {
+      const updated = await patchAgencyClient(access, clientId, {
+        name: editForm.name.trim(),
+        industry_slug: editForm.industry_slug.trim() || undefined,
+        owner_am_id: editForm.owner_am_id.trim() || undefined,
+        notes: editForm.notes.trim() || undefined,
+        status: editForm.status,
+      });
+      setClient(updated);
+      setEditForm({
+        name: updated.name ?? '',
+        industry_slug: updated.industry_slug ?? '',
+        owner_am_id: updated.owner_am_id ?? '',
+        notes: updated.notes ?? '',
+        status: updated.status ?? 'prospect',
+      });
+      setActionMsg('Đã lưu thông tin client');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lưu client thất bại');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function logout() {
     clearSession();
     router.push('/login');
@@ -228,6 +285,7 @@ export function AgencyClientDetailContent() {
               <h2 style={{ margin: 0, flex: '1 1 auto' }}>
                 {client.code} · {client.name}
               </h2>
+              <AgencyReadOnlyBadge user={user} />
               <span className={`agency-status-badge ${statusBadgeClass(client.status)}`}>{client.status}</span>
             </div>
             <p className="muted">AM: {client.owner_am_id || '—'} · Ngành: {client.industry_slug || '—'}</p>
@@ -254,6 +312,71 @@ export function AgencyClientDetailContent() {
 
             {tab === 'overview' ? (
               <>
+                <h3 style={{ fontSize: '1rem', marginTop: '0.5rem' }}>Thông tin client</h3>
+                {canWrite ? (
+                  <form className="agency-client-edit" onSubmit={(e) => void handleSaveClient(e)}>
+                    <label>
+                      Tên
+                      <input
+                        value={editForm.name}
+                        onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                        required
+                      />
+                    </label>
+                    <label>
+                      Ngành (slug)
+                      <input
+                        value={editForm.industry_slug}
+                        onChange={(e) => setEditForm((f) => ({ ...f, industry_slug: e.target.value }))}
+                        placeholder="vd. fmcg, bds"
+                      />
+                    </label>
+                    <label>
+                      Owner AM (staff id / email)
+                      <input
+                        value={editForm.owner_am_id}
+                        onChange={(e) => setEditForm((f) => ({ ...f, owner_am_id: e.target.value }))}
+                      />
+                    </label>
+                    <label>
+                      Trạng thái
+                      <select
+                        value={editForm.status}
+                        onChange={(e) => setEditForm((f) => ({ ...f, status: e.target.value }))}
+                      >
+                        {CLIENT_STATUSES.map((s) => (
+                          <option key={s} value={s}>
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Ghi chú
+                      <textarea
+                        value={editForm.notes}
+                        onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                      />
+                    </label>
+                    <div>
+                      <button type="submit" className="btn btn-sm" disabled={busy}>
+                        Lưu thông tin
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <dl className="agency-client-edit" style={{ gridTemplateColumns: 'auto 1fr', display: 'grid', gap: '0.5rem 1rem' }}>
+                    <dt className="muted">Tên</dt>
+                    <dd style={{ margin: 0 }}>{client.name}</dd>
+                    <dt className="muted">Ngành</dt>
+                    <dd style={{ margin: 0 }}>{client.industry_slug || '—'}</dd>
+                    <dt className="muted">AM</dt>
+                    <dd style={{ margin: 0 }}>{client.owner_am_id || '—'}</dd>
+                    <dt className="muted">Ghi chú</dt>
+                    <dd style={{ margin: 0 }}>{client.notes || '—'}</dd>
+                  </dl>
+                )}
+
                 <h3 style={{ fontSize: '1rem', marginTop: '1.5rem' }}>Performance (Meta, 7 ngày)</h3>
                 <div style={{ overflowX: 'auto' }}>
                   <table className="perf-table">
@@ -341,7 +464,10 @@ export function AgencyClientDetailContent() {
                     </button>
                   ) : null}
                 </div>
-                {activateDisabled && client.status !== 'active' ? (
+                {activateDisabled && client.status !== 'active' && !canWrite ? (
+                  <p className="muted">Chế độ chỉ xem — không thể sửa checklist hoặc kích hoạt.</p>
+                ) : null}
+                {activateDisabled && client.status !== 'active' && canWrite ? (
                   <p className="muted">Hoàn thành checklist trước khi kích hoạt (PTT_CLIENT_STRICT_ONBOARDING).</p>
                 ) : null}
               </div>

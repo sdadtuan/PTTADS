@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
+import { AgencyReadOnlyBadge, canAgencyWrite } from '@/components/AgencyReadOnlyBadge';
 import { fetchAgencyJobs, replayAgencyJob, staffMe, staffRefresh } from '@/lib/api';
 import type { JobRow } from '@/lib/api';
 import {
@@ -29,7 +30,7 @@ export default function AgencyJobsPage() {
   const [msg, setMsg] = useState('');
   const [busyId, setBusyId] = useState('');
 
-  const canWrite = hasCap(user, 'crm_agency', 'create');
+  const canWrite = canAgencyWrite(user);
 
   const ensureAuth = useCallback(async (): Promise<string | null> => {
     let access = getAccessToken();
@@ -119,7 +120,10 @@ export default function AgencyJobsPage() {
       ) : null}
 
       <div className="card">
-        <h2 style={{ marginTop: 0 }}>Pipeline ingest</h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h2 style={{ margin: 0, flex: '1 1 auto' }}>Pipeline ingest</h2>
+          <AgencyReadOnlyBadge user={user} />
+        </div>
         <p className="muted">
           pending {stats.pending ?? 0} · running {stats.running ?? 0} · dead {deadCount} · failed {stats.failed ?? 0}
         </p>

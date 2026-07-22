@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
+import { AgencyReadOnlyBadge, canAgencyWrite } from '@/components/AgencyReadOnlyBadge';
 import { fetchHubCampaignMaps, patchHubCampaignMap, staffMe, staffRefresh } from '@/lib/api';
 import type { HubMapRow } from '@/lib/api';
 import {
@@ -34,7 +35,7 @@ export function CrmHubContent() {
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState('');
 
-  const canWrite = hasCap(user, 'crm_agency', 'create');
+  const canWrite = canAgencyWrite(user);
 
   const ensureAuth = useCallback(async (): Promise<string | null> => {
     let access = getAccessToken();
@@ -141,10 +142,13 @@ export function CrmHubContent() {
     <main style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem' }}>
       <OpsNav user={user} onLogout={logout} />
       <div className="card">
-        <p className="muted" style={{ marginTop: 0 }}>
-          Hub campaign map (PG) · chỉnh Meta Campaign ID inline
-          {campaignFilter ? ` · filter campaign_id=${campaignFilter}` : ''}
-        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <p className="muted" style={{ margin: 0, flex: '1 1 auto' }}>
+            Hub campaign map (PG) · chỉnh Meta Campaign ID inline
+            {campaignFilter ? ` · filter campaign_id=${campaignFilter}` : ''}
+          </p>
+          <AgencyReadOnlyBadge user={user} />
+        </div>
         {error ? <p className="error">{error}</p> : null}
         {msg ? <p className="muted">{msg}</p> : null}
 

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Issue/renew Let's Encrypt cert for portal.pttads.vn and install nginx site (Phase 3 prod)
+# Issue/renew Let's Encrypt cert for portal.pttads.vn (optional — skip if using /etc/nginx/ssl/).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=lib/nginx_ssl_paths.sh
+. "$ROOT/scripts/lib/nginx_ssl_paths.sh"
 DOMAIN="${PTT_PORTAL_DOMAIN:-portal.pttads.vn}"
 EMAIL="${CERTBOT_EMAIL:-ops@pttads.vn}"
 NGINX_SITE="/etc/nginx/sites-available/${DOMAIN}"
@@ -10,6 +12,16 @@ NGINX_ENABLED="/etc/nginx/sites-enabled/${DOMAIN}"
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run as root on VPS: sudo $0" >&2
   exit 1
+fi
+
+if [[ -f "$PTT_NGINX_SSL_CERT_DEFAULT" && -f "$PTT_NGINX_SSL_KEY_DEFAULT" ]]; then
+  echo "SKIP  Using VPS TLS: $PTT_NGINX_SSL_CERT_DEFAULT"
+  cp "$ROOT/deploy/nginx-portal.conf" "$NGINX_SITE"
+  nginx_ssl_rewrite_site "$NGINX_SITE" "$DOMAIN"
+  ln -sf "$NGINX_SITE" "$NGINX_ENABLED"
+  nginx -t && systemctl reload nginx
+  echo "OK  https://${DOMAIN}/login (manual cert)"
+  exit 0
 fi
 
 if ! command -v certbot >/dev/null 2>&1; then

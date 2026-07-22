@@ -11,6 +11,7 @@
 | Staff login | `admin@pttads.vn` + `ADMIN_PASSWORD` trong `.env` |
 | Cap ghi Agency | `crm_agency` → `create` (seed super admin) |
 | Domain staff | **`https://rs.pttads.vn`** — ops-web + `/api/` cùng host (nginx `deploy/nginx-rs-flask-retired.conf`) |
+| TLS VPS | `/etc/nginx/ssl/portalpttadsvn.pem` + `.key` (dùng chung mọi site `*.pttads.vn`) |
 
 Trong `/var/www/ptt/.env` (nếu chưa có):
 

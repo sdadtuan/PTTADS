@@ -1684,6 +1684,7 @@ export interface AgencyClient {
   industry_slug: string | null;
   status: string;
   owner_am_id: string | null;
+  notes?: string | null;
   channels?: string;
   channel_accounts?: Array<{
     id: string;
@@ -1881,6 +1882,25 @@ export async function createAgencyClient(
   body: CreateClientBody,
 ): Promise<AgencyClient> {
   return agencyMutate(token, '/api/v1/clients', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export interface UpdateClientBody {
+  name?: string;
+  industry_slug?: string;
+  owner_am_id?: string;
+  notes?: string;
+  status?: string;
+}
+
+export async function patchAgencyClient(
+  token: string,
+  clientId: string,
+  body: UpdateClientBody,
+): Promise<AgencyClient> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
 }
 
 export interface OnboardingItem {

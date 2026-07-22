@@ -2,18 +2,13 @@
 # Apply nginx static alias for ops-web (fixes blank pages when /_next/static 404).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$ROOT/deploy/nginx-rs-flask-retired.conf"
-DEST="/etc/nginx/sites-available/rs.pttads.vn"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "Run with sudo: sudo $0"
   exit 1
 fi
 
-cp "$SRC" "$DEST"
-nginx -t
-systemctl reload nginx
-echo "OK  nginx rs.pttads.vn reloaded (/_next/static served from disk)"
+"$ROOT/scripts/patch_nginx_rs_static.sh"
 
 STATIC="$ROOT/services/ops-web/.next/standalone/.next/static/css"
 if [[ -d "$STATIC" ]]; then

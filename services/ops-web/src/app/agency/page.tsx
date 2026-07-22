@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
+import { AgencyReadOnlyBadge, canAgencyWrite } from '@/components/AgencyReadOnlyBadge';
 import {
   fetchAgencyClients,
   fetchAgencyNotifications,
@@ -110,6 +111,7 @@ export default function AgencyPage() {
   const deadJobs = stats?.jobs?.dead ?? 0;
   const onboardingCount = stats?.clients?.onboarding ?? 0;
   const activeCount = stats?.clients?.active ?? 0;
+  const canWrite = canAgencyWrite(user);
 
   return (
     <main style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem' }}>
@@ -124,9 +126,12 @@ export default function AgencyPage() {
       ) : null}
 
       <div className="card" style={{ marginBottom: '1rem' }}>
-        <p className="muted" style={{ marginTop: 0 }}>
-          Agency ops · PG primary · Nest API
-        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <p className="muted" style={{ margin: 0, flex: '1 1 auto' }}>
+            Agency ops · PG primary · Nest API
+          </p>
+          <AgencyReadOnlyBadge user={user} />
+        </div>
         <div className="agency-stat-grid">
           <div className="agency-stat-card">
             <strong>{stats?.pg_ready ? clientTotal : '—'}</strong>
@@ -146,9 +151,11 @@ export default function AgencyPage() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
-          <Link href="/agency/clients/new" className="btn btn-sm">
-            + Client
-          </Link>
+          {canWrite ? (
+            <Link href="/agency/clients/new" className="btn btn-sm">
+              + Client
+            </Link>
+          ) : null}
           <Link href="/agency/ingest" className="btn btn-secondary btn-sm">
             Ingest
           </Link>

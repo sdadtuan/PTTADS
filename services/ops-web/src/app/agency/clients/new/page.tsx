@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
+import { AgencyReadOnlyBadge, canAgencyWrite } from '@/components/AgencyReadOnlyBadge';
 import { createAgencyClient, staffMe, staffRefresh } from '@/lib/api';
 import {
   clearSession,
@@ -33,7 +34,11 @@ export default function NewClientPage() {
     staffMe(access)
       .then((me) => {
         setUser(me);
-        if (!hasCap(me, 'crm_agency', 'create')) {
+        if (!hasCap(me, 'crm_agency', 'view')) {
+          router.replace('/agency');
+          return;
+        }
+        if (!canAgencyWrite(me)) {
           setError('Không có quyền tạo client');
         }
       })
@@ -54,7 +59,7 @@ export default function NewClientPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const access = getAccessToken();
-    if (!access || !user) return;
+    if (!access || !user || !canAgencyWrite(user)) return;
     setSaving(true);
     setError('');
     try {
@@ -78,6 +83,8 @@ export default function NewClientPage() {
     );
   }
 
+  const canWrite = canAgencyWrite(user);
+
   return (
     <main style={{ maxWidth: 520, margin: '0 auto', padding: '1.5rem' }}>
       <OpsNav user={user} onLogout={() => { clearSession(); router.push('/login'); }} />
@@ -87,7 +94,10 @@ export default function NewClientPage() {
         </Link>
       </p>
       <div className="card">
-        <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Client mới</h2>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+          <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Client mới</h2>
+          <AgencyReadOnlyBadge user={user} />
+        </div>
         {error ? <p className="error">{error}</p> : null}
         <form onSubmit={(e) => void onSubmit(e)} style={{ display: 'grid', gap: '0.85rem' }}>
           <label style={{ display: 'grid', gap: '0.35rem' }}>
@@ -108,7 +118,7 @@ export default function NewClientPage() {
               style={{ padding: '0.55rem', borderRadius: 8, border: '1px solid var(--border)' }}
             />
           </label>
-          <button type="submit" className="btn btn-sm" disabled={saving || !!error}>
+          <button type="submit" className="btn btn-sm" disabled={saving || !canWrite || !!error}>
             {saving ? 'Đang tạo…' : 'Tạo client'}
           </button>
         </form>
