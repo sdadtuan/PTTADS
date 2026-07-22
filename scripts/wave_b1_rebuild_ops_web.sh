@@ -32,24 +32,26 @@ echo "OK  static copied ($css_name)"
 ls -la "$css_file"
 
 echo ""
-echo "-- systemd (requires sudo once) --"
-echo "sudo cp $ROOT/deploy/ptt-ops-web.service /etc/systemd/system/"
-echo "sudo systemctl daemon-reload"
-echo "sudo systemctl restart ptt-ops-web"
+echo "=== Cần sudo (user linuxuser) — deploy KHÔNG restart được service ==="
+echo "Chạy MỘT lệnh sau (nhập password linuxuser):"
+echo "  sudo $ROOT/scripts/wave_b1_fix_static_sudo.sh"
 echo ""
-echo "-- nginx static alias (requires sudo once) --"
-echo "sudo $ROOT/scripts/apply_nginx_rs_static.sh"
+echo "Hoặc từng bước:"
+echo "  sudo cp $ROOT/deploy/ptt-ops-web.service /etc/systemd/system/"
+echo "  sudo systemctl daemon-reload && sudo systemctl restart ptt-ops-web"
+echo "  sudo $ROOT/scripts/apply_nginx_rs_static.sh"
 echo ""
 
 restarted=0
-if systemctl is-active ptt-ops-web >/dev/null 2>&1; then
-  if systemctl restart ptt-ops-web 2>/dev/null; then
-    restarted=1
-    echo "OK  systemctl restart ptt-ops-web (user session)"
-  fi
+if [[ "$(id -u)" -eq 0 ]]; then
+  systemctl restart ptt-ops-web && restarted=1
+elif sudo -n systemctl restart ptt-ops-web 2>/dev/null; then
+  restarted=1
 fi
-if [[ "$restarted" -eq 0 ]]; then
-  echo "WARN  could not restart ptt-ops-web — run: sudo systemctl restart ptt-ops-web"
+if [[ "$restarted" -eq 1 ]]; then
+  echo "OK  ptt-ops-web restarted"
+else
+  echo "SKIP restart (no sudo) — chạy wave_b1_fix_static_sudo.sh ở trên"
 fi
 
 sleep 2
@@ -63,16 +65,13 @@ public_code="$(curl -sk -o /dev/null -w "%{http_code}" "https://rs.pttads.vn/_ne
 echo "probe public rs.pttads.vn → HTTP $public_code"
 
 if [[ "$public_code" == "200" ]]; then
-  echo "OK  static served via nginx/https"
+  echo "OK  static served via https://rs.pttads.vn (nginx)"
   exit 0
 fi
 if [[ "$node_code" == "200" ]]; then
-  echo "OK  static served via node :3200 (apply nginx alias for production)"
+  echo "OK  static served via node :3200"
   exit 0
 fi
 
-echo "FAIL  static still 404"
-echo "  1) sudo cp $ROOT/deploy/ptt-ops-web.service /etc/systemd/system/ && sudo systemctl daemon-reload"
-echo "  2) sudo systemctl restart ptt-ops-web"
-echo "  3) sudo $ROOT/scripts/apply_nginx_rs_static.sh"
+echo "FAIL  static 404 — bắt buộc chạy: sudo $ROOT/scripts/wave_b1_fix_static_sudo.sh"
 exit 1
