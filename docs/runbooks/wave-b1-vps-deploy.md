@@ -96,7 +96,29 @@ Redirect Spec: `/crm/agency/*` → `/agency/*`.
 | FAIL kpi-definitions / onboarding | Chạy `./scripts/wave_b1_pg_bootstrap.sh` |
 | 403 missing_cap | Chạy `python3 scripts/seed_super_admin_full_access.py --sqlite /var/www/ptt/ptt.db --username admin --email admin@pttads.vn --apply-pg` |
 | 503 pg_not_ready | Kiểm tra `DATABASE_URL`, `curl http://127.0.0.1:3000/health` |
-| UI trắng / không hiển thị trang | **404 trên `/_next/static/*`** — chạy `./scripts/wave_b1_rebuild_ops_web.sh` + cập nhật `ptt-ops-web.service` (WorkingDirectory=`.next/standalone`) |
+| UI trắng / không hiển thị trang | **404 trên `/_next/static/*`** — xem mục **Sửa màn trắng** bên dưới |
+
+### Sửa màn trắng (404 static)
+
+```bash
+cd /var/www/ptt && git pull origin main
+export NEXT_PUBLIC_PTT_API_URL=https://rs.pttads.vn
+./scripts/wave_b1_rebuild_ops_web.sh
+
+# Bắt buộc sudo (deploy user không restart được service):
+sudo cp deploy/ptt-ops-web.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl restart ptt-ops-web
+sudo ./scripts/apply_nginx_rs_static.sh
+```
+
+Kiểm tra:
+
+```bash
+CSS=$(basename services/ops-web/.next/standalone/.next/static/css/*.css)
+curl -sI "https://rs.pttads.vn/_next/static/css/$CSS" | head -1
+# HTTP/2 200
+```
 | Replay 400 | Chỉ job `status=dead` |
 
 Logs:
