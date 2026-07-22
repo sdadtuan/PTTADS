@@ -2,6 +2,12 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 import { AppConfigService } from '../config/app-config.service';
 import {
+  computeTokenStatus,
+  encryptAccessToken,
+  TokenVaultError,
+  vaultConfigured,
+} from './token-vault.util';
+import {
   AgencyChannelAccount,
   AgencyClientDetail,
   AgencyClientRow,
@@ -177,20 +183,163 @@ export class AgencyRepository implements OnModuleDestroy {
   }
 
   async listChannelAccounts(clientId: string): Promise<AgencyChannelAccount[]> {
+    const vaultReady = await this.vaultColumnsReady();
     const result = await this.db.query(
-      `SELECT id::text, channel, external_account_id, display_name, status
-       FROM client_channel_accounts
-       WHERE client_id = $1::uuid
-       ORDER BY channel, display_name NULLS LAST`,
+      vaultReady
+        ? `SELECT id::text, channel, external_account_id, display_name, status,
+                  credential_ref, access_token_encrypted, token_expires_at, token_status, meta
+           FROM client_channel_accounts
+           WHERE client_id = $1::uuid
+           ORDER BY channel, display_name NULLS LAST`
+        : `SELECT id::text, channel, external_account_id, display_name, status
+           FROM client_channel_accounts
+           WHERE client_id = $1::uuid
+           ORDER BY channel, display_name NULLS LAST`,
       [clientId],
     );
-    return result.rows.map((row) => ({
+    return result.rows.map((row) => this.mapChannelAccountRow(row, vaultReady));
+  }
+
+  private mapChannelAccountRow(row: Record<string, unknown>, vaultReady: boolean): AgencyChannelAccount {
+    const base: AgencyChannelAccount = {
       id: String(row.id),
-      channel: row.channel ?? '',
-      external_account_id: row.external_account_id ?? null,
-      display_name: row.display_name ?? null,
-      status: row.status ?? null,
-    }));
+      channel: String(row.channel ?? ''),
+      external_account_id: (row.external_account_id as string | null) ?? null,
+      display_name: (row.display_name as string | null) ?? null,
+      status: (row.status as string | null) ?? null,
+    };
+    if (!vaultReady) {
+      return base;
+    }
+    const cred = String(row.credential_ref ?? '').trim();
+    const hasToken = Boolean(row.access_token_encrypted) || Boolean(cred);
+    const expiresRaw = row.token_expires_at;
+    const expires =
+      expiresRaw instanceof Date
+        ? expiresRaw
+        : expiresRaw
+          ? new Date(String(expiresRaw))
+          : null;
+    const tokenStatus = computeTokenStatus({
+      hasToken,
+      tokenStatus: row.token_status as string | null,
+      tokenExpiresAt: expires,
+    });
+    const meta = row.meta as Record<string, unknown> | null;
+    const pixelId =
+      meta && typeof meta === 'object'
+        ? String(meta.pixel_id ?? meta.meta_pixel_id ?? '').trim() || null
+        : null;
+    return {
+      ...base,
+      credential_ref: cred || null,
+      has_token: hasToken,
+      token_status: tokenStatus,
+      token_expires_at: expires ? expires.toISOString() : null,
+      pixel_id: pixelId,
+    };
+  }
+
+  async vaultColumnsReady(): Promise<boolean> {
+    try {
+      const result = await this.db.query(
+        `SELECT COUNT(*)::int AS c FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'client_channel_accounts'
+           AND column_name = 'access_token_encrypted'`,
+      );
+      return Number(result.rows[0]?.c ?? 0) >= 1;
+    } catch {
+      return false;
+    }
+  }
+
+  async fetchChannelAccount(clientId: string, accountId: string): Promise<AgencyChannelAccount | null> {
+    const vaultReady = await this.vaultColumnsReady();
+    const result = await this.db.query(
+      vaultReady
+        ? `SELECT id::text, channel, external_account_id, display_name, status,
+                  credential_ref, access_token_encrypted, token_expires_at, token_status, meta
+           FROM client_channel_accounts
+           WHERE client_id = $1::uuid AND id = $2::uuid`
+        : `SELECT id::text, channel, external_account_id, display_name, status
+           FROM client_channel_accounts
+           WHERE client_id = $1::uuid AND id = $2::uuid`,
+      [clientId, accountId],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return this.mapChannelAccountRow(row, vaultReady);
+  }
+
+  async setChannelAccountToken(
+    clientId: string,
+    accountId: string,
+    params: {
+      access_token?: string;
+      credential_ref?: string;
+      token_expires_at?: string;
+      revoke?: boolean;
+    },
+  ): Promise<AgencyChannelAccount> {
+    if (!(await this.vaultColumnsReady())) {
+      throw new Error('DDL v3 chưa apply — chạy ./scripts/apply_pg_ddl_v3.sh');
+    }
+    const existing = await this.fetchChannelAccount(clientId, accountId);
+    if (!existing) {
+      throw new Error('account_not_found');
+    }
+
+    if (params.revoke) {
+      await this.db.query(
+        `UPDATE client_channel_accounts
+         SET access_token_encrypted = NULL,
+             credential_ref = NULL,
+             token_status = 'revoked',
+             last_token_refresh_at = NOW(),
+             updated_at = NOW()
+         WHERE client_id = $1::uuid AND id = $2::uuid`,
+        [clientId, accountId],
+      );
+      const out = await this.fetchChannelAccount(clientId, accountId);
+      if (!out) throw new Error('account_not_found');
+      return out;
+    }
+
+    const token = params.access_token?.trim() ?? '';
+    const cred = params.credential_ref?.trim() ?? '';
+    if (!token && !cred) {
+      throw new Error('token_or_credential_required');
+    }
+
+    let encBlob: Buffer | null = null;
+    if (token) {
+      if (!vaultConfigured()) {
+        throw new TokenVaultError('PTT_TOKEN_VAULT_KEY chưa cấu hình');
+      }
+      encBlob = encryptAccessToken(token);
+    }
+
+    const expiresAt = params.token_expires_at?.trim() || null;
+    const status = computeTokenStatus({
+      hasToken: Boolean(encBlob || cred),
+      tokenExpiresAt: expiresAt ? new Date(expiresAt) : null,
+    });
+
+    await this.db.query(
+      `UPDATE client_channel_accounts
+       SET access_token_encrypted = COALESCE($3, access_token_encrypted),
+           credential_ref = COALESCE($4, credential_ref),
+           token_expires_at = COALESCE($5::timestamptz, token_expires_at),
+           token_status = $6,
+           last_token_refresh_at = NOW(),
+           updated_at = NOW()
+       WHERE client_id = $1::uuid AND id = $2::uuid`,
+      [clientId, accountId, encBlob, cred || null, expiresAt, status],
+    );
+    const out = await this.fetchChannelAccount(clientId, accountId);
+    if (!out) throw new Error('account_not_found');
+    return out;
   }
 
   async clientCounts(): Promise<Record<string, number>> {
@@ -287,6 +436,7 @@ export class AgencyRepository implements OnModuleDestroy {
       category: row.category ?? '',
       title: row.title ?? '',
       body: row.body ?? null,
+      link_url: row.link_url ?? null,
       client_id: null,
       read: row.read_at != null,
       created_at: iso(row.created_at),
@@ -578,6 +728,107 @@ export class AgencyRepository implements OnModuleDestroy {
       granularity: row.granularity ?? null,
       description: row.description ?? null,
     }));
+  }
+
+  async createKpiDefinition(body: {
+    code: string;
+    name: string;
+    formula: string;
+    granularity?: string;
+    description?: string;
+  }): Promise<{ code: string; name: string; formula: string; granularity: string | null; description: string | null }> {
+    const code = body.code.trim().toUpperCase();
+    await this.db.query(
+      `INSERT INTO kpi_definitions (code, name, formula, granularity, description)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        code,
+        body.name.trim(),
+        body.formula.trim(),
+        body.granularity?.trim() || null,
+        body.description?.trim() || null,
+      ],
+    );
+    return {
+      code,
+      name: body.name.trim(),
+      formula: body.formula.trim(),
+      granularity: body.granularity?.trim() || null,
+      description: body.description?.trim() || null,
+    };
+  }
+
+  async updateKpiDefinition(
+    code: string,
+    body: { name?: string; formula?: string; granularity?: string; description?: string },
+  ): Promise<boolean> {
+    const sets: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+    if (body.name !== undefined) {
+      sets.push(`name = $${idx++}`);
+      values.push(body.name.trim());
+    }
+    if (body.formula !== undefined) {
+      sets.push(`formula = $${idx++}`);
+      values.push(body.formula.trim());
+    }
+    if (body.granularity !== undefined) {
+      sets.push(`granularity = $${idx++}`);
+      values.push(body.granularity.trim() || null);
+    }
+    if (body.description !== undefined) {
+      sets.push(`description = $${idx++}`);
+      values.push(body.description.trim() || null);
+    }
+    if (!sets.length) return true;
+    values.push(code.trim().toUpperCase());
+    const result = await this.db.query(
+      `UPDATE kpi_definitions SET ${sets.join(', ')} WHERE code = $${idx}`,
+      values,
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async deleteKpiDefinition(code: string): Promise<boolean> {
+    const result = await this.db.query(`DELETE FROM kpi_definitions WHERE code = $1`, [
+      code.trim().toUpperCase(),
+    ]);
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async listClientLeads(clientId: string, limit = 50): Promise<
+    Array<{
+      id: string;
+      full_name: string | null;
+      phone: string | null;
+      email: string | null;
+      status: string | null;
+      channel: string | null;
+      created_at: string | null;
+    }>
+  > {
+    try {
+      const result = await this.db.query(
+        `SELECT id::text, full_name, phone, email, status, channel, created_at
+         FROM crm_leads
+         WHERE agency_client_id = $1::uuid
+         ORDER BY created_at DESC
+         LIMIT $2`,
+        [clientId, limit],
+      );
+      return result.rows.map((row) => ({
+        id: String(row.id),
+        full_name: row.full_name ?? null,
+        phone: row.phone ?? null,
+        email: row.email ?? null,
+        status: row.status ?? null,
+        channel: row.channel ?? null,
+        created_at: iso(row.created_at),
+      }));
+    } catch {
+      return [];
+    }
   }
 
   async updateHubCampaignMap(params: {

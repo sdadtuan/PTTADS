@@ -1,8 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { AgencySideEffectsService } from './agency-side-effects.service';
 import { AgencyRepository } from './agency.repository';
 import {
   AgencyClientsListResponse,
   AgencyClientDetail,
+  AgencySideEffectsSummary,
   AgencyStatsResponse,
   FacebookHubResponse,
   HubCampaignMapsResponse,
@@ -14,7 +16,13 @@ import {
   AddChannelAccountBody,
   UpdateClientBody,
   PatchHubCampaignMapBody,
+  SetChannelTokenBody,
+  CreateKpiDefinitionBody,
+  UpdateKpiDefinitionBody,
+  ClientLeadRow,
 } from './agency.types';
+import { TokenVaultError } from './token-vault.util';
+import { WorkflowsService } from '../workflows/workflows.service';
 
 const META_CAMPAIGN_ID_RE = /^[0-9]{5,20}$/;
 const VALID_CHANNELS = new Set(['meta', 'zalo', 'google', 'email']);
@@ -30,7 +38,13 @@ function normalizeMetaCampaignId(raw: string): string {
 
 @Injectable()
 export class AgencyService {
-  constructor(private readonly repo: AgencyRepository) {}
+  private readonly logger = new Logger(AgencyService.name);
+
+  constructor(
+    private readonly repo: AgencyRepository,
+    private readonly sideEffects: AgencySideEffectsService,
+    private readonly workflows: WorkflowsService,
+  ) {}
 
   private async ensurePg(): Promise<void> {
     if (!(await this.repo.pgReady())) {
@@ -102,6 +116,7 @@ export class AgencyService {
       owner_am_id: body.owner_am_id,
       notes: body.notes,
     });
+    await this.sideEffects.onClientCreated(row.id, body.owner_am_id);
     return { ...row, channel_accounts: [] };
   }
 
@@ -239,7 +254,18 @@ export class AgencyService {
     if (!ok) {
       throw new NotFoundException({ error: 'item_not_found' });
     }
-    return this.getOnboarding(clientId);
+    const workflowSignal = await this.sideEffects.onOnboardingPatched(clientId);
+    const response = await this.getOnboarding(clientId);
+    return { ...response, side_effects: workflowSignal ? { workflow_signal: workflowSignal } : undefined };
+  }
+
+  async getOnboardingWorkflowStatus(clientId: string) {
+    await this.ensurePg();
+    const client = await this.repo.fetchClient(clientId);
+    if (!client) {
+      throw new NotFoundException({ error: 'Not found' });
+    }
+    return this.workflows.onboardingStatus(clientId);
   }
 
   async activateClient(clientId: string, force = false): Promise<AgencyClientDetail> {
@@ -259,7 +285,29 @@ export class AgencyService {
     if (!row) {
       throw new NotFoundException({ error: 'Not found' });
     }
-    return this.getClient(clientId);
+    const effects = await this.sideEffects.onClientActivated(clientId, client.code);
+    const detail = await this.getClient(clientId);
+    return {
+      ...detail,
+      side_effects: this.mapSideEffects(effects),
+    };
+  }
+
+  private mapSideEffects(effects: {
+    domain_event_id: string | null;
+    jobs_enqueued: Array<{ id: string; job_type: string; status: string; created: boolean }>;
+    workflow_signal?: string;
+  }): AgencySideEffectsSummary {
+    return {
+      domain_event_id: effects.domain_event_id,
+      jobs_enqueued: effects.jobs_enqueued.map((j) => ({
+        id: j.id,
+        job_type: j.job_type,
+        status: j.status,
+        created: j.created,
+      })),
+      workflow_signal: effects.workflow_signal,
+    };
   }
 
   async addChannelAccount(clientId: string, body: AddChannelAccountBody): Promise<AgencyClientDetail> {
@@ -282,6 +330,80 @@ export class AgencyService {
       display_name: body.display_name,
     });
     return this.getClient(clientId);
+  }
+
+  async setChannelAccountToken(
+    clientId: string,
+    accountId: string,
+    body: SetChannelTokenBody,
+  ): Promise<AgencyClientDetail & { side_effects?: AgencySideEffectsSummary }> {
+    await this.ensurePg();
+    const client = await this.repo.fetchClient(clientId);
+    if (!client) {
+      throw new NotFoundException({ error: 'Not found' });
+    }
+    try {
+      await this.repo.setChannelAccountToken(clientId, accountId, body);
+    } catch (err) {
+      if (err instanceof TokenVaultError) {
+        throw new BadRequestException({ error: 'vault_not_configured', message: err.message });
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('DDL v3')) {
+        throw new ServiceUnavailableException({ error: 'vault_ddl_missing', message: msg });
+      }
+      if (msg === 'account_not_found') {
+        throw new NotFoundException({ error: 'account_not_found' });
+      }
+      throw new BadRequestException({ error: msg });
+    }
+    const account = await this.repo.fetchChannelAccount(clientId, accountId);
+    let jobs: AgencySideEffectsSummary['jobs_enqueued'];
+    if (account?.channel === 'meta' && account.has_token && !body.revoke) {
+      const enqueued = await this.sideEffects.enqueueMetaInsightsSync(clientId);
+      jobs = enqueued.map((j) => ({
+        id: j.id,
+        job_type: j.job_type,
+        status: j.status,
+        created: j.created,
+      }));
+    }
+    const detail = await this.getClient(clientId);
+    return jobs?.length ? { ...detail, side_effects: { jobs_enqueued: jobs } } : detail;
+  }
+
+  async syncClientInsights(clientId: string): Promise<{ ok: boolean; jobs_enqueued: AgencySideEffectsSummary['jobs_enqueued'] }> {
+    await this.ensurePg();
+    const client = await this.repo.fetchClient(clientId);
+    if (!client) {
+      throw new NotFoundException({ error: 'Not found' });
+    }
+    const jobs = await this.sideEffects.enqueueMetaInsightsSync(clientId);
+    if (!jobs.length) {
+      throw new ServiceUnavailableException({
+        error: 'jobs_disabled',
+        hint: 'Bật PTT_JOBS_ENABLED=1 và chạy ptt-worker',
+      });
+    }
+    return {
+      ok: true,
+      jobs_enqueued: jobs.map((j) => ({
+        id: j.id,
+        job_type: j.job_type,
+        status: j.status,
+        created: j.created,
+      })),
+    };
+  }
+
+  async listClientLeads(clientId: string): Promise<{ leads: ClientLeadRow[] }> {
+    await this.ensurePg();
+    const client = await this.repo.fetchClient(clientId);
+    if (!client) {
+      throw new NotFoundException({ error: 'Not found' });
+    }
+    const leads = await this.repo.listClientLeads(clientId);
+    return { leads };
   }
 
   async replayJob(jobId: string): Promise<{ id: string; status: string; replayed: boolean }> {
@@ -312,6 +434,42 @@ export class AgencyService {
     await this.ensurePg();
     const definitions = await this.repo.listKpiDefinitions();
     return { definitions };
+  }
+
+  async createKpiDefinition(body: CreateKpiDefinitionBody): Promise<{ definition: KpiDefinitionRow }> {
+    await this.ensurePg();
+    const code = body.code?.trim() ?? '';
+    if (!/^[A-Z0-9_]{2,40}$/.test(code.toUpperCase())) {
+      throw new BadRequestException({ error: 'invalid_code' });
+    }
+    if (!body.name?.trim() || !body.formula?.trim()) {
+      throw new BadRequestException({ error: 'name_and_formula_required' });
+    }
+    try {
+      const row = await this.repo.createKpiDefinition(body);
+      return { definition: row };
+    } catch (err) {
+      this.logger.warn(`createKpiDefinition failed: ${String(err)}`);
+      throw new BadRequestException({ error: 'create_failed', hint: 'code trùng?' });
+    }
+  }
+
+  async updateKpiDefinition(code: string, body: UpdateKpiDefinitionBody): Promise<{ ok: boolean }> {
+    await this.ensurePg();
+    const ok = await this.repo.updateKpiDefinition(code, body);
+    if (!ok) {
+      throw new NotFoundException({ error: 'not_found' });
+    }
+    return { ok: true };
+  }
+
+  async deleteKpiDefinition(code: string): Promise<{ ok: boolean }> {
+    await this.ensurePg();
+    const ok = await this.repo.deleteKpiDefinition(code);
+    if (!ok) {
+      throw new NotFoundException({ error: 'not_found' });
+    }
+    return { ok: true };
   }
 
   async patchHubCampaignMap(body: PatchHubCampaignMapBody): Promise<{ ok: boolean; map_id: string; external_campaign_id: string }> {

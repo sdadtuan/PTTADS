@@ -157,4 +157,24 @@ export class JobQueueRepository implements OnModuleDestroy {
       clientId: this.normalizeClientUuid(input.clientId),
     });
   }
+
+  /** Agency ops jobs (activate, token connect, manual sync) — only requires PTT_JOBS_ENABLED. */
+  async enqueueAgencyJob(input: {
+    jobType: string;
+    payload: Record<string, unknown>;
+    idempotencyKey: string;
+    clientId: string;
+    correlationId?: string;
+  }): Promise<EnqueuedJob | null> {
+    if (!this.config.jobsEnabled) {
+      return null;
+    }
+    return this.enqueueJobRecord({
+      jobType: input.jobType,
+      payload: input.payload,
+      idempotencyKey: input.idempotencyKey,
+      correlationId: input.correlationId,
+      clientId: this.normalizeClientUuid(input.clientId),
+    });
+  }
 }

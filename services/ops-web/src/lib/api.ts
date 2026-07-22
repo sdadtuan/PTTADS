@@ -1692,7 +1692,15 @@ export interface AgencyClient {
     external_account_id: string | null;
     display_name: string | null;
     status: string | null;
+    has_token?: boolean;
+    token_status?: string | null;
+    token_expires_at?: string | null;
   }>;
+  side_effects?: {
+    domain_event_id?: string | null;
+    jobs_enqueued?: Array<{ id: string; job_type: string; status: string; created?: boolean }>;
+    workflow_signal?: string;
+  };
   created_at: string | null;
   updated_at: string | null;
 }
@@ -1860,6 +1868,7 @@ export interface NotificationRow {
   category: string;
   title: string;
   body: string | null;
+  link_url: string | null;
   read: boolean;
   created_at: string | null;
 }
@@ -1955,6 +1964,77 @@ export async function addClientChannelAccount(
   return agencyMutate(token, `/api/v1/clients/${clientId}/channel-accounts`, {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+}
+
+export async function setClientChannelToken(
+  token: string,
+  clientId: string,
+  accountId: string,
+  body: { access_token?: string; credential_ref?: string; token_expires_at?: string; revoke?: boolean },
+): Promise<AgencyClient> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/channel-accounts/${accountId}/token`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function syncClientInsights(
+  token: string,
+  clientId: string,
+): Promise<{ ok: boolean; jobs_enqueued?: NonNullable<AgencyClient['side_effects']>['jobs_enqueued'] }> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/sync/insights`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export interface ClientLeadSummary {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
+  email: string | null;
+  status: string | null;
+  channel: string | null;
+  created_at: string | null;
+}
+
+export async function fetchClientLeads(
+  token: string,
+  clientId: string,
+): Promise<{ leads: ClientLeadSummary[] }> {
+  return agencyFetch(token, `/api/v1/clients/${clientId}/leads`);
+}
+
+export async function fetchOnboardingWorkflowStatus(
+  token: string,
+  clientId: string,
+): Promise<{ ok: boolean; status?: string; workflow_id?: string }> {
+  return agencyFetch(token, `/api/v1/clients/${clientId}/onboarding/workflow-status`);
+}
+
+export async function createKpiDefinition(
+  token: string,
+  body: { code: string; name: string; formula: string; granularity?: string; description?: string },
+): Promise<{ definition: KpiDefinition }> {
+  return agencyMutate(token, '/api/v1/kpi-definitions', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export async function updateKpiDefinition(
+  token: string,
+  code: string,
+  body: { name?: string; formula?: string; granularity?: string; description?: string },
+): Promise<{ ok: boolean }> {
+  return agencyMutate(token, `/api/v1/kpi-definitions/${encodeURIComponent(code)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteKpiDefinition(token: string, code: string): Promise<{ ok: boolean }> {
+  return agencyMutate(token, `/api/v1/kpi-definitions/${encodeURIComponent(code)}`, {
+    method: 'DELETE',
+    body: '{}',
   });
 }
 

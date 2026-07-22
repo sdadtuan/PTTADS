@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -18,6 +19,8 @@ import {
   JobsListResponse,
   NotificationsListResponse,
   PatchHubCampaignMapBody,
+  CreateKpiDefinitionBody,
+  UpdateKpiDefinitionBody,
 } from './agency.types';
 import {
   StaffAgencyViewGuard,
@@ -92,6 +95,25 @@ export class AgencyOpsController {
   @UseGuards(StaffOrInternalKeyGuard, StaffAgencyViewGuard)
   async listKpiDefinitions() {
     return this.agency.listKpiDefinitions();
+  }
+
+  @Post('kpi-definitions')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(StaffOrInternalKeyGuard, StaffAgencyWriteGuard)
+  async createKpiDefinition(@Body() body: CreateKpiDefinitionBody) {
+    return this.agency.createKpiDefinition(body);
+  }
+
+  @Patch('kpi-definitions/:code')
+  @UseGuards(StaffOrInternalKeyGuard, StaffAgencyWriteGuard)
+  async updateKpiDefinition(@Param('code') code: string, @Body() body: UpdateKpiDefinitionBody) {
+    return this.agency.updateKpiDefinition(code, body);
+  }
+
+  @Delete('kpi-definitions/:code')
+  @UseGuards(StaffOrInternalKeyGuard, StaffAgencyWriteGuard)
+  async deleteKpiDefinition(@Param('code') code: string) {
+    return this.agency.deleteKpiDefinition(code);
   }
 
   @Get('facebook-ads/hub')

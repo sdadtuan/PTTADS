@@ -23,6 +23,7 @@ import {
   OnboardingResponse,
   UpdateClientBody,
   AddChannelAccountBody,
+  SetChannelTokenBody,
 } from './agency.types';
 import { StaffAgencyViewGuard } from './guards/staff-agency-view.guard';
 import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
@@ -111,6 +112,16 @@ export class ClientsController {
     return this.agency.activateClient(id, force === '1' || force === 'true');
   }
 
+  @Get(':id/leads')
+  async listClientLeads(@Param('id') id: string) {
+    return this.agency.listClientLeads(id);
+  }
+
+  @Get(':id/onboarding/workflow-status')
+  async onboardingWorkflowStatus(@Param('id') id: string) {
+    return this.agency.getOnboardingWorkflowStatus(id);
+  }
+
   @Get(':id/onboarding')
   async getOnboarding(@Param('id') id: string): Promise<OnboardingResponse> {
     return this.agency.getOnboarding(id);
@@ -134,5 +145,22 @@ export class ClientsController {
     @Body() body: AddChannelAccountBody,
   ): Promise<AgencyClientDetail> {
     return this.agency.addChannelAccount(id, body);
+  }
+
+  @Patch(':id/channel-accounts/:accountId/token')
+  @UseGuards(StaffAgencyWriteGuard)
+  async setChannelToken(
+    @Param('id') id: string,
+    @Param('accountId') accountId: string,
+    @Body() body: SetChannelTokenBody,
+  ) {
+    return this.agency.setChannelAccountToken(id, accountId, body);
+  }
+
+  @Post(':id/sync/insights')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(StaffAgencyWriteGuard)
+  async syncInsights(@Param('id') id: string) {
+    return this.agency.syncClientInsights(id);
   }
 }

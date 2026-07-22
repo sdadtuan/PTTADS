@@ -26,6 +26,13 @@ export interface CreateClientBody {
 export interface AgencyClientDetail extends AgencyClientRow {
   channel_accounts?: AgencyChannelAccount[];
   progress?: Record<string, unknown>;
+  side_effects?: AgencySideEffectsSummary;
+}
+
+export interface AgencySideEffectsSummary {
+  domain_event_id?: string | null;
+  jobs_enqueued?: Array<{ id: string; job_type: string; status: string; created: boolean }>;
+  workflow_signal?: string;
 }
 
 export interface AgencyChannelAccount {
@@ -34,6 +41,11 @@ export interface AgencyChannelAccount {
   external_account_id: string | null;
   display_name: string | null;
   status: string | null;
+  has_token?: boolean;
+  token_status?: string | null;
+  token_expires_at?: string | null;
+  credential_ref?: string | null;
+  pixel_id?: string | null;
 }
 
 export interface AgencyStatsResponse {
@@ -87,6 +99,7 @@ export interface OnboardingProgress {
 export interface OnboardingResponse {
   items: OnboardingItemRow[];
   progress: OnboardingProgress;
+  side_effects?: AgencySideEffectsSummary;
 }
 
 export interface KpiDefinitionRow {
@@ -109,6 +122,38 @@ export interface AddChannelAccountBody {
   channel: string;
   external_account_id: string;
   display_name?: string;
+}
+
+export interface SetChannelTokenBody {
+  access_token?: string;
+  credential_ref?: string;
+  token_expires_at?: string;
+  revoke?: boolean;
+}
+
+export interface CreateKpiDefinitionBody {
+  code: string;
+  name: string;
+  formula: string;
+  granularity?: string;
+  description?: string;
+}
+
+export interface UpdateKpiDefinitionBody {
+  name?: string;
+  formula?: string;
+  granularity?: string;
+  description?: string;
+}
+
+export interface ClientLeadRow {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
+  email: string | null;
+  status: string | null;
+  channel: string | null;
+  created_at: string | null;
 }
 
 export interface PatchHubCampaignMapBody {
@@ -144,6 +189,7 @@ export interface NotificationRow {
   category: string;
   title: string;
   body: string | null;
+  link_url: string | null;
   client_id: string | null;
   read: boolean;
   created_at: string | null;

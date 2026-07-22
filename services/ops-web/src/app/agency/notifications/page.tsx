@@ -152,18 +152,39 @@ export default function AgencyNotificationsPage() {
         <ul className="notification-list">
           {filtered.map((n) => (
             <li key={n.id} className={`notif-item${n.read ? '' : ' notif-item--unread'}`}>
-              <div>
-                <strong>{n.title}</strong>
+              <div style={{ flex: '1 1 auto' }}>
+                {n.link_url ? (
+                  <Link href={n.link_url} className="nav-link">
+                    <strong>{n.title}</strong>
+                  </Link>
+                ) : (
+                  <strong>{n.title}</strong>
+                )}
                 {n.body ? <p className="muted" style={{ margin: '0.25rem 0 0' }}>{n.body}</p> : null}
                 <p className="muted" style={{ margin: '0.25rem 0 0', fontSize: '0.85rem' }}>
                   {n.category} · {n.created_at?.slice(0, 16) ?? '—'}
+                  {n.link_url ? (
+                    <>
+                      {' · '}
+                      <Link href={n.link_url} className="nav-link">
+                        Mở liên kết
+                      </Link>
+                    </>
+                  ) : null}
                 </p>
               </div>
-              {!n.read ? (
-                <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void markRead(n.id)}>
-                  Đã đọc
-                </button>
-              ) : null}
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+                {n.link_url ? (
+                  <Link href={n.link_url} className="btn btn-secondary btn-sm">
+                    Xem
+                  </Link>
+                ) : null}
+                {!n.read ? (
+                  <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void markRead(n.id)}>
+                    Đã đọc
+                  </button>
+                ) : null}
+              </div>
             </li>
           ))}
           {filtered.length === 0 ? (

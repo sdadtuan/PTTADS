@@ -9,14 +9,24 @@ import {
   activateAgencyClient,
   addClientChannelAccount,
   fetchAgencyClient,
+  fetchClientLeads,
   fetchClientOnboarding,
   fetchClientPerformance,
+  fetchOnboardingWorkflowStatus,
   patchAgencyClient,
   patchClientOnboardingItem,
+  setClientChannelToken,
   staffMe,
   staffRefresh,
+  syncClientInsights,
 } from '@/lib/api';
-import type { AgencyClient, OnboardingItem, OnboardingResponse, PerformanceRow } from '@/lib/api';
+import type {
+  AgencyClient,
+  ClientLeadSummary,
+  OnboardingItem,
+  OnboardingResponse,
+  PerformanceRow,
+} from '@/lib/api';
 import {
   clearSession,
   getAccessToken,
@@ -28,7 +38,7 @@ import {
   type StoredStaffUser,
 } from '@/lib/auth';
 
-type TabId = 'overview' | 'checklist' | 'channels';
+type TabId = 'overview' | 'checklist' | 'channels' | 'leads';
 
 const CLIENT_STATUSES = ['prospect', 'onboarding', 'active', 'paused'] as const;
 
@@ -79,6 +89,10 @@ export function AgencyClientDetailContent() {
     notes: '',
     status: 'prospect',
   });
+  const [workflowStatus, setWorkflowStatus] = useState<string>('');
+  const [clientLeads, setClientLeads] = useState<ClientLeadSummary[]>([]);
+  const [tokenAccountId, setTokenAccountId] = useState('');
+  const [tokenValue, setTokenValue] = useState('');
 
   const canWrite = canAgencyWrite(user);
 
@@ -118,14 +132,18 @@ export function AgencyClientDetailContent() {
 
   const reload = useCallback(
     async (access: string) => {
-      const [detail, perf, ob] = await Promise.all([
+      const [detail, perf, ob, wf, leadsOut] = await Promise.all([
         fetchAgencyClient(access, clientId),
         fetchClientPerformance(access, clientId, { group_by: 'campaign' }),
         fetchClientOnboarding(access, clientId),
+        fetchOnboardingWorkflowStatus(access, clientId).catch(() => ({ ok: false, status: '' })),
+        fetchClientLeads(access, clientId).catch(() => ({ leads: [] })),
       ]);
       setClient(detail);
       setPerfRows(perf.rows ?? []);
       setOnboarding(ob);
+      setWorkflowStatus(wf.status ?? (wf.ok ? 'unknown' : 'off'));
+      setClientLeads(leadsOut.leads ?? []);
       setEditForm({
         name: detail.name ?? '',
         industry_slug: detail.industry_slug ?? '',
@@ -190,7 +208,14 @@ export function AgencyClientDetailContent() {
     try {
       const updated = await activateAgencyClient(access, clientId, force);
       setClient(updated);
-      setActionMsg('Client đã kích hoạt');
+      const fx = updated.side_effects;
+      if (fx?.jobs_enqueued?.length) {
+        setActionMsg(
+          `Client đã kích hoạt · ${fx.jobs_enqueued.length} job (${fx.jobs_enqueued.map((j) => j.job_type).join(', ')})`,
+        );
+      } else {
+        setActionMsg('Client đã kích hoạt');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Kích hoạt thất bại');
     } finally {
@@ -248,6 +273,44 @@ export function AgencyClientDetailContent() {
     }
   }
 
+  async function handleConnectToken(e: React.FormEvent) {
+    e.preventDefault();
+    const access = getAccessToken();
+    if (!access || !canWrite || !tokenAccountId) return;
+    setBusy(true);
+    setError('');
+    setActionMsg('');
+    try {
+      const updated = await setClientChannelToken(access, clientId, tokenAccountId, {
+        access_token: tokenValue,
+      });
+      setClient(updated);
+      setTokenValue('');
+      const n = updated.side_effects?.jobs_enqueued?.length ?? 0;
+      setActionMsg(n ? `Token đã lưu · ${n} sync job queued` : 'Token đã lưu');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lưu token thất bại');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSyncInsights() {
+    const access = getAccessToken();
+    if (!access || !canWrite) return;
+    setBusy(true);
+    setActionMsg('');
+    setError('');
+    try {
+      const out = await syncClientInsights(access, clientId);
+      setActionMsg(`Đã enqueue ${out.jobs_enqueued?.length ?? 0} meta_insights_sync job`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sync insights thất bại');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function logout() {
     clearSession();
     router.push('/login');
@@ -296,6 +359,7 @@ export function AgencyClientDetailContent() {
                   ['overview', 'Tổng quan'],
                   ['checklist', `Checklist ${progress.completed}/${progress.total}`],
                   ['channels', 'Kênh ads'],
+                  ['leads', `Leads (${clientLeads.length})`],
                 ] as const
               ).map(([id, label]) => (
                 <button
@@ -378,6 +442,17 @@ export function AgencyClientDetailContent() {
                 )}
 
                 <h3 style={{ fontSize: '1rem', marginTop: '1.5rem' }}>Performance (Meta, 7 ngày)</h3>
+                {canWrite ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    style={{ marginBottom: '0.75rem' }}
+                    disabled={busy}
+                    onClick={() => void handleSyncInsights()}
+                  >
+                    Sync insights now
+                  </button>
+                ) : null}
                 <div style={{ overflowX: 'auto' }}>
                   <table className="perf-table">
                     <thead>
@@ -424,6 +499,9 @@ export function AgencyClientDetailContent() {
                   <div className="onboarding-progress-bar" style={{ width: `${progress.percent}%` }} />
                 </div>
                 <p className="muted">{progress.percent}% · {progress.completed}/{progress.total} mục</p>
+                {workflowStatus ? (
+                  <p className="muted">Temporal workflow: {workflowStatus}</p>
+                ) : null}
                 <ul className="onboarding-list">
                   {(onboarding?.items ?? []).map((item) => (
                     <li key={item.id} className="onboarding-item">
@@ -481,6 +559,7 @@ export function AgencyClientDetailContent() {
                       <th>Channel</th>
                       <th>External ID</th>
                       <th>Tên hiển thị</th>
+                      <th>Token</th>
                       <th>Status</th>
                     </tr>
                   </thead>
@@ -490,18 +569,51 @@ export function AgencyClientDetailContent() {
                         <td>{acc.channel}</td>
                         <td>{acc.external_account_id ?? '—'}</td>
                         <td>{acc.display_name ?? '—'}</td>
+                        <td>{acc.token_status ?? (acc.has_token ? 'ok' : '—')}</td>
                         <td>{acc.status ?? '—'}</td>
                       </tr>
                     ))}
                     {(client.channel_accounts ?? []).length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="muted">
+                        <td colSpan={5} className="muted">
                           Chưa có channel account
                         </td>
                       </tr>
                     ) : null}
                   </tbody>
                 </table>
+
+                {canWrite ? (
+                  <form onSubmit={(e) => void handleConnectToken(e)} style={{ marginTop: '1.25rem', display: 'grid', gap: '0.75rem', maxWidth: 480 }}>
+                    <h3 style={{ fontSize: '1rem', margin: 0 }}>Connect Meta token (vault)</h3>
+                    <select
+                      value={tokenAccountId}
+                      onChange={(e) => setTokenAccountId(e.target.value)}
+                      required
+                      style={{ padding: '0.5rem' }}
+                    >
+                      <option value="">Chọn Meta account…</option>
+                      {(client.channel_accounts ?? [])
+                        .filter((a) => a.channel === 'meta')
+                        .map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.external_account_id} · {a.display_name || a.id.slice(0, 8)}
+                          </option>
+                        ))}
+                    </select>
+                    <input
+                      type="password"
+                      placeholder="Meta access token"
+                      value={tokenValue}
+                      onChange={(e) => setTokenValue(e.target.value)}
+                      required
+                      style={{ padding: '0.5rem' }}
+                    />
+                    <button type="submit" className="btn btn-sm" disabled={busy}>
+                      Lưu token + enqueue sync
+                    </button>
+                  </form>
+                ) : null}
 
                 {canWrite ? (
                   <form onSubmit={(e) => void handleAddChannel(e)} style={{ marginTop: '1.25rem', display: 'grid', gap: '0.75rem', maxWidth: 480 }}>
@@ -534,6 +646,46 @@ export function AgencyClientDetailContent() {
                     </button>
                   </form>
                 ) : null}
+              </div>
+            ) : null}
+
+            {tab === 'leads' ? (
+              <div style={{ marginTop: '1rem', overflowX: 'auto' }}>
+                <table className="perf-table">
+                  <thead>
+                    <tr>
+                      <th>Tên</th>
+                      <th>Phone</th>
+                      <th>Trạng thái</th>
+                      <th>Kênh</th>
+                      <th>Ngày</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientLeads.map((lead) => (
+                      <tr key={lead.id}>
+                        <td>{lead.full_name || '—'}</td>
+                        <td>{lead.phone || '—'}</td>
+                        <td>{lead.status || '—'}</td>
+                        <td>{lead.channel || '—'}</td>
+                        <td>{lead.created_at?.slice(0, 10) ?? '—'}</td>
+                        <td>
+                          <Link href={`/crm/leads/${lead.id}`} className="nav-link">
+                            Mở CRM
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                    {clientLeads.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="muted">
+                          Chưa có lead gắn client này (agency_client_id)
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
               </div>
             ) : null}
           </>
