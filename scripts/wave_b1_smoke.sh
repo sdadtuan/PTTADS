@@ -28,6 +28,9 @@ http_get() {
     ok "$label (HTTP $code)"
   else
     bad "$label (HTTP $code) $(head -c 200 "$body" | tr '\n' ' ')"
+    if [[ "$code" == "404" ]]; then
+      echo "      hint: Nest chưa rebuild Wave B1 — git pull && cd services/ptt-crm-api && npm run build && sudo systemctl restart ptt-crm-api"
+    fi
   fi
   rm -f "$body"
 }

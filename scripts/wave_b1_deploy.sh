@@ -47,6 +47,15 @@ if [[ "$restart_ok" -eq 1 ]]; then
   sleep 2
   curl -sf "http://127.0.0.1:3000/health" >/dev/null && echo "OK  Nest /health"
   curl -sf -o /dev/null "http://127.0.0.1:3200/login" && echo "OK  ops-web :3200"
+  kpi_code="$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:3000/api/v1/kpi-definitions")"
+  if [[ "$kpi_code" == "401" || "$kpi_code" == "403" ]]; then
+    echo "OK  Nest Wave B1 routes present (kpi-definitions HTTP $kpi_code — auth required)"
+  elif [[ "$kpi_code" == "404" ]]; then
+    echo "FAIL Nest thiếu Wave B1 — dist cũ? Chạy lại: cd services/ptt-crm-api && npm run build && sudo systemctl restart ptt-crm-api"
+    exit 1
+  else
+    echo "WARN kpi-definitions HTTP $kpi_code"
+  fi
 fi
 
 echo ""
