@@ -12,6 +12,7 @@ import {
   AgencyClientDetail,
   AgencyClientRow,
   FacebookHubClientRow,
+  GoogleHubClientRow,
   HubCampaignGlobalRow,
   HubCampaignMapRow,
   JobRow,
@@ -1213,6 +1214,129 @@ export class AgencyRepository implements OnModuleDestroy {
     return { clients, summary, dateFrom, dateTo, windowDays };
   }
 
+  async googleHubSummary(params: {
+    windowDays?: number;
+    dateTo?: string;
+    dateFrom?: string;
+    status?: string;
+    clientId?: string;
+    q?: string;
+  }): Promise<{ clients: GoogleHubClientRow[]; summary: Record<string, unknown>; dateFrom: string; dateTo: string; windowDays: number }> {
+    const { dateFrom, dateTo, windowDays } = resolveFacebookHubDateWindow({
+      days: params.windowDays,
+      dateTo: params.dateTo,
+      dateFrom: params.dateFrom,
+    });
+
+    const clientClauses = ['1=1'];
+    const sqlParams: unknown[] = [dateFrom, dateTo];
+    let idx = 3;
+    if (params.status) {
+      clientClauses.push(`c.status = $${idx++}`);
+      sqlParams.push(params.status);
+    }
+    if (params.clientId) {
+      clientClauses.push(`c.id = $${idx++}::uuid`);
+      sqlParams.push(params.clientId);
+    }
+    if (params.q) {
+      clientClauses.push(`(c.code ILIKE $${idx} OR c.name ILIKE $${idx})`);
+      sqlParams.push(`%${params.q}%`);
+      idx++;
+    }
+
+    const result = await this.db.query(
+      `WITH perf AS (
+         SELECT dp.client_id,
+                SUM(dp.spend) AS spend,
+                SUM(dp.leads_crm) AS leads_crm,
+                COUNT(DISTINCT dp.external_campaign_id) AS campaigns,
+                COUNT(DISTINCT dp.external_campaign_id)
+                  FILTER (WHERE dp.hub_campaign_map_id IS NULL) AS unmapped_campaigns,
+                COUNT(*) FILTER (
+                  WHERE hcm.target_cpl_vnd IS NOT NULL
+                    AND dp.leads_crm > 0
+                    AND (dp.spend / dp.leads_crm) > hcm.target_cpl_vnd
+                ) AS over_target_rows
+         FROM daily_performance dp
+         LEFT JOIN hub_campaign_map hcm ON hcm.id = dp.hub_campaign_map_id
+         WHERE dp.channel = 'google'
+           AND dp.performance_date BETWEEN $1::date AND $2::date
+         GROUP BY dp.client_id
+       ),
+       google_acct AS (
+         SELECT cca.client_id,
+                COUNT(*) FILTER (WHERE cca.channel = 'google') AS google_account_count,
+                BOOL_OR(cca.channel = 'google' AND cca.access_token_encrypted IS NOT NULL) AS google_has_token
+         FROM client_channel_accounts cca
+         GROUP BY cca.client_id
+       )
+       SELECT c.id::text, c.code, c.name, c.status, c.owner_am_id,
+              COALESCE(ga.google_account_count, 0) AS google_account_count,
+              COALESCE(ga.google_has_token, FALSE) AS google_has_token,
+              COALESCE(p.spend, 0) AS spend,
+              COALESCE(p.leads_crm, 0) AS leads_crm,
+              COALESCE(p.campaigns, 0) AS campaigns,
+              COALESCE(p.unmapped_campaigns, 0) AS unmapped_campaigns,
+              COALESCE(p.over_target_rows, 0) AS over_target_rows
+       FROM clients c
+       LEFT JOIN google_acct ga ON ga.client_id = c.id
+       LEFT JOIN perf p ON p.client_id = c.id
+       WHERE ${clientClauses.join(' AND ')}
+         AND (
+           COALESCE(ga.google_account_count, 0) > 0
+           OR COALESCE(p.spend, 0) > 0
+           OR COALESCE(p.leads_crm, 0) > 0
+           OR c.status IN ('active', 'onboarding')
+         )
+       ORDER BY COALESCE(p.spend, 0) DESC, c.code ASC
+       LIMIT 200`,
+      sqlParams,
+    );
+
+    const clients: GoogleHubClientRow[] = [];
+    let totalSpend = 0;
+    let totalLeads = 0;
+    let overTarget = 0;
+    let unmapped = 0;
+
+    for (const row of result.rows) {
+      const spend = Number(row.spend ?? 0);
+      const leads = Math.trunc(Number(row.leads_crm ?? 0));
+      totalSpend += spend;
+      totalLeads += leads;
+      overTarget += Math.trunc(Number(row.over_target_rows ?? 0));
+      unmapped += Math.trunc(Number(row.unmapped_campaigns ?? 0));
+      clients.push({
+        id: String(row.id),
+        code: row.code ?? null,
+        name: row.name ?? null,
+        status: row.status ?? null,
+        owner_am_id: row.owner_am_id ?? null,
+        google_account_count: Math.trunc(Number(row.google_account_count ?? 0)),
+        spend: Math.round(spend * 100) / 100,
+        leads_crm: leads,
+        cpl: computeCpl(spend, leads),
+        campaigns: Math.trunc(Number(row.campaigns ?? 0)),
+        unmapped_campaigns: Math.trunc(Number(row.unmapped_campaigns ?? 0)),
+        over_target_rows: Math.trunc(Number(row.over_target_rows ?? 0)),
+        google_has_token: Boolean(row.google_has_token),
+        token_status: Boolean(row.google_has_token) ? 'ok' : 'missing',
+      });
+    }
+
+    const summary = {
+      google_clients: clients.length,
+      total_spend: Math.round(totalSpend * 100) / 100,
+      total_leads: totalLeads,
+      avg_cpl: computeCpl(totalSpend, totalLeads),
+      over_target_rows: overTarget,
+      unmapped_campaigns: unmapped,
+    };
+
+    return { clients, summary, dateFrom, dateTo, windowDays };
+  }
+
   async facebookHubCampaignExport(params: {
     dateFrom: string;
     dateTo: string;
@@ -1221,6 +1345,70 @@ export class AgencyRepository implements OnModuleDestroy {
     q?: string;
   }): Promise<FacebookHubCampaignExportRow[]> {
     const clauses = [`dp.channel = 'meta'`, `dp.performance_date BETWEEN $1::date AND $2::date`];
+    const sqlParams: unknown[] = [params.dateFrom, params.dateTo];
+    let idx = 3;
+
+    if (params.clientId) {
+      clauses.push(`dp.client_id = $${idx++}::uuid`);
+      sqlParams.push(params.clientId);
+    }
+    if (params.status) {
+      clauses.push(`c.status = $${idx++}`);
+      sqlParams.push(params.status);
+    }
+    if (params.q) {
+      clauses.push(`(c.code ILIKE $${idx} OR c.name ILIKE $${idx})`);
+      sqlParams.push(`%${params.q}%`);
+      idx++;
+    }
+
+    const result = await this.db.query(
+      `SELECT c.id::text AS client_id,
+              c.code AS client_code,
+              c.name AS client_name,
+              dp.external_campaign_id,
+              MAX(hcm.external_campaign_name) AS external_campaign_name,
+              SUM(dp.spend) AS spend,
+              SUM(dp.leads_crm) AS leads_crm,
+              MAX(hcm.target_cpl_vnd) AS target_cpl_vnd,
+              BOOL_OR(dp.hub_campaign_map_id IS NOT NULL) AS hub_mapped
+       FROM daily_performance dp
+       JOIN clients c ON c.id = dp.client_id
+       LEFT JOIN hub_campaign_map hcm ON hcm.id = dp.hub_campaign_map_id
+       WHERE ${clauses.join(' AND ')}
+       GROUP BY c.id, c.code, c.name, dp.external_campaign_id
+       ORDER BY SUM(dp.spend) DESC, c.code ASC, dp.external_campaign_id ASC
+       LIMIT 5000`,
+      sqlParams,
+    );
+
+    return result.rows.map((row) => {
+      const spend = Number(row.spend ?? 0);
+      const leads = Math.trunc(Number(row.leads_crm ?? 0));
+      return {
+        client_id: String(row.client_id),
+        client_code: row.client_code ?? null,
+        client_name: row.client_name ?? null,
+        external_campaign_id: row.external_campaign_id ?? null,
+        external_campaign_name: row.external_campaign_name ?? null,
+        spend: Math.round(spend * 100) / 100,
+        leads_crm: leads,
+        cpl: computeCpl(spend, leads),
+        target_cpl_vnd:
+          row.target_cpl_vnd != null ? Math.trunc(Number(row.target_cpl_vnd)) : null,
+        hub_mapped: Boolean(row.hub_mapped),
+      };
+    });
+  }
+
+  async googleHubCampaignExport(params: {
+    dateFrom: string;
+    dateTo: string;
+    clientId?: string;
+    status?: string;
+    q?: string;
+  }): Promise<FacebookHubCampaignExportRow[]> {
+    const clauses = [`dp.channel = 'google'`, `dp.performance_date BETWEEN $1::date AND $2::date`];
     const sqlParams: unknown[] = [params.dateFrom, params.dateTo];
     let idx = 3;
 

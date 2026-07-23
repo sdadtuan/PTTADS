@@ -47,6 +47,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/agency/notifications': 'Thông báo Agency',
   '/agency/kpi-definitions': 'Định nghĩa KPI',
   '/meta/facebook-ads': 'Meta Ads',
+  '/google/google-ads': 'Google Ads',
+  '/meta/ads-combined': 'Ads CPL',
   '/meta/migration': 'Meta Migration',
   '/crm/hub': 'Hub · Hợp đồng',
   '/seo/hub': 'SEO/AEO Hub',
@@ -192,6 +194,10 @@ function buildSections(
   if (hasCap(user, 'crm_facebook_ads', 'view') || hasCap(user, 'crm_agency', 'view')) {
     agency.push({ href: '/meta/facebook-ads', label: 'Meta Ads' });
     agency.push({ href: '/meta/migration', label: 'Meta Migration' });
+  }
+  if (hasCap(user, 'crm_google_ads', 'view') || hasCap(user, 'crm_agency', 'view')) {
+    agency.push({ href: '/google/google-ads', label: 'Google Ads' });
+    agency.push({ href: '/meta/ads-combined', label: 'Ads CPL' });
   }
   if (hasCap(user, 'crm_seo', 'view') || hasCap(user, 'crm_agency', 'view')) {
     agency.push({ href: '/seo/hub', label: 'SEO/AEO Hub' });

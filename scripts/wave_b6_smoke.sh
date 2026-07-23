@@ -56,6 +56,8 @@ if [[ -n "$LIFECYCLE_ID" ]]; then
   [[ "$cw_stats" =~ ^2 ]] && ok "GET /crm/campaign-writes/stats (HTTP $cw_stats)" || bad "GET campaign-writes/stats (HTTP $cw_stats)"
   cw_list="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/crm/campaign-writes?status=all" "${AUTH[@]}")"
   [[ "$cw_list" =~ ^2 ]] && ok "GET /crm/campaign-writes (HTTP $cw_list)" || bad "GET campaign-writes (HTTP $cw_list)"
+  ghub="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/v1/google-ads/hub?days=7" "${AUTH[@]}")"
+  [[ "$ghub" =~ ^2 ]] && ok "GET /google-ads/hub (HTTP $ghub)" || bad "GET google-ads/hub (HTTP $ghub)"
 else
   bad "no LIFECYCLE_ID — skip B6 lifecycle routes"
 fi

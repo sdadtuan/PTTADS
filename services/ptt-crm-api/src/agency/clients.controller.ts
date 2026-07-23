@@ -234,4 +234,11 @@ export class ClientsController {
   async syncInsights(@Param('id') id: string) {
     return this.agency.syncClientInsights(id);
   }
+
+  @Post(':id/sync/google-insights')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(StaffAgencyWriteGuard)
+  async syncGoogleInsights(@Param('id') id: string) {
+    return this.agency.syncGoogleClientInsights(id);
+  }
 }

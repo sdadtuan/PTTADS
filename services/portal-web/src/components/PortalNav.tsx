@@ -14,6 +14,7 @@ interface PortalNavProps {
 const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Performance',
   '/meta': 'Meta Performance',
+  '/google': 'Google Performance',
   '/creatives': 'Creative inbox',
   '/seo': 'SEO/AEO',
   '/seo/reports': 'SEO Reports',
@@ -27,6 +28,7 @@ export function PortalNav({ user, onLogout, seoEnabled = true, emailEnabled = tr
   const links = [
     { href: '/dashboard', label: 'Performance' },
     { href: '/meta', label: 'Meta (Facebook)' },
+    { href: '/google', label: 'Google Ads' },
     { href: '/creatives', label: 'Creative inbox' },
   ];
   if (seoEnabled) {

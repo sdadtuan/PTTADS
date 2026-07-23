@@ -175,3 +175,8 @@ export function facebookHubExportFilename(scope: string, dateFrom: string, dateT
   const safeScope = scope === 'campaigns' ? 'campaigns' : 'clients';
   return `meta-hub-${safeScope}-${dateFrom}_${dateTo}.csv`;
 }
+
+export function googleAdsHubExportFilename(scope: string, dateFrom: string, dateTo: string): string {
+  const safeScope = scope === 'campaigns' ? 'campaigns' : 'clients';
+  return `google-hub-${safeScope}-${dateFrom}_${dateTo}.csv`;
+}

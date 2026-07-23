@@ -360,6 +360,13 @@ ADMIN_CRM_SECTIONS: tuple[dict[str, Any], ...] = (
         "description": "Hub Meta/Facebook — token, CPL, map Hub, truy cập nhanh Lead Ads.",
     },
     {
+        "id": "crm_google_ads",
+        "label": "Google Ads",
+        "group": "CRM · Quảng cáo",
+        "page": "/crm/google-ads",
+        "description": "Hub Google Ads — OAuth pilot, CPL, map Hub, sync insights.",
+    },
+    {
         "id": "crm_seo_aeo",
         "label": "SEO/AEO Ops — Tổng quan",
         "group": "CRM · SEO/AEO",
@@ -426,6 +433,7 @@ SIDEBAR_CRM_NAV_SECTIONS: tuple[str, ...] = (
     "crm_payroll_attendance",
     "crm_agency",
     "crm_facebook_ads",
+    "crm_google_ads",
     "crm_seo_aeo",
 )
 
@@ -473,6 +481,7 @@ _POSITION_DEFAULT: dict[str, dict[str, frozenset[str]]] = {
         "crm_hdsd": frozenset({"view", "export"}),
         "crm_agency": frozenset({"view", "edit", "create", "configure"}),
         "crm_facebook_ads": frozenset({"view", "edit", "create", "configure"}),
+        "crm_google_ads": frozenset({"view", "export"}),
         "crm_seo_aeo": frozenset({"view"}),
         "crm_seo_aeo_settings": frozenset({"view", "edit", "configure"}),
         "crm_seo_aeo_reports": frozenset({"view", "export"}),
@@ -509,6 +518,7 @@ _POSITION_DEFAULT: dict[str, dict[str, frozenset[str]]] = {
         "crm_hdsd": frozenset({"view", "export"}),
         "crm_agency": frozenset({"view", "edit", "create", "configure"}),
         "crm_facebook_ads": frozenset({"view", "edit", "create", "configure"}),
+        "crm_google_ads": frozenset({"view", "export"}),
         "crm_seo_aeo": frozenset({"view", "edit", "create", "approve", "configure", "export"}),
         "crm_seo_aeo_write": frozenset({"view", "edit", "create"}),
         "crm_seo_aeo_approve": frozenset({"approve"}),

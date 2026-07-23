@@ -10,6 +10,7 @@ import {
   AgencyStatsResponse,
   FacebookHubResponse,
   FacebookHubAlert,
+  GoogleHubResponse,
   HubCampaignMapsResponse,
   HubCampaignGlobalRow,
   HubCampaignMapRow,
@@ -35,8 +36,16 @@ import {
   buildFacebookHubCampaignsCsv,
   buildFacebookHubClientsCsv,
   facebookHubExportFilename,
+  googleAdsHubExportFilename,
   normalizeHubClientUuid,
 } from './facebook-hub.util';
+import { googleAdsPilotStatus, checkGoogleAdsPilot } from './google-ads-pilot.util';
+import {
+  exchangeGoogleAuthorizationCode,
+  googleOAuthAuthorizationUrl,
+  googleOAuthConfigured,
+  parseGoogleOAuthState,
+} from './google-oauth.util';
 import {
   checkAutosyncStandalone,
   evaluateSoakGate,
@@ -314,6 +323,151 @@ export class AgencyService {
     };
   }
 
+  async googleHub(query: {
+    days?: string;
+    to?: string;
+    date_to?: string;
+    from?: string;
+    date_from?: string;
+    status?: string;
+    client_id?: string;
+    q?: string;
+  }): Promise<GoogleHubResponse> {
+    await this.ensurePg();
+    const windowDays = Math.min(Math.max(Number(query.days ?? 7) || 7, 1), 90);
+    const dateTo = (query.to ?? query.date_to ?? '').trim() || undefined;
+    const dateFrom = (query.from ?? query.date_from ?? '').trim() || undefined;
+    const clientId = normalizeHubClientUuid(query.client_id);
+    const q = query.q?.trim() || undefined;
+    const status = query.status?.trim() || undefined;
+
+    const { clients, summary, dateFrom: df, dateTo: dt, windowDays: wd } =
+      await this.repo.googleHubSummary({
+        windowDays,
+        dateTo,
+        dateFrom,
+        status,
+        clientId: clientId ?? undefined,
+        q,
+      });
+
+    return {
+      ok: true,
+      pg_ready: true,
+      date_from: df,
+      date_to: dt,
+      window_days: wd,
+      summary,
+      clients,
+      alerts: this.buildGoogleHubAlerts(summary),
+      pilot: googleAdsPilotStatus(clientId ?? undefined) as unknown as Record<string, unknown>,
+      filters: {
+        client_id: clientId,
+        status: status ?? null,
+        q: q ?? null,
+      },
+    };
+  }
+
+  async googleHubExportCsv(query: {
+    days?: string;
+    to?: string;
+    date_to?: string;
+    from?: string;
+    date_from?: string;
+    status?: string;
+    client_id?: string;
+    q?: string;
+    scope?: string;
+  }): Promise<{ csv: string; filename: string }> {
+    await this.ensurePg();
+    const hub = await this.googleHub(query);
+    const scope = (query.scope ?? 'clients').trim().toLowerCase();
+    const meta = { dateFrom: hub.date_from, dateTo: hub.date_to };
+
+    if (scope === 'campaigns') {
+      const rows = await this.repo.googleHubCampaignExport({
+        dateFrom: hub.date_from,
+        dateTo: hub.date_to,
+        clientId: hub.filters?.client_id ?? undefined,
+        status: hub.filters?.status ?? undefined,
+        q: hub.filters?.q ?? undefined,
+      });
+      return {
+        csv: buildFacebookHubCampaignsCsv(rows, meta),
+        filename: googleAdsHubExportFilename('campaigns', meta.dateFrom, meta.dateTo),
+      };
+    }
+
+    const exportClients = hub.clients.map((c) => ({
+      id: c.id,
+      code: c.code,
+      name: c.name,
+      status: c.status,
+      owner_am_id: c.owner_am_id,
+      meta_account_count: c.google_account_count,
+      spend: c.spend,
+      leads_crm: c.leads_crm,
+      cpl: c.cpl,
+      campaigns: c.campaigns,
+      unmapped_campaigns: c.unmapped_campaigns,
+      over_target_rows: c.over_target_rows,
+      meta_has_token: c.google_has_token,
+      token_status: c.token_status,
+    }));
+
+    return {
+      csv: buildFacebookHubClientsCsv(exportClients, meta),
+      filename: googleAdsHubExportFilename('clients', meta.dateFrom, meta.dateTo),
+    };
+  }
+
+  googleAdsPilotStatus(clientId?: string) {
+    return { ok: true, pilot: googleAdsPilotStatus(clientId) };
+  }
+
+  googleOAuthStart(agencyClientId: string, accountId?: string) {
+    if (!googleOAuthConfigured()) {
+      throw new ServiceUnavailableException({
+        error: 'missing_google_oauth_env',
+        hint: 'Cấu hình PTT_GOOGLE_ADS_CLIENT_ID/SECRET và PTT_GOOGLE_OAUTH_REDIRECT_URI',
+      });
+    }
+    const pilot = checkGoogleAdsPilot(agencyClientId);
+    const url = googleOAuthAuthorizationUrl(agencyClientId.trim(), accountId?.trim() || undefined);
+    return { ok: true, authorization_url: url, pilot };
+  }
+
+  async googleOAuthCallback(code: string, state: string): Promise<{ redirect_url: string }> {
+    const parsed = parseGoogleOAuthState(state);
+    const agencyClientId = parsed.client_id.trim();
+    const accountId = parsed.account_id.trim();
+    if (!agencyClientId) {
+      throw new BadRequestException({ error: 'invalid_oauth_state' });
+    }
+    await this.ensurePg();
+    const tokens = await exchangeGoogleAuthorizationCode(code);
+    let targetAccountId = accountId;
+    if (!targetAccountId) {
+      const client = await this.getClient(agencyClientId);
+      const googleAcc = (client.channel_accounts ?? []).find((a) => a.channel === 'google');
+      targetAccountId = googleAcc?.id ?? '';
+    }
+    if (!targetAccountId) {
+      throw new BadRequestException({
+        error: 'google_account_required',
+        message: 'Tạo channel account Google trước khi connect OAuth',
+      });
+    }
+    await this.setChannelAccountToken(agencyClientId, targetAccountId, {
+      access_token: tokens.refresh_token,
+    });
+    const opsWeb = (process.env.PTT_OPS_WEB_URL ?? 'https://ops.pttads.vn').replace(/\/$/, '');
+    return {
+      redirect_url: `${opsWeb}/agency/clients/${encodeURIComponent(agencyClientId)}?tab=channels&google_oauth=ok`,
+    };
+  }
+
   facebookAdsMigrationStatus(): Record<string, unknown> {
     const retired = this.isEnvTruthy('PTT_FLASK_META_ADS_ADMIN_RETIRED');
     const opsWeb = (process.env.PTT_OPS_WEB_URL ?? 'https://ops.pttads.vn').replace(/\/$/, '');
@@ -535,6 +689,29 @@ export class AgencyService {
         severity: 'warn',
         message: `${overTarget} dòng CPL vượt target trong kỳ đã chọn`,
         link: '/meta/facebook-ads',
+        link_label: 'Xem bảng client',
+      });
+    }
+    return alerts;
+  }
+
+  private buildGoogleHubAlerts(summary: Record<string, unknown>): FacebookHubAlert[] {
+    const alerts: FacebookHubAlert[] = [];
+    const unmapped = Number(summary.unmapped_campaigns ?? 0);
+    const overTarget = Number(summary.over_target_rows ?? 0);
+    if (unmapped > 0) {
+      alerts.push({
+        severity: 'warn',
+        message: `${unmapped} campaign Google chưa map Hub`,
+        link: '/crm/hub',
+        link_label: 'Mở Hub map',
+      });
+    }
+    if (overTarget > 0) {
+      alerts.push({
+        severity: 'warn',
+        message: `${overTarget} dòng CPL vượt target trong kỳ đã chọn`,
+        link: '/google/google-ads',
         link_label: 'Xem bảng client',
       });
     }
@@ -822,6 +999,17 @@ export class AgencyService {
         created: j.created,
       }));
     }
+    if (account?.channel === 'google' && account.has_token && !body.revoke) {
+      const enqueued = await this.sideEffects.enqueueGoogleInsightsSync(clientId);
+      jobs = (jobs ?? []).concat(
+        enqueued.map((j) => ({
+          id: j.id,
+          job_type: j.job_type,
+          status: j.status,
+          created: j.created,
+        })),
+      );
+    }
     const detail = await this.getClient(clientId);
     return jobs?.length ? { ...detail, side_effects: { jobs_enqueued: jobs } } : detail;
   }
@@ -841,6 +1029,32 @@ export class AgencyService {
     }
     return {
       ok: true,
+      jobs_enqueued: jobs.map((j) => ({
+        id: j.id,
+        job_type: j.job_type,
+        status: j.status,
+        created: j.created,
+      })),
+    };
+  }
+
+  async syncGoogleClientInsights(clientId: string): Promise<{ ok: boolean; jobs_enqueued: AgencySideEffectsSummary['jobs_enqueued']; pilot?: ReturnType<typeof checkGoogleAdsPilot> }> {
+    await this.ensurePg();
+    const client = await this.repo.fetchClient(clientId);
+    if (!client) {
+      throw new NotFoundException({ error: 'Not found' });
+    }
+    const pilot = checkGoogleAdsPilot(clientId);
+    const jobs = await this.sideEffects.enqueueGoogleInsightsSync(clientId);
+    if (!jobs.length) {
+      throw new ServiceUnavailableException({
+        error: 'jobs_disabled',
+        hint: 'Bật PTT_JOBS_ENABLED=1 và chạy ptt-worker',
+      });
+    }
+    return {
+      ok: true,
+      pilot,
       jobs_enqueued: jobs.map((j) => ({
         id: j.id,
         job_type: j.job_type,

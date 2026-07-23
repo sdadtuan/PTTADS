@@ -80,4 +80,22 @@ export class AgencySideEffectsService {
     });
     return job ? [job] : [];
   }
+
+  async enqueueGoogleInsightsSync(
+    clientId: string,
+    targetDate?: string,
+  ): Promise<EnqueuedJob[]> {
+    const dateKey = targetDate?.trim() || new Date().toISOString().slice(0, 10);
+    const job = await this.jobQueue.enqueueAgencyJob({
+      jobType: 'google_insights_sync',
+      payload: {
+        client_id: clientId,
+        compute_metrics: true,
+        target_date: dateKey,
+      },
+      idempotencyKey: `google_insights_sync:${clientId}:${dateKey}`,
+      clientId,
+    });
+    return job ? [job] : [];
+  }
 }

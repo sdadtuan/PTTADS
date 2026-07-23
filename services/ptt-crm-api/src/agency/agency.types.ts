@@ -298,3 +298,37 @@ export interface FacebookHubResponse {
     q?: string | null;
   };
 }
+
+export interface GoogleHubClientRow {
+  id: string;
+  code: string | null;
+  name: string | null;
+  status: string | null;
+  owner_am_id: string | null;
+  google_account_count: number;
+  spend: number;
+  leads_crm: number;
+  cpl: number | null;
+  campaigns: number;
+  unmapped_campaigns: number;
+  over_target_rows: number;
+  google_has_token: boolean;
+  token_status: string;
+}
+
+export interface GoogleHubResponse {
+  ok: boolean;
+  pg_ready: boolean;
+  date_from: string;
+  date_to: string;
+  window_days: number;
+  summary: Record<string, unknown>;
+  clients: GoogleHubClientRow[];
+  alerts: FacebookHubAlert[];
+  pilot?: Record<string, unknown>;
+  filters?: {
+    client_id?: string | null;
+    status?: string | null;
+    q?: string | null;
+  };
+}

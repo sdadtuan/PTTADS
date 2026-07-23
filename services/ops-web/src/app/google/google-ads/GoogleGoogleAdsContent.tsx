@@ -3,18 +3,16 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { MetaMigrationPanel } from '@/components/MetaMigrationPanel';
+import { GooglePilotBanner } from '@/components/GooglePilotBanner';
 import { OpsNav } from '@/components/OpsNav';
 import {
-  downloadFacebookHubExport,
+  downloadGoogleHubExport,
   fetchAgencyClients,
-  fetchFacebookAdsMigrationStatus,
-  fetchFacebookHub,
+  fetchGoogleHub,
   staffMe,
   staffRefresh,
   type AgencyClient,
-  type FacebookAdsMigrationStatus,
-  type FacebookHubResponse,
+  type GoogleHubResponse,
 } from '@/lib/api';
 import {
   clearSession,
@@ -44,12 +42,11 @@ function opsWebLink(path: string): string {
   return path;
 }
 
-export function MetaFacebookAdsContent() {
+export function GoogleGoogleAdsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState<StoredStaffUser | null>(null);
-  const [hub, setHub] = useState<FacebookHubResponse | null>(null);
-  const [migration, setMigration] = useState<FacebookAdsMigrationStatus | null>(null);
+  const [hub, setHub] = useState<GoogleHubResponse | null>(null);
   const [clientOptions, setClientOptions] = useState<AgencyClient[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -88,9 +85,9 @@ export function MetaFacebookAdsContent() {
       setUser(me);
       updateStoredUser(me);
       const ok =
-        hasCap(me, 'crm_facebook_ads', 'view') || hasCap(me, 'crm_agency', 'view');
+        hasCap(me, 'crm_google_ads', 'view') || hasCap(me, 'crm_agency', 'view');
       if (!ok) {
-        setError('Không có quyền Meta hub');
+        setError('Không có quyền Google hub');
         return null;
       }
       return access;
@@ -117,7 +114,7 @@ export function MetaFacebookAdsContent() {
     if (status) qs.set('status', status);
     if (q) qs.set('q', q);
     const suffix = qs.toString();
-    router.replace(suffix ? `/meta/facebook-ads?${suffix}` : '/meta/facebook-ads', {
+    router.replace(suffix ? `/google/google-ads?${suffix}` : '/google/google-ads', {
       scroll: false,
     });
   }, [clientId, dateFrom, dateTo, days, q, router, status]);
@@ -127,11 +124,11 @@ export function MetaFacebookAdsContent() {
       setLoading(true);
       setError('');
       try {
-        const data = await fetchFacebookHub(access, hubQuery);
+        const data = await fetchGoogleHub(access, hubQuery);
         setHub(data);
         syncUrl();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Tải Meta hub thất bại');
+        setError(err instanceof Error ? err.message : 'Tải Google hub thất bại');
       } finally {
         setLoading(false);
       }
@@ -149,12 +146,6 @@ export function MetaFacebookAdsContent() {
       } catch {
         /* optional filter list */
       }
-      try {
-        const mig = await fetchFacebookAdsMigrationStatus(access);
-        setMigration(mig);
-      } catch {
-        /* optional */
-      }
       await loadHub(access);
     })();
   }, [ensureAuth, loadHub]);
@@ -171,7 +162,7 @@ export function MetaFacebookAdsContent() {
     setExportBusy(true);
     setError('');
     try {
-      const { blob, filename } = await downloadFacebookHubExport(access, {
+      const { blob, filename } = await downloadGoogleHubExport(access, {
         ...hubQuery,
         scope: exportScope,
       });
@@ -208,20 +199,20 @@ export function MetaFacebookAdsContent() {
     <main style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem' }}>
       <OpsNav user={user} onLogout={logout} />
 
-      {migration ? <MetaMigrationPanel status={migration} variant="compact" /> : null}
+      {hub?.pilot ? <GooglePilotBanner pilot={hub.pilot} /> : null}
 
       <div className="card" style={{ marginBottom: '1rem' }}>
-        <h1 style={{ marginTop: 0, fontSize: '1.25rem' }}>Meta Ads Hub</h1>
+        <h1 style={{ marginTop: 0, fontSize: '1.25rem' }}>Google Ads Hub</h1>
         <p className="muted" style={{ marginTop: 0 }}>
-          Closed-loop spend + CPL · kỳ {hub?.date_from ?? '—'} → {hub?.date_to ?? '—'}
+          Closed-loop spend + CPL (Google) · kỳ {hub?.date_from ?? '—'} → {hub?.date_to ?? '—'}
           {hub?.window_days ? ` (${hub.window_days} ngày)` : ''}
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
           <Link href="/meta/ads-combined" className="btn btn-sm btn-secondary">
-            Meta + Google
+            Meta + Google (combined)
           </Link>
-          <Link href="/google/google-ads" className="btn btn-sm btn-secondary">
-            Google Ads hub
+          <Link href="/meta/facebook-ads" className="btn btn-sm btn-secondary">
+            Meta Ads hub
           </Link>
           <Link href="/crm/hub" className="btn btn-sm btn-secondary">
             Hub campaign map
@@ -367,7 +358,7 @@ export function MetaFacebookAdsContent() {
           <p className="muted" style={{ margin: 0 }}>
             Clients
           </p>
-          <strong>{String(summary.meta_clients ?? rows.length)}</strong>
+          <strong>{String(summary.google_clients ?? rows.length)}</strong>
         </div>
         <div>
           <p className="muted" style={{ margin: 0 }}>
@@ -431,7 +422,7 @@ export function MetaFacebookAdsContent() {
                   <td>{c.campaigns}</td>
                   <td>{c.unmapped_campaigns ?? 0}</td>
                   <td>{c.over_target_rows}</td>
-                  <td>{c.token_status ?? (c.meta_has_token ? 'ok' : '—')}</td>
+                  <td>{c.token_status ?? (c.google_has_token ? 'ok' : '—')}</td>
                 </tr>
               ))}
               {!loading && rows.length === 0 ? (

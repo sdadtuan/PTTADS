@@ -25,6 +25,8 @@ import {
   staffMe,
   staffRefresh,
   syncClientInsights,
+  fetchGoogleOAuthStartUrl,
+  syncGoogleClientInsights,
 } from '@/lib/api';
 import { jobTypeLabel } from '@/lib/job-labels';
 import type {
@@ -451,6 +453,46 @@ export function AgencyClientDetailContent() {
     }
   }
 
+  async function handleSyncGoogleInsights() {
+    const access = getAccessToken();
+    if (!access || !canWrite) return;
+    setBusy(true);
+    setActionMsg('');
+    setError('');
+    try {
+      const out = await syncGoogleClientInsights(access, clientId);
+      const warn = out.pilot?.warning ? ` · ${String(out.pilot.warning)}` : '';
+      setActionMsg(`Đã enqueue job: ${jobTypeLabel('google_insights_sync')}${warn}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sync Google insights thất bại');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleGoogleOAuthConnect(accountId: string) {
+    const access = getAccessToken();
+    if (!access || !canWrite) return;
+    setBusy(true);
+    setError('');
+    try {
+      const out = await fetchGoogleOAuthStartUrl(access, clientId, accountId);
+      if (out.pilot?.warning) {
+        setActionMsg(String(out.pilot.warning));
+      }
+      window.location.href = out.authorization_url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không mở được Google OAuth');
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    if (searchParams.get('google_oauth') === 'ok') {
+      setActionMsg('Google OAuth connected — refresh token đã lưu vault');
+    }
+  }, [searchParams]);
+
   function logout() {
     clearSession();
     router.push('/login');
@@ -581,17 +623,26 @@ export function AgencyClientDetailContent() {
                   </dl>
                 )}
 
-                <h3 style={{ fontSize: '1rem', marginTop: '1.5rem' }}>Performance (Meta, 7 ngày)</h3>
+                <h3 style={{ fontSize: '1rem', marginTop: '1.5rem' }}>Performance (Meta + Google, 7 ngày)</h3>
                 {canWrite ? (
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    style={{ marginBottom: '0.75rem' }}
-                    disabled={busy}
-                    onClick={() => void handleSyncInsights()}
-                  >
-                    Sync insights now
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={busy}
+                      onClick={() => void handleSyncInsights()}
+                    >
+                      Sync Meta now
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={busy}
+                      onClick={() => void handleSyncGoogleInsights()}
+                    >
+                      Sync Google now
+                    </button>
+                  </div>
                 ) : null}
                 <div style={{ overflowX: 'auto' }}>
                   <table className="perf-table">
@@ -765,6 +816,16 @@ export function AgencyClientDetailContent() {
                             {acc.channel === 'meta' && (acc.has_token || acc.token_status === 'valid') ? (
                               <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => void handleRevokeToken(acc.id)}>
                                 Thu hồi token
+                              </button>
+                            ) : null}{' '}
+                            {acc.channel === 'google' && canWrite ? (
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                disabled={busy}
+                                onClick={() => void handleGoogleOAuthConnect(acc.id)}
+                              >
+                                Connect OAuth
                               </button>
                             ) : null}{' '}
                             <button

@@ -2,6 +2,7 @@
 
 const JOB_TYPE_LABELS: Record<string, string> = {
   meta_insights_sync: 'Đồng bộ insights Meta Ads',
+  google_insights_sync: 'Đồng bộ insights Google Ads',
   meta_token_refresh: 'Làm mới token Meta',
   ingest_lead: 'Ingest lead (webhook/form)',
   form_ingest: 'Ingest form lead',

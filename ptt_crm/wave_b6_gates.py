@@ -28,6 +28,13 @@ def _truthy(name: str, default: str = "0") -> bool:
 
 def _check_b6_modules() -> dict[str, Any]:
     files = [
+        ROOT / "docs/specs/2026-07-23-wave-b6-s6-google-ads-e2e-design.md",
+        ROOT / "services/ptt-crm-api/src/agency/google-ads-pilot.util.ts",
+        ROOT / "services/ptt-crm-api/src/agency/google-oauth.util.ts",
+        ROOT / "ptt_jobs/handlers/google_insights_sync.py",
+        ROOT / "services/ops-web/src/app/google/google-ads/page.tsx",
+        ROOT / "services/ops-web/src/app/meta/ads-combined/page.tsx",
+        ROOT / "services/portal-web/src/app/google/page.tsx",
         ROOT / "docs/specs/2026-07-23-wave-b6-s5-onboarding-widget-design.md",
         ROOT / "services/ptt-crm-api/src/service-lifecycle/lifecycle-onboarding.service.ts",
         ROOT / "services/ptt-crm-api/src/agency/clients.controller.ts",

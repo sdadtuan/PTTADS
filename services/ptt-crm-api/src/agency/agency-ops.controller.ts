@@ -19,6 +19,7 @@ import { AgencyService } from './agency.service';
 import {
   AgencyStatsResponse,
   FacebookHubResponse,
+  GoogleHubResponse,
   JobsListResponse,
   NotificationsListResponse,
   PatchHubCampaignMapBody,
@@ -30,6 +31,7 @@ import {
 import {
   StaffAgencyViewGuard,
   StaffFacebookAdsViewGuard,
+  StaffGoogleAdsViewGuard,
 } from './guards/staff-agency-view.guard';
 import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
 
@@ -191,6 +193,85 @@ export class AgencyOpsController {
     });
     res.setHeader('Content-Disposition', `attachment; filename="${out.filename}"`);
     return out.csv;
+  }
+
+  @Get('google-ads/pilot-status')
+  @UseGuards(StaffOrInternalKeyGuard, StaffGoogleAdsViewGuard)
+  googleAdsPilotStatus(@Query('client_id') clientId?: string) {
+    return this.agency.googleAdsPilotStatus(clientId);
+  }
+
+  @Get('google-ads/hub')
+  @UseGuards(StaffOrInternalKeyGuard, StaffGoogleAdsViewGuard)
+  async googleHub(
+    @Query('days') days?: string,
+    @Query('to') to?: string,
+    @Query('date_to') dateTo?: string,
+    @Query('from') from?: string,
+    @Query('date_from') dateFrom?: string,
+    @Query('status') status?: string,
+    @Query('client_id') clientId?: string,
+    @Query('q') q?: string,
+  ): Promise<GoogleHubResponse> {
+    return this.agency.googleHub({
+      days,
+      to,
+      date_to: dateTo,
+      from,
+      date_from: dateFrom,
+      status,
+      client_id: clientId,
+      q,
+    });
+  }
+
+  @Get('google-ads/hub/export')
+  @UseGuards(StaffOrInternalKeyGuard, StaffGoogleAdsViewGuard)
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  async googleHubExport(
+    @Res({ passthrough: true }) res: Response,
+    @Query('days') days?: string,
+    @Query('to') to?: string,
+    @Query('date_to') dateTo?: string,
+    @Query('from') from?: string,
+    @Query('date_from') dateFrom?: string,
+    @Query('status') status?: string,
+    @Query('client_id') clientId?: string,
+    @Query('q') q?: string,
+    @Query('scope') scope?: string,
+  ): Promise<string> {
+    const out = await this.agency.googleHubExportCsv({
+      days,
+      to,
+      date_to: dateTo,
+      from,
+      date_from: dateFrom,
+      status,
+      client_id: clientId,
+      q,
+      scope,
+    });
+    res.setHeader('Content-Disposition', `attachment; filename="${out.filename}"`);
+    return out.csv;
+  }
+
+  @Get('google-ads/oauth/start')
+  @UseGuards(StaffOrInternalKeyGuard, StaffAgencyWriteGuard)
+  googleOAuthStart(
+    @Query('client_id') clientId: string,
+    @Query('account_id') accountId?: string,
+  ) {
+    return this.agency.googleOAuthStart(clientId, accountId);
+  }
+
+  @Get('google-ads/oauth/callback')
+  async googleOAuthCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Res() res: Response,
+  ) {
+    const out = await this.agency.googleOAuthCallback(code, state);
+    res.redirect(302, out.redirect_url);
   }
 
   @Get('crm/hub-campaign-maps')
