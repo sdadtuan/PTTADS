@@ -1802,6 +1802,43 @@ export interface FacebookAdsMigrationStatus {
   retirement_applied_ok?: boolean | null;
   retirement_env_applied_ok?: boolean | null;
   retirement_apply_artifact_present?: boolean;
+  gate_m1_g07?: boolean;
+  autosync_standalone_ok?: boolean;
+  autosync_unit_present?: boolean;
+  autosync_daemon_present?: boolean;
+  autosync_gunicorn_background_off?: boolean;
+  autosync_unit_no_ptt_dependency?: boolean;
+  gate_m1_g08?: boolean;
+  soak_7d_ok?: boolean;
+  soak_span_days?: number | null;
+  soak_sample_count?: number;
+  soak_required_days?: number;
+  soak_min_samples?: number;
+  soak_failure_count?: number;
+  soak_latest_recorded_at?: string | null;
+  soak_error?: string | null;
+  manual_uat?: MetaMigrationManualUat;
+  manual_uat_updated_at?: string | null;
+  signoff_path?: string;
+  ops_web_migration_url?: string;
+}
+
+export type MetaMigrationManualUatField =
+  | 'ops_web_hub_cpl_summary'
+  | 'webhook_test_lead_created'
+  | 'autosync_single_process'
+  | 'portal_meta_readonly'
+  | 'campaign_write_approve_smoke';
+
+export type MetaMigrationManualUat = Record<MetaMigrationManualUatField, boolean>;
+
+export interface MetaMigrationSignoffResponse {
+  ok: boolean;
+  path: string;
+  manual_uat: MetaMigrationManualUat;
+  updated_at: string | null;
+  signed_at: string | null;
+  created_from_template?: boolean;
 }
 
 export interface HubMapRow {
@@ -1902,6 +1939,22 @@ export async function fetchFacebookAdsMigrationStatus(
   token: string,
 ): Promise<FacebookAdsMigrationStatus> {
   return agencyFetch(token, '/api/v1/facebook-ads/migration-status');
+}
+
+export async function fetchFacebookAdsMigrationSignoff(
+  token: string,
+): Promise<MetaMigrationSignoffResponse> {
+  return agencyFetch(token, '/api/v1/facebook-ads/migration-signoff');
+}
+
+export async function patchFacebookAdsMigrationManualUat(
+  token: string,
+  updates: Partial<MetaMigrationManualUat>,
+): Promise<{ ok: boolean; manual_uat: MetaMigrationManualUat; updated_at: string; path: string }> {
+  return agencyMutate(token, '/api/v1/facebook-ads/migration-signoff/manual-uat', {
+    method: 'PATCH',
+    body: JSON.stringify(updates),
+  });
 }
 
 export async function fetchFacebookHub(

@@ -35,6 +35,13 @@ import {
   facebookHubExportFilename,
   normalizeHubClientUuid,
 } from './facebook-hub.util';
+import {
+  checkAutosyncStandalone,
+  evaluateSoakGate,
+  ManualUatState,
+  readMigrationSignoff,
+  writeManualUat,
+} from './meta-migration.util';
 import { WorkflowsService } from '../workflows/workflows.service';
 
 const META_CAMPAIGN_ID_RE = /^[0-9]{5,20}$/;
@@ -309,11 +316,15 @@ export class AgencyService {
     const nginx = this.metaNginxRedirectStatus(opsWeb);
     const dryRun = this.metaRetirementDryRunStatus();
     const applied = this.metaRetirementApplyStatus();
+    const autosync = checkAutosyncStandalone();
+    const soak = evaluateSoakGate();
+    const signoff = readMigrationSignoff();
     const gateM1G06 = Boolean(nginx.gate_m1_g06);
     return {
       ok: true,
       flask_meta_ads_admin_retired: retired,
       ops_web_hub_url: `${opsWeb}/meta/facebook-ads`,
+      ops_web_migration_url: `${opsWeb}/meta/migration`,
       ops_web_hub_path: '/meta/facebook-ads',
       legacy_rs_path: '/crm/facebook-ads',
       canonical_upstream: retired ? 'ops-web' : 'flask',
@@ -335,8 +346,42 @@ export class AgencyService {
       retirement_applied_ok: applied.retirement_applied_ok,
       retirement_env_applied_ok: applied.retirement_env_applied_ok,
       retirement_apply_artifact_present: applied.artifact_present,
+      gate_m1_g07: autosync.gate_m1_g07,
+      autosync_standalone_ok: autosync.autosync_standalone_ok,
+      autosync_unit_present: autosync.autosync_unit_present,
+      autosync_daemon_present: autosync.autosync_daemon_present,
+      autosync_gunicorn_background_off: autosync.autosync_gunicorn_background_off,
+      autosync_unit_no_ptt_dependency: autosync.autosync_unit_no_ptt_dependency,
+      gate_m1_g08: soak.gate_m1_g08,
+      soak_7d_ok: soak.soak_7d_ok,
+      soak_span_days: soak.soak_span_days,
+      soak_sample_count: soak.soak_sample_count,
+      soak_required_days: soak.soak_required_days,
+      soak_min_samples: soak.soak_min_samples,
+      soak_failure_count: soak.soak_failure_count,
+      soak_latest_recorded_at: soak.soak_latest_recorded_at,
+      soak_error: soak.soak_error,
+      manual_uat: signoff.manual_uat,
+      manual_uat_updated_at: signoff.updated_at,
+      signoff_path: signoff.path,
       horizon1_expect_meta_hub_retired: this.isEnvTruthy('HORIZON1_EXPECT_META_HUB_RETIRED'),
     };
+  }
+
+  facebookAdsMigrationSignoff(): Record<string, unknown> {
+    return readMigrationSignoff();
+  }
+
+  patchFacebookAdsMigrationManualUat(updates: Partial<ManualUatState>): Record<string, unknown> {
+    try {
+      return writeManualUat(updates);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message === 'signoff_template_missing') {
+        throw new ServiceUnavailableException({ error: 'signoff_template_missing' });
+      }
+      throw err;
+    }
   }
 
   private metaRetirementApplyStatus(): {

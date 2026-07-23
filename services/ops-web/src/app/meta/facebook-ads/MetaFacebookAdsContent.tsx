@@ -208,7 +208,7 @@ export function MetaFacebookAdsContent() {
     <main style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem' }}>
       <OpsNav user={user} onLogout={logout} />
 
-      {migration ? <MetaMigrationPanel status={migration} /> : null}
+      {migration ? <MetaMigrationPanel status={migration} variant="compact" /> : null}
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <h1 style={{ marginTop: 0, fontSize: '1.25rem' }}>Meta Ads Hub</h1>

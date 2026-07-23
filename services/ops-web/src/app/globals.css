@@ -1454,3 +1454,48 @@ body:has(.ops-sidebar) main {
   margin: 0.75rem 0 0;
   font-size: 0.82rem;
 }
+
+.meta-migration-panel--compact {
+  padding: 0.85rem 1rem;
+}
+
+.meta-migration-compact-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.meta-migration-uat-section {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+}
+
+.meta-migration-uat-checklist {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.meta-migration-uat-check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.meta-migration-uat-check input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--primary);
+}
+
+.meta-migration-uat-meta {
+  margin: 0.65rem 0 0;
+  font-size: 0.8rem;
+}

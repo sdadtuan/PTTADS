@@ -127,6 +127,18 @@ export class AgencyOpsController {
     return this.agency.facebookAdsMigrationStatus();
   }
 
+  @Get('facebook-ads/migration-signoff')
+  @UseGuards(StaffOrInternalKeyGuard, StaffFacebookAdsViewGuard)
+  facebookAdsMigrationSignoff(): Record<string, unknown> {
+    return this.agency.facebookAdsMigrationSignoff();
+  }
+
+  @Patch('facebook-ads/migration-signoff/manual-uat')
+  @UseGuards(StaffOrInternalKeyGuard, StaffFacebookAdsViewGuard)
+  patchFacebookAdsMigrationManualUat(@Body() body: Partial<Record<string, boolean>>) {
+    return this.agency.patchFacebookAdsMigrationManualUat(body);
+  }
+
   @Get('facebook-ads/hub')
   @UseGuards(StaffOrInternalKeyGuard, StaffFacebookAdsViewGuard)
   async facebookHub(
