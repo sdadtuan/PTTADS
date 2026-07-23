@@ -17,6 +17,13 @@ export class SvcFinanceService {
     return this.sqlite.getSummary(lifecycleId, contractAmount);
   }
 
+  listPayments(lifecycleId: number) {
+    if (!this.sqlite.lifecycleExists(lifecycleId)) {
+      throw new NotFoundException({ error: 'Không tìm thấy lifecycle' });
+    }
+    return { payments: this.sqlite.listPayments(lifecycleId) };
+  }
+
   createPayment(body: Record<string, unknown>) {
     const lifecycleId = Number(body.lifecycle_id);
     const amountVnd = Number(body.amount_vnd);

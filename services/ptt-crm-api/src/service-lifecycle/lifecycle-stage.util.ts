@@ -18,8 +18,9 @@ export function validateStageAdvance(input: {
   toStage: string;
   currentStageComplete: boolean;
   tmmtGate?: { ok: boolean; messages?: string[] };
+  paymentGate?: { ok: boolean; messages?: string[] };
 }): void {
-  const { fromStage, toStage, currentStageComplete, tmmtGate } = input;
+  const { fromStage, toStage, currentStageComplete, tmmtGate, paymentGate } = input;
   if (!(VALID_STAGES as readonly string[]).includes(toStage)) {
     throw new StageAdvanceError(`Stage không hợp lệ: ${toStage}`);
   }
@@ -42,6 +43,14 @@ export function validateStageAdvance(input: {
       throw new StageAdvanceError((tmmtGate?.messages ?? ['TMMT chưa đủ'])[0] ?? 'TMMT chưa đủ');
     }
   }
+  if (toStage === 'retain' && fromStage === 'handover') {
+    if (paymentGate && !paymentGate.ok) {
+      throw new StageAdvanceError(
+        (paymentGate.messages ?? ['Cần xác nhận công nợ trước khi chuyển Retain'])[0] ??
+          'Cần xác nhận công nợ trước khi chuyển Retain',
+      );
+    }
+  }
 }
 
 export function getStageAdvanceInfo(input: {
@@ -50,6 +59,7 @@ export function getStageAdvanceInfo(input: {
   currentDone: number;
   currentTotal: number;
   tmmtGate?: { ok: boolean; messages?: string[] };
+  paymentGate?: { ok: boolean; requires_confirm?: boolean; messages?: string[]; outstanding_vnd?: number };
 }): {
   current_stage: string;
   next_stage: string | null;
@@ -58,8 +68,14 @@ export function getStageAdvanceInfo(input: {
   current_complete: boolean;
   current_done: number;
   current_total: number;
+  payment_gate?: {
+    ok: boolean;
+    requires_confirm: boolean;
+    outstanding_vnd: number;
+    messages: string[];
+  };
 } {
-  const { currentStage, currentStageComplete, currentDone, currentTotal, tmmtGate } = input;
+  const { currentStage, currentStageComplete, currentDone, currentTotal, tmmtGate, paymentGate } = input;
   const nxt = nextStage(currentStage);
   let blockReason = '';
   let canForward = false;
@@ -73,9 +89,26 @@ export function getStageAdvanceInfo(input: {
     } else {
       canForward = true;
     }
+  } else if (nxt === 'retain' && currentStage === 'handover') {
+    if (paymentGate?.requires_confirm) {
+      blockReason =
+        (paymentGate.messages ?? ['Còn công nợ HĐ — xác nhận trên workflow detail trước khi Retain'])[0] ??
+        'Còn công nợ HĐ — xác nhận trên workflow detail trước khi Retain';
+    } else {
+      canForward = true;
+    }
   } else {
     canForward = true;
   }
+  const paymentGateOut =
+    nxt === 'retain' && currentStage === 'handover' && paymentGate
+      ? {
+          ok: paymentGate.ok ?? false,
+          requires_confirm: Boolean(paymentGate.requires_confirm),
+          outstanding_vnd: Number(paymentGate.outstanding_vnd ?? 0),
+          messages: paymentGate.messages ?? [],
+        }
+      : undefined;
   return {
     current_stage: currentStage,
     next_stage: nxt,
@@ -84,5 +117,6 @@ export function getStageAdvanceInfo(input: {
     current_complete: currentStageComplete,
     current_done: currentDone,
     current_total: currentTotal,
+    payment_gate: paymentGateOut,
   };
 }

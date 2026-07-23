@@ -55,6 +55,52 @@ export class SvcFinanceSqliteRepository implements OnModuleDestroy {
     return Number(row?.amount_vnd ?? 0);
   }
 
+  private resolvePaymentDueOn(payment: {
+    due_on?: string | null;
+    status?: string;
+    received_on?: string;
+  }): string {
+    const due = String(payment.due_on ?? '').trim().slice(0, 10);
+    if (due) return due;
+    if (String(payment.status ?? '') === 'pending') {
+      return String(payment.received_on ?? '').trim().slice(0, 10);
+    }
+    return '';
+  }
+
+  private lifecycleArTotals(lifecycleId: number): { ar_pending_vnd: number; ar_overdue_vnd: number } {
+    const rows = this.database
+      .prepare(
+        `SELECT amount_vnd, received_on, due_on, status FROM crm_svc_payments
+         WHERE lifecycle_id = ? AND status = 'pending'`,
+      )
+      .all(lifecycleId) as Array<{
+      amount_vnd: number;
+      received_on: string;
+      due_on: string | null;
+      status: string;
+    }>;
+    const today = new Date().toISOString().slice(0, 10);
+    let pending = 0;
+    let overdue = 0;
+    for (const row of rows) {
+      const amount = Number(row.amount_vnd ?? 0);
+      pending += amount;
+      const due = this.resolvePaymentDueOn(row);
+      if (due && due < today) overdue += amount;
+    }
+    return { ar_pending_vnd: pending, ar_overdue_vnd: overdue };
+  }
+
+  listPayments(lifecycleId: number): SvcPaymentRow[] {
+    return this.database
+      .prepare(
+        `SELECT * FROM crm_svc_payments WHERE lifecycle_id = ?
+         ORDER BY received_on DESC, id DESC`,
+      )
+      .all(lifecycleId) as unknown as SvcPaymentRow[];
+  }
+
   getSummary(lifecycleId: number, contractAmountVnd: number): Record<string, unknown> {
     const payRow = this.database
       .prepare(
@@ -95,17 +141,20 @@ export class SvcFinanceSqliteRepository implements OnModuleDestroy {
     const totalExpenses = deliveryExpenses + presalesExpenses;
     const profit = received - deliveryExpenses;
     const marginPct = received > 0 ? (profit / received) * 100 : 0;
-    const outstanding = contractAmountVnd - received;
+    const outstanding = Math.max(0, contractAmountVnd - received);
+    const { ar_pending_vnd, ar_overdue_vnd } = this.lifecycleArTotals(lifecycleId);
 
     return {
       expected_revenue: contractAmountVnd,
       received_revenue: received,
       pending_revenue: pending,
+      ar_pending_vnd,
+      ar_overdue_vnd,
       delivery_expenses: deliveryExpenses,
       presales_expenses: presalesExpenses,
       total_expenses: totalExpenses,
       profit_vnd: profit,
-      margin_pct: marginPct,
+      margin_pct: Math.round(marginPct * 100) / 100,
       outstanding_vnd: outstanding,
       lifecycle_id: lifecycleId,
     };

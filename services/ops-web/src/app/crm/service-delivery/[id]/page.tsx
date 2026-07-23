@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { LifecycleFinancePanel } from '@/components/LifecycleFinancePanel';
 import { LifecycleHubLinksPanel } from '@/components/LifecycleHubLinksPanel';
 import { LifecycleStaffPicker } from '@/components/LifecycleStaffPicker';
 import { LifecycleTmmtPanel } from '@/components/LifecycleTmmtPanel';
@@ -43,7 +44,7 @@ export default function CrmServiceDeliveryDetailPage() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [detailTab, setDetailTab] = useState<'workflow' | 'tmmt'>('workflow');
+  const [detailTab, setDetailTab] = useState<'workflow' | 'tmmt' | 'finance'>('workflow');
 
   const ensureAuth = useCallback(async (): Promise<string | null> => {
     let access = getAccessToken();
@@ -265,6 +266,13 @@ export default function CrmServiceDeliveryDetailPage() {
             >
               TMMT chính thức
             </button>
+            <button
+              type="button"
+              className={detailTab === 'finance' ? 'btn btn-sm' : 'btn btn-sm btn-ghost'}
+              onClick={() => setDetailTab('finance')}
+            >
+              Tài chính
+            </button>
           </div>
 
           {detailTab === 'workflow' ? (
@@ -276,13 +284,21 @@ export default function CrmServiceDeliveryDetailPage() {
               onStageChanged={setStage}
               onFinanceRefresh={() => void reloadDetail(token)}
               onOpenTmmtTab={() => setDetailTab('tmmt')}
+              onOpenFinanceTab={() => setDetailTab('finance')}
             />
-          ) : (
+          ) : detailTab === 'tmmt' ? (
             <LifecycleTmmtPanel
               token={token}
               user={user}
               lifecycleId={lifecycleId}
               stage={stage}
+              onSaved={() => void reloadDetail(token)}
+            />
+          ) : (
+            <LifecycleFinancePanel
+              token={token}
+              user={user}
+              lifecycleId={lifecycleId}
               onSaved={() => void reloadDetail(token)}
             />
           )}

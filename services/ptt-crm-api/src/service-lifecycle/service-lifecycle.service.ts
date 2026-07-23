@@ -4,9 +4,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SvcFinanceService } from '../svc-finance/svc-finance.service';
-import { validateOfficialTmmt, buildOfficialPlanPayload, mergeStrategyFramework, mergeTargetMarketProf } from './lifecycle-marketing-plan.util';
-import { getStageAdvanceInfo, StageAdvanceError, validateStageAdvance } from './lifecycle-stage.util';
 import { LifecycleConsultService } from './lifecycle-consult.service';
+import {
+  buildOfficialPlanPayload,
+  mergeStrategyFramework,
+  mergeTargetMarketProf,
+  validateOfficialTmmt,
+} from './lifecycle-marketing-plan.util';
+import { paymentGateFromSummary } from './lifecycle-payment-gate.util';
+import { getStageAdvanceInfo, StageAdvanceError, validateStageAdvance } from './lifecycle-stage.util';
 import { LifecycleTasksRepository } from './lifecycle-tasks.repository';
 import { ServiceLifecycleSqliteRepository } from './service-lifecycle-sqlite.repository';
 import {
@@ -77,6 +83,7 @@ export class ServiceLifecycleService {
           toStage,
           currentStageComplete: this.tasks.isStageComplete(id, existing.stage),
           tmmtGate: this.tmmtGate(id, existing.stage, toStage),
+          paymentGate: this.paymentGate(id, existing.stage, toStage, Boolean(body.finance_confirm)),
         });
       } catch (err) {
         if (err instanceof StageAdvanceError) {
@@ -121,12 +128,17 @@ export class ServiceLifecycleService {
       lc.stage === 'onboard'
         ? validateOfficialTmmt(this.sqlite.getOfficialMarketingPlan(id))
         : undefined;
+    const paymentGate =
+      lc.stage === 'handover'
+        ? paymentGateFromSummary(this.svcFinance.summary(id) as { outstanding_vnd?: number })
+        : undefined;
     return getStageAdvanceInfo({
       currentStage: lc.stage,
       currentStageComplete: complete,
       currentDone: prog.done,
       currentTotal: prog.total,
       tmmtGate,
+      paymentGate,
     });
   }
 
@@ -234,6 +246,11 @@ export class ServiceLifecycleService {
     return this.svcFinance.summary(id);
   }
 
+  listPayments(id: number) {
+    this.requireLifecycle(id);
+    return this.svcFinance.listPayments(id);
+  }
+
   context(id: number) {
     const ctx = this.sqlite.getLifecycleContext(id);
     if (!ctx) {
@@ -263,5 +280,18 @@ export class ServiceLifecycleService {
       return validateOfficialTmmt(this.sqlite.getOfficialMarketingPlan(lifecycleId));
     }
     return undefined;
+  }
+
+  private paymentGate(
+    lifecycleId: number,
+    fromStage: string,
+    toStage: string,
+    financeConfirm: boolean,
+  ) {
+    if (toStage !== 'retain' || fromStage !== 'handover') return undefined;
+    return paymentGateFromSummary(
+      this.svcFinance.summary(lifecycleId) as { outstanding_vnd?: number },
+      financeConfirm,
+    );
   }
 }

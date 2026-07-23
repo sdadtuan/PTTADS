@@ -80,6 +80,11 @@ export class ServiceLifecycleController {
     return this.serviceLifecycle.presalesSummary(id);
   }
 
+  @Get(':id/payments')
+  listPayments(@Param('id', ParseIntPipe) id: number) {
+    return this.serviceLifecycle.listPayments(id);
+  }
+
   @Get(':id/finance-summary')
   financeSummary(@Param('id', ParseIntPipe) id: number) {
     return this.serviceLifecycle.financeSummary(id);

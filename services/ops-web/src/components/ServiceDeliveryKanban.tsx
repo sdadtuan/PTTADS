@@ -86,9 +86,29 @@ export function ServiceDeliveryKanban({
       {funnelStats && Object.keys(funnelStats).length > 0 ? (
         <div className="card" style={{ padding: '0.75rem 1rem' }}>
           <strong>Funnel active</strong>
-          <span className="muted" style={{ marginLeft: '0.5rem' }}>
-            {STAGES.map((s) => `${STAGE_LABELS[s] ?? s}: ${funnelStats[s] ?? 0}`).join(' · ')}
-          </span>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))',
+              gap: '0.4rem',
+              marginTop: '0.5rem',
+            }}
+          >
+            {STAGES.map((s) => (
+              <div
+                key={s}
+                style={{
+                  padding: '0.35rem 0.5rem',
+                  borderRadius: 8,
+                  border: '1px solid var(--border)',
+                  fontSize: '0.82rem',
+                }}
+              >
+                <div className="muted">{STAGE_LABELS[s] ?? s}</div>
+                <strong>{funnelStats[s] ?? 0}</strong>
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
       {canEdit ? (

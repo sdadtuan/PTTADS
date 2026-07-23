@@ -38,6 +38,7 @@ export interface PatchServiceLifecycleBody {
   notes?: string;
   assigned_am?: number | null;
   assigned_sp?: number | null;
+  finance_confirm?: boolean;
 }
 
 export const VALID_STAGES = [

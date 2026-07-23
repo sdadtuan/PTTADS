@@ -2,12 +2,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ConsultBriefPanel } from '@/components/ConsultBriefPanel';
-import { LifecycleFinanceActions } from '@/components/LifecycleFinanceActions';
 import {
   fetchServiceLifecycleAdvanceInfo,
-  fetchServiceLifecycleFinanceSummary,
   fetchServiceLifecycleMarketingPlan,
-  fetchServiceLifecyclePresalesSummary,
   fetchServiceLifecycleProgress,
   fetchServiceLifecycleTasks,
   patchServiceLifecycle,
@@ -26,6 +23,13 @@ const STAGE_LABELS: Record<string, string> = {
   retain: 'Giữ chân',
 };
 
+type PaymentGate = {
+  ok?: boolean;
+  requires_confirm?: boolean;
+  outstanding_vnd?: number;
+  messages?: string[];
+};
+
 type TaskRow = {
   id: number;
   title: string;
@@ -42,6 +46,7 @@ type Props = {
   onStageChanged?: (stage: string) => void;
   onFinanceRefresh?: () => void;
   onOpenTmmtTab?: () => void;
+  onOpenFinanceTab?: () => void;
 };
 
 export function ServiceDeliveryWorkflowPanel({
@@ -52,6 +57,7 @@ export function ServiceDeliveryWorkflowPanel({
   onStageChanged,
   onFinanceRefresh,
   onOpenTmmtTab,
+  onOpenFinanceTab,
 }: Props) {
   const canEdit = hasCap(user, 'crm_board', 'edit');
   const [tab, setTab] = useState(initialStage);
@@ -59,8 +65,7 @@ export function ServiceDeliveryWorkflowPanel({
   const [progress, setProgress] = useState<Record<string, { total: number; done: number; pct: number }>>({});
   const [advance, setAdvance] = useState<Record<string, unknown>>({});
   const [tmmtValidation, setTmmtValidation] = useState<{ ok: boolean; messages: string[] } | null>(null);
-  const [finance, setFinance] = useState<Record<string, unknown> | null>(null);
-  const [presales, setPresales] = useState<Record<string, unknown> | null>(null);
+  const [financeConfirm, setFinanceConfirm] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -74,18 +79,14 @@ export function ServiceDeliveryWorkflowPanel({
     setLoading(true);
     setError('');
     try {
-      const [taskOut, progOut, advOut, finOut, psOut] = await Promise.all([
+      const [taskOut, progOut, advOut] = await Promise.all([
         fetchServiceLifecycleTasks(token, lifecycleId),
         fetchServiceLifecycleProgress(token, lifecycleId),
         fetchServiceLifecycleAdvanceInfo(token, lifecycleId),
-        fetchServiceLifecycleFinanceSummary(token, lifecycleId),
-        fetchServiceLifecyclePresalesSummary(token, lifecycleId),
       ]);
       setTasks(taskOut.tasks as Record<string, TaskRow[]>);
       setProgress(progOut.progress);
       setAdvance(advOut);
-      setFinance(finOut);
-      setPresales(psOut);
       if (tab === 'onboard') {
         const mp = await fetchServiceLifecycleMarketingPlan(token, lifecycleId);
         setTmmtValidation(mp.validation);
@@ -116,17 +117,30 @@ export function ServiceDeliveryWorkflowPanel({
     }
   }
 
+  const paymentGate = advance.payment_gate as PaymentGate | undefined;
+  const showPaymentGate =
+    tab === 'handover' &&
+    String(advance.current_stage ?? '') === 'handover' &&
+    String(advance.next_stage ?? '') === 'retain' &&
+    Boolean(paymentGate?.requires_confirm);
+
   async function advanceForward() {
     const nxt = String(advance.next_stage ?? '');
     if (!nxt || !canEdit) return;
+    if (showPaymentGate && !financeConfirm) return;
     setSaving(true);
     setMessage('');
     setError('');
     try {
-      await patchServiceLifecycle(token, lifecycleId, { stage: nxt });
+      await patchServiceLifecycle(token, lifecycleId, {
+        stage: nxt,
+        finance_confirm: showPaymentGate && financeConfirm ? true : undefined,
+      });
       setTab(nxt);
+      setFinanceConfirm(false);
       onStageChanged?.(nxt);
       setMessage(`Đã chuyển → ${STAGE_LABELS[nxt] ?? nxt}`);
+      onFinanceRefresh?.();
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Chuyển stage thất bại');
@@ -143,6 +157,12 @@ export function ServiceDeliveryWorkflowPanel({
     String(advance.current_stage ?? '') === 'onboard' &&
     String(advance.next_stage ?? '') === 'deliver';
 
+  const onCurrentTab = tab === String(advance.current_stage ?? '');
+  const canShowAdvanceButton =
+    canEdit &&
+    onCurrentTab &&
+    (Boolean(advance.can_advance_forward) || (showPaymentGate && financeConfirm));
+
   const workflowCard = (
     <div className="card" style={{ padding: '1rem' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
@@ -150,7 +170,7 @@ export function ServiceDeliveryWorkflowPanel({
         <span className="muted">{tabProg.done}/{tabProg.total} task · {tabProg.pct}%</span>
       </div>
 
-      {Boolean(advance.block_reason) && tab === String(advance.current_stage ?? '') ? (
+      {Boolean(advance.block_reason) && onCurrentTab && !showPaymentGate ? (
         <p className="error" style={{ marginTop: '0.5rem' }}>
           {String(advance.block_reason)}
         </p>
@@ -184,6 +204,40 @@ export function ServiceDeliveryWorkflowPanel({
         <p style={{ color: 'var(--accent)', marginTop: '0.75rem' }}>Gate TMMT ✓ — có thể chuyển Deliver</p>
       ) : null}
 
+      {showPaymentGate ? (
+        <div
+          style={{
+            marginTop: '0.75rem',
+            padding: '0.65rem 0.75rem',
+            borderRadius: 8,
+            border: '1px solid #c90',
+            background: 'rgba(255, 200, 0, 0.04)',
+          }}
+        >
+          <p style={{ margin: '0 0 0.35rem', fontWeight: 600, color: '#c90' }}>Gate Payment — còn công nợ HĐ</p>
+          <p style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>
+            {(paymentGate?.messages ?? [])[0] ??
+              `Còn ${Number(paymentGate?.outstanding_vnd ?? 0).toLocaleString('vi-VN')} VND chưa thu`}
+          </p>
+          {onOpenFinanceTab ? (
+            <button type="button" className="btn btn-sm btn-secondary" style={{ marginBottom: '0.5rem' }} onClick={onOpenFinanceTab}>
+              Mở tab Tài chính
+            </button>
+          ) : null}
+          <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'flex-start', fontSize: '0.9rem' }}>
+            <input
+              type="checkbox"
+              checked={financeConfirm}
+              onChange={(e) => setFinanceConfirm(e.target.checked)}
+              disabled={!canEdit || saving}
+            />
+            <span>
+              Xác nhận chuyển sang <strong>Giữ chân</strong> dù còn công nợ (AM/SP chịu trách nhiệm thu hồi)
+            </span>
+          </label>
+        </div>
+      ) : null}
+
       <ul style={{ margin: '0.75rem 0 0', padding: 0, listStyle: 'none', display: 'grid', gap: '0.4rem' }}>
         {tabTasks.length === 0 ? <li className="muted">Không có task.</li> : null}
         {tabTasks.map((task) => (
@@ -212,7 +266,7 @@ export function ServiceDeliveryWorkflowPanel({
         ))}
       </ul>
 
-      {canEdit && Boolean(advance.can_advance_forward) && tab === String(advance.current_stage ?? '') ? (
+      {canShowAdvanceButton ? (
         <button type="button" className="btn btn-sm" style={{ marginTop: '0.75rem' }} disabled={saving} onClick={() => void advanceForward()}>
           Chuyển → {STAGE_LABELS[String(advance.next_stage)] ?? String(advance.next_stage)}
         </button>
@@ -247,27 +301,6 @@ export function ServiceDeliveryWorkflowPanel({
       ) : (
         workflowCard
       )}
-
-      {finance ? (
-        <p className="muted" style={{ margin: 0, fontSize: '0.9rem' }}>
-          Tóm tắt: Nhận {Number(finance.received_revenue ?? 0).toLocaleString('vi-VN')} · Lợi nhuận{' '}
-          {Number(finance.profit_vnd ?? 0).toLocaleString('vi-VN')}
-          {presales && Number(presales.presales_total_vnd ?? 0) > 0
-            ? ` · Pre-sales ${Number(presales.presales_total_vnd).toLocaleString('vi-VN')}`
-            : ''}
-        </p>
-      ) : null}
-
-      <LifecycleFinanceActions
-        token={token}
-        user={user}
-        lifecycleId={lifecycleId}
-        onSaved={() => {
-          void reload();
-          onFinanceRefresh?.();
-        }}
-        onError={setError}
-      />
     </div>
   );
 }

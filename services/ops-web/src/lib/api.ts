@@ -1020,6 +1020,13 @@ export async function fetchServiceLifecycleFinanceSummary(
   return crmFetch(token, `/api/crm/service-lifecycle/${id}/finance-summary`);
 }
 
+export async function fetchServiceLifecyclePayments(
+  token: string,
+  id: number,
+): Promise<{ payments: Array<Record<string, unknown>> }> {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/payments`);
+}
+
 export async function fetchServiceLifecycleContext(
   token: string,
   id: number,
@@ -1046,7 +1053,14 @@ export async function fetchServiceLifecycleDetail(token: string, id: number): Pr
 export async function patchServiceLifecycle(
   token: string,
   id: number,
-  body: Partial<{ stage: string; notes: string; service_slug: string; assigned_am: number | null; assigned_sp: number | null }>,
+  body: Partial<{
+    stage: string;
+    notes: string;
+    service_slug: string;
+    assigned_am: number | null;
+    assigned_sp: number | null;
+    finance_confirm: boolean;
+  }>,
 ): Promise<ServiceLifecycleRow> {
   return crmFetch<ServiceLifecycleRow>(token, `/api/crm/service-lifecycle/${id}`, {
     method: 'PATCH',
