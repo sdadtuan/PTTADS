@@ -174,6 +174,10 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
           <p className="muted" style={{ margin: '0.35rem 0 0', fontSize: '0.85rem' }}>
             {data.auto_start_enabled ? 'Auto-start bật khi vào Deliver' : 'Auto-start tắt'}
             {data.external_campaign_id ? ` · Campaign ${data.external_campaign_id}` : ''}
+            {' · '}
+            <a href="/crm/launch-qa" className="nav-link">
+              Mở Launch board →
+            </a>
           </p>
         </div>
 

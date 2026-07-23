@@ -43,6 +43,10 @@ if [[ -n "$LIFECYCLE_ID" ]]; then
   done
   adv_code="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/crm/service-lifecycle/$LIFECYCLE_ID/advance-info" "${AUTH[@]}")"
   [[ "$adv_code" =~ ^2 ]] && ok "GET advance-info (HTTP $adv_code)" || bad "GET advance-info (HTTP $adv_code)"
+  lqa_stats="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/crm/launch-qa/stats" "${AUTH[@]}")"
+  [[ "$lqa_stats" =~ ^2 ]] && ok "GET /crm/launch-qa/stats (HTTP $lqa_stats)" || bad "GET launch-qa/stats (HTTP $lqa_stats)"
+  lqa_runs="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/crm/launch-qa/runs?status=all" "${AUTH[@]}")"
+  [[ "$lqa_runs" =~ ^2 ]] && ok "GET /crm/launch-qa/runs (HTTP $lqa_runs)" || bad "GET launch-qa/runs (HTTP $lqa_runs)"
 else
   bad "no LIFECYCLE_ID — skip B6 lifecycle routes"
 fi

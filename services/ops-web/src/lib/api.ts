@@ -1130,6 +1130,32 @@ export async function postServiceLifecycleCreativeSubmit(
   });
 }
 
+export async function fetchLaunchQaStats(token: string) {
+  return crmFetch<{ ok: boolean; stats: Record<string, number> }>(token, '/api/crm/launch-qa/stats');
+}
+
+export async function fetchLaunchQaRuns(token: string, status = 'all', limit = 100) {
+  const qs = new URLSearchParams({ status, limit: String(limit) });
+  return crmFetch<{
+    ok: boolean;
+    status: string;
+    count: number;
+    runs: Array<{
+      id: string;
+      client_id: string;
+      external_campaign_id: string;
+      campaign_name: string | null;
+      status: string;
+      launch_ready: boolean;
+      progress: { total: number; completed: number; percent: number };
+      temporal_workflow_id: string | null;
+      started_at: string;
+      completed_at: string | null;
+      lifecycle_id: number | null;
+    }>;
+  }>(token, `/api/crm/launch-qa/runs?${qs.toString()}`);
+}
+
 export async function createServiceLifecycleExpense(
   token: string,
   lifecycleId: number,
@@ -1156,6 +1182,7 @@ export async function patchServiceLifecycle(
     assigned_am: number | null;
     assigned_sp: number | null;
     finance_confirm: boolean;
+    launch_qa_confirm: boolean;
   }>,
 ): Promise<ServiceLifecycleRow> {
   return crmFetch<ServiceLifecycleRow>(token, `/api/crm/service-lifecycle/${id}`, {

@@ -40,6 +40,7 @@ export interface PatchServiceLifecycleBody {
   assigned_am?: number | null;
   assigned_sp?: number | null;
   finance_confirm?: boolean;
+  launch_qa_confirm?: boolean;
 }
 
 export const VALID_STAGES = [

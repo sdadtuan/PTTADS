@@ -11,6 +11,7 @@ import { WorkflowsService } from '../workflows/workflows.service';
 import { LaunchQaAutoStartService } from './launch-qa-auto-start.service';
 import { LaunchQaPgRepository } from './launch-qa-pg.repository';
 import { launchQaGateFromRun, launchQaProgress } from './lifecycle-launch-gate.util';
+import { launchQaHandoverGateFromRun } from './lifecycle-launch-handover-gate.util';
 import { ServiceLifecycleSqliteRepository } from './service-lifecycle-sqlite.repository';
 
 @Injectable()
@@ -204,9 +205,14 @@ export class LifecycleLaunchQaService {
     });
   }
 
-  async launchQaGateForLifecycle(lifecycleId: number) {
+  async launchQaGateForLifecycle(lifecycleId: number, launchQaConfirm?: boolean) {
     const payload = await this.launchQa(lifecycleId);
-    return payload.gate;
+    const ctx = this.resolveLaunchContext(lifecycleId);
+    return launchQaHandoverGateFromRun({
+      run: payload.run,
+      hasContext: ctx.ok,
+      launchQaConfirm,
+    });
   }
 
   async maybeAutoStartOnDeliver(lifecycleId: number, startedBy?: string) {

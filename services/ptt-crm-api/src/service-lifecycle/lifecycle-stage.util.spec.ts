@@ -85,4 +85,37 @@ describe('lifecycle-stage.util', () => {
     expect(info.can_advance_forward).toBe(false);
     expect(info.payment_gate?.requires_confirm).toBe(true);
   });
+
+  it('blocks deliver→handover without launch qa confirm', () => {
+    expect(() =>
+      validateStageAdvance({
+        fromStage: 'deliver',
+        toStage: 'handover',
+        currentStageComplete: true,
+        launchQaGate: { ok: false, messages: ['Launch QA chưa launch_ready'] },
+      }),
+    ).toThrow(/Launch QA/i);
+  });
+
+  it('advance info shows launch qa gate on deliver', () => {
+    const info = getStageAdvanceInfo({
+      currentStage: 'deliver',
+      currentStageComplete: true,
+      currentDone: 2,
+      currentTotal: 2,
+      launchQaGate: {
+        ok: false,
+        warn_only: true,
+        launch_ready: false,
+        progress_percent: 50,
+        progress_completed: 3,
+        progress_total: 6,
+        requires_confirm: true,
+        status: 'in_progress',
+        messages: ['Launch QA chưa launch_ready'],
+      },
+    });
+    expect(info.can_advance_forward).toBe(false);
+    expect(info.launch_qa_gate?.requires_confirm).toBe(true);
+  });
 });

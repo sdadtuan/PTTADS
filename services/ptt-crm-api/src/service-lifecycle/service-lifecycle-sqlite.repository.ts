@@ -397,6 +397,36 @@ export class ServiceLifecycleSqliteRepository implements OnModuleDestroy {
     return out;
   }
 
+  /** Reverse lookup for Launch QA board: agency_client_id + campaign.code → lifecycle_id */
+  buildLaunchQaLifecycleIndex(): Map<string, number> {
+    const index = new Map<string, number>();
+    try {
+      const rows = this.database
+        .prepare(
+          `SELECT sl.id AS lifecycle_id, ct.agency_client_id, camp.code AS campaign_code
+           FROM crm_service_lifecycle sl
+           INNER JOIN crm_contracts ct ON ct.id = sl.contract_id
+           INNER JOIN crm_campaigns camp ON camp.id = ct.campaign_id
+           WHERE sl.status = 'active'
+             AND TRIM(COALESCE(ct.agency_client_id, '')) != ''
+             AND TRIM(COALESCE(camp.code, '')) != ''`,
+        )
+        .all() as Array<{ lifecycle_id: number; agency_client_id: string; campaign_code: string }>;
+      for (const row of rows) {
+        const clientId = String(row.agency_client_id ?? '').trim();
+        const code = String(row.campaign_code ?? '').trim();
+        if (!clientId || !code) continue;
+        const key = `${clientId}:${code}`;
+        if (!index.has(key)) {
+          index.set(key, Number(row.lifecycle_id));
+        }
+      }
+    } catch {
+      /* crm_campaigns optional in some dev DBs */
+    }
+    return index;
+  }
+
   advanceStage(
     id: number,
     toStage: string,

@@ -181,6 +181,48 @@ export class LaunchQaPgRepository implements OnModuleDestroy {
     return row ? this.mapRow(row) : null;
   }
 
+  async listRuns(statusFilter: string, limit = 100): Promise<LaunchQaRunRow[]> {
+    const filter = statusFilter.trim().toLowerCase();
+    const params: unknown[] = [Math.min(200, Math.max(1, limit))];
+    let where = '';
+    if (filter && filter !== 'all') {
+      where = `WHERE status = $2`;
+      params.push(filter);
+    }
+    const result = await this.db.query(
+      `SELECT id::text, client_id::text, external_campaign_id, campaign_name,
+              status, checklist, launch_ready, temporal_workflow_id, temporal_run_id,
+              started_by, started_at, completed_at
+       FROM launch_qa_runs
+       ${where}
+       ORDER BY started_at DESC
+       LIMIT $1`,
+      params,
+    );
+    return result.rows.map((row) => this.mapRow(row));
+  }
+
+  async countByStatus(): Promise<Record<string, number>> {
+    const result = await this.db.query(
+      `SELECT status, COUNT(*)::int AS c FROM launch_qa_runs GROUP BY status`,
+    );
+    const out: Record<string, number> = {
+      all: 0,
+      in_progress: 0,
+      passed: 0,
+      failed: 0,
+      blocked: 0,
+      timeout: 0,
+    };
+    for (const row of result.rows) {
+      const status = String(row.status ?? '');
+      const count = Number(row.c ?? 0);
+      out[status] = count;
+      out.all += count;
+    }
+    return out;
+  }
+
   private mapRow(row: Record<string, unknown>): LaunchQaRunRow {
     return {
       id: String(row.id),

@@ -19,8 +19,9 @@ export function validateStageAdvance(input: {
   currentStageComplete: boolean;
   tmmtGate?: { ok: boolean; messages?: string[] };
   paymentGate?: { ok: boolean; messages?: string[] };
+  launchQaGate?: { ok: boolean; messages?: string[] };
 }): void {
-  const { fromStage, toStage, currentStageComplete, tmmtGate, paymentGate } = input;
+  const { fromStage, toStage, currentStageComplete, tmmtGate, paymentGate, launchQaGate } = input;
   if (!(VALID_STAGES as readonly string[]).includes(toStage)) {
     throw new StageAdvanceError(`Stage không hợp lệ: ${toStage}`);
   }
@@ -41,6 +42,14 @@ export function validateStageAdvance(input: {
   if (toStage === 'deliver' && fromStage === 'onboard') {
     if (!tmmtGate?.ok) {
       throw new StageAdvanceError((tmmtGate?.messages ?? ['TMMT chưa đủ'])[0] ?? 'TMMT chưa đủ');
+    }
+  }
+  if (toStage === 'handover' && fromStage === 'deliver') {
+    if (launchQaGate && !launchQaGate.ok) {
+      throw new StageAdvanceError(
+        (launchQaGate.messages ?? ['Cần xác nhận Launch QA trước khi chuyển Handover'])[0] ??
+          'Cần xác nhận Launch QA trước khi chuyển Handover',
+      );
     }
   }
   if (toStage === 'retain' && fromStage === 'handover') {
@@ -65,6 +74,9 @@ export function getStageAdvanceInfo(input: {
     warn_only: true;
     launch_ready: boolean;
     progress_percent: number;
+    progress_completed?: number;
+    progress_total?: number;
+    requires_confirm?: boolean;
     status: string | null;
     messages: string[];
   };
@@ -87,6 +99,9 @@ export function getStageAdvanceInfo(input: {
     warn_only: true;
     launch_ready: boolean;
     progress_percent: number;
+    progress_completed: number;
+    progress_total: number;
+    requires_confirm: boolean;
     status: string | null;
     messages: string[];
   };
@@ -114,6 +129,14 @@ export function getStageAdvanceInfo(input: {
     } else {
       canForward = true;
     }
+  } else if (nxt === 'handover' && currentStage === 'deliver') {
+    if (launchQaGate?.requires_confirm) {
+      blockReason =
+        (launchQaGate.messages ?? ['Launch QA chưa launch_ready — xác nhận trước khi Handover'])[0] ??
+        'Launch QA chưa launch_ready — xác nhận trước khi Handover';
+    } else {
+      canForward = true;
+    }
   } else {
     canForward = true;
   }
@@ -133,6 +156,9 @@ export function getStageAdvanceInfo(input: {
           warn_only: true as const,
           launch_ready: launchQaGate.launch_ready,
           progress_percent: launchQaGate.progress_percent,
+          progress_completed: Number(launchQaGate.progress_completed ?? 0),
+          progress_total: Number(launchQaGate.progress_total ?? 0),
+          requires_confirm: Boolean(launchQaGate.requires_confirm),
           status: launchQaGate.status,
           messages: launchQaGate.messages,
         }

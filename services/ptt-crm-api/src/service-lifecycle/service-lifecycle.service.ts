@@ -11,7 +11,7 @@ import {
   validateOfficialTmmt,
 } from './lifecycle-marketing-plan.util';
 import { paymentGateFromSummary } from './lifecycle-payment-gate.util';
-import type { LaunchQaGateResult } from './lifecycle-launch-gate.util';
+import type { LaunchQaHandoverGateResult } from './lifecycle-launch-handover-gate.util';
 import { getStageAdvanceInfo, StageAdvanceError, validateStageAdvance } from './lifecycle-stage.util';
 import { LifecycleTasksRepository } from './lifecycle-tasks.repository';
 import { ServiceLifecycleSqliteRepository } from './service-lifecycle-sqlite.repository';
@@ -87,6 +87,7 @@ export class ServiceLifecycleService {
           currentStageComplete: this.tasks.isStageComplete(id, existing.stage),
           tmmtGate: this.tmmtGate(id, existing.stage, toStage),
           paymentGate: this.paymentGate(id, existing.stage, toStage, Boolean(body.finance_confirm)),
+          launchQaGate: await this.launchQaGate(id, existing.stage, toStage, Boolean(body.launch_qa_confirm)),
         });
       } catch (err) {
         if (err instanceof StageAdvanceError) {
@@ -142,7 +143,7 @@ export class ServiceLifecycleService {
       lc.stage === 'handover'
         ? paymentGateFromSummary(this.svcFinance.summary(id) as { outstanding_vnd?: number })
         : undefined;
-    let launchQaGate: LaunchQaGateResult | undefined;
+    let launchQaGate: LaunchQaHandoverGateResult | undefined;
     if (lc.stage === 'deliver') {
       try {
         launchQaGate = await this.lifecycleLaunchQa.launchQaGateForLifecycle(id);
@@ -373,5 +374,16 @@ export class ServiceLifecycleService {
       this.svcFinance.summary(lifecycleId) as { outstanding_vnd?: number },
       financeConfirm,
     );
+  }
+
+  private async launchQaGate(
+    lifecycleId: number,
+    fromStage: string,
+    toStage: string,
+    launchQaConfirm: boolean,
+  ) {
+    if (toStage !== 'handover' || fromStage !== 'deliver') return undefined;
+    const gate = await this.lifecycleLaunchQa.launchQaGateForLifecycle(lifecycleId, launchQaConfirm);
+    return { ok: gate.ok, messages: gate.messages };
   }
 }

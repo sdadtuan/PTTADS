@@ -35,6 +35,9 @@ type LaunchQaGate = {
   warn_only?: boolean;
   launch_ready?: boolean;
   progress_percent?: number;
+  progress_completed?: number;
+  progress_total?: number;
+  requires_confirm?: boolean;
   messages?: string[];
 };
 
@@ -76,6 +79,7 @@ export function ServiceDeliveryWorkflowPanel({
   const [advance, setAdvance] = useState<Record<string, unknown>>({});
   const [tmmtValidation, setTmmtValidation] = useState<{ ok: boolean; messages: string[] } | null>(null);
   const [financeConfirm, setFinanceConfirm] = useState(false);
+  const [launchQaConfirm, setLaunchQaConfirm] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -139,13 +143,13 @@ export function ServiceDeliveryWorkflowPanel({
     tab === 'deliver' &&
     String(advance.current_stage ?? '') === 'deliver' &&
     String(advance.next_stage ?? '') === 'handover' &&
-    launchQaGate &&
-    !launchQaGate.ok;
+    Boolean(launchQaGate?.requires_confirm);
 
   async function advanceForward() {
     const nxt = String(advance.next_stage ?? '');
     if (!nxt || !canEdit) return;
     if (showPaymentGate && !financeConfirm) return;
+    if (showLaunchQaGate && !launchQaConfirm) return;
     setSaving(true);
     setMessage('');
     setError('');
@@ -153,9 +157,11 @@ export function ServiceDeliveryWorkflowPanel({
       await patchServiceLifecycle(token, lifecycleId, {
         stage: nxt,
         finance_confirm: showPaymentGate && financeConfirm ? true : undefined,
+        launch_qa_confirm: showLaunchQaGate && launchQaConfirm ? true : undefined,
       });
       setTab(nxt);
       setFinanceConfirm(false);
+      setLaunchQaConfirm(false);
       onStageChanged?.(nxt);
       setMessage(`Đã chuyển → ${STAGE_LABELS[nxt] ?? nxt}`);
       onFinanceRefresh?.();
@@ -179,7 +185,9 @@ export function ServiceDeliveryWorkflowPanel({
   const canShowAdvanceButton =
     canEdit &&
     onCurrentTab &&
-    (Boolean(advance.can_advance_forward) || (showPaymentGate && financeConfirm));
+    (Boolean(advance.can_advance_forward) ||
+      (showPaymentGate && financeConfirm) ||
+      (showLaunchQaGate && launchQaConfirm));
 
   const workflowCard = (
     <div className="card" style={{ padding: '1rem' }}>
@@ -188,7 +196,7 @@ export function ServiceDeliveryWorkflowPanel({
         <span className="muted">{tabProg.done}/{tabProg.total} task · {tabProg.pct}%</span>
       </div>
 
-      {Boolean(advance.block_reason) && onCurrentTab && !showPaymentGate ? (
+      {Boolean(advance.block_reason) && onCurrentTab && !showPaymentGate && !showLaunchQaGate ? (
         <p className="error" style={{ marginTop: '0.5rem' }}>
           {String(advance.block_reason)}
         </p>
@@ -237,16 +245,24 @@ export function ServiceDeliveryWorkflowPanel({
           </p>
           <p style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>
             {(launchQaGate?.messages ?? [])[0] ??
-              `Checklist ${launchQaGate?.progress_percent ?? 0}% — hoàn thiện trước bàn giao`}
+              `Checklist ${launchQaGate?.progress_completed ?? 0}/${launchQaGate?.progress_total ?? 0} — hoàn thiện trước bàn giao`}
           </p>
           {onOpenLaunchQaTab ? (
-            <button type="button" className="btn btn-sm btn-secondary" onClick={onOpenLaunchQaTab}>
+            <button type="button" className="btn btn-sm btn-secondary" style={{ marginBottom: '0.5rem' }} onClick={onOpenLaunchQaTab}>
               Mở tab Launch QA
             </button>
           ) : null}
-          <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.8rem' }}>
-            Cảnh báo only — vẫn có thể chuyển Handover nếu task giai đoạn đã xong.
-          </p>
+          <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'flex-start', fontSize: '0.9rem' }}>
+            <input
+              type="checkbox"
+              checked={launchQaConfirm}
+              onChange={(e) => setLaunchQaConfirm(e.target.checked)}
+              disabled={!canEdit || saving}
+            />
+            <span>
+              Xác nhận chuyển sang <strong>Bàn giao</strong> dù Launch QA chưa launch_ready (AM/QA chịu trách nhiệm)
+            </span>
+          </label>
         </div>
       ) : null}
 
