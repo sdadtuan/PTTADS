@@ -301,6 +301,28 @@ export class AgencyService {
     };
   }
 
+  facebookAdsMigrationStatus(): Record<string, unknown> {
+    const retired = this.isEnvTruthy('PTT_FLASK_META_ADS_ADMIN_RETIRED');
+    const opsWeb = (process.env.PTT_OPS_WEB_URL ?? 'https://ops.pttads.vn').replace(/\/$/, '');
+    return {
+      ok: true,
+      flask_meta_ads_admin_retired: retired,
+      ops_web_hub_url: `${opsWeb}/meta/facebook-ads`,
+      ops_web_hub_path: '/meta/facebook-ads',
+      canonical_upstream: retired ? 'ops-web' : 'flask',
+      webhooks_nest_meta: this.isEnvTruthy('PTT_WEBHOOKS_NEST_META'),
+      webhooks_flask_fallback: this.isEnvTruthy('PTT_WEBHOOKS_FLASK_FALLBACK'),
+      gate_m1_g09: retired,
+      horizon1_expect_meta_hub_retired: this.isEnvTruthy('HORIZON1_EXPECT_META_HUB_RETIRED'),
+    };
+  }
+
+  private isEnvTruthy(name: string, defaultValue = '0'): boolean {
+    return ['1', 'true', 'yes', 'on'].includes(
+      (process.env[name] ?? defaultValue).trim().toLowerCase(),
+    );
+  }
+
   private buildFacebookHubAlerts(summary: Record<string, unknown>): FacebookHubAlert[] {
     const alerts: FacebookHubAlert[] = [];
     const unmapped = Number(summary.unmapped_campaigns ?? 0);

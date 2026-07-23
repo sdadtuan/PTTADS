@@ -7,10 +7,12 @@ import { OpsNav } from '@/components/OpsNav';
 import {
   downloadFacebookHubExport,
   fetchAgencyClients,
+  fetchFacebookAdsMigrationStatus,
   fetchFacebookHub,
   staffMe,
   staffRefresh,
   type AgencyClient,
+  type FacebookAdsMigrationStatus,
   type FacebookHubResponse,
 } from '@/lib/api';
 import {
@@ -46,6 +48,7 @@ export function MetaFacebookAdsContent() {
   const searchParams = useSearchParams();
   const [user, setUser] = useState<StoredStaffUser | null>(null);
   const [hub, setHub] = useState<FacebookHubResponse | null>(null);
+  const [migration, setMigration] = useState<FacebookAdsMigrationStatus | null>(null);
   const [clientOptions, setClientOptions] = useState<AgencyClient[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -145,6 +148,12 @@ export function MetaFacebookAdsContent() {
       } catch {
         /* optional filter list */
       }
+      try {
+        const mig = await fetchFacebookAdsMigrationStatus(access);
+        setMigration(mig);
+      } catch {
+        /* optional */
+      }
       await loadHub(access);
     })();
   }, [ensureAuth, loadHub]);
@@ -197,6 +206,22 @@ export function MetaFacebookAdsContent() {
   return (
     <main style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem' }}>
       <OpsNav user={user} onLogout={logout} />
+
+      {migration?.flask_meta_ads_admin_retired ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: '1rem',
+            borderLeft: '4px solid var(--accent, #2563eb)',
+            padding: '0.75rem 1rem',
+          }}
+        >
+          <p style={{ margin: 0 }}>
+            Hub Meta canonical trên ops-web · Flask <code>/crm/facebook-ads</code> đã retire (M1-G09).
+            Bookmark cũ trên rs.pttads.vn sẽ redirect về đây.
+          </p>
+        </div>
+      ) : null}
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <h1 style={{ marginTop: 0, fontSize: '1.25rem' }}>Meta Ads Hub</h1>

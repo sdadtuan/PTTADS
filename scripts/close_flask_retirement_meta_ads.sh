@@ -85,25 +85,26 @@ _set_env CRM_FACEBOOK_BACKGROUND_IN_GUNICORN 0
 
 echo ""
 echo "==> Merge nginx redirect block"
-if [[ ! -f "$NGINX_SRC" ]]; then
-  echo "FAIL missing $NGINX_SRC" >&2
-  exit 1
-fi
-if grep -q "location ^~ /crm/facebook-ads" "$NGINX_SITE" 2>/dev/null; then
+if [[ -x "$ROOT/scripts/apply_nginx_meta_ads_retired.sh" ]]; then
+  "$ROOT/scripts/apply_nginx_meta_ads_retired.sh"
+elif grep -q "location ^~ /crm/facebook-ads" "$NGINX_SITE" 2>/dev/null; then
   echo "    nginx already has /crm/facebook-ads redirect"
 else
   echo "    Append Meta redirect from $NGINX_SRC (manual merge if custom nginx)"
   cat "$NGINX_SRC" >>"$NGINX_SITE.bak-horizon1-meta"
   echo "    Wrote reference to ${NGINX_SITE}.bak-horizon1-meta — review and merge into live site"
+  nginx -t
+  systemctl reload nginx
 fi
 
-nginx -t
-systemctl reload nginx
-
 echo ""
-echo "==> Restart Nest + autosync (if systemd units present)"
-systemctl restart ptt-crm-api.service 2>/dev/null || true
-systemctl restart ptt-fb-autosync.service 2>/dev/null || true
+echo "==> Restart services (pick up .env + nginx)"
+for unit in ptt-crm-api ptt-ops-web ptt ptt.service; do
+  if systemctl restart "$unit" 2>/dev/null; then
+    echo "OK  restarted $unit"
+  fi
+done
+systemctl restart ptt-fb-autosync.service 2>/dev/null && echo "OK  restarted ptt-fb-autosync" || true
 
 echo ""
 echo "DONE Meta Ads admin retirement applied."

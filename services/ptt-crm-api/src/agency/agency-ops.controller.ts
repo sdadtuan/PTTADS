@@ -121,6 +121,12 @@ export class AgencyOpsController {
     return this.agency.deleteKpiDefinition(code);
   }
 
+  @Get('facebook-ads/migration-status')
+  @UseGuards(StaffOrInternalKeyGuard, StaffFacebookAdsViewGuard)
+  facebookAdsMigrationStatus(): Record<string, unknown> {
+    return this.agency.facebookAdsMigrationStatus();
+  }
+
   @Get('facebook-ads/hub')
   @UseGuards(StaffOrInternalKeyGuard, StaffFacebookAdsViewGuard)
   async facebookHub(

@@ -69,7 +69,7 @@ def _check_no_flask_email_admin() -> dict[str, Any]:
 def _check_nginx_delivery_redirects() -> dict[str, Any]:
     nginx = ROOT / "deploy" / "nginx-rs-delivery-admin-retired.conf"
     text = nginx.read_text(encoding="utf-8") if nginx.is_file() else ""
-    ok = nginx.is_file() and "/crm/seo" in text and "/email/" in text
+    ok = nginx.is_file() and "/crm/seo" in text and "/email/" in text and "/crm/facebook-ads" in text
     return {
         "id": "P5DA-G04",
         "ok": ok,

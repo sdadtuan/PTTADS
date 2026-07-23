@@ -147,8 +147,30 @@ def facebook_background_in_gunicorn() -> bool:
     return _truthy("CRM_FACEBOOK_BACKGROUND_IN_GUNICORN", "0")
 
 
+def meta_ads_admin_retired() -> bool:
+    """Horizon 1 B3.3 — Flask /crm/facebook-ads admin off; ops-web canonical."""
+    return _truthy("PTT_FLASK_META_ADS_ADMIN_RETIRED", "0")
+
+
+def meta_ads_ops_web_hub_path() -> str:
+    return "/meta/facebook-ads"
+
+
+def meta_ads_ops_on_ops_web() -> bool:
+    if meta_ads_admin_retired():
+        return True
+    mode = (os.environ.get("PTT_META_ADS_UPSTREAM") or "ops-web").strip().lower()
+    if mode in {"flask", "legacy"}:
+        return False
+    return mode in {"ops-web", "nest", "ops"}
+
+
 def ops_web_base_url() -> str:
     return (os.environ.get("PTT_OPS_WEB_URL") or "http://127.0.0.1:3200").rstrip("/")
+
+
+def meta_ads_ops_web_hub_url() -> str:
+    return f"{ops_web_base_url()}{meta_ads_ops_web_hub_path()}"
 
 
 def agency_ops_on_ops_web() -> bool:

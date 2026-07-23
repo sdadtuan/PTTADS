@@ -1776,6 +1776,14 @@ export interface FacebookHubQuery {
   q?: string;
 }
 
+export interface FacebookAdsMigrationStatus {
+  ok: boolean;
+  flask_meta_ads_admin_retired: boolean;
+  ops_web_hub_url: string;
+  canonical_upstream: string;
+  gate_m1_g09: boolean;
+}
+
 export interface HubMapRow {
   map_id?: string;
   hub_campaign_id: number | null;
@@ -1868,6 +1876,12 @@ export async function fetchClientPerformance(
   if (params?.group_by) qs.set('group_by', params.group_by);
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   return agencyFetch(token, `/api/v1/clients/${clientId}/performance${suffix}`);
+}
+
+export async function fetchFacebookAdsMigrationStatus(
+  token: string,
+): Promise<FacebookAdsMigrationStatus> {
+  return agencyFetch(token, '/api/v1/facebook-ads/migration-status');
 }
 
 export async function fetchFacebookHub(

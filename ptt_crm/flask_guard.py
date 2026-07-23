@@ -82,3 +82,14 @@ def deny_flask_finance_write(action: str = "finance_write") -> tuple[Any, int] |
 
 def deny_flask_svc_finance_write(action: str = "svc_finance_write") -> tuple[Any, int] | None:
     return None
+
+
+def deny_flask_meta_ads_admin(action: str = "meta_ads_admin") -> tuple[Any, int] | None:
+    """Redirect Flask Meta hub to ops-web when PTT_FLASK_META_ADS_ADMIN_RETIRED=1."""
+    from ptt_crm.meta_ads_admin_retirement import flask_meta_ads_admin_redirect
+
+    target = flask_meta_ads_admin_redirect()
+    if not target:
+        return None
+    url, code = target
+    return ({"redirect": url, "reason": action, "flask_meta_ads_admin_retired": True}, code)
