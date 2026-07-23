@@ -18,10 +18,27 @@ if [[ -f "$ENV_FILE" ]]; then
 fi
 
 VERIFY_TOKEN="${CRM_FACEBOOK_VERIFY_TOKEN:-${FACEBOOK_VERIFY_TOKEN:-test-meta-verify}}"
+FB_SECRET="${CRM_FACEBOOK_APP_SECRET:-${FACEBOOK_APP_SECRET:-}}"
 
 fail=0
 ok() { echo "OK  $*"; }
 bad() { echo "FAIL $*"; fail=1; }
+
+# Nest verifyFacebookSignature requires X-Hub-Signature-256 when App Secret is set (.env VPS).
+meta_sig_curl_args() {
+  local payload="$1"
+  if [[ -z "$FB_SECRET" ]]; then
+    return 0
+  fi
+  local sig
+  sig="$(FB_SECRET="$FB_SECRET" python3 -c "
+import hmac, hashlib, os, sys
+secret = os.environ['FB_SECRET']
+body = sys.argv[1].encode('utf-8')
+print('sha256=' + hmac.new(secret.encode('utf-8'), body, hashlib.sha256).hexdigest())
+" "$payload")"
+  printf '%s\n' -H "X-Hub-Signature-256: $sig"
+}
 
 echo "== Wave B3.1 smoke BASE=$BASE =="
 
@@ -51,9 +68,12 @@ fi
 # flat lead POST (legacy/dev payload)
 flat_payload='{"full_name":"B3.1 smoke","phone":"0908111222","email":"b31@test.local","meta":{"facebook_leadgen_id":"b31-smoke-flat-001"}}'
 flat_resp="$(mktemp)"
+flat_sig=()
+while IFS= read -r line; do flat_sig+=("$line"); done < <(meta_sig_curl_args "$flat_payload")
 flat_code="$(curl -s -o "$flat_resp" -w "%{http_code}" -X POST "$BASE/api/v1/webhooks/meta" \
   -H 'Content-Type: application/json' \
   -H "X-PTT-Client-Id: $CLIENT_ID" \
+  "${flat_sig[@]}" \
   -d "$flat_payload")"
 if [[ "$flat_code" == "200" ]]; then
   ok "POST meta flat lead (HTTP 200)"
@@ -73,8 +93,11 @@ rm -f "$flat_resp"
 # standard leadgen webhook shape (Graph fetch may be pending without token)
 leadgen_payload='{"object":"page","entry":[{"id":"123456789012345","changes":[{"field":"leadgen","value":{"leadgen_id":"b31-smoke-lg-001","form_id":"2814926042203269","page_id":"123456789012345"}}]}]}'
 lg_resp="$(mktemp)"
+lg_sig=()
+while IFS= read -r line; do lg_sig+=("$line"); done < <(meta_sig_curl_args "$leadgen_payload")
 lg_code="$(curl -s -o "$lg_resp" -w "%{http_code}" -X POST "$BASE/api/v1/webhooks/meta" \
   -H 'Content-Type: application/json' \
+  "${lg_sig[@]}" \
   -d "$leadgen_payload")"
 if [[ "$lg_code" == "200" ]]; then
   ok "POST meta leadgen payload (HTTP 200)"

@@ -74,6 +74,8 @@ set -a && source .env && set +a
 CLIENT_ID=333a8341-a08f-4b7e-9ddf-b7c053935d03 ./scripts/wave_b3_1_smoke.sh
 ```
 
+> **Lưu ý:** Khi `CRM_FACEBOOK_APP_SECRET` có trong `.env`, smoke tự thêm `X-Hub-Signature-256` (HMAC body). Nếu vẫn 401 → secret không khớp App trên Meta Developer Console; chạy `python3 scripts/ptt_fb_webhook_probe.py` mục **POST chữ ký**.
+
 ## Meta Developer Console
 
 | Field | Giá trị |
