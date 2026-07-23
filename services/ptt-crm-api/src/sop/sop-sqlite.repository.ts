@@ -65,6 +65,13 @@ export class SopSqliteRepository implements OnModuleDestroy {
     return row ? this.mapTemplateRow(row) : null;
   }
 
+  getTemplateByCode(code: string): SopTemplateRow | null {
+    const row = this.database
+      .prepare('SELECT * FROM crm_sop_templates WHERE code = ? AND active = 1 ORDER BY id DESC LIMIT 1')
+      .get(code) as unknown as Record<string, unknown> | undefined;
+    return row ? this.mapTemplateRow(row) : null;
+  }
+
   listSteps(templateId: number): SopStepRow[] {
     const rows = this.database
       .prepare(

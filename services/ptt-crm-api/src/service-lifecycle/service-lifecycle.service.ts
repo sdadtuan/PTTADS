@@ -3,6 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { SvcFinanceService } from '../svc-finance/svc-finance.service';
+import { validateOfficialTmmt } from './lifecycle-marketing-plan.util';
+import { getStageAdvanceInfo, StageAdvanceError, validateStageAdvance } from './lifecycle-stage.util';
+import { LifecycleTasksRepository } from './lifecycle-tasks.repository';
 import { ServiceLifecycleSqliteRepository } from './service-lifecycle-sqlite.repository';
 import {
   CreateServiceLifecycleBody,
@@ -13,7 +17,11 @@ import {
 
 @Injectable()
 export class ServiceLifecycleService {
-  constructor(private readonly sqlite: ServiceLifecycleSqliteRepository) {}
+  constructor(
+    private readonly sqlite: ServiceLifecycleSqliteRepository,
+    private readonly tasks: LifecycleTasksRepository,
+    private readonly svcFinance: SvcFinanceService,
+  ) {}
 
   list(serviceSlug?: string, amId?: string, includeDraft?: string) {
     const am = amId ? Number(amId) : undefined;
@@ -22,7 +30,7 @@ export class ServiceLifecycleService {
       amId: am && Number.isFinite(am) && am > 0 ? am : undefined,
       includeDraft: includeDraft === '1',
     });
-    return { lifecycles };
+    return { lifecycles, funnel_stats: this.sqlite.funnelStats() };
   }
 
   detail(id: number) {
@@ -32,6 +40,11 @@ export class ServiceLifecycleService {
     }
     const events = this.sqlite.listEvents(id);
     return { ...lifecycle, events };
+  }
+
+  events(id: number) {
+    this.requireLifecycle(id);
+    return { events: this.sqlite.listEvents(id) };
   }
 
   create(body: CreateServiceLifecycleBody) {
@@ -46,18 +59,43 @@ export class ServiceLifecycleService {
   }
 
   patch(id: number, body: PatchServiceLifecycleBody) {
-    if ('stage' in body && body.stage != null) {
-      const stage = String(body.stage).trim();
-      if (!isValidStage(stage)) {
-        throw new BadRequestException({ error: `Stage không hợp lệ: ${stage}` });
-      }
+    const existing = this.sqlite.getLifecycleById(id);
+    if (!existing) {
+      throw new NotFoundException({ error: 'Không tìm thấy lifecycle' });
     }
+
+    if ('stage' in body && body.stage != null) {
+      const toStage = String(body.stage).trim();
+      if (!isValidStage(toStage)) {
+        throw new BadRequestException({ error: `Stage không hợp lệ: ${toStage}` });
+      }
+      try {
+        validateStageAdvance({
+          fromStage: existing.stage,
+          toStage,
+          currentStageComplete: this.tasks.isStageComplete(id, existing.stage),
+          tmmtGate: this.tmmtGate(id, existing.stage, toStage),
+        });
+      } catch (err) {
+        if (err instanceof StageAdvanceError) {
+          throw new BadRequestException({ error: err.message, block_reason: err.message });
+        }
+        throw err;
+      }
+      const notes =
+        'notes' in body && typeof body.notes === 'string'
+          ? body.notes.trim().slice(0, 2000)
+          : existing.notes;
+      return this.sqlite.advanceStage(id, toStage, notes);
+    }
+
     if ('service_slug' in body && body.service_slug != null) {
       const slug = String(body.service_slug).trim();
       if (slug && !isValidSlug(slug)) {
         throw new BadRequestException({ error: 'service_slug không hợp lệ' });
       }
     }
+
     const updated = this.sqlite.patchLifecycle(id, body);
     if (!updated) {
       throw new NotFoundException({ error: 'Không tìm thấy lifecycle' });
@@ -65,11 +103,123 @@ export class ServiceLifecycleService {
     return updated;
   }
 
+  advanceInfo(id: number) {
+    const lc = this.requireLifecycle(id);
+    const prog = this.tasks.getProgress(id)[lc.stage] ?? { done: 0, total: 0 };
+    const complete = this.tasks.isStageComplete(id, lc.stage);
+    const tmmtGate =
+      lc.stage === 'onboard'
+        ? validateOfficialTmmt(this.sqlite.getOfficialMarketingPlan(id))
+        : undefined;
+    return getStageAdvanceInfo({
+      currentStage: lc.stage,
+      currentStageComplete: complete,
+      currentDone: prog.done,
+      currentTotal: prog.total,
+      tmmtGate,
+    });
+  }
+
   listTasks(id: number) {
-    const lifecycle = this.sqlite.getLifecycleById(id);
-    if (!lifecycle) {
+    this.requireLifecycle(id);
+    return { tasks: this.tasks.listTasksGrouped(id) };
+  }
+
+  progress(id: number) {
+    this.requireLifecycle(id);
+    return { progress: this.tasks.getProgress(id) };
+  }
+
+  updateTask(
+    lifecycleId: number,
+    taskId: number,
+    body: { is_done?: boolean; notes?: string; form_data?: Record<string, unknown> },
+    doneBy?: number | null,
+  ) {
+    this.requireLifecycle(lifecycleId);
+    const task = this.tasks.getTask(taskId);
+    if (!task || task.lifecycle_id !== lifecycleId) {
+      throw new NotFoundException({ error: 'Không tìm thấy task' });
+    }
+    const updated = this.tasks.updateTask(taskId, { ...body, done_by: doneBy ?? null });
+    if (!updated) {
+      throw new NotFoundException({ error: 'Không tìm thấy task' });
+    }
+    return { task: updated };
+  }
+
+  createCustomTask(
+    lifecycleId: number,
+    body: { stage?: string; title?: string; description?: string },
+  ) {
+    this.requireLifecycle(lifecycleId);
+    const stage = String(body.stage ?? '').trim();
+    if (!isValidStage(stage)) {
+      throw new BadRequestException({ error: 'Stage không hợp lệ' });
+    }
+    const title = String(body.title ?? '').trim();
+    if (!title) {
+      throw new BadRequestException({ error: 'Cần title' });
+    }
+    const task = this.tasks.createCustomTask(
+      lifecycleId,
+      stage,
+      title,
+      String(body.description ?? ''),
+    );
+    return { task };
+  }
+
+  marketingPlan(id: number) {
+    this.requireLifecycle(id);
+    const plan = this.sqlite.getOfficialMarketingPlan(id);
+    return { plan, validation: validateOfficialTmmt(plan) };
+  }
+
+  patchMarketingPlan(id: number, body: Record<string, unknown>) {
+    const lc = this.requireLifecycle(id);
+    if (!lc.marketing_plan_id) {
+      throw new NotFoundException({ error: 'Chưa có Kế hoạch MKT chính thức' });
+    }
+    const plan = this.sqlite.updateOfficialMarketingPlan(lc.marketing_plan_id, body);
+    if (!plan) {
+      throw new NotFoundException({ error: 'Không tìm thấy plan' });
+    }
+    return { plan, validation: validateOfficialTmmt(plan) };
+  }
+
+  marketingPlanValidation(id: number) {
+    this.requireLifecycle(id);
+    const plan = this.sqlite.getOfficialMarketingPlan(id);
+    return validateOfficialTmmt(plan);
+  }
+
+  presalesSummary(id: number) {
+    this.requireLifecycle(id);
+    return this.sqlite.presalesSummary(id);
+  }
+
+  createExpense(id: number, body: Record<string, unknown>) {
+    this.requireLifecycle(id);
+    return this.sqlite.createExpense(id, body);
+  }
+
+  financeSummary(id: number) {
+    return this.svcFinance.summary(id);
+  }
+
+  private requireLifecycle(id: number) {
+    const lc = this.sqlite.getLifecycleById(id);
+    if (!lc) {
       throw new NotFoundException({ error: 'Không tìm thấy lifecycle' });
     }
-    return { tasks: [] };
+    return lc;
+  }
+
+  private tmmtGate(lifecycleId: number, fromStage: string, toStage: string) {
+    if (toStage === 'deliver' && fromStage === 'onboard') {
+      return validateOfficialTmmt(this.sqlite.getOfficialMarketingPlan(lifecycleId));
+    }
+    return undefined;
   }
 }

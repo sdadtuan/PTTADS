@@ -36,6 +36,8 @@ export interface PatchServiceLifecycleBody {
   stage?: string;
   service_slug?: string;
   notes?: string;
+  assigned_am?: number | null;
+  assigned_sp?: number | null;
 }
 
 export const VALID_STAGES = [

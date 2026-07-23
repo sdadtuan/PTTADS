@@ -913,17 +913,84 @@ export async function patchMarketingPlan(
 
 export async function fetchServiceLifecycles(
   token: string,
-  params?: { service_slug?: string; include_draft?: boolean },
-): Promise<ServiceLifecycleRow[]> {
+  params?: { service_slug?: string; include_draft?: boolean; am_id?: string },
+): Promise<{ lifecycles: ServiceLifecycleRow[]; funnel_stats?: Record<string, number> }> {
   const qs = new URLSearchParams();
   if (params?.service_slug) qs.set('service_slug', params.service_slug);
   if (params?.include_draft) qs.set('include_draft', '1');
+  if (params?.am_id) qs.set('am_id', params.am_id);
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
-  const out = await crmFetch<{ lifecycles: ServiceLifecycleRow[] }>(
+  return crmFetch<{ lifecycles: ServiceLifecycleRow[]; funnel_stats?: Record<string, number> }>(
     token,
     `/api/crm/service-lifecycle${suffix}`,
   );
-  return out.lifecycles ?? [];
+}
+
+export async function fetchServiceLifecycleAdvanceInfo(
+  token: string,
+  id: number,
+): Promise<Record<string, unknown>> {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/advance-info`);
+}
+
+export async function fetchServiceLifecycleTasks(
+  token: string,
+  id: number,
+): Promise<{ tasks: Record<string, Array<Record<string, unknown>>> }> {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/tasks`);
+}
+
+export async function fetchServiceLifecycleProgress(
+  token: string,
+  id: number,
+): Promise<{ progress: Record<string, { total: number; done: number; pct: number }> }> {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/progress`);
+}
+
+export async function patchServiceLifecycleTask(
+  token: string,
+  lifecycleId: number,
+  taskId: number,
+  body: Partial<{ is_done: boolean; notes: string; form_data: Record<string, unknown> }>,
+): Promise<{ task: Record<string, unknown> }> {
+  return crmFetch(token, `/api/crm/service-lifecycle/${lifecycleId}/tasks/${taskId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchServiceLifecycleMarketingPlan(
+  token: string,
+  id: number,
+): Promise<{ plan: Record<string, unknown> | null; validation: { ok: boolean; messages: string[] } }> {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/marketing-plan`);
+}
+
+export async function patchServiceLifecycleMarketingPlan(
+  token: string,
+  id: number,
+  body: Record<string, unknown>,
+): Promise<{ plan: Record<string, unknown>; validation: { ok: boolean; messages: string[] } }> {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/marketing-plan`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchServiceLifecyclePresalesSummary(
+  token: string,
+  id: number,
+): Promise<Record<string, unknown>> {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/presales-summary`);
+}
+
+export async function fetchServiceLifecycleFinanceSummary(
+  token: string,
+  id: number,
+): Promise<Record<string, unknown>> {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/finance-summary`);
 }
 
 export async function fetchServiceLifecycleDetail(token: string, id: number): Promise<Record<string, unknown>> {
@@ -933,7 +1000,7 @@ export async function fetchServiceLifecycleDetail(token: string, id: number): Pr
 export async function patchServiceLifecycle(
   token: string,
   id: number,
-  body: Partial<{ stage: string; notes: string; service_slug: string }>,
+  body: Partial<{ stage: string; notes: string; service_slug: string; assigned_am: number | null; assigned_sp: number | null }>,
 ): Promise<ServiceLifecycleRow> {
   return crmFetch<ServiceLifecycleRow>(token, `/api/crm/service-lifecycle/${id}`, {
     method: 'PATCH',

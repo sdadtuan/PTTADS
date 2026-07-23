@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { SopAutoStartService } from '../sop/sop-auto-start.service';
 import { LeadsContractSqliteRepository } from './leads-contract-sqlite.repository';
 import type {
   ContractReadiness,
@@ -10,7 +11,10 @@ import type {
 
 @Injectable()
 export class LeadsContractService {
-  constructor(private readonly repo: LeadsContractSqliteRepository) {}
+  constructor(
+    private readonly repo: LeadsContractSqliteRepository,
+    private readonly sopAutoStart: SopAutoStartService,
+  ) {}
 
   getReadiness(leadId: number): ContractReadiness {
     return this.repo.getReadiness(leadId);
@@ -45,6 +49,12 @@ export class LeadsContractService {
   }
 
   approve(approvalId: number, actor: string) {
-    return this.repo.approveAndPromote(approvalId, actor);
+    const result = this.repo.approveAndPromote(approvalId, actor);
+    const sop = this.sopAutoStart.maybeStartOnLifecyclePromote({
+      lifecycleId: result.lifecycle_id,
+      contractId: result.contract.id,
+      serviceSlug: result.contract.service_slug ?? '',
+    });
+    return { ...result, sop_auto_start: sop };
   }
 }

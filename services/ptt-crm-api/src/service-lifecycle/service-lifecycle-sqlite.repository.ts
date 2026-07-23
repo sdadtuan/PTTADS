@@ -2,6 +2,7 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { DatabaseSync } from 'node:sqlite';
 import { catalogTs } from '../catalog/catalog-slug.util';
 import { AppConfigService } from '../config/app-config.service';
+import { createLifecycleExpense, listPresalesSummary } from './lifecycle-finance.util';
 import {
   CreateServiceLifecycleBody,
   PatchServiceLifecycleBody,
@@ -192,15 +193,108 @@ export class ServiceLifecycleSqliteRepository implements OnModuleDestroy {
           .run(ts, serviceSlug, notes, id);
       }
     } else {
+      let assignedAm = existing.assigned_am;
+      let assignedSp = existing.assigned_sp;
+      if ('assigned_am' in body) {
+        assignedAm =
+          body.assigned_am != null && Number(body.assigned_am) > 0 ? Number(body.assigned_am) : null;
+      }
+      if ('assigned_sp' in body) {
+        assignedSp =
+          body.assigned_sp != null && Number(body.assigned_sp) > 0 ? Number(body.assigned_sp) : null;
+      }
       this.database
         .prepare(
           `UPDATE crm_service_lifecycle
-           SET updated_at = ?, service_slug = ?, notes = ?
+           SET updated_at = ?, service_slug = ?, notes = ?, assigned_am = ?, assigned_sp = ?
            WHERE id = ?`,
         )
-        .run(ts, serviceSlug, notes, id);
+        .run(ts, serviceSlug, notes, assignedAm, assignedSp, id);
     }
 
+    return this.getLifecycleById(id);
+  }
+
+  getOfficialMarketingPlan(lifecycleId: number): Record<string, unknown> | null {
+    const lc = this.getLifecycleById(lifecycleId);
+    if (!lc?.marketing_plan_id) return null;
+    const row = this.database
+      .prepare('SELECT * FROM crm_marketing_plans WHERE id = ?')
+      .get(lc.marketing_plan_id) as Record<string, unknown> | undefined;
+    return row ?? null;
+  }
+
+  createExpense(lifecycleId: number, body: Record<string, unknown>): Record<string, unknown> {
+    return createLifecycleExpense(this.database, lifecycleId, body);
+  }
+
+  presalesSummary(lifecycleId: number): Record<string, unknown> {
+    return listPresalesSummary(this.database, lifecycleId);
+  }
+
+  updateOfficialMarketingPlan(planId: number, patch: Record<string, unknown>): Record<string, unknown> | null {
+    const ts = catalogTs();
+    const sets: string[] = ['updated_at = ?'];
+    const params: (string | number)[] = [ts];
+    if (patch.north_star != null) {
+      sets.push('north_star = ?');
+      params.push(String(patch.north_star).slice(0, 4000));
+    }
+    if (patch.objectives != null) {
+      sets.push('objectives = ?');
+      params.push(String(patch.objectives).slice(0, 4000));
+    }
+    if (patch.strategy_framework_json != null) {
+      sets.push('strategy_framework_json = ?');
+      params.push(String(patch.strategy_framework_json));
+    }
+    if (patch.target_market_prof_json != null) {
+      sets.push('target_market_prof_json = ?');
+      params.push(String(patch.target_market_prof_json));
+    }
+    params.push(planId);
+    this.database.prepare(`UPDATE crm_marketing_plans SET ${sets.join(', ')} WHERE id = ?`).run(...params);
+    return this.database.prepare('SELECT * FROM crm_marketing_plans WHERE id = ?').get(planId) as
+      | Record<string, unknown>
+      | undefined ?? null;
+  }
+
+  funnelStats(): Record<string, number> {
+    const rows = this.database
+      .prepare(
+        `SELECT stage, COUNT(*) AS c FROM crm_service_lifecycle
+         WHERE status = 'active' GROUP BY stage`,
+      )
+      .all() as Array<{ stage: string; c: number }>;
+    const out: Record<string, number> = {};
+    for (const r of rows) out[String(r.stage)] = Number(r.c);
+    return out;
+  }
+
+  advanceStage(
+    id: number,
+    toStage: string,
+    notes: string,
+    actorType = 'human',
+  ): ServiceLifecycleRow | null {
+    const existing = this.getLifecycleById(id);
+    if (!existing) return null;
+    const ts = catalogTs();
+    const fromStage = existing.stage;
+    this.database
+      .prepare(
+        `UPDATE crm_service_lifecycle
+         SET stage = ?, stage_entered_at = ?, updated_at = ?, notes = ?
+         WHERE id = ?`,
+      )
+      .run(toStage, ts, ts, notes, id);
+    this.database
+      .prepare(
+        `INSERT INTO crm_service_lifecycle_events
+           (lifecycle_id, from_stage, to_stage, actor_type, notes, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(id, fromStage, toStage, actorType, notes, ts);
     return this.getLifecycleById(id);
   }
 

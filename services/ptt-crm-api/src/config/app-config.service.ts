@@ -62,6 +62,7 @@ export class AppConfigService {
   readonly crmLeadsFunnelNest: boolean;
   readonly presalesOnLead: boolean;
   readonly crmServiceDeliveryNest: boolean;
+  readonly sopAutoStartOnLaunch: boolean;
 
   constructor() {
     this.port = Number(process.env.PORT ?? process.env.CRM_API_PORT ?? 3000);
@@ -133,6 +134,9 @@ export class AppConfigService {
     );
     this.crmServiceDeliveryNest = ['1', 'true', 'yes', 'on'].includes(
       (process.env.PTT_CRM_SERVICE_DELIVERY_NEST ?? '0').trim().toLowerCase(),
+    );
+    this.sopAutoStartOnLaunch = ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_SOP_AUTO_START_ON_LAUNCH ?? '0').trim().toLowerCase(),
     );
   }
 

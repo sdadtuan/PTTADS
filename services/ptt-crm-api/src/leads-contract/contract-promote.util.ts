@@ -1,6 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { PRESALES_STAGES } from '../leads-funnel/leads-funnel.types';
 import { validatePreliminaryPlan } from '../leads-funnel/presales-marketing-plan.util';
+import { linkPresalesExpensesToLifecycle } from '../service-lifecycle/lifecycle-finance.util';
 import { seedPostOnboardLifecycleTasks } from './lifecycle-tasks-seed.util';
 
 export class ContractPromoteUtil {
@@ -233,6 +234,7 @@ export class ContractPromoteUtil {
 
     seedPostOnboardLifecycleTasks(db, lifecycleId, serviceSlug, ts);
     this.clonePreliminaryToOfficial(db, presalesId, lifecycleId, ts);
+    linkPresalesExpensesToLifecycle(db, presalesId, lifecycleId);
 
     db.prepare(
       `UPDATE crm_lead_intake_sessions SET lifecycle_id = ? WHERE lead_id = ? AND (lifecycle_id IS NULL OR lifecycle_id = 0)`,
@@ -262,7 +264,7 @@ export class ContractPromoteUtil {
     if (!gate.ok) throw new Error(gate.messages[0] ?? 'KH MKT sơ bộ chưa đủ');
     let name = String(draft.name ?? '').trim();
     if (!name.endsWith('(chính thức)')) name = `${name} (chính thức)`.slice(0, 200);
-    db.prepare(
+    const insert = db.prepare(
       `INSERT INTO crm_marketing_plans (
          code, name, status, plan_kind, lead_id, presales_id, lifecycle_id, source_plan_id,
          north_star, objectives, notes, strategy_framework_json, target_market_prof_json,
@@ -273,6 +275,12 @@ export class ContractPromoteUtil {
               target_market_steps4_json, ?, ?
        FROM crm_marketing_plans WHERE id = ?`,
     ).run(`LC-${lifecycleId}-OFFICIAL`, name, lifecycleId, ts, ts, Number(draft.id));
+    const officialId = Number(insert.lastInsertRowid);
+    db.prepare(`UPDATE crm_service_lifecycle SET marketing_plan_id = ?, updated_at = ? WHERE id = ?`).run(
+      officialId,
+      ts,
+      lifecycleId,
+    );
   }
 
   private deletePlaceholderIfOrphan(db: DatabaseSync, customerId: number): void {

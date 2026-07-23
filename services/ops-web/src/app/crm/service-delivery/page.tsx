@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
+import { ServiceDeliveryKanban } from '@/components/ServiceDeliveryKanban';
 import { fetchServiceLifecycles, staffMe, staffRefresh, type ServiceLifecycleRow } from '@/lib/api';
 import {
   clearSession,
@@ -20,6 +20,8 @@ export default function CrmServiceDeliveryPage() {
   const router = useRouter();
   const [user, setUser] = useState<StoredStaffUser | null>(null);
   const [rows, setRows] = useState<ServiceLifecycleRow[]>([]);
+  const [funnelStats, setFunnelStats] = useState<Record<string, number>>({});
+  const [filterSlug, setFilterSlug] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -57,22 +59,28 @@ export default function CrmServiceDeliveryPage() {
     }
   }, [router]);
 
+  const load = useCallback(async () => {
+    const access = await ensureAuth();
+    if (!access) return;
+    setLoading(true);
+    setError('');
+    try {
+      const data = await fetchServiceLifecycles(access, {
+        include_draft: true,
+        service_slug: filterSlug || undefined,
+      });
+      setRows(data.lifecycles ?? []);
+      setFunnelStats(data.funnel_stats ?? {});
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Tải lifecycle thất bại');
+    } finally {
+      setLoading(false);
+    }
+  }, [ensureAuth, filterSlug]);
+
   useEffect(() => {
-    void (async () => {
-      const access = await ensureAuth();
-      if (!access) return;
-      setLoading(true);
-      setError('');
-      try {
-        const data = await fetchServiceLifecycles(access, { include_draft: true });
-        setRows(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Tải lifecycle thất bại');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [ensureAuth]);
+    void load();
+  }, [load]);
 
   function logout() {
     clearSession();
@@ -88,27 +96,30 @@ export default function CrmServiceDeliveryPage() {
   }
 
   return (
-    <main style={{ maxWidth: 960, margin: '0 auto', padding: '1.5rem' }}>
+    <main style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem' }}>
       <OpsNav user={user} onLogout={logout} />
       <div className="card">
-        <h2 style={{ marginTop: 0, fontSize: '1.15rem' }}>Service Delivery</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <h2 style={{ margin: 0, fontSize: '1.15rem' }}>Service Delivery — Kanban</h2>
+          <input
+            placeholder="Lọc service_slug…"
+            value={filterSlug}
+            onChange={(e) => setFilterSlug(e.target.value)}
+            onBlur={() => void load()}
+            style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              padding: '0.45rem 0.65rem',
+              color: 'var(--text)',
+              minWidth: 200,
+            }}
+          />
+        </div>
         {loading ? <p className="muted">Đang tải…</p> : null}
         {error ? <p className="error">{error}</p> : null}
-        {rows.length === 0 && !loading ? <p className="muted">Chưa có lifecycle.</p> : null}
-        <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-          {rows.map((lc) => (
-            <li key={lc.id} style={{ marginBottom: '0.35rem' }}>
-              <Link href={`/crm/service-delivery/${lc.id}`} className="nav-link">
-                #{lc.id} · {lc.service_slug}
-              </Link>{' '}
-              <span className="muted">
-                {lc.stage} / {lc.status}
-                {lc.customer_id ? ` · KH #${lc.customer_id}` : ''}
-                {lc.lead_id ? ` · Lead #${lc.lead_id}` : ''}
-              </span>
-            </li>
-          ))}
-        </ul>
+        {!loading && rows.length === 0 ? <p className="muted">Chưa có lifecycle.</p> : null}
+        {!loading && rows.length > 0 ? <ServiceDeliveryKanban rows={rows} funnelStats={funnelStats} /> : null}
       </div>
     </main>
   );

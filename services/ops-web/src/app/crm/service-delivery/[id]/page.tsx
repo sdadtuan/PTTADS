@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
+import { ServiceDeliveryWorkflowPanel } from '@/components/ServiceDeliveryWorkflowPanel';
 import { fetchServiceLifecycleDetail, patchServiceLifecycle, staffMe, staffRefresh } from '@/lib/api';
 import {
   clearSession,
@@ -16,8 +17,6 @@ import {
   type StoredStaffUser,
 } from '@/lib/auth';
 
-const STAGES = ['lead', 'consult', 'proposal', 'onboard', 'deliver', 'handover', 'retain'];
-
 export default function CrmServiceDeliveryDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -26,6 +25,9 @@ export default function CrmServiceDeliveryDetailPage() {
   const [row, setRow] = useState<Record<string, unknown> | null>(null);
   const [stage, setStage] = useState('lead');
   const [notes, setNotes] = useState('');
+  const [assignedAm, setAssignedAm] = useState('');
+  const [assignedSp, setAssignedSp] = useState('');
+  const [token, setToken] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
@@ -74,12 +76,15 @@ export default function CrmServiceDeliveryDetailPage() {
     void (async () => {
       const access = await ensureAuth();
       if (!access) return;
+      setToken(access);
       setLoading(true);
       try {
         const data = await fetchServiceLifecycleDetail(access, lifecycleId);
         setRow(data);
         setStage(String(data.stage ?? 'lead'));
         setNotes(String(data.notes ?? ''));
+        setAssignedAm(data.assigned_am != null ? String(data.assigned_am) : '');
+        setAssignedSp(data.assigned_sp != null ? String(data.assigned_sp) : '');
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Tải thất bại');
       } finally {
@@ -88,7 +93,7 @@ export default function CrmServiceDeliveryDetailPage() {
     })();
   }, [ensureAuth, lifecycleId]);
 
-  async function onSave(e: React.FormEvent) {
+  async function onSaveMeta(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
     const access = getAccessToken();
@@ -97,9 +102,13 @@ export default function CrmServiceDeliveryDetailPage() {
     setError('');
     setMessage('');
     try {
-      const updated = await patchServiceLifecycle(access, lifecycleId, { stage, notes: notes.trim() });
+      const updated = await patchServiceLifecycle(access, lifecycleId, {
+        notes: notes.trim(),
+        assigned_am: assignedAm ? Number(assignedAm) : null,
+        assigned_sp: assignedSp ? Number(assignedSp) : null,
+      });
       setRow({ ...row, ...updated });
-      setMessage('Đã lưu');
+      setMessage('Đã lưu ghi chú / AM / SP');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Lưu thất bại');
     } finally {
@@ -123,79 +132,104 @@ export default function CrmServiceDeliveryDetailPage() {
   }
 
   return (
-    <main style={{ maxWidth: 900, margin: '0 auto', padding: '1.5rem' }}>
+    <main style={{ maxWidth: 1000, margin: '0 auto', padding: '1.5rem' }}>
       <OpsNav user={user} onLogout={logout} />
       <p style={{ margin: '0 0 1rem' }}>
         <Link href="/crm/service-delivery" className="nav-link">
           ← Service delivery
         </Link>
       </p>
-      <div className="card">
-        {loading ? <p className="muted">Đang tải…</p> : null}
-        {error ? <p className="error">{error}</p> : null}
-        {message ? <p style={{ color: 'var(--accent)' }}>{message}</p> : null}
-        {row && !loading ? (
-          <form onSubmit={(e) => void onSave(e)} style={{ display: 'grid', gap: '0.75rem' }}>
+      {loading ? <p className="muted">Đang tải…</p> : null}
+      {error ? <p className="error">{error}</p> : null}
+      {message ? <p style={{ color: 'var(--accent)' }}>{message}</p> : null}
+      {row && !loading ? (
+        <>
+          <div className="card" style={{ marginBottom: '1rem', padding: '1rem' }}>
             <h2 style={{ margin: 0, fontSize: '1.15rem' }}>
               #{lifecycleId} · {String(row.service_slug ?? '')}
             </h2>
-            <p className="muted">Status: {String(row.status ?? '')}</p>
-            <label style={{ display: 'grid', gap: '0.35rem' }}>
-              <span className="muted">Stage</span>
-              <select
-                value={stage}
-                onChange={(e) => setStage(e.target.value)}
-                disabled={!hasCap(user, 'crm_board', 'edit') || saving}
-                style={{
-                  background: 'var(--bg)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  padding: '0.55rem 0.75rem',
-                  color: 'var(--text)',
-                }}
-              >
-                {STAGES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label style={{ display: 'grid', gap: '0.35rem' }}>
-              <span className="muted">Ghi chú</span>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                rows={3}
-                disabled={!hasCap(user, 'crm_board', 'edit') || saving}
-                style={{
-                  background: 'var(--bg)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  padding: '0.55rem 0.75rem',
-                  color: 'var(--text)',
-                  resize: 'vertical',
-                }}
-              />
-            </label>
-            <button type="submit" className="btn btn-sm" disabled={saving || !hasCap(user, 'crm_board', 'edit')}>
-              Lưu stage
-            </button>
-            {events.length > 0 ? (
-              <div>
-                <h3 style={{ fontSize: '1rem' }}>Events</h3>
-                <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
-                  {events.slice(-10).map((ev) => (
-                    <li key={ev.id}>
-                      → {ev.to_stage}: {ev.notes || '—'} ({ev.created_at})
-                    </li>
-                  ))}
-                </ul>
+            <p className="muted">
+              Stage: {stage} · Status: {String(row.status ?? '')}
+            </p>
+            <form onSubmit={(e) => void onSaveMeta(e)} style={{ display: 'grid', gap: '0.65rem', marginTop: '0.75rem' }}>
+              <label style={{ display: 'grid', gap: '0.35rem' }}>
+                <span className="muted">Ghi chú</span>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={2}
+                  disabled={!hasCap(user, 'crm_board', 'edit') || saving}
+                  style={{
+                    background: 'var(--bg)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 8,
+                    padding: '0.55rem 0.75rem',
+                    color: 'var(--text)',
+                  }}
+                />
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                <label style={{ display: 'grid', gap: '0.35rem' }}>
+                  <span className="muted">AM (staff id)</span>
+                  <input
+                    value={assignedAm}
+                    onChange={(e) => setAssignedAm(e.target.value)}
+                    disabled={!hasCap(user, 'crm_board', 'edit') || saving}
+                    style={{
+                      background: 'var(--bg)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      padding: '0.55rem 0.75rem',
+                      color: 'var(--text)',
+                    }}
+                  />
+                </label>
+                <label style={{ display: 'grid', gap: '0.35rem' }}>
+                  <span className="muted">SP (staff id)</span>
+                  <input
+                    value={assignedSp}
+                    onChange={(e) => setAssignedSp(e.target.value)}
+                    disabled={!hasCap(user, 'crm_board', 'edit') || saving}
+                    style={{
+                      background: 'var(--bg)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      padding: '0.55rem 0.75rem',
+                      color: 'var(--text)',
+                    }}
+                  />
+                </label>
               </div>
-            ) : null}
-          </form>
-        ) : null}
-      </div>
+              <button type="submit" className="btn btn-sm" disabled={saving || !hasCap(user, 'crm_board', 'edit')}>
+                Lưu meta
+              </button>
+            </form>
+          </div>
+
+          {token ? (
+            <ServiceDeliveryWorkflowPanel
+              token={token}
+              user={user}
+              lifecycleId={lifecycleId}
+              initialStage={stage}
+              onStageChanged={setStage}
+            />
+          ) : null}
+
+          {events.length > 0 ? (
+            <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>
+              <h3 style={{ fontSize: '1rem', marginTop: 0 }}>Events</h3>
+              <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
+                {events.slice(-10).map((ev) => (
+                  <li key={ev.id}>
+                    → {ev.to_stage}: {ev.notes || '—'} ({ev.created_at})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </>
+      ) : null}
     </main>
   );
 }
