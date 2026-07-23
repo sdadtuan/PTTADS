@@ -439,6 +439,7 @@ export class ServiceLifecycleSqliteRepository implements OnModuleDestroy {
       notes: String(row.notes ?? ''),
       marketing_plan_id:
         row.marketing_plan_id != null ? Number(row.marketing_plan_id) : null,
+      sop_run_id: row.sop_run_id != null ? Number(row.sop_run_id) : null,
       created_at: String(row.created_at ?? ''),
       updated_at: String(row.updated_at ?? ''),
     };

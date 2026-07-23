@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { IntakeModule } from '../intake/intake.module';
+import { SopModule } from '../sop/sop.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { SvcFinanceModule } from '../svc-finance/svc-finance.module';
 import {
@@ -13,7 +14,7 @@ import { ServiceLifecycleSqliteRepository } from './service-lifecycle-sqlite.rep
 import { ServiceLifecycleService } from './service-lifecycle.service';
 
 @Module({
-  imports: [StaffAuthModule, SvcFinanceModule, IntakeModule],
+  imports: [StaffAuthModule, SvcFinanceModule, IntakeModule, SopModule],
   controllers: [ServiceLifecycleController],
   providers: [
     ServiceLifecycleService,

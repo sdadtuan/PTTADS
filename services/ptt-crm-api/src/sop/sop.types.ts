@@ -51,6 +51,22 @@ export interface SopRunStats {
   overdue: number;
 }
 
+export interface SopRunTaskRow {
+  id: number;
+  run_id: number;
+  step_id: number | null;
+  position: number;
+  title: string;
+  description: string;
+  role: string;
+  due_date: string;
+  status: string;
+  notes: string;
+  checklist_json: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface CreateSopRunBody {
   name: string;
   template_id?: number | null;

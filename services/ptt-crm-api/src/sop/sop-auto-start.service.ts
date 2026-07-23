@@ -2,8 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { AppConfigService } from '../config/app-config.service';
 import { catalogTs } from '../catalog/catalog-slug.util';
 import { SopSqliteRepository } from './sop-sqlite.repository';
+import { shouldReuseLifecycleSopRun } from './sop-auto-start.util';
 
 const LAUNCH_TEMPLATE_CODE = 'MKT-LAUNCH-14D';
+
+export interface SopAutoStartResult {
+  started: boolean;
+  run_id?: number;
+  idempotent?: boolean;
+  reason?: string;
+}
 
 @Injectable()
 export class SopAutoStartService {
@@ -17,14 +25,26 @@ export class SopAutoStartService {
     contractId?: number | null;
     customerName?: string;
     serviceSlug?: string;
-  }): { started: boolean; run_id?: number; reason?: string } {
+  }): SopAutoStartResult {
     if (!this.config.sopAutoStartOnLaunch) {
       return { started: false, reason: 'PTT_SOP_AUTO_START_ON_LAUNCH disabled' };
     }
+
+    const existingRunId = this.getLifecycleSopRunId(input.lifecycleId);
+    if (shouldReuseLifecycleSopRun(existingRunId, !!this.sop.getRunById(existingRunId!))) {
+      return {
+        started: true,
+        run_id: existingRunId!,
+        idempotent: true,
+        reason: 'lifecycle_once',
+      };
+    }
+
     const template = this.sop.getTemplateByCode(LAUNCH_TEMPLATE_CODE);
     if (!template) {
       return { started: false, reason: `Template ${LAUNCH_TEMPLATE_CODE} not found` };
     }
+
     const campaignId = input.contractId ? this.findCampaignForContract(input.contractId) : null;
     const name = [
       'Launch SOP',
@@ -34,6 +54,7 @@ export class SopAutoStartService {
       .filter(Boolean)
       .join(' — ')
       .slice(0, 200);
+
     const run = this.sop.createRun(
       {
         name,
@@ -44,7 +65,32 @@ export class SopAutoStartService {
       },
       true,
     );
-    return { started: true, run_id: Number((run as { id?: number }).id ?? 0) || undefined };
+    const runId = Number((run as { id?: number }).id ?? 0);
+    if (!runId) {
+      return { started: false, reason: 'Failed to create SOP run' };
+    }
+    this.setLifecycleSopRunId(input.lifecycleId, runId);
+    return { started: true, run_id: runId };
+  }
+
+  private getLifecycleSopRunId(lifecycleId: number): number | null {
+    try {
+      const db = (this.sop as unknown as { database: import('node:sqlite').DatabaseSync }).database;
+      const row = db
+        .prepare(`SELECT sop_run_id FROM crm_service_lifecycle WHERE id = ? LIMIT 1`)
+        .get(lifecycleId) as { sop_run_id: number | null } | undefined;
+      const rid = row?.sop_run_id != null ? Number(row.sop_run_id) : 0;
+      return rid > 0 ? rid : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private setLifecycleSopRunId(lifecycleId: number, runId: number): void {
+    const db = (this.sop as unknown as { database: import('node:sqlite').DatabaseSync }).database;
+    db.prepare(
+      `UPDATE crm_service_lifecycle SET sop_run_id = ?, updated_at = ? WHERE id = ?`,
+    ).run(runId, catalogTs(), lifecycleId);
   }
 
   private findCampaignForContract(contractId: number): number | null {

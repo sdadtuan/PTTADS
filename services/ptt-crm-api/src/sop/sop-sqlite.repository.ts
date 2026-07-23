@@ -10,6 +10,7 @@ import {
   normalizeSopRunStatus,
   SopRunRow,
   SopRunStats,
+  SopRunTaskRow,
   SopStepRow,
   SopTemplateRow,
 } from './sop.types';
@@ -149,6 +150,33 @@ export class SopSqliteRepository implements OnModuleDestroy {
       .prepare(`${RUN_SELECT} WHERE r.id = ?`)
       .get(runId) as unknown as Record<string, unknown> | undefined;
     return row ? this.mapRunRow(row) : null;
+  }
+
+  listRunTasks(runId: number): SopRunTaskRow[] {
+    const rows = this.database
+      .prepare(
+        `SELECT id, run_id, step_id, position, title, description, role,
+                due_date, status, notes, checklist_json, created_at, updated_at
+         FROM crm_sop_run_tasks
+         WHERE run_id = ?
+         ORDER BY position ASC, id ASC`,
+      )
+      .all(runId) as unknown as Array<Record<string, unknown>>;
+    return rows.map((row) => ({
+      id: Number(row.id),
+      run_id: Number(row.run_id),
+      step_id: row.step_id != null ? Number(row.step_id) : null,
+      position: Number(row.position ?? 0),
+      title: String(row.title ?? ''),
+      description: String(row.description ?? ''),
+      role: String(row.role ?? ''),
+      due_date: String(row.due_date ?? ''),
+      status: String(row.status ?? 'todo'),
+      notes: String(row.notes ?? ''),
+      checklist_json: String(row.checklist_json ?? '[]'),
+      created_at: String(row.created_at ?? ''),
+      updated_at: String(row.updated_at ?? ''),
+    }));
   }
 
   private generateTasks(runId: number, templateId: number, startDate: string): void {

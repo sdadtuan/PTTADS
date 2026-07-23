@@ -11,6 +11,7 @@ export interface ServiceLifecycleRow {
   stage_entered_at: string;
   notes: string;
   marketing_plan_id: number | null;
+  sop_run_id: number | null;
   created_at: string;
   updated_at: string;
 }

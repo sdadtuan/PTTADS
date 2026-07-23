@@ -522,6 +522,12 @@ export async function approveContractApproval(token: string, approvalId: number)
     lifecycle_id: number;
     customer_id: number;
     contract: LeadContractRow;
+    sop_auto_start?: {
+      started: boolean;
+      run_id?: number;
+      idempotent?: boolean;
+      reason?: string;
+    };
   }>(token, `/api/v1/contracts/approvals/${approvalId}/approve`, { method: 'POST', body: '{}' });
 }
 
@@ -868,8 +874,18 @@ export interface SopRunRow {
   status: string;
   template_id: number | null;
   template_name: string | null;
+  template_channel?: string | null;
+  campaign_name?: string | null;
   start_date: string;
   updated_at: string;
+  stats?: {
+    total?: number;
+    done?: number;
+    skipped?: number;
+    in_progress?: number;
+    todo?: number;
+    overdue?: number;
+  };
 }
 
 export async function fetchMarketingPlans(
@@ -1032,6 +1048,25 @@ export async function fetchServiceLifecycleContext(
   id: number,
 ): Promise<Record<string, unknown>> {
   return crmFetch(token, `/api/crm/service-lifecycle/${id}/context`);
+}
+
+export async function fetchServiceLifecycleSop(token: string, id: number) {
+  return crmFetch<{
+    lifecycle_id: number;
+    sop_run_id: number | null;
+    auto_start_enabled: boolean;
+    template_code: string;
+    run: SopRunRow | null;
+    tasks: Array<{
+      id: number;
+      position: number;
+      title: string;
+      role: string;
+      due_date: string;
+      status: string;
+    }>;
+    message?: string | null;
+  }>(token, `/api/crm/service-lifecycle/${id}/sop`);
 }
 
 export async function createServiceLifecycleExpense(

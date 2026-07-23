@@ -180,6 +180,17 @@ export class LeadsContractSqliteRepository implements OnModuleDestroy {
     if (!planCols.has('source_plan_id')) {
       db.exec('ALTER TABLE crm_marketing_plans ADD COLUMN source_plan_id INTEGER');
     }
+    const lcCols = new Set(
+      (db.prepare('PRAGMA table_info(crm_service_lifecycle)').all() as Array<{ name: string }>).map(
+        (c) => c.name,
+      ),
+    );
+    if (!lcCols.has('marketing_plan_id')) {
+      db.exec('ALTER TABLE crm_service_lifecycle ADD COLUMN marketing_plan_id INTEGER');
+    }
+    if (!lcCols.has('sop_run_id')) {
+      db.exec('ALTER TABLE crm_service_lifecycle ADD COLUMN sop_run_id INTEGER');
+    }
   }
 
   mapContract(row: Record<string, unknown>): ContractRow {

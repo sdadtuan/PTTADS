@@ -90,6 +90,11 @@ export class ServiceLifecycleController {
     return this.serviceLifecycle.financeSummary(id);
   }
 
+  @Get(':id/sop')
+  sop(@Param('id', ParseIntPipe) id: number) {
+    return this.serviceLifecycle.sop(id);
+  }
+
   @Get(':id')
   detail(@Param('id', ParseIntPipe) id: number) {
     return this.serviceLifecycle.detail(id);

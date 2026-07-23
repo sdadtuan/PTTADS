@@ -1,8 +1,6 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { AppConfigService } from '../config/app-config.service';
+import { SopSqliteRepository } from '../sop/sop-sqlite.repository';
 import { SvcFinanceService } from '../svc-finance/svc-finance.service';
 import { LifecycleConsultService } from './lifecycle-consult.service';
 import {
@@ -29,6 +27,8 @@ export class ServiceLifecycleService {
     private readonly tasks: LifecycleTasksRepository,
     private readonly svcFinance: SvcFinanceService,
     private readonly consult: LifecycleConsultService,
+    private readonly sopSqlite: SopSqliteRepository,
+    private readonly config: AppConfigService,
   ) {}
 
   list(serviceSlug?: string, amId?: string, includeDraft?: string) {
@@ -257,6 +257,36 @@ export class ServiceLifecycleService {
       throw new NotFoundException({ error: 'Không tìm thấy lifecycle' });
     }
     return ctx;
+  }
+
+  sop(id: number) {
+    const lc = this.requireLifecycle(id);
+    const autoStartEnabled = this.config.sopAutoStartOnLaunch;
+    const templateCode = 'MKT-LAUNCH-14D';
+    if (!lc.sop_run_id) {
+      return {
+        lifecycle_id: id,
+        sop_run_id: null,
+        auto_start_enabled: autoStartEnabled,
+        template_code: templateCode,
+        run: null,
+        tasks: [],
+        message: autoStartEnabled
+          ? 'Chưa có SOP run — sẽ tạo khi GDKD duyệt HĐ (lifecycle_once).'
+          : 'PTT_SOP_AUTO_START_ON_LAUNCH đang tắt.',
+      };
+    }
+    const run = this.sopSqlite.getRunById(lc.sop_run_id);
+    const tasks = run ? this.sopSqlite.listRunTasks(lc.sop_run_id) : [];
+    return {
+      lifecycle_id: id,
+      sop_run_id: lc.sop_run_id,
+      auto_start_enabled: autoStartEnabled,
+      template_code: templateCode,
+      run,
+      tasks,
+      message: run ? null : 'sop_run_id không còn hợp lệ — liên hệ admin.',
+    };
   }
 
   consultBrief(id: number) {

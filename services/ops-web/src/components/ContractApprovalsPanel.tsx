@@ -23,6 +23,7 @@ export function ContractApprovalsPanel({ token, user, onMessage, onError }: Prop
   const [busyId, setBusyId] = useState<number | null>(null);
   const [rejectNotes, setRejectNotes] = useState<Record<number, string>>({});
   const [lastLifecycleId, setLastLifecycleId] = useState<number | null>(null);
+  const [lastSopRunId, setLastSopRunId] = useState<number | null>(null);
 
   const canApprove = hasCap(user, 'crm_leads', 'assign');
 
@@ -46,7 +47,18 @@ export function ContractApprovalsPanel({ token, user, onMessage, onError }: Prop
     setBusyId(id);
     try {
       const out = await approveContractApproval(token, id);
-      onMessage?.(`Đã duyệt — lifecycle #${out.lifecycle_id} Onboard`);
+      const sop = out.sop_auto_start;
+      let msg = `Đã duyệt — lifecycle #${out.lifecycle_id} Onboard`;
+      if (sop?.started && sop.run_id) {
+        msg += sop.idempotent ? ` · SOP run #${sop.run_id} (đã có)` : ` · SOP run #${sop.run_id} đã khởi tạo`;
+        setLastSopRunId(sop.run_id);
+      } else if (sop?.reason) {
+        msg += ` · SOP: ${sop.reason}`;
+        setLastSopRunId(null);
+      } else {
+        setLastSopRunId(null);
+      }
+      onMessage?.(msg);
       setLastLifecycleId(out.lifecycle_id);
       await reload();
     } catch (err) {
@@ -81,6 +93,20 @@ export function ContractApprovalsPanel({ token, user, onMessage, onError }: Prop
           <Link href={`/crm/service-delivery/${lastLifecycleId}`} className="nav-link">
             Mở workflow →
           </Link>
+          {lastSopRunId ? (
+            <>
+              {' '}
+              ·{' '}
+              <Link href={`/crm/service-delivery/${lastLifecycleId}?tab=sop`} className="nav-link">
+                SOP Launch (#{lastSopRunId})
+              </Link>
+              {' '}
+              ·{' '}
+              <Link href="/crm/sop" className="nav-link">
+                Hub SOP
+              </Link>
+            </>
+          ) : null}
         </p>
       ) : null}
       {rows.map((row) => (

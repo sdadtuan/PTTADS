@@ -39,6 +39,7 @@ if [[ "${WAVE_B5_UPDATE_ENV:-0}" == "1" ]]; then
 PTT_CRM_LEADS_FUNNEL_NEST=1
 PTT_PRESALES_ON_LEAD=1
 PTT_SOP_AUTO_START_ON_LAUNCH=1
+PTT_FLASK_CRM_SERVICE_LIFECYCLE_RETIRED=1
 WAVE_B5_EXPECT_SERVICE_DELIVERY_NEST=1"
 fi
 
@@ -56,4 +57,5 @@ bash "$ROOT/scripts/wave_b5_gate.sh" || {
 echo ""
 echo "UAT manual (PO sign-off): docs/runbooks/wave-b5-po-signoff-checklist.md"
 echo "  ADMIN_PASSWORD='...' ./scripts/wave_b5_s0_smoke.sh"
+echo "  ADMIN_PASSWORD='...' ./scripts/wave_b5_smoke.sh"
 echo "  ./scripts/wave_b5_pytest_parity.sh"

@@ -198,6 +198,13 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
             )
         except Exception:
             pass
+    if "sop_run_id" not in _lc_cols:
+        try:
+            conn.execute(
+                "ALTER TABLE crm_service_lifecycle ADD COLUMN sop_run_id INTEGER"
+            )
+        except Exception:
+            pass
     try:
         backfill_assigned_am_from_leads(conn)
     except Exception as exc:

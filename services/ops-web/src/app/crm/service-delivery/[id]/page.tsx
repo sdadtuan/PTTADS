@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { LifecycleFinancePanel } from '@/components/LifecycleFinancePanel';
 import { LifecycleHubLinksPanel } from '@/components/LifecycleHubLinksPanel';
+import { LifecycleSopPanel } from '@/components/LifecycleSopPanel';
 import { LifecycleStaffPicker } from '@/components/LifecycleStaffPicker';
 import { LifecycleTmmtPanel } from '@/components/LifecycleTmmtPanel';
 import { OpsNav } from '@/components/OpsNav';
@@ -32,6 +33,7 @@ const STAGES = ['lead', 'consult', 'proposal', 'onboard', 'deliver', 'handover',
 export default function CrmServiceDeliveryDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const lifecycleId = Number(params.id);
   const [user, setUser] = useState<StoredStaffUser | null>(null);
   const [row, setRow] = useState<Record<string, unknown> | null>(null);
@@ -44,7 +46,7 @@ export default function CrmServiceDeliveryDetailPage() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [detailTab, setDetailTab] = useState<'workflow' | 'tmmt' | 'finance'>('workflow');
+  const [detailTab, setDetailTab] = useState<'workflow' | 'tmmt' | 'finance' | 'sop'>('workflow');
 
   const ensureAuth = useCallback(async (): Promise<string | null> => {
     let access = getAccessToken();
@@ -112,6 +114,13 @@ export default function CrmServiceDeliveryDetailPage() {
       }
     })();
   }, [ensureAuth, lifecycleId, reloadDetail]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'workflow' || tab === 'tmmt' || tab === 'finance' || tab === 'sop') {
+      setDetailTab(tab);
+    }
+  }, [searchParams]);
 
   async function onSaveNotes(e: React.FormEvent) {
     e.preventDefault();
@@ -273,6 +282,13 @@ export default function CrmServiceDeliveryDetailPage() {
             >
               Tài chính
             </button>
+            <button
+              type="button"
+              className={detailTab === 'sop' ? 'btn btn-sm' : 'btn btn-sm btn-ghost'}
+              onClick={() => setDetailTab('sop')}
+            >
+              SOP Launch
+            </button>
           </div>
 
           {detailTab === 'workflow' ? (
@@ -294,13 +310,15 @@ export default function CrmServiceDeliveryDetailPage() {
               stage={stage}
               onSaved={() => void reloadDetail(token)}
             />
-          ) : (
+          ) : detailTab === 'finance' ? (
             <LifecycleFinancePanel
               token={token}
               user={user}
               lifecycleId={lifecycleId}
               onSaved={() => void reloadDetail(token)}
             />
+          ) : (
+            <LifecycleSopPanel token={token} lifecycleId={lifecycleId} />
           )}
 
           {events.length > 0 ? (

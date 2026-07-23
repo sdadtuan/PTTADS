@@ -50,14 +50,21 @@ def _check_nest_modules() -> dict[str, Any]:
         ROOT / "services/ptt-crm-api/src/service-lifecycle/lifecycle-stage.util.ts",
         ROOT / "services/ptt-crm-api/src/service-lifecycle/lifecycle-tasks.repository.ts",
         ROOT / "services/ptt-crm-api/src/service-lifecycle/lifecycle-marketing-plan.util.ts",
+        ROOT / "services/ptt-crm-api/src/service-lifecycle/lifecycle-consult.service.ts",
+        ROOT / "services/ptt-crm-api/src/service-lifecycle/lifecycle-payment-gate.util.ts",
         ROOT / "services/ptt-crm-api/src/service-lifecycle/service-lifecycle-sqlite.repository.ts",
         ROOT / "services/ptt-crm-api/src/sop/sop-auto-start.service.ts",
+        ROOT / "services/ptt-crm-api/src/sop/sop-auto-start.util.ts",
         ROOT / "services/ops-web/src/components/ServiceDeliveryKanban.tsx",
         ROOT / "services/ops-web/src/components/ServiceDeliveryWorkflowPanel.tsx",
         ROOT / "services/ops-web/src/components/LifecycleStaffPicker.tsx",
         ROOT / "services/ops-web/src/components/LifecycleHubLinksPanel.tsx",
-        ROOT / "services/ops-web/src/components/LifecycleFinanceActions.tsx",
-        ROOT / "docs/specs/2026-07-23-wave-b5-c-ux-polish-design.md",
+        ROOT / "services/ops-web/src/components/LifecycleTmmtPanel.tsx",
+        ROOT / "services/ops-web/src/components/LifecycleFinancePanel.tsx",
+        ROOT / "services/ops-web/src/components/LifecycleSopPanel.tsx",
+        ROOT / "docs/specs/2026-07-23-wave-b5-s3-tmmt-consult-design.md",
+        ROOT / "docs/specs/2026-07-23-wave-b5-s4-finance-handoff-design.md",
+        ROOT / "docs/specs/2026-07-23-wave-b5-s5-sop-cutover-design.md",
     ]
     missing = [str(p.relative_to(ROOT)) for p in files if not p.is_file()]
     return {
@@ -74,6 +81,7 @@ def _check_scripts() -> dict[str, Any]:
         ROOT / "scripts/wave_b5_gate.sh",
         ROOT / "scripts/wave_b5_pytest_parity.sh",
         ROOT / "scripts/wave_b5_deploy.sh",
+        ROOT / "scripts/wave_b5_smoke.sh",
     ]
     missing = [str(p.relative_to(ROOT)) for p in scripts if not p.is_file()]
     return {"id": "B5-G04", "ok": not missing, "label": "Wave B5 gate/deploy scripts", "missing": missing}
@@ -112,7 +120,7 @@ def _run_nest_jest() -> dict[str, Any]:
         "npm",
         "test",
         "--",
-        "--testPathPattern=service-lifecycle|leads-contract|lifecycle-stage|lifecycle-marketing",
+        "--testPathPattern=service-lifecycle|leads-contract|lifecycle-stage|lifecycle-marketing|lifecycle-consult|lifecycle-payment|sop-auto-start",
         "--silent",
     ]
     proc = subprocess.run(cmd, cwd=str(api), capture_output=True, text=True)
