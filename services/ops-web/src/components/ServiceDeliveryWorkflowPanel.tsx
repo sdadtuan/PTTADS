@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { LifecycleFinanceActions } from '@/components/LifecycleFinanceActions';
 import {
   fetchServiceLifecycleAdvanceInfo,
   fetchServiceLifecycleFinanceSummary,
@@ -39,6 +40,7 @@ type Props = {
   lifecycleId: number;
   initialStage: string;
   onStageChanged?: (stage: string) => void;
+  onFinanceRefresh?: () => void;
 };
 
 export function ServiceDeliveryWorkflowPanel({
@@ -47,6 +49,7 @@ export function ServiceDeliveryWorkflowPanel({
   lifecycleId,
   initialStage,
   onStageChanged,
+  onFinanceRefresh,
 }: Props) {
   const canEdit = hasCap(user, 'crm_board', 'edit');
   const [tab, setTab] = useState(initialStage);
@@ -249,22 +252,26 @@ export function ServiceDeliveryWorkflowPanel({
         </div>
       ) : null}
 
-      <div className="card" style={{ padding: '1rem' }}>
-        <h3 style={{ margin: '0 0 0.5rem', fontSize: '1rem' }}>Tài chính</h3>
-        {finance ? (
-          <p className="muted" style={{ margin: 0 }}>
-            Nhận: {Number(finance.received_revenue ?? 0).toLocaleString('vi-VN')} · Chi delivery:{' '}
-            {Number(finance.delivery_expenses ?? 0).toLocaleString('vi-VN')} · Pre-sales:{' '}
-            {Number(finance.presales_expenses ?? 0).toLocaleString('vi-VN')} · Lợi nhuận:{' '}
-            {Number(finance.profit_vnd ?? 0).toLocaleString('vi-VN')}
-          </p>
-        ) : null}
-        {presales && Array.isArray(presales.presales_expenses) && presales.presales_expenses.length > 0 ? (
-          <p className="muted" style={{ margin: '0.5rem 0 0' }}>
-            {presales.presales_expenses.length} khoản chi pre-sales đã link lifecycle
-          </p>
-        ) : null}
-      </div>
+      {finance ? (
+        <p className="muted" style={{ margin: 0, fontSize: '0.9rem' }}>
+          Tóm tắt: Nhận {Number(finance.received_revenue ?? 0).toLocaleString('vi-VN')} · Lợi nhuận{' '}
+          {Number(finance.profit_vnd ?? 0).toLocaleString('vi-VN')}
+          {presales && Number(presales.presales_total_vnd ?? 0) > 0
+            ? ` · Pre-sales ${Number(presales.presales_total_vnd).toLocaleString('vi-VN')}`
+            : ''}
+        </p>
+      ) : null}
+
+      <LifecycleFinanceActions
+        token={token}
+        user={user}
+        lifecycleId={lifecycleId}
+        onSaved={() => {
+          void reload();
+          onFinanceRefresh?.();
+        }}
+        onError={setError}
+      />
     </div>
   );
 }

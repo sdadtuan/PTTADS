@@ -50,9 +50,14 @@ def _check_nest_modules() -> dict[str, Any]:
         ROOT / "services/ptt-crm-api/src/service-lifecycle/lifecycle-stage.util.ts",
         ROOT / "services/ptt-crm-api/src/service-lifecycle/lifecycle-tasks.repository.ts",
         ROOT / "services/ptt-crm-api/src/service-lifecycle/lifecycle-marketing-plan.util.ts",
+        ROOT / "services/ptt-crm-api/src/service-lifecycle/service-lifecycle-sqlite.repository.ts",
         ROOT / "services/ptt-crm-api/src/sop/sop-auto-start.service.ts",
         ROOT / "services/ops-web/src/components/ServiceDeliveryKanban.tsx",
         ROOT / "services/ops-web/src/components/ServiceDeliveryWorkflowPanel.tsx",
+        ROOT / "services/ops-web/src/components/LifecycleStaffPicker.tsx",
+        ROOT / "services/ops-web/src/components/LifecycleHubLinksPanel.tsx",
+        ROOT / "services/ops-web/src/components/LifecycleFinanceActions.tsx",
+        ROOT / "docs/specs/2026-07-23-wave-b5-c-ux-polish-design.md",
     ]
     missing = [str(p.relative_to(ROOT)) for p in files if not p.is_file()]
     return {

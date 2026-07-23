@@ -22,6 +22,7 @@ export function ContractApprovalsPanel({ token, user, onMessage, onError }: Prop
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [rejectNotes, setRejectNotes] = useState<Record<number, string>>({});
+  const [lastLifecycleId, setLastLifecycleId] = useState<number | null>(null);
 
   const canApprove = hasCap(user, 'crm_leads', 'assign');
 
@@ -46,6 +47,7 @@ export function ContractApprovalsPanel({ token, user, onMessage, onError }: Prop
     try {
       const out = await approveContractApproval(token, id);
       onMessage?.(`Đã duyệt — lifecycle #${out.lifecycle_id} Onboard`);
+      setLastLifecycleId(out.lifecycle_id);
       await reload();
     } catch (err) {
       onError?.(err instanceof Error ? err.message : 'Duyệt thất bại');
@@ -73,6 +75,14 @@ export function ContractApprovalsPanel({ token, user, onMessage, onError }: Prop
 
   return (
     <div style={{ display: 'grid', gap: '0.75rem' }}>
+      {lastLifecycleId ? (
+        <p style={{ color: 'var(--accent)', margin: 0 }}>
+          Vừa promote lifecycle #{lastLifecycleId} —{' '}
+          <Link href={`/crm/service-delivery/${lastLifecycleId}`} className="nav-link">
+            Mở workflow →
+          </Link>
+        </p>
+      ) : null}
       {rows.map((row) => (
         <div
           key={row.id}

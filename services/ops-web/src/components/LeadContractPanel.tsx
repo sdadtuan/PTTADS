@@ -25,6 +25,7 @@ export function LeadContractPanel({ token, leadId, user, onMessage, onError }: P
   const [checks, setChecks] = useState<ContractReadinessCheck[]>([]);
   const [contract, setContract] = useState<LeadContractRow | null>(null);
   const [approval, setApproval] = useState<ContractApprovalRow | null>(null);
+  const [lifecycleId, setLifecycleId] = useState<number | null>(null);
   const [amount, setAmount] = useState('');
   const [submitNotes, setSubmitNotes] = useState('');
   const [busy, setBusy] = useState(false);
@@ -39,6 +40,7 @@ export function LeadContractPanel({ token, leadId, user, onMessage, onError }: P
       setChecks(data.checks);
       setContract(data.contract);
       setApproval(data.approval);
+      setLifecycleId(data.lifecycle_id != null && data.lifecycle_id > 0 ? data.lifecycle_id : null);
       if (data.contract?.amount_vnd) setAmount(String(data.contract.amount_vnd));
     } catch (err) {
       onError?.(err instanceof Error ? err.message : 'Tải HĐ thất bại');
@@ -196,12 +198,32 @@ export function LeadContractPanel({ token, leadId, user, onMessage, onError }: P
       ) : null}
 
       {contract?.status === 'active' ? (
-        <p className="muted" style={{ marginTop: '0.5rem' }}>
-          HĐ đã ký Active — kiểm tra{' '}
-          <Link href="/crm/service-delivery" className="nav-link">
-            Service Delivery
-          </Link>
-        </p>
+        <div
+          style={{
+            marginTop: '0.75rem',
+            padding: '0.65rem 0.85rem',
+            borderRadius: 8,
+            border: '1px solid var(--accent, #16a34a)',
+            background: 'rgba(22, 163, 74, 0.08)',
+          }}
+        >
+          <strong>HĐ đã ký Active</strong>
+          {lifecycleId ? (
+            <p style={{ margin: '0.35rem 0 0' }}>
+              Lifecycle #{lifecycleId} ·{' '}
+              <Link href={`/crm/service-delivery/${lifecycleId}`} className="nav-link">
+                Mở workflow triển khai →
+              </Link>
+            </p>
+          ) : (
+            <p className="muted" style={{ margin: '0.35rem 0 0' }}>
+              Đang promote… refresh trang hoặc xem{' '}
+              <Link href="/crm/service-delivery" className="nav-link">
+                Service Delivery
+              </Link>
+            </p>
+          )}
+        </div>
       ) : null}
     </section>
   );

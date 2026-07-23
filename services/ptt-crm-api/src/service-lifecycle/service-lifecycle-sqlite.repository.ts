@@ -9,6 +9,7 @@ import {
   ServiceLifecycleEventRow,
   ServiceLifecycleRow,
 } from './service-lifecycle.types';
+import type { LifecycleContextDto } from './lifecycle-context.util';
 
 @Injectable()
 export class ServiceLifecycleSqliteRepository implements OnModuleDestroy {
@@ -257,6 +258,131 @@ export class ServiceLifecycleSqliteRepository implements OnModuleDestroy {
     return this.database.prepare('SELECT * FROM crm_marketing_plans WHERE id = ?').get(planId) as
       | Record<string, unknown>
       | undefined ?? null;
+  }
+
+  private staffDisplayName(staffId: number | null): string {
+    if (!staffId) return '';
+    try {
+      const row = this.database
+        .prepare(`SELECT name, email FROM crm_staff WHERE id = ? LIMIT 1`)
+        .get(staffId) as { name: string; email: string } | undefined;
+      if (!row) return `#${staffId}`;
+      return String(row.name || row.email || `#${staffId}`);
+    } catch {
+      return `#${staffId}`;
+    }
+  }
+
+  getLifecycleContext(lifecycleId: number): LifecycleContextDto | null {
+    const lc = this.getLifecycleById(lifecycleId);
+    if (!lc) return null;
+
+    let leadFullName = '';
+    let ownerId: number | null = null;
+    if (lc.lead_id) {
+      const lead = this.database
+        .prepare(`SELECT full_name, owner_id FROM crm_leads WHERE id = ?`)
+        .get(lc.lead_id) as { full_name: string; owner_id: number | null } | undefined;
+      if (lead) {
+        leadFullName = String(lead.full_name ?? '');
+        ownerId = lead.owner_id != null ? Number(lead.owner_id) : null;
+      }
+    }
+
+    let presalesId: number | null = null;
+    let assignedSp: number | null = null;
+    if (lc.lead_id) {
+      const ps = this.database
+        .prepare(`SELECT id, assigned_sp FROM crm_lead_presales WHERE lead_id = ? LIMIT 1`)
+        .get(lc.lead_id) as { id: number; assigned_sp: number | null } | undefined;
+      if (ps) {
+        presalesId = Number(ps.id);
+        assignedSp = ps.assigned_sp != null ? Number(ps.assigned_sp) : null;
+      }
+    }
+
+    let contractTitle = '';
+    let contractAmount = 0;
+    let agencyClientId = '';
+    let campaignId: number | null = null;
+    if (lc.contract_id) {
+      const ct = this.database
+        .prepare(
+          `SELECT title, amount_vnd, agency_client_id, campaign_id FROM crm_contracts WHERE id = ? LIMIT 1`,
+        )
+        .get(lc.contract_id) as Record<string, unknown> | undefined;
+      if (ct) {
+        contractTitle = String(ct.title ?? '');
+        contractAmount = Number(ct.amount_vnd ?? 0);
+        agencyClientId = String(ct.agency_client_id ?? '').trim();
+        campaignId = ct.campaign_id != null ? Number(ct.campaign_id) : null;
+      }
+    }
+
+    let campaignName = '';
+    let campaignCode = '';
+    if (campaignId) {
+      try {
+        const camp = this.database
+          .prepare(`SELECT name, code FROM crm_campaigns WHERE id = ? LIMIT 1`)
+          .get(campaignId) as { name: string; code: string } | undefined;
+        if (camp) {
+          campaignName = String(camp.name ?? '');
+          campaignCode = String(camp.code ?? '');
+        }
+      } catch {
+        /* optional table */
+      }
+    }
+
+    const agencyLink = agencyClientId
+      ? `/agency/clients/${encodeURIComponent(agencyClientId)}?tab=contracts`
+      : null;
+    const hubLink =
+      agencyClientId && campaignId
+        ? `/crm/hub?client_id=${encodeURIComponent(agencyClientId)}`
+        : agencyClientId
+          ? `/crm/hub?client_id=${encodeURIComponent(agencyClientId)}`
+          : null;
+
+    return {
+      lifecycle_id: lc.id,
+      lead_id: lc.lead_id,
+      customer_id: lc.customer_id,
+      contract_id: lc.contract_id,
+      service_slug: lc.service_slug,
+      stage: lc.stage,
+      status: lc.status,
+      lead: {
+        id: lc.lead_id,
+        full_name: leadFullName,
+        owner_id: ownerId,
+        owner_name: this.staffDisplayName(ownerId),
+      },
+      presales: {
+        id: presalesId,
+        assigned_sp: assignedSp,
+        assigned_sp_name: this.staffDisplayName(assignedSp),
+      },
+      contract: {
+        id: lc.contract_id,
+        title: contractTitle,
+        amount_vnd: contractAmount,
+        agency_client_id: agencyClientId,
+        campaign_id: campaignId,
+      },
+      campaign: {
+        id: campaignId,
+        name: campaignName,
+        code: campaignCode,
+      },
+      links: {
+        service_delivery: `/crm/service-delivery/${lc.id}`,
+        lead: lc.lead_id ? `/crm/leads/${lc.lead_id}` : null,
+        agency_client: agencyLink,
+        hub: hubLink,
+      },
+    };
   }
 
   funnelStats(): Record<string, number> {

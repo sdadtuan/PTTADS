@@ -208,6 +208,14 @@ export class ServiceLifecycleService {
     return this.svcFinance.summary(id);
   }
 
+  context(id: number) {
+    const ctx = this.sqlite.getLifecycleContext(id);
+    if (!ctx) {
+      throw new NotFoundException({ error: 'Không tìm thấy lifecycle' });
+    }
+    return ctx;
+  }
+
   private requireLifecycle(id: number) {
     const lc = this.sqlite.getLifecycleById(id);
     if (!lc) {

@@ -461,6 +461,7 @@ export async function fetchLeadContractReadiness(token: string, leadId: number) 
     checks: ContractReadinessCheck[];
     contract: LeadContractRow | null;
     approval: ContractApprovalRow | null;
+    lifecycle_id?: number | null;
   }>(token, `/api/v1/leads/${leadId}/contract/readiness`, { method: 'GET' });
 }
 
@@ -991,6 +992,25 @@ export async function fetchServiceLifecycleFinanceSummary(
   id: number,
 ): Promise<Record<string, unknown>> {
   return crmFetch(token, `/api/crm/service-lifecycle/${id}/finance-summary`);
+}
+
+export async function fetchServiceLifecycleContext(
+  token: string,
+  id: number,
+): Promise<Record<string, unknown>> {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/context`);
+}
+
+export async function createServiceLifecycleExpense(
+  token: string,
+  lifecycleId: number,
+  body: { title?: string; category?: string; amount_vnd?: number; expense_on?: string; notes?: string },
+): Promise<Record<string, unknown>> {
+  return crmFetch(token, `/api/crm/service-lifecycle/${lifecycleId}/expenses`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 export async function fetchServiceLifecycleDetail(token: string, id: number): Promise<Record<string, unknown>> {

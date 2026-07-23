@@ -43,6 +43,7 @@ export interface ContractReadiness {
   checks: ReadinessCheck[];
   contract: ContractRow | null;
   approval: ContractApprovalRow | null;
+  lifecycle_id?: number | null;
 }
 
 export interface CreateContractBody {

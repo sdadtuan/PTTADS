@@ -19,9 +19,13 @@ import {
 export default function CrmServiceDeliveryPage() {
   const router = useRouter();
   const [user, setUser] = useState<StoredStaffUser | null>(null);
+  const [token, setToken] = useState('');
   const [rows, setRows] = useState<ServiceLifecycleRow[]>([]);
   const [funnelStats, setFunnelStats] = useState<Record<string, number>>({});
   const [filterSlug, setFilterSlug] = useState('');
+  const [filterAm, setFilterAm] = useState('');
+  const [toast, setToast] = useState('');
+  const [toastErr, setToastErr] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -41,6 +45,7 @@ export default function CrmServiceDeliveryPage() {
         setError('Không có quyền service delivery');
         return null;
       }
+      setToken(access);
       return access;
     } catch {
       const refresh = getRefreshToken();
@@ -55,6 +60,7 @@ export default function CrmServiceDeliveryPage() {
       const me = await staffMe(access);
       setUser(me);
       updateStoredUser(me);
+      setToken(access);
       return access;
     }
   }, [router]);
@@ -68,6 +74,7 @@ export default function CrmServiceDeliveryPage() {
       const data = await fetchServiceLifecycles(access, {
         include_draft: true,
         service_slug: filterSlug || undefined,
+        am_id: filterAm || undefined,
       });
       setRows(data.lifecycles ?? []);
       setFunnelStats(data.funnel_stats ?? {});
@@ -76,7 +83,7 @@ export default function CrmServiceDeliveryPage() {
     } finally {
       setLoading(false);
     }
-  }, [ensureAuth, filterSlug]);
+  }, [ensureAuth, filterSlug, filterAm]);
 
   useEffect(() => {
     void load();
@@ -85,6 +92,12 @@ export default function CrmServiceDeliveryPage() {
   function logout() {
     clearSession();
     router.push('/login');
+  }
+
+  function notify(msg: string, isError?: boolean) {
+    setToast(msg);
+    setToastErr(Boolean(isError));
+    window.setTimeout(() => setToast(''), 5000);
   }
 
   if (!user) {
@@ -99,27 +112,69 @@ export default function CrmServiceDeliveryPage() {
     <main style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem' }}>
       <OpsNav user={user} onLogout={logout} />
       <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '0.75rem',
+            flexWrap: 'wrap',
+            marginBottom: '0.75rem',
+          }}
+        >
           <h2 style={{ margin: 0, fontSize: '1.15rem' }}>Service Delivery — Kanban</h2>
-          <input
-            placeholder="Lọc service_slug…"
-            value={filterSlug}
-            onChange={(e) => setFilterSlug(e.target.value)}
-            onBlur={() => void load()}
-            style={{
-              background: 'var(--bg)',
-              border: '1px solid var(--border)',
-              borderRadius: 8,
-              padding: '0.45rem 0.65rem',
-              color: 'var(--text)',
-              minWidth: 200,
-            }}
-          />
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <input
+              placeholder="Lọc service_slug…"
+              value={filterSlug}
+              onChange={(e) => setFilterSlug(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void load();
+              }}
+              style={{
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                padding: '0.45rem 0.65rem',
+                color: 'var(--text)',
+                minWidth: 160,
+              }}
+            />
+            <input
+              placeholder="Lọc AM (staff id)…"
+              value={filterAm}
+              onChange={(e) => setFilterAm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void load();
+              }}
+              style={{
+                background: 'var(--bg)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                padding: '0.45rem 0.65rem',
+                color: 'var(--text)',
+                width: 120,
+              }}
+            />
+            <button type="button" className="btn btn-sm" onClick={() => void load()}>
+              Lọc
+            </button>
+          </div>
         </div>
+        {toast ? <p className={toastErr ? 'error' : undefined} style={toastErr ? undefined : { color: 'var(--accent)' }}>{toast}</p> : null}
         {loading ? <p className="muted">Đang tải…</p> : null}
         {error ? <p className="error">{error}</p> : null}
         {!loading && rows.length === 0 ? <p className="muted">Chưa có lifecycle.</p> : null}
-        {!loading && rows.length > 0 ? <ServiceDeliveryKanban rows={rows} funnelStats={funnelStats} /> : null}
+        {!loading && rows.length > 0 ? (
+          <ServiceDeliveryKanban
+            rows={rows}
+            funnelStats={funnelStats}
+            token={token}
+            canEdit={hasCap(user, 'crm_board', 'edit')}
+            onRefresh={() => void load()}
+            onNotify={notify}
+          />
+        ) : null}
       </div>
     </main>
   );

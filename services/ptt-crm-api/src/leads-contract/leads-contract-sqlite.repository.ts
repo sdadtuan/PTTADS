@@ -281,7 +281,13 @@ export class LeadsContractSqliteRepository implements OnModuleDestroy {
       pendingApproval: approval,
     });
 
-    return { ok: checks.every((c) => c.ok) && approval?.status !== 'pending', checks, contract, approval };
+    return {
+      ok: checks.every((c) => c.ok) && approval?.status !== 'pending',
+      checks,
+      contract,
+      approval,
+      lifecycle_id: ps?.lifecycle_id != null ? Number(ps.lifecycle_id) : null,
+    };
   }
 
   getContractForLead(leadId: number): { contract: ContractRow | null; approval: ContractApprovalRow | null } {

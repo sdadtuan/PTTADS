@@ -35,6 +35,11 @@ export class ServiceLifecycleController {
     return this.serviceLifecycle.list(serviceSlug, amId, includeDraft);
   }
 
+  @Get(':id/context')
+  context(@Param('id', ParseIntPipe) id: number) {
+    return this.serviceLifecycle.context(id);
+  }
+
   @Get(':id/advance-info')
   advanceInfo(@Param('id', ParseIntPipe) id: number) {
     return this.serviceLifecycle.advanceInfo(id);
