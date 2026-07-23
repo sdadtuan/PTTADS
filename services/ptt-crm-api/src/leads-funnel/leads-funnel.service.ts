@@ -99,6 +99,13 @@ export class LeadsFunnelService {
     return { ok: true, funnel: this.getFunnel(leadId) };
   }
 
+  getConsultAdvanceGate(leadId: number) {
+    const snap = this.repo.getPresalesSnapshot(leadId);
+    if (!snap) throw new NotFoundException({ error: 'No presales for lead' });
+    const gate = this.repo.buildConsultAdvanceGate(leadId, snap.presales.id);
+    return { ok: true, gate, presales_stage: snap.presales.stage };
+  }
+
   advancePresales(leadId: number, body: AdvancePresalesBody, allowOverride = false) {
     try {
       this.repo.advancePresales(leadId, {

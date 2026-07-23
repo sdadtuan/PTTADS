@@ -153,6 +153,12 @@ export class LeadsFunnelController {
     }
   }
 
+  @Get(':id/presales/consult-gate')
+  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsViewGuard, PresalesOnLeadGuard)
+  getConsultGate(@Param('id', ParseIntPipe) id: number) {
+    return this.funnel.getConsultAdvanceGate(id);
+  }
+
   @Post(':id/presales/advance')
   @HttpCode(HttpStatus.OK)
   @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard, PresalesOnLeadGuard, LeadNotInReviewQueueGuard)

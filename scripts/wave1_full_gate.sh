@@ -27,3 +27,10 @@ export WAVE1F_EXPECT_LEADS_OPS_WEB="${WAVE1F_EXPECT_LEADS_OPS_WEB:-1}"
 export WAVE1F_SKIP_SOAK="${WAVE1F_SKIP_SOAK:-1}"
 
 "$PYTHON" -m ptt_crm.wave1_full_gates
+
+if [[ "${WAVE1_INCLUDE_B4:-1}" == "1" ]]; then
+  echo ""
+  echo "== Wave B4 funnel gates =="
+  export WAVE_B4_SKIP_JEST="${WAVE_B4_SKIP_JEST:-1}"
+  bash "$ROOT/scripts/wave_b4_gate.sh"
+fi

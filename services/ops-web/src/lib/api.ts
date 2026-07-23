@@ -360,6 +360,25 @@ export async function ensureLeadPresales(
   });
 }
 
+export async function fetchLeadPresalesConsultGate(
+  token: string,
+  leadId: number,
+): Promise<{
+  ok: boolean;
+  gate: {
+    ok: boolean;
+    level: string;
+    messages: string[];
+    requires_confirm: boolean;
+    requires_override: boolean;
+    decision?: string;
+    bant_total?: number;
+  };
+  presales_stage: string;
+}> {
+  return leadFunnelMutate(token, `/api/v1/leads/${leadId}/presales/consult-gate`, { method: 'GET' });
+}
+
 export async function advanceLeadPresales(
   token: string,
   leadId: number,

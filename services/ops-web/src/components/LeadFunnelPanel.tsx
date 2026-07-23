@@ -6,6 +6,7 @@ import {
   completeLeadCareStage,
   ensureLeadPresales,
   fetchLeadFunnel,
+  fetchLeadPresalesConsultGate,
   fetchLeadPresalesMarketingPlan,
   patchLeadPresalesMarketingPlan,
   patchLeadPresalesTask,
@@ -14,6 +15,28 @@ import {
   type LeadFunnelSnapshot,
 } from '@/lib/api';
 import { hasCap, type StoredStaffUser } from '@/lib/auth';
+
+const STRATEGY_LABELS: Record<string, string> = {
+  target_market: 'Thị trường mục tiêu',
+  market_message: 'Thông điệp thị trường',
+  media_reach: 'Kênh tiếp cận / Media',
+  conversion_strategy: 'Chiến lược chuyển đổi',
+  retention_system: 'Hệ thống giữ chân',
+  nurture_system: 'Nuôi dưỡng lead',
+  world_class_experience: 'Trải nghiệm đẳng cấp',
+  lifecycle_extension: 'Gia hạn lifecycle',
+  referral_engine: 'Giới thiệu / Referral',
+};
+
+interface ConsultGateState {
+  ok: boolean;
+  level: string;
+  messages: string[];
+  requires_confirm: boolean;
+  requires_override: boolean;
+  bant_total?: number;
+  decision?: string;
+}
 
 const FUNNEL_STEPS = [
   { key: 'b2', label: 'B2 Liên hệ' },
@@ -37,35 +60,46 @@ export function LeadFunnelPanel({ token, leadId, user, serviceSlug, onMessage, o
   const [careNote, setCareNote] = useState('');
   const [careReport, setCareReport] = useState('Đã liên hệ KH — xác nhận nhu cầu');
   const [busy, setBusy] = useState(false);
+  const [planName, setPlanName] = useState('');
   const [planNorthStar, setPlanNorthStar] = useState('');
   const [planObjectives, setPlanObjectives] = useState('');
-  const [planMarketMessage, setPlanMarketMessage] = useState('');
-  const [planMediaReach, setPlanMediaReach] = useState('');
-  const [planConversion, setPlanConversion] = useState('');
+  const [planStrategy, setPlanStrategy] = useState<Record<string, string>>({});
   const [planValidation, setPlanValidation] = useState<string[]>([]);
+  const [consultGate, setConsultGate] = useState<ConsultGateState | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
     try {
       const snap = await fetchLeadFunnel(token, leadId);
       setFunnel(snap);
-      if (snap.presales && ['consult', 'proposal'].includes(snap.presales.presales.stage)) {
-        try {
-          const mp = await fetchLeadPresalesMarketingPlan(token, leadId);
-          setPlanNorthStar(String(mp.plan.north_star ?? ''));
-          setPlanObjectives(String(mp.plan.objectives ?? ''));
-          let sf: Record<string, string> = {};
+      if (snap.presales) {
+        if (snap.presales.presales.stage === 'lead') {
           try {
-            sf = JSON.parse(String(mp.plan.strategy_framework_json ?? '{}')) as Record<string, string>;
+            const cg = await fetchLeadPresalesConsultGate(token, leadId);
+            setConsultGate(cg.gate);
           } catch {
-            sf = {};
+            setConsultGate(null);
           }
-          setPlanMarketMessage(sf.market_message ?? '');
-          setPlanMediaReach(sf.media_reach ?? '');
-          setPlanConversion(sf.conversion_strategy ?? '');
-          setPlanValidation(mp.validation.messages ?? []);
-        } catch {
-          setPlanValidation([]);
+        } else {
+          setConsultGate(null);
+        }
+        if (snap.presales.presales.stage === 'proposal') {
+          try {
+            const mp = await fetchLeadPresalesMarketingPlan(token, leadId);
+            setPlanName(String(mp.plan.name ?? ''));
+            setPlanNorthStar(String(mp.plan.north_star ?? ''));
+            setPlanObjectives(String(mp.plan.objectives ?? ''));
+            let sf: Record<string, string> = {};
+            try {
+              sf = JSON.parse(String(mp.plan.strategy_framework_json ?? '{}')) as Record<string, string>;
+            } catch {
+              sf = {};
+            }
+            setPlanStrategy(sf);
+            setPlanValidation(mp.validation.messages ?? []);
+          } catch {
+            setPlanValidation([]);
+          }
         }
       }
     } catch (err) {
@@ -272,6 +306,28 @@ export function LeadFunnelPanel({ token, leadId, user, serviceSlug, onMessage, o
                   {task.title}
                 </label>
               ))}
+              {consultGate && funnel.presales.presales.stage === 'lead' && (
+                <div
+                  className="banner"
+                  style={{
+                    marginBottom: '0.75rem',
+                    background: consultGate.ok ? '#ecfdf5' : '#fef2f2',
+                    border: `1px solid ${consultGate.ok ? '#86efac' : '#fecaca'}`,
+                  }}
+                >
+                  <strong>Gate chuyển Tư vấn (Intake)</strong>
+                  <ul style={{ margin: '0.35rem 0 0', paddingLeft: '1.1rem', fontSize: '0.9rem' }}>
+                    {consultGate.messages.map((m) => (
+                      <li key={m}>{m}</li>
+                    ))}
+                  </ul>
+                  {consultGate.bant_total != null && (
+                    <p className="muted" style={{ margin: '0.35rem 0 0', fontSize: '0.85rem' }}>
+                      BANT {consultGate.bant_total}/30 · decision: {consultGate.decision || '—'}
+                    </p>
+                  )}
+                </div>
+              )}
               {canEdit && (
                 <button
                   type="button"
@@ -312,9 +368,9 @@ export function LeadFunnelPanel({ token, leadId, user, serviceSlug, onMessage, o
                 </p>
               )}
 
-              {['consult', 'proposal'].includes(funnel.presales.presales.stage) && (
+              {funnel.presales.presales.stage === 'proposal' && (
                 <div className="stack-gap" style={{ marginTop: '1rem' }}>
-                  <h4 style={{ margin: 0 }}>KH Marketing sơ bộ</h4>
+                  <h4 style={{ margin: 0 }}>KH Marketing sơ bộ @ Proposal</h4>
                   {planValidation.length > 0 && (
                     <ul className="muted" style={{ fontSize: '0.85rem', margin: 0, paddingLeft: '1.1rem' }}>
                       {planValidation.map((m) => (
@@ -322,6 +378,16 @@ export function LeadFunnelPanel({ token, leadId, user, serviceSlug, onMessage, o
                       ))}
                     </ul>
                   )}
+                  <label>
+                    Tên kế hoạch
+                    <input
+                      type="text"
+                      value={planName}
+                      disabled={!canEdit || busy}
+                      onChange={(e) => setPlanName(e.target.value)}
+                      style={{ width: '100%', marginTop: '0.25rem' }}
+                    />
+                  </label>
                   <label>
                     North Star
                     <input
@@ -333,7 +399,7 @@ export function LeadFunnelPanel({ token, leadId, user, serviceSlug, onMessage, o
                     />
                   </label>
                   <label>
-                    Mục tiêu
+                    Mục tiêu chiến lược
                     <textarea
                       rows={2}
                       value={planObjectives}
@@ -342,36 +408,20 @@ export function LeadFunnelPanel({ token, leadId, user, serviceSlug, onMessage, o
                       style={{ width: '100%', marginTop: '0.25rem' }}
                     />
                   </label>
-                  <label>
-                    Thông điệp thị trường
-                    <textarea
-                      rows={2}
-                      value={planMarketMessage}
-                      disabled={!canEdit || busy}
-                      onChange={(e) => setPlanMarketMessage(e.target.value)}
-                      style={{ width: '100%', marginTop: '0.25rem' }}
-                    />
-                  </label>
-                  <label>
-                    Kênh tiếp cận
-                    <textarea
-                      rows={2}
-                      value={planMediaReach}
-                      disabled={!canEdit || busy}
-                      onChange={(e) => setPlanMediaReach(e.target.value)}
-                      style={{ width: '100%', marginTop: '0.25rem' }}
-                    />
-                  </label>
-                  <label>
-                    Chiến lược chuyển đổi
-                    <textarea
-                      rows={2}
-                      value={planConversion}
-                      disabled={!canEdit || busy}
-                      onChange={(e) => setPlanConversion(e.target.value)}
-                      style={{ width: '100%', marginTop: '0.25rem' }}
-                    />
-                  </label>
+                  {Object.entries(STRATEGY_LABELS).map(([key, label]) => (
+                    <label key={key}>
+                      {label}
+                      <textarea
+                        rows={2}
+                        value={planStrategy[key] ?? ''}
+                        disabled={!canEdit || busy}
+                        onChange={(e) =>
+                          setPlanStrategy((prev) => ({ ...prev, [key]: e.target.value }))
+                        }
+                        style={{ width: '100%', marginTop: '0.25rem' }}
+                      />
+                    </label>
+                  ))}
                   {canEdit && (
                     <button
                       type="button"
@@ -380,13 +430,10 @@ export function LeadFunnelPanel({ token, leadId, user, serviceSlug, onMessage, o
                       onClick={() =>
                         void run(async () => {
                           const out = await patchLeadPresalesMarketingPlan(token, leadId, {
+                            name: planName,
                             north_star: planNorthStar,
                             objectives: planObjectives,
-                            strategy_framework: {
-                              market_message: planMarketMessage,
-                              media_reach: planMediaReach,
-                              conversion_strategy: planConversion,
-                            },
+                            strategy_framework: planStrategy,
                           });
                           setFunnel(out.funnel);
                           setPlanValidation(out.validation.messages ?? []);

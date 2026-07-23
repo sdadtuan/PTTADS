@@ -3,8 +3,19 @@
 > **Phạm vi:** Port workflow kinh doanh Lead funnel từ Flask/Python sang Nest + ops-web — **FR-CRM-04** (B2 review queue) và **FR-CRM-05** (presales gates + KH MKT sơ bộ).  
 > **Không nhầm với:** Meta Horizon 1 **B4** (campaign write pilot) trong [`horizon1-meta-ads-migration-checklist.md`](./horizon1-meta-ads-migration-checklist.md).
 
-**Trạng thái:** Implemented v1.1 (S2 polish + consult gate + ops-web UI) · deploy: `./scripts/wave_b4_deploy.sh`  
-**Cập nhật:** 2026-07-23  
+**Trạng thái:** DoD v1.2 (PG DDL prep + workflow seed + gates + UI form) · deploy: `./scripts/wave_b4_deploy.sh`  
+**Cập nhật:** 2026-07-23
+
+### DoD checklist (Wave B4)
+
+| Hạng mục | Trạng thái | Verify |
+|----------|------------|--------|
+| PG DDL funnel/presales (S0) | SQL + apply script (Nest vẫn SQLite) | `WAVE_B4_APPLY_PG_DDL=1 ./scripts/wave_b4_deploy.sh` |
+| Presales seed SERVICE_WORKFLOW_STEPS | 12 services JSON export | `python3 scripts/export_presales_workflow_steps.py` |
+| Consult advance + intake gate | Nest util + GET `/presales/consult-gate` | `./scripts/wave_b4_pytest_parity.sh` |
+| Marketing plan form @ proposal | ops-web full strategy form | `/crm/leads/:id` stage proposal |
+| Cron review-queue sync | systemd timer units | `sudo systemctl enable --now ptt-lead-review-queue-sync.timer` |
+| wave1_full_gate + pytest | `wave_b4_gate.sh` wired | `./scripts/wave_b4_gate.sh` |  
 **Production:** Staff/API `https://rs.pttads.vn` · ops-web `/crm/leads/*`
 
 ---

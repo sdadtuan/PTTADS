@@ -1,9 +1,15 @@
+import workflowData from './presales-workflow-steps.data.json';
+
 export interface PresalesWorkflowStep {
   title: string;
   description: string;
   ai_prompt_key?: string;
   form_fields?: Array<{ key: string; label: string; type: string }>;
 }
+
+type WorkflowData = Record<string, Record<string, PresalesWorkflowStep[]>>;
+
+const SERVICE_STEPS = workflowData as WorkflowData;
 
 const GENERIC_STEPS: Record<string, PresalesWorkflowStep[]> = {
   lead: [
@@ -30,6 +36,16 @@ const GENERIC_STEPS: Record<string, PresalesWorkflowStep[]> = {
 };
 
 export function workflowStepsForService(serviceSlug: string): Record<string, PresalesWorkflowStep[]> {
-  void serviceSlug;
-  return GENERIC_STEPS;
+  const slug = String(serviceSlug || '').trim();
+  const steps = SERVICE_STEPS[slug];
+  if (!steps) return GENERIC_STEPS;
+  return {
+    lead: steps.lead?.length ? steps.lead : GENERIC_STEPS.lead,
+    consult: steps.consult?.length ? steps.consult : GENERIC_STEPS.consult,
+    proposal: steps.proposal?.length ? steps.proposal : GENERIC_STEPS.proposal,
+  };
+}
+
+export function listPresalesServiceSlugs(): string[] {
+  return Object.keys(SERVICE_STEPS).sort();
 }

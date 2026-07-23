@@ -222,6 +222,10 @@ export class LeadsFunnelSqliteRepository implements OnModuleDestroy {
     }
   }
 
+  buildConsultAdvanceGate(leadId: number, presalesId: number) {
+    return this.consultAdvanceGate(leadId, presalesId);
+  }
+
   private consultAdvanceGate(leadId: number, presalesId: number) {
     const sessions = this.database
       .prepare(
