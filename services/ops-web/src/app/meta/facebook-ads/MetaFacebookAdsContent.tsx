@@ -218,7 +218,8 @@ export function MetaFacebookAdsContent() {
         >
           <p style={{ margin: 0 }}>
             Hub Meta canonical trên ops-web · Flask <code>/crm/facebook-ads</code> đã retire (M1-G09).
-            Bookmark cũ trên rs.pttads.vn sẽ redirect về đây.
+            Bookmark cũ trên rs.pttads.vn sẽ redirect về đây
+            {migration.gate_m1_g06 ? ' (M1-G06 ✓)' : migration.nginx_redirect_live_skipped ? ' — chưa verify live redirect' : ' — M1-G06 pending'}.
           </p>
         </div>
       ) : null}

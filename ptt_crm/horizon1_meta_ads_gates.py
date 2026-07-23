@@ -148,15 +148,9 @@ def _nest_hub_smoke() -> dict[str, Any]:
 
 
 def _check_nginx_meta_redirect() -> dict[str, Any]:
-    nginx = ROOT / "deploy" / "nginx-rs-delivery-admin-retired.conf"
-    text = nginx.read_text(encoding="utf-8") if nginx.is_file() else ""
-    ok = "/crm/facebook-ads" in text and "ops.pttads.vn/meta/facebook-ads" in text
-    return {
-        "id": "M1-G06",
-        "ok": ok,
-        "label": "nginx /crm/facebook-ads → ops-web redirect",
-        "path": str(nginx.relative_to(ROOT)) if nginx.is_file() else None,
-    }
+    from ptt_crm.meta_ads_nginx_redirect import verify_nginx_redirect_gate
+
+    return verify_nginx_redirect_gate()
 
 
 def _check_autosync_standalone() -> dict[str, Any]:

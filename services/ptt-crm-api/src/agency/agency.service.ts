@@ -1,4 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { AgencySideEffectsService } from './agency-side-effects.service';
 import { AgencyRepository } from './agency.repository';
 import {
@@ -304,17 +306,68 @@ export class AgencyService {
   facebookAdsMigrationStatus(): Record<string, unknown> {
     const retired = this.isEnvTruthy('PTT_FLASK_META_ADS_ADMIN_RETIRED');
     const opsWeb = (process.env.PTT_OPS_WEB_URL ?? 'https://ops.pttads.vn').replace(/\/$/, '');
+    const nginx = this.metaNginxRedirectStatus(opsWeb);
+    const gateM1G06 = Boolean(nginx.gate_m1_g06);
     return {
       ok: true,
       flask_meta_ads_admin_retired: retired,
       ops_web_hub_url: `${opsWeb}/meta/facebook-ads`,
       ops_web_hub_path: '/meta/facebook-ads',
+      legacy_rs_path: '/crm/facebook-ads',
       canonical_upstream: retired ? 'ops-web' : 'flask',
       webhooks_nest_meta: this.isEnvTruthy('PTT_WEBHOOKS_NEST_META'),
       webhooks_flask_fallback: this.isEnvTruthy('PTT_WEBHOOKS_FLASK_FALLBACK'),
       gate_m1_g09: retired,
+      gate_m1_g06: gateM1G06,
+      gate_m1_g06_config: nginx.gate_m1_g06_config,
+      gate_m1_g06_live: nginx.gate_m1_g06_live,
+      nginx_redirect_live_skipped: nginx.live_verify_skipped,
+      nginx_deploy_config_ok: nginx.deploy_config_ok,
       horizon1_expect_meta_hub_retired: this.isEnvTruthy('HORIZON1_EXPECT_META_HUB_RETIRED'),
     };
+  }
+
+  private metaNginxRedirectStatus(_opsWebBase: string): {
+    gate_m1_g06: boolean;
+    gate_m1_g06_config: boolean;
+    gate_m1_g06_live: boolean | null;
+    live_verify_skipped: boolean;
+    deploy_config_ok: boolean;
+  } {
+    const hubPath = '/meta/facebook-ads';
+    const deployOk = this.metaNginxDeployConfigOk(hubPath);
+    const liveSkipped = this.isEnvTruthy('HORIZON1_SKIP_NGINX_REDIRECT_VERIFY', '1');
+    const liveVerified = this.isEnvTruthy('HORIZON1_META_NGINX_REDIRECT_VERIFIED', '0');
+    const configOk = deployOk;
+    const liveOk = liveSkipped ? null : liveVerified;
+    const gateOk = configOk && (liveOk !== false);
+    return {
+      gate_m1_g06: gateOk,
+      gate_m1_g06_config: configOk,
+      gate_m1_g06_live: liveOk,
+      live_verify_skipped: liveSkipped,
+      deploy_config_ok: deployOk,
+    };
+  }
+
+  private metaNginxDeployConfigOk(hubPath: string): boolean {
+    const root = path.resolve(process.cwd(), '../..');
+    const candidates = [
+      path.join(root, 'deploy/nginx-rs-delivery-admin-retired.conf'),
+      path.join(root, 'deploy/nginx-meta-ads-retired-snippet.conf'),
+    ];
+    const needlePath = '/crm/facebook-ads';
+    for (const file of candidates) {
+      try {
+        const text = fs.readFileSync(file, 'utf8');
+        if (text.includes(needlePath) && text.includes(hubPath)) {
+          return true;
+        }
+      } catch {
+        // missing file — try next
+      }
+    }
+    return false;
   }
 
   private isEnvTruthy(name: string, defaultValue = '0'): boolean {

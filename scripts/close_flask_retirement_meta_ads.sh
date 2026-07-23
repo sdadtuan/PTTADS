@@ -108,4 +108,5 @@ systemctl restart ptt-fb-autosync.service 2>/dev/null && echo "OK  restarted ptt
 
 echo ""
 echo "DONE Meta Ads admin retirement applied."
-echo "Verify: curl -I https://rs.pttads.vn/crm/facebook-ads"
+echo "Verify: ./scripts/wave_b3_4_smoke.sh"
+echo "        curl -I https://rs.pttads.vn/crm/facebook-ads"

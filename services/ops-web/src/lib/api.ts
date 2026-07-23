@@ -1780,8 +1780,14 @@ export interface FacebookAdsMigrationStatus {
   ok: boolean;
   flask_meta_ads_admin_retired: boolean;
   ops_web_hub_url: string;
+  legacy_rs_path?: string;
   canonical_upstream: string;
   gate_m1_g09: boolean;
+  gate_m1_g06?: boolean;
+  gate_m1_g06_config?: boolean;
+  gate_m1_g06_live?: boolean | null;
+  nginx_redirect_live_skipped?: boolean;
+  nginx_deploy_config_ok?: boolean;
 }
 
 export interface HubMapRow {
