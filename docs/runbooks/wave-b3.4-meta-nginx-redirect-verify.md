@@ -106,4 +106,4 @@ sudo nginx -t && sudo systemctl reload nginx
 ## Bước tiếp (B3.5–B3.6)
 
 - **B3.5** dry-run `close_flask_retirement_meta_ads.sh` — [`wave-b3.5-meta-retirement-dry-run.md`](./wave-b3.5-meta-retirement-dry-run.md)
-- **B3.6** APPLY prod retirement pack
+- **B3.6** APPLY prod retirement pack — [`wave-b3.6-meta-retirement-apply-prod.md`](./wave-b3.6-meta-retirement-apply-prod.md)

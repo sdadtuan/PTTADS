@@ -1794,6 +1794,10 @@ export interface FacebookAdsMigrationStatus {
   retirement_env_pending_changes?: number | null;
   retirement_env_already_applied?: boolean | null;
   retirement_next_apply_command?: string;
+  gate_m1_g12?: boolean;
+  retirement_applied_ok?: boolean | null;
+  retirement_env_applied_ok?: boolean | null;
+  retirement_apply_artifact_present?: boolean;
 }
 
 export interface HubMapRow {

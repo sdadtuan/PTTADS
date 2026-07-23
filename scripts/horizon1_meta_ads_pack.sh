@@ -10,6 +10,7 @@
 #   ./scripts/horizon1_meta_ads_pack.sh metrics     # M1-E pilot metrics
 #   ./scripts/horizon1_meta_ads_pack.sh meta-retire # partial Flask Meta hub retire (dry-run / APPLY=1)
 #   ./scripts/horizon1_meta_ads_pack.sh b3.5         # Wave B3.5 retirement dry-run (M1-G11)
+#   ./scripts/horizon1_meta_ads_pack.sh b3.6         # Wave B3.6 APPLY prod (M1-G12, sudo)
 #
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -110,6 +111,16 @@ case "$MODE" in
     export CRM_FACEBOOK_BACKGROUND_IN_GUNICORN=0
     "$ROOT/scripts/wave_b3_5_deploy.sh"
     "$ROOT/scripts/wave_b3_5_smoke.sh"
+    ;;
+  b3.6)
+    chmod +x "$ROOT/scripts/wave_b3_6_deploy.sh" "$ROOT/scripts/wave_b3_6_smoke.sh"
+    export APPLY="${APPLY:-0}"
+    if [[ "$APPLY" == "1" ]]; then
+      sudo -E "$ROOT/scripts/wave_b3_6_deploy.sh"
+    else
+      "$ROOT/scripts/wave_b3_6_deploy.sh"
+    fi
+    "$ROOT/scripts/wave_b3_6_smoke.sh"
     ;;
   *)
     echo "Unknown mode: $MODE" >&2

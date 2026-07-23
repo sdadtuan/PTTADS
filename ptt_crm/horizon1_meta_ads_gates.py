@@ -229,6 +229,28 @@ def _check_meta_retirement_dry_run() -> dict[str, Any]:
     }
 
 
+def _check_meta_retirement_applied() -> dict[str, Any]:
+    if not _truthy("HORIZON1_EXPECT_META_RETIREMENT_APPLIED", "0"):
+        return {
+            "id": "M1-G12",
+            "ok": True,
+            "label": "Meta Ads retirement prod APPLY",
+            "skipped": True,
+        }
+    from ptt_crm.meta_ads_retirement_apply import verify_apply_artifact
+
+    result = verify_apply_artifact()
+    return {
+        "id": "M1-G12",
+        "ok": bool(result.get("ok")),
+        "label": "Meta Ads retirement prod APPLY",
+        "artifact": result.get("path"),
+        "generated_at": result.get("generated_at"),
+        "source": result.get("source"),
+        "error": result.get("error"),
+    }
+
+
 def run_gates() -> dict[str, Any]:
     checks = [
         _check_seed_script(),
@@ -241,6 +263,7 @@ def run_gates() -> dict[str, Any]:
         _check_autosync_standalone(),
         _check_meta_admin_retired_flag(),
         _check_meta_retirement_dry_run(),
+        _check_meta_retirement_applied(),
         _check_campaign_write_pilot(),
         _check_soak(),
     ]

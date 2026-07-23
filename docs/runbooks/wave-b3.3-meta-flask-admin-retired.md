@@ -102,4 +102,4 @@ sudo systemctl restart ptt ptt-crm-api
 
 - **B3.4** nginx redirect verify production (M1-G06) — [`wave-b3.4-meta-nginx-redirect-verify.md`](./wave-b3.4-meta-nginx-redirect-verify.md)
 - **B3.5** dry-run `close_flask_retirement_meta_ads.sh` — [`wave-b3.5-meta-retirement-dry-run.md`](./wave-b3.5-meta-retirement-dry-run.md)
-- **B3.6** APPLY prod retirement script
+- **B3.6** APPLY prod retirement script — [`wave-b3.6-meta-retirement-apply-prod.md`](./wave-b3.6-meta-retirement-apply-prod.md)

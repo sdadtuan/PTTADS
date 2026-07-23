@@ -308,6 +308,7 @@ export class AgencyService {
     const opsWeb = (process.env.PTT_OPS_WEB_URL ?? 'https://ops.pttads.vn').replace(/\/$/, '');
     const nginx = this.metaNginxRedirectStatus(opsWeb);
     const dryRun = this.metaRetirementDryRunStatus();
+    const applied = this.metaRetirementApplyStatus();
     const gateM1G06 = Boolean(nginx.gate_m1_g06);
     return {
       ok: true,
@@ -330,8 +331,41 @@ export class AgencyService {
       retirement_env_pending_changes: dryRun.env_pending_changes,
       retirement_env_already_applied: dryRun.env_already_applied,
       retirement_next_apply_command: dryRun.next_apply_command,
+      gate_m1_g12: applied.gate_m1_g12,
+      retirement_applied_ok: applied.retirement_applied_ok,
+      retirement_env_applied_ok: applied.retirement_env_applied_ok,
+      retirement_apply_artifact_present: applied.artifact_present,
       horizon1_expect_meta_hub_retired: this.isEnvTruthy('HORIZON1_EXPECT_META_HUB_RETIRED'),
     };
+  }
+
+  private metaRetirementApplyStatus(): {
+    gate_m1_g12: boolean;
+    retirement_applied_ok: boolean | null;
+    retirement_env_applied_ok: boolean | null;
+    artifact_present: boolean;
+  } {
+    const root = path.resolve(process.cwd(), '../..');
+    const artifactPath = path.join(root, '.local-dev/horizon1-meta-ads-retirement-applied.json');
+    const envApplied = this.isEnvTruthy('HORIZON1_META_RETIREMENT_APPLIED', '0');
+    try {
+      const raw = fs.readFileSync(artifactPath, 'utf8');
+      const data = JSON.parse(raw) as { ok?: boolean; applied?: boolean };
+      const ok = Boolean(data.ok) && data.applied !== false;
+      return {
+        gate_m1_g12: ok,
+        retirement_applied_ok: ok,
+        retirement_env_applied_ok: ok,
+        artifact_present: true,
+      };
+    } catch {
+      return {
+        gate_m1_g12: envApplied,
+        retirement_applied_ok: envApplied ? true : null,
+        retirement_env_applied_ok: envApplied ? true : null,
+        artifact_present: false,
+      };
+    }
   }
 
   private metaRetirementDryRunStatus(): {

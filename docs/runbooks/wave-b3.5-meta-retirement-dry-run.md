@@ -117,3 +117,5 @@ sudo -E HORIZON1_SKIP_SYSTEMD=0 ./scripts/wave_b3_5_smoke.sh
 sudo -E APPLY=1 ./scripts/close_flask_retirement_meta_ads.sh
 ADMIN_PASSWORD='...' ./scripts/wave_b3_4_smoke.sh
 ```
+
+→ Chi tiết: [`wave-b3.6-meta-retirement-apply-prod.md`](./wave-b3.6-meta-retirement-apply-prod.md)

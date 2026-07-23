@@ -42,13 +42,20 @@ export HORIZON1_SKIP_SOAK="${HORIZON1_SKIP_SOAK:-1}"
 export HORIZON1_SKIP_NEST_SMOKE="${HORIZON1_SKIP_NEST_SMOKE:-1}"
 export HORIZON1_SKIP_NGINX_REDIRECT_VERIFY="${HORIZON1_SKIP_NGINX_REDIRECT_VERIFY:-1}"
 export HORIZON1_SKIP_SYSTEMD="${HORIZON1_SKIP_SYSTEMD:-1}"
+export HORIZON1_SKIP_SOAK=1
+export HORIZON1_SKIP_NEST_SMOKE=1
+export CRM_FACEBOOK_BACKGROUND=1
+export CRM_FACEBOOK_BACKGROUND_IN_GUNICORN=0
 
-if [[ "$APPLY" != "1" ]]; then
-  export HORIZON1_SKIP_SOAK=1
-  export HORIZON1_SKIP_NEST_SMOKE=1
+if [[ "$APPLY" == "1" ]]; then
+  echo "==> B3.6 APPLY — require dry-run prerequisite"
+  "$PYTHON" -m ptt_crm.meta_ads_retirement_apply prerequisite || {
+    echo "FAIL run ./scripts/wave_b3_5_deploy.sh first" >&2
+    exit 1
+  }
   export HORIZON1_SKIP_NGINX_REDIRECT_VERIFY=1
-  export CRM_FACEBOOK_BACKGROUND=1
-  export CRM_FACEBOOK_BACKGROUND_IN_GUNICORN=0
+else
+  export HORIZON1_SKIP_NGINX_REDIRECT_VERIFY=1
 fi
 
 echo "==> Meta Ads admin retirement — preflight (B3.5 dry-run)"
@@ -82,8 +89,9 @@ echo "    Post-apply smoke: ./scripts/wave_b3_4_smoke.sh"
 if [[ "$APPLY" != "1" ]]; then
   echo ""
   echo "DRY-RUN complete (artifact: .local-dev/horizon1-meta-ads-retirement-dry-run.json)"
-  echo "Execute on VPS:"
+  echo "Execute on VPS (B3.6):"
   echo "  sudo -E APPLY=1 $0"
+  echo "  sudo -E APPLY=1 ./scripts/wave_b3_6_deploy.sh"
   echo ""
   echo "Rollback:"
   echo "  PTT_FLASK_META_ADS_ADMIN_RETIRED=0 in $ENV_FILE"
@@ -142,6 +150,20 @@ done
 systemctl restart ptt-fb-autosync.service 2>/dev/null && echo "OK  restarted ptt-fb-autosync" || true
 
 echo ""
+echo "==> Post-apply verification (B3.6)"
+_set_env HORIZON1_META_RETIREMENT_DRY_RUN_VERIFIED 1
+_set_env HORIZON1_META_RETIREMENT_APPLIED 1
+
+export HORIZON1_SKIP_NGINX_REDIRECT_VERIFY=0
+export HORIZON1_SKIP_SYSTEMD="${HORIZON1_SKIP_SYSTEMD:-0}"
+export CRM_FACEBOOK_BACKGROUND=1
+export CRM_FACEBOOK_BACKGROUND_IN_GUNICORN=0
+"$PYTHON" -m ptt_crm.meta_ads_retirement_apply record || {
+  echo "WARN post-apply verify incomplete — see .local-dev/horizon1-meta-ads-retirement-applied.json" >&2
+}
+
+echo ""
 echo "DONE Meta Ads admin retirement applied (B3.6)."
-echo "Verify: ./scripts/wave_b3_4_smoke.sh"
+echo "Verify: ./scripts/wave_b3_6_smoke.sh"
+echo "        ./scripts/wave_b3_4_smoke.sh"
 echo "        curl -I https://rs.pttads.vn/crm/facebook-ads"

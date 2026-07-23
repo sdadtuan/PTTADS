@@ -11,6 +11,7 @@ from ptt_crm.config import (
 )
 from ptt_crm.meta_ads_nginx_redirect import nginx_redirect_status
 from ptt_crm.meta_ads_retirement_preflight import retirement_dry_run_status
+from ptt_crm.meta_ads_retirement_apply import retirement_apply_status
 
 
 def flask_meta_ads_admin_redirect() -> tuple[str, int] | None:
@@ -24,6 +25,7 @@ def migration_status(*, include_nginx_live: bool = False) -> dict[str, Any]:
     retired = meta_ads_admin_retired()
     nginx = nginx_redirect_status(include_live=include_nginx_live)
     dry_run = retirement_dry_run_status()
+    applied = retirement_apply_status()
     return {
         "ok": True,
         "flask_meta_ads_admin_retired": retired,
@@ -43,4 +45,8 @@ def migration_status(*, include_nginx_live: bool = False) -> dict[str, Any]:
         "retirement_env_pending_changes": dry_run.get("env_pending_changes"),
         "retirement_env_already_applied": dry_run.get("env_already_applied"),
         "retirement_next_apply_command": dry_run.get("next_apply_command"),
+        "gate_m1_g12": bool(applied["gate_m1_g12"]),
+        "retirement_applied_ok": applied.get("retirement_applied_ok"),
+        "retirement_env_applied_ok": applied.get("retirement_env_applied_ok"),
+        "retirement_apply_artifact_present": applied.get("retirement_apply_artifact_present"),
     }

@@ -230,6 +230,11 @@ export function MetaFacebookAdsContent() {
                       migration.retirement_env_pending_changes > 0
                     ? ` · Dry-run: ${migration.retirement_env_pending_changes} env flag pending (B3.6 APPLY)`
                     : ' · M1-G11 pending'}
+            {migration.gate_m1_g12
+              ? ' · Prod APPLY OK (M1-G12 ✓)'
+              : migration.retirement_apply_artifact_present === false && migration.flask_meta_ads_admin_retired
+                ? ' · Chưa APPLY B3.6 trên VPS'
+                : ''}
           </p>
         </div>
       ) : null}
