@@ -78,6 +78,9 @@ if [[ "$create_code" =~ ^2 ]]; then
   [[ -n "$MAP_ID" ]] && ok "map_id=$MAP_ID hub_campaign_id=$HUB_ID" || bad "POST missing map_id"
 else
   bad "POST client hub-campaign-maps (HTTP $create_code) $(head -c 200 "$create_resp" | tr '\n' ' ')"
+  if [[ "$create_code" == "404" ]]; then
+    echo "HINT Wave B2.5 write routes chưa deploy — trên VPS: git pull && ./scripts/wave_b25_deploy.sh" >&2
+  fi
   MAP_ID=""
 fi
 rm -f "$create_resp"

@@ -44,14 +44,22 @@ done
 if [[ "$restart_ok" -eq 1 ]]; then
   sleep 2
   curl -sf "http://127.0.0.1:3000/health" >/dev/null && echo "OK  Nest /health"
-  hub_code="$(curl -s -o /dev/null -w "%{http_code}" -X POST "http://127.0.0.1:3000/api/v1/crm/hub-campaign-maps" \
-    -H 'Content-Type: application/json' -d '{}')"
-  if [[ "$hub_code" == "401" || "$hub_code" == "403" || "$hub_code" == "400" ]]; then
-    echo "OK  POST hub-campaign-maps route present (HTTP $hub_code)"
-  elif [[ "$hub_code" == "404" || "$hub_code" == "405" ]]; then
-    echo "FAIL Nest thiếu Wave B2.5 POST — rebuild + restart ptt-crm-api"
-    exit 1
-  fi
+  probe_post_route() {
+    local label="$1"
+    local url="$2"
+    local body code
+    body="$(curl -s -X POST "$url" -H 'Content-Type: application/json' -d '{}')"
+    code="$(curl -s -o /dev/null -w "%{http_code}" -X POST "$url" -H 'Content-Type: application/json' -d '{}')"
+    if [[ "$body" == *"Cannot POST"* ]]; then
+      echo "FAIL Nest thiếu Wave B2.5 $label (HTTP $code route missing)"
+      return 1
+    fi
+    echo "OK  POST $label route present (HTTP $code)"
+    return 0
+  }
+  probe_post_route "crm/hub-campaign-maps" "http://127.0.0.1:3000/api/v1/crm/hub-campaign-maps"
+  probe_post_route "clients/:id/hub-campaign-maps" \
+    "http://127.0.0.1:3000/api/v1/clients/00000000-0000-0000-0000-000000000001/hub-campaign-maps"
 fi
 
 echo ""
