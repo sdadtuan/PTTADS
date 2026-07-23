@@ -461,30 +461,191 @@ export class AgencyRepository implements OnModuleDestroy {
     values.push(params.limit);
 
     const result = await this.db.query(
-      `SELECT hub_campaign_id, channel, external_campaign_id, external_campaign_name,
-              target_cpl_vnd, active, updated_at
+      `SELECT id::text AS map_id, hub_campaign_id, channel, external_campaign_id,
+              external_campaign_name, external_account_id, target_cpl_vnd, active, updated_at
        FROM hub_campaign_map
        WHERE ${clauses.join(' AND ')}
-       ORDER BY external_campaign_name NULLS LAST, external_campaign_id
+       ORDER BY active DESC, external_campaign_name NULLS LAST, external_campaign_id
        LIMIT $${idx}`,
       values,
     );
 
-    return result.rows.map((row) => {
-      const hubId =
-        row.hub_campaign_id != null ? Math.trunc(Number(row.hub_campaign_id)) : null;
-      return {
-        hub_campaign_id: hubId,
-        channel: row.channel ?? 'meta',
-        external_campaign_id: row.external_campaign_id ?? null,
-        external_campaign_name: row.external_campaign_name ?? null,
-        target_cpl_vnd:
-          row.target_cpl_vnd != null ? Math.round(Number(row.target_cpl_vnd) * 100) / 100 : null,
-        active: Boolean(row.active),
-        updated_at: iso(row.updated_at),
-        hub_url: hubId != null ? `/crm/hub?campaign_id=${hubId}` : '/crm/hub',
-      };
-    });
+    return result.rows.map((row) => this.mapHubCampaignRow(row));
+  }
+
+  /** Agency-native hub_campaign_id range (no SQLite Hub row required). */
+  private static readonly AGENCY_HUB_ID_BASE = 9_000_000_000;
+
+  private mapHubCampaignRow(row: Record<string, unknown>): HubCampaignMapRow {
+    const hubId =
+      row.hub_campaign_id != null ? Math.trunc(Number(row.hub_campaign_id)) : null;
+    return {
+      map_id: String(row.map_id ?? ''),
+      hub_campaign_id: hubId,
+      channel: String(row.channel ?? 'meta'),
+      external_campaign_id: row.external_campaign_id != null ? String(row.external_campaign_id) : null,
+      external_campaign_name: row.external_campaign_name != null ? String(row.external_campaign_name) : null,
+      external_account_id: row.external_account_id != null ? String(row.external_account_id) : null,
+      target_cpl_vnd:
+        row.target_cpl_vnd != null ? Math.round(Number(row.target_cpl_vnd) * 100) / 100 : null,
+      active: Boolean(row.active),
+      updated_at: iso(row.updated_at),
+      hub_url: hubId != null ? `/crm/hub?campaign_id=${hubId}` : '/crm/hub',
+    };
+  }
+
+  async allocateAgencyHubCampaignId(): Promise<number> {
+    const base = AgencyRepository.AGENCY_HUB_ID_BASE;
+    const result = await this.db.query(
+      `SELECT COALESCE(MAX(hub_campaign_id), $1::bigint) + 1 AS next_id
+       FROM hub_campaign_map
+       WHERE hub_campaign_id >= $1::bigint`,
+      [base],
+    );
+    return Math.trunc(Number(result.rows[0]?.next_id ?? base + 1));
+  }
+
+  async resolveMetaAccountId(clientId: string): Promise<string | null> {
+    const result = await this.db.query(
+      `SELECT external_account_id
+       FROM client_channel_accounts
+       WHERE client_id = $1::uuid AND channel = 'meta' AND status = 'active'
+       ORDER BY updated_at DESC
+       LIMIT 1`,
+      [clientId],
+    );
+    const row = result.rows[0];
+    return row?.external_account_id ? String(row.external_account_id).trim() : null;
+  }
+
+  async createHubCampaignMap(params: {
+    clientId: string;
+    hubCampaignId: number;
+    channel: string;
+    externalCampaignId: string;
+    externalCampaignName?: string | null;
+    externalAccountId?: string | null;
+    targetCplVnd?: number | null;
+  }): Promise<HubCampaignMapRow> {
+    const result = await this.db.query(
+      `INSERT INTO hub_campaign_map (
+         client_id, hub_campaign_id, channel,
+         external_campaign_id, external_campaign_name,
+         external_account_id, target_cpl_vnd, active, meta
+       ) VALUES (
+         $1::uuid, $2, $3,
+         $4, $5,
+         $6, $7, TRUE, '{"source":"agency_ui"}'::jsonb
+       )
+       RETURNING id::text AS map_id, hub_campaign_id, channel, external_campaign_id,
+                 external_campaign_name, external_account_id, target_cpl_vnd, active, updated_at`,
+      [
+        params.clientId,
+        params.hubCampaignId,
+        params.channel,
+        params.externalCampaignId,
+        params.externalCampaignName?.trim() || null,
+        params.externalAccountId?.trim() || null,
+        params.targetCplVnd ?? null,
+      ],
+    );
+    return this.mapHubCampaignRow(result.rows[0]);
+  }
+
+  async fetchHubCampaignMapById(
+    mapId: string,
+    clientId?: string,
+  ): Promise<(HubCampaignMapRow & { client_id: string }) | null> {
+    const clauses = ['hcm.id = $1::uuid'];
+    const values: unknown[] = [mapId];
+    if (clientId) {
+      clauses.push('hcm.client_id = $2::uuid');
+      values.push(clientId);
+    }
+    const result = await this.db.query(
+      `SELECT hcm.id::text AS map_id, hcm.client_id::text, hcm.hub_campaign_id, hcm.channel,
+              hcm.external_campaign_id, hcm.external_campaign_name, hcm.external_account_id,
+              hcm.target_cpl_vnd, hcm.active, hcm.updated_at
+       FROM hub_campaign_map hcm
+       WHERE ${clauses.join(' AND ')}
+       LIMIT 1`,
+      values,
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      ...this.mapHubCampaignRow(row),
+      client_id: String(row.client_id),
+    };
+  }
+
+  async updateHubCampaignMapById(
+    mapId: string,
+    params: {
+      clientId?: string;
+      externalCampaignId?: string;
+      externalCampaignName?: string | null;
+      externalAccountId?: string | null;
+      targetCplVnd?: number | null;
+      active?: boolean;
+    },
+  ): Promise<HubCampaignMapRow | null> {
+    const sets: string[] = ['updated_at = NOW()'];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    if (params.externalCampaignId !== undefined) {
+      sets.push(`external_campaign_id = $${idx++}`);
+      values.push(params.externalCampaignId);
+    }
+    if (params.externalCampaignName !== undefined) {
+      sets.push(`external_campaign_name = $${idx++}`);
+      values.push(params.externalCampaignName);
+    }
+    if (params.externalAccountId !== undefined) {
+      sets.push(`external_account_id = $${idx++}`);
+      values.push(params.externalAccountId);
+    }
+    if (params.targetCplVnd !== undefined) {
+      sets.push(`target_cpl_vnd = $${idx++}`);
+      values.push(params.targetCplVnd);
+    }
+    if (params.active !== undefined) {
+      sets.push(`active = $${idx++}`);
+      values.push(params.active);
+    }
+
+    const clauses = [`id = $${idx++}::uuid`];
+    values.push(mapId);
+    if (params.clientId) {
+      clauses.push(`client_id = $${idx++}::uuid`);
+      values.push(params.clientId);
+    }
+
+    const result = await this.db.query(
+      `UPDATE hub_campaign_map
+       SET ${sets.join(', ')}
+       WHERE ${clauses.join(' AND ')}
+       RETURNING id::text AS map_id, hub_campaign_id, channel, external_campaign_id,
+                 external_campaign_name, external_account_id, target_cpl_vnd, active, updated_at`,
+      values,
+    );
+    const row = result.rows[0];
+    return row ? this.mapHubCampaignRow(row) : null;
+  }
+
+  async deleteHubCampaignMapById(mapId: string, clientId?: string): Promise<boolean> {
+    const clauses = ['id = $1::uuid'];
+    const values: unknown[] = [mapId];
+    if (clientId) {
+      clauses.push('client_id = $2::uuid');
+      values.push(clientId);
+    }
+    const result = await this.db.query(
+      `DELETE FROM hub_campaign_map WHERE ${clauses.join(' AND ')} RETURNING id`,
+      values,
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 
   async listHubCampaignMapsGlobal(params: {
@@ -507,35 +668,22 @@ export class AgencyRepository implements OnModuleDestroy {
 
     const result = await this.db.query(
       `SELECT hcm.id::text AS map_id, hcm.hub_campaign_id, hcm.channel, hcm.external_campaign_id,
-              hcm.external_campaign_name, hcm.target_cpl_vnd, hcm.active, hcm.updated_at,
-              hcm.client_id::text, c.code AS client_code, c.name AS client_name
+              hcm.external_campaign_name, hcm.external_account_id, hcm.target_cpl_vnd, hcm.active,
+              hcm.updated_at, hcm.client_id::text, c.code AS client_code, c.name AS client_name
        FROM hub_campaign_map hcm
        JOIN clients c ON c.id = hcm.client_id
        WHERE ${clauses.join(' AND ')}
-       ORDER BY c.code, hcm.external_campaign_name NULLS LAST
+       ORDER BY c.code, hcm.active DESC, hcm.external_campaign_name NULLS LAST
        LIMIT $${idx}`,
       values,
     );
 
-    return result.rows.map((row) => {
-      const hubId =
-        row.hub_campaign_id != null ? Math.trunc(Number(row.hub_campaign_id)) : null;
-      return {
-        map_id: String(row.map_id),
-        hub_campaign_id: hubId,
-        channel: row.channel ?? 'meta',
-        external_campaign_id: row.external_campaign_id ?? null,
-        external_campaign_name: row.external_campaign_name ?? null,
-        target_cpl_vnd:
-          row.target_cpl_vnd != null ? Math.round(Number(row.target_cpl_vnd) * 100) / 100 : null,
-        active: Boolean(row.active),
-        updated_at: iso(row.updated_at),
-        hub_url: hubId != null ? `/crm/hub?campaign_id=${hubId}` : '/crm/hub',
-        client_id: String(row.client_id),
-        client_code: row.client_code ?? null,
-        client_name: row.client_name ?? null,
-      };
-    });
+    return result.rows.map((row) => ({
+      ...this.mapHubCampaignRow(row),
+      client_id: String(row.client_id),
+      client_code: row.client_code != null ? String(row.client_code) : null,
+      client_name: row.client_name != null ? String(row.client_name) : null,
+    }));
   }
 
   async updateClient(

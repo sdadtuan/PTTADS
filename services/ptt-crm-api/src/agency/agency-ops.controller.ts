@@ -19,6 +19,8 @@ import {
   JobsListResponse,
   NotificationsListResponse,
   PatchHubCampaignMapBody,
+  CreateHubCampaignMapBody,
+  UpdateHubCampaignMapBody,
   CreateKpiDefinitionBody,
   UpdateKpiDefinitionBody,
 } from './agency.types';
@@ -145,5 +147,32 @@ export class AgencyOpsController {
   @UseGuards(StaffOrInternalKeyGuard, StaffAgencyWriteGuard)
   async patchHubCampaignMap(@Body() body: PatchHubCampaignMapBody) {
     return this.agency.patchHubCampaignMap(body);
+  }
+
+  @Post('crm/hub-campaign-maps')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(StaffOrInternalKeyGuard, StaffAgencyWriteGuard)
+  async createHubCampaignMap(@Body() body: CreateHubCampaignMapBody) {
+    return this.agency.createHubCampaignMap(body);
+  }
+
+  @Patch('crm/hub-campaign-maps/:mapId')
+  @UseGuards(StaffOrInternalKeyGuard, StaffAgencyWriteGuard)
+  async updateHubCampaignMap(
+    @Param('mapId') mapId: string,
+    @Body() body: UpdateHubCampaignMapBody,
+    @Query('client_id') clientId?: string,
+  ) {
+    return this.agency.updateHubCampaignMapById(mapId, body, clientId?.trim() || undefined);
+  }
+
+  @Delete('crm/hub-campaign-maps/:mapId')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(StaffOrInternalKeyGuard, StaffAgencyWriteGuard)
+  async deleteHubCampaignMap(
+    @Param('mapId') mapId: string,
+    @Query('client_id') clientId?: string,
+  ) {
+    return this.agency.deleteHubCampaignMapById(mapId, clientId?.trim() || undefined);
   }
 }

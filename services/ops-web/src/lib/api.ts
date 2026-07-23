@@ -1756,11 +1756,28 @@ export interface HubMapRow {
   channel: string;
   external_campaign_id: string | null;
   external_campaign_name: string | null;
+  external_account_id?: string | null;
   target_cpl_vnd: number | null;
   active: boolean;
   client_id?: string;
   client_code?: string | null;
   client_name?: string | null;
+}
+
+export interface HubMapCreateBody {
+  channel?: string;
+  external_campaign_id: string;
+  external_campaign_name?: string;
+  external_account_id?: string;
+  target_cpl_vnd?: number;
+}
+
+export interface HubMapUpdateBody {
+  external_campaign_id?: string;
+  external_campaign_name?: string | null;
+  external_account_id?: string | null;
+  target_cpl_vnd?: number | null;
+  active?: boolean;
 }
 
 async function agencyFetch<T>(token: string, path: string): Promise<T> {
@@ -2105,13 +2122,81 @@ export async function fetchKpiDefinitions(
   return agencyFetch(token, '/api/v1/kpi-definitions');
 }
 
-export async function patchHubCampaignMap(
+export async function fetchClientHubCampaignMaps(
   token: string,
-  body: { client_id: string; hub_campaign_id: number; external_campaign_id: string },
-): Promise<{ ok: boolean; map_id: string; external_campaign_id: string }> {
+  clientId: string,
+  params?: { include_inactive?: boolean },
+): Promise<{ ok: boolean; maps: HubMapRow[]; count: number; client_id: string }> {
+  const qs = new URLSearchParams();
+  if (params?.include_inactive) qs.set('include_inactive', '1');
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return agencyFetch(token, `/api/v1/clients/${clientId}/hub-campaign-maps${suffix}`);
+}
+
+export async function createClientHubCampaignMap(
+  token: string,
+  clientId: string,
+  body: HubMapCreateBody,
+): Promise<{ ok: boolean; map: HubMapRow; jobs_enqueued?: Array<{ id: string; job_type: string }> }> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/hub-campaign-maps`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function createHubCampaignMap(
+  token: string,
+  body: HubMapCreateBody & { client_id: string },
+): Promise<{ ok: boolean; map: HubMapRow; jobs_enqueued?: Array<{ id: string; job_type: string }> }> {
   return agencyMutate(token, '/api/v1/crm/hub-campaign-maps', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateHubCampaignMap(
+  token: string,
+  mapId: string,
+  body: HubMapUpdateBody,
+  clientId?: string,
+): Promise<{ ok: boolean; map: HubMapRow; jobs_enqueued?: Array<{ id: string; job_type: string }> }> {
+  const qs = clientId ? `?client_id=${encodeURIComponent(clientId)}` : '';
+  return agencyMutate(token, `/api/v1/crm/hub-campaign-maps/${mapId}${qs}`, {
     method: 'PATCH',
     body: JSON.stringify(body),
+  });
+}
+
+export async function updateClientHubCampaignMap(
+  token: string,
+  clientId: string,
+  mapId: string,
+  body: HubMapUpdateBody,
+): Promise<{ ok: boolean; map: HubMapRow; jobs_enqueued?: Array<{ id: string; job_type: string }> }> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/hub-campaign-maps/${mapId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteHubCampaignMap(
+  token: string,
+  mapId: string,
+  clientId?: string,
+): Promise<{ ok: boolean }> {
+  const qs = clientId ? `?client_id=${encodeURIComponent(clientId)}` : '';
+  return agencyMutate(token, `/api/v1/crm/hub-campaign-maps/${mapId}${qs}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function deleteClientHubCampaignMap(
+  token: string,
+  clientId: string,
+  mapId: string,
+): Promise<{ ok: boolean }> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/hub-campaign-maps/${mapId}`, {
+    method: 'DELETE',
   });
 }
 

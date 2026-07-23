@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
 import { AgencyReadOnlyBadge, canAgencyWrite } from '@/components/AgencyReadOnlyBadge';
+import { HubCampaignMapsPanel } from '@/components/HubCampaignMapsPanel';
 import {
   activateAgencyClient,
   addClientChannelAccount,
@@ -41,7 +42,7 @@ import {
   type StoredStaffUser,
 } from '@/lib/auth';
 
-type TabId = 'overview' | 'checklist' | 'channels' | 'leads';
+type TabId = 'overview' | 'checklist' | 'channels' | 'campaigns' | 'leads';
 
 const CLIENT_STATUSES = ['prospect', 'onboarding', 'active', 'paused'] as const;
 
@@ -102,6 +103,7 @@ export function AgencyClientDetailContent() {
     display_name: '',
     status: 'active',
   });
+  const [accessToken, setAccessToken] = useState('');
 
   const canWrite = canAgencyWrite(user);
 
@@ -169,6 +171,7 @@ export function AgencyClientDetailContent() {
     void (async () => {
       const access = await ensureAuth();
       if (!access) return;
+      setAccessToken(access);
       setLoading(true);
       setError('');
       try {
@@ -439,6 +442,7 @@ export function AgencyClientDetailContent() {
                   ['overview', 'Tổng quan'],
                   ['checklist', `Checklist ${progress.completed}/${progress.total}`],
                   ['channels', 'Kênh ads'],
+                  ['campaigns', 'Campaign map'],
                   ['leads', `Leads (${clientLeads.length})`],
                 ] as const
               ).map(([id, label]) => (
@@ -804,6 +808,26 @@ export function AgencyClientDetailContent() {
                   <p className="muted" style={{ marginTop: '1rem' }}>
                     Thêm Meta channel account trước khi lưu token.
                   </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {tab === 'campaigns' ? (
+              <div style={{ marginTop: '1rem' }}>
+                <p className="muted" style={{ marginTop: 0 }}>
+                  <Link href={`/crm/hub?client_id=${clientId}`} className="nav-link">
+                    Xem tất cả trên Hub map
+                  </Link>
+                </p>
+                {accessToken ? (
+                  <HubCampaignMapsPanel
+                    token={accessToken}
+                    canWrite={canWrite}
+                    clientId={clientId}
+                    clientLabel={`${client.code} · ${client.name}`}
+                    onFeedback={setActionMsg}
+                    onError={setError}
+                  />
                 ) : null}
               </div>
             ) : null}

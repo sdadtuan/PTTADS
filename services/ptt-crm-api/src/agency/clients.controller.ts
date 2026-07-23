@@ -26,6 +26,8 @@ import {
   AddChannelAccountBody,
   UpdateChannelAccountBody,
   SetChannelTokenBody,
+  CreateHubCampaignMapBody,
+  UpdateHubCampaignMapBody,
 } from './agency.types';
 import { StaffAgencyViewGuard } from './guards/staff-agency-view.guard';
 import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
@@ -81,6 +83,30 @@ export class ClientsController {
       include_inactive: includeInactive,
       limit: limit !== undefined ? Number(limit) : undefined,
     });
+  }
+
+  @Post(':id/hub-campaign-maps')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(StaffAgencyWriteGuard)
+  async createHubMap(@Param('id') id: string, @Body() body: Omit<CreateHubCampaignMapBody, 'client_id'>) {
+    return this.agency.createHubCampaignMap({ ...body, client_id: id });
+  }
+
+  @Patch(':id/hub-campaign-maps/:mapId')
+  @UseGuards(StaffAgencyWriteGuard)
+  async updateHubMap(
+    @Param('id') id: string,
+    @Param('mapId') mapId: string,
+    @Body() body: UpdateHubCampaignMapBody,
+  ) {
+    return this.agency.updateHubCampaignMapById(mapId, body, id);
+  }
+
+  @Delete(':id/hub-campaign-maps/:mapId')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(StaffAgencyWriteGuard)
+  async deleteHubMap(@Param('id') id: string, @Param('mapId') mapId: string) {
+    return this.agency.deleteHubCampaignMapById(mapId, id);
   }
 
   @Get(':id/performance')

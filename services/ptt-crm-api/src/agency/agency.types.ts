@@ -55,10 +55,12 @@ export interface AgencyStatsResponse {
 }
 
 export interface HubCampaignMapRow {
+  map_id: string;
   hub_campaign_id: number | null;
   channel: string;
   external_campaign_id: string | null;
   external_campaign_name: string | null;
+  external_account_id: string | null;
   target_cpl_vnd: number | null;
   active: boolean;
   updated_at: string | null;
@@ -166,6 +168,24 @@ export interface PatchHubCampaignMapBody {
   client_id: string;
   hub_campaign_id: number;
   external_campaign_id: string;
+}
+
+export interface CreateHubCampaignMapBody {
+  client_id: string;
+  channel?: string;
+  external_campaign_id: string;
+  external_campaign_name?: string;
+  external_account_id?: string;
+  target_cpl_vnd?: number;
+  hub_campaign_id?: number;
+}
+
+export interface UpdateHubCampaignMapBody {
+  external_campaign_id?: string;
+  external_campaign_name?: string;
+  external_account_id?: string;
+  target_cpl_vnd?: number | null;
+  active?: boolean;
 }
 
 export interface JobRow {

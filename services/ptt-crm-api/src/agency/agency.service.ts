@@ -9,6 +9,7 @@ import {
   FacebookHubResponse,
   HubCampaignMapsResponse,
   HubCampaignGlobalRow,
+  HubCampaignMapRow,
   JobsListResponse,
   NotificationsListResponse,
   OnboardingResponse,
@@ -17,6 +18,8 @@ import {
   UpdateChannelAccountBody,
   UpdateClientBody,
   PatchHubCampaignMapBody,
+  CreateHubCampaignMapBody,
+  UpdateHubCampaignMapBody,
   SetChannelTokenBody,
   CreateKpiDefinitionBody,
   UpdateKpiDefinitionBody,
@@ -26,6 +29,7 @@ import { TokenVaultError } from './token-vault.util';
 import { WorkflowsService } from '../workflows/workflows.service';
 
 const META_CAMPAIGN_ID_RE = /^[0-9]{5,20}$/;
+const VALID_HUB_CHANNELS = new Set(['meta', 'zalo', 'google']);
 const VALID_CHANNELS = new Set(['meta', 'zalo', 'google', 'email']);
 const VALID_CHANNEL_STATUSES = new Set(['active', 'inactive', 'revoked', 'error']);
 
@@ -36,6 +40,25 @@ function strictOnboardingEnabled(): boolean {
 
 function normalizeMetaCampaignId(raw: string): string {
   return raw.replace(/\D/g, '').trim();
+}
+
+function normalizeExternalCampaignId(channel: string, raw: string): string {
+  const ch = channel.trim().toLowerCase();
+  if (ch === 'meta') return normalizeMetaCampaignId(raw);
+  return raw.trim();
+}
+
+function validateExternalCampaignId(channel: string, externalId: string): void {
+  const ch = channel.trim().toLowerCase();
+  if (ch === 'meta') {
+    if (!META_CAMPAIGN_ID_RE.test(externalId)) {
+      throw new BadRequestException({ error: 'invalid_meta_campaign_id' });
+    }
+    return;
+  }
+  if (!externalId || externalId.length > 128) {
+    throw new BadRequestException({ error: 'invalid_external_campaign_id' });
+  }
 }
 
 @Injectable()
@@ -531,9 +554,7 @@ export class AgencyService {
     if (!clientId || !Number.isFinite(hubCampaignId) || hubCampaignId <= 0) {
       throw new BadRequestException({ error: 'invalid_payload' });
     }
-    if (!META_CAMPAIGN_ID_RE.test(externalId)) {
-      throw new BadRequestException({ error: 'invalid_meta_campaign_id' });
-    }
+    validateExternalCampaignId('meta', externalId);
     const client = await this.repo.fetchClient(clientId);
     if (!client) {
       throw new NotFoundException({ error: 'client_not_found' });
@@ -546,6 +567,167 @@ export class AgencyService {
     if (!out) {
       throw new NotFoundException({ error: 'map_not_found' });
     }
+    await this.maybeEnqueueInsightsAfterMapChange(clientId, 'meta');
     return { ok: true, ...out };
+  }
+
+  async createHubCampaignMap(
+    body: CreateHubCampaignMapBody,
+  ): Promise<{ ok: boolean; map: HubCampaignMapRow; jobs_enqueued?: AgencySideEffectsSummary['jobs_enqueued'] }> {
+    await this.ensurePg();
+    const clientId = body.client_id?.trim() ?? '';
+    const channel = (body.channel?.trim() || 'meta').toLowerCase();
+    const externalId = normalizeExternalCampaignId(channel, body.external_campaign_id ?? '');
+    if (!clientId) {
+      throw new BadRequestException({ error: 'client_id_required' });
+    }
+    if (!VALID_HUB_CHANNELS.has(channel)) {
+      throw new BadRequestException({ error: 'invalid_channel' });
+    }
+    validateExternalCampaignId(channel, externalId);
+    const client = await this.repo.fetchClient(clientId);
+    if (!client) {
+      throw new NotFoundException({ error: 'client_not_found' });
+    }
+
+    let hubCampaignId = body.hub_campaign_id != null ? Math.trunc(Number(body.hub_campaign_id)) : 0;
+    if (!Number.isFinite(hubCampaignId) || hubCampaignId <= 0) {
+      hubCampaignId = await this.repo.allocateAgencyHubCampaignId();
+    }
+
+    let externalAccountId = body.external_account_id?.trim() || null;
+    if (!externalAccountId && channel === 'meta') {
+      externalAccountId = await this.repo.resolveMetaAccountId(clientId);
+    }
+
+    let targetCpl: number | null = null;
+    if (body.target_cpl_vnd != null && Number.isFinite(Number(body.target_cpl_vnd))) {
+      const n = Number(body.target_cpl_vnd);
+      targetCpl = n > 0 ? Math.round(n * 100) / 100 : null;
+    }
+
+    try {
+      const map = await this.repo.createHubCampaignMap({
+        clientId,
+        hubCampaignId,
+        channel,
+        externalCampaignId: externalId,
+        externalCampaignName: body.external_campaign_name?.trim() || null,
+        externalAccountId,
+        targetCplVnd: targetCpl,
+      });
+      const jobs = await this.maybeEnqueueInsightsAfterMapChange(clientId, channel);
+      return {
+        ok: true,
+        map,
+        ...(jobs?.length ? { jobs_enqueued: jobs } : {}),
+      };
+    } catch (err) {
+      const msg = String(err);
+      if (msg.includes('unique') || msg.includes('duplicate')) {
+        throw new BadRequestException({ error: 'duplicate_map', hint: 'Campaign ID đã map cho client này' });
+      }
+      this.logger.warn(`createHubCampaignMap failed: ${msg}`);
+      throw new BadRequestException({ error: 'create_failed' });
+    }
+  }
+
+  async updateHubCampaignMapById(
+    mapId: string,
+    body: UpdateHubCampaignMapBody,
+    clientId?: string,
+  ): Promise<{ ok: boolean; map: HubCampaignMapRow; jobs_enqueued?: AgencySideEffectsSummary['jobs_enqueued'] }> {
+    await this.ensurePg();
+    const existing = await this.repo.fetchHubCampaignMapById(mapId, clientId);
+    if (!existing) {
+      throw new NotFoundException({ error: 'map_not_found' });
+    }
+
+    const channel = existing.channel;
+    let externalId: string | undefined;
+    if (body.external_campaign_id !== undefined) {
+      externalId = normalizeExternalCampaignId(channel, body.external_campaign_id);
+      validateExternalCampaignId(channel, externalId);
+    }
+
+    let targetCpl: number | null | undefined;
+    if (body.target_cpl_vnd !== undefined) {
+      if (body.target_cpl_vnd == null) {
+        targetCpl = null;
+      } else {
+        const n = Number(body.target_cpl_vnd);
+        targetCpl = Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+      }
+    }
+
+    try {
+      const map = await this.repo.updateHubCampaignMapById(mapId, {
+        clientId,
+        externalCampaignId: externalId,
+        externalCampaignName:
+          body.external_campaign_name !== undefined
+            ? body.external_campaign_name?.trim() || null
+            : undefined,
+        externalAccountId:
+          body.external_account_id !== undefined
+            ? body.external_account_id?.trim() || null
+            : undefined,
+        targetCplVnd: targetCpl,
+        active: body.active,
+      });
+      if (!map) {
+        throw new NotFoundException({ error: 'map_not_found' });
+      }
+      const jobs = await this.maybeEnqueueInsightsAfterMapChange(existing.client_id, channel);
+      return {
+        ok: true,
+        map,
+        ...(jobs?.length ? { jobs_enqueued: jobs } : {}),
+      };
+    } catch (err) {
+      if (err instanceof NotFoundException || err instanceof BadRequestException) throw err;
+      const msg = String(err);
+      if (msg.includes('unique') || msg.includes('duplicate')) {
+        throw new BadRequestException({ error: 'duplicate_map' });
+      }
+      throw err;
+    }
+  }
+
+  async deleteHubCampaignMapById(
+    mapId: string,
+    clientId?: string,
+  ): Promise<{ ok: boolean }> {
+    await this.ensurePg();
+    const existing = await this.repo.fetchHubCampaignMapById(mapId, clientId);
+    if (!existing) {
+      throw new NotFoundException({ error: 'map_not_found' });
+    }
+    const ok = await this.repo.deleteHubCampaignMapById(mapId, clientId);
+    if (!ok) {
+      throw new NotFoundException({ error: 'map_not_found' });
+    }
+    return { ok: true };
+  }
+
+  private async maybeEnqueueInsightsAfterMapChange(
+    clientId: string,
+    channel: string,
+  ): Promise<AgencySideEffectsSummary['jobs_enqueued'] | undefined> {
+    if (channel !== 'meta') return undefined;
+    const jobsEnabled = (process.env.PTT_JOBS_ENABLED ?? '').trim();
+    if (jobsEnabled !== '1' && jobsEnabled.toLowerCase() !== 'true') return undefined;
+    try {
+      const jobs = await this.sideEffects.enqueueMetaInsightsSync(clientId);
+      return jobs.map((j) => ({
+        id: j.id,
+        job_type: j.job_type,
+        status: j.status,
+        created: j.created,
+      }));
+    } catch (err) {
+      this.logger.warn(`enqueue insights after hub map: ${String(err)}`);
+      return undefined;
+    }
   }
 }
