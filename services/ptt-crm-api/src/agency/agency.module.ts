@@ -9,11 +9,14 @@ import { AgencyOpsController } from './agency-ops.controller';
 import { AgencySideEffectsService } from './agency-side-effects.service';
 import { AgencyRepository } from './agency.repository';
 import { AgencyService } from './agency.service';
+import { ClientOffboardRepository } from './client-offboard.repository';
+import { ClientOffboardService } from './client-offboard.service';
 import { ClientsController } from './clients.controller';
 import {
   StaffAgencyViewGuard,
   StaffFacebookAdsViewGuard,
 } from './guards/staff-agency-view.guard';
+import { StaffAgencyConfigureGuard } from './guards/staff-agency-configure.guard';
 import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
 
 @Module({
@@ -23,10 +26,13 @@ import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
     AgencyService,
     AgencyRepository,
     AgencySideEffectsService,
+    ClientOffboardRepository,
+    ClientOffboardService,
     StaffAgencyViewGuard,
     StaffFacebookAdsViewGuard,
     StaffAgencyWriteGuard,
+    StaffAgencyConfigureGuard,
   ],
-  exports: [AgencyService],
+  exports: [AgencyService, ClientOffboardService],
 })
 export class AgencyModule {}

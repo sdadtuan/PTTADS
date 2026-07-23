@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ClientOnboardingWidget } from '@/components/ClientOnboardingWidget';
 import { OpsNav } from '@/components/OpsNav';
-import { AgencyReadOnlyBadge, canAgencyWrite } from '@/components/AgencyReadOnlyBadge';
+import { AgencyReadOnlyBadge, canAgencyConfigure, canAgencyWrite } from '@/components/AgencyReadOnlyBadge';
 import { HubCampaignMapsPanel } from '@/components/HubCampaignMapsPanel';
 import {
   activateAgencyClient,
@@ -13,9 +13,11 @@ import {
   deleteClientChannelAccount,
   fetchAgencyClientContracts,
   fetchAgencyClient,
+  fetchClientOffboardAudit,
   fetchClientLeads,
   fetchClientOnboardingSummary,
   fetchClientPerformance,
+  offboardAgencyClient,
   patchAgencyClient,
   patchClientChannelAccount,
   patchClientOnboardingItem,
@@ -32,6 +34,7 @@ import { jobTypeLabel } from '@/lib/job-labels';
 import type {
   AgencyClient,
   ClientLeadSummary,
+  ClientOffboardAuditRow,
   OnboardingItem,
   OnboardingSummaryResponse,
   PerformanceRow,
@@ -51,6 +54,13 @@ type TabId = 'overview' | 'checklist' | 'channels' | 'campaigns' | 'leads' | 'co
 
 const CLIENT_STATUSES = ['prospect', 'onboarding', 'active', 'paused'] as const;
 
+const OFFBOARD_REASONS = [
+  { value: 'contract_ended', label: 'Hết hợp đồng' },
+  { value: 'churn', label: 'Churn / rời agency' },
+  { value: 'compliance', label: 'Tuân thủ / bảo mật' },
+  { value: 'other', label: 'Khác' },
+] as const;
+
 interface ClientEditForm {
   name: string;
   industry_slug: string;
@@ -68,6 +78,8 @@ function statusBadgeClass(status: string): string {
   if (status === 'active') return 'badge-active';
   if (status === 'onboarding') return 'badge-onboarding';
   if (status === 'paused') return 'badge-paused';
+  if (status === 'archived') return 'badge-paused';
+  if (status === 'offboarding') return 'badge-onboarding';
   return 'badge-prospect';
 }
 
@@ -113,8 +125,15 @@ export function AgencyClientDetailContent() {
     facebook_page_id: '',
   });
   const [accessToken, setAccessToken] = useState('');
+  const [offboardReason, setOffboardReason] = useState('contract_ended');
+  const [offboardNote, setOffboardNote] = useState('');
+  const [offboardAudit, setOffboardAudit] = useState<ClientOffboardAuditRow[]>([]);
+  const [showOffboardConfirm, setShowOffboardConfirm] = useState(false);
 
   const canWrite = canAgencyWrite(user);
+  const canConfigure = canAgencyConfigure(user);
+  const tenantLocked = Boolean(client?.tenant_locked || client?.status === 'archived');
+  const canMutate = canWrite && !tenantLocked;
 
   const ensureAuth = useCallback(async (): Promise<string | null> => {
     let access = getAccessToken();
@@ -203,6 +222,21 @@ export function AgencyClientDetailContent() {
     })();
   }, [tab, accessToken, clientId]);
 
+  useEffect(() => {
+    if (!clientId || !accessToken || !tenantLocked) {
+      setOffboardAudit([]);
+      return;
+    }
+    void (async () => {
+      try {
+        const out = await fetchClientOffboardAudit(accessToken, clientId);
+        setOffboardAudit(out.rows ?? []);
+      } catch {
+        setOffboardAudit([]);
+      }
+    })();
+  }, [clientId, accessToken, tenantLocked]);
+
   function setTab(next: TabId) {
     const qs = new URLSearchParams(searchParams.toString());
     if (next === 'overview') qs.delete('tab');
@@ -211,9 +245,43 @@ export function AgencyClientDetailContent() {
     router.replace(`/agency/clients/${clientId}${suffix}`);
   }
 
+  async function handleOffboard() {
+    const access = getAccessToken();
+    if (!access || !canConfigure || tenantLocked) return;
+    if (
+      !window.confirm(
+        'Offboard client này? Tất cả token kênh sẽ bị thu hồi, portal users bị vô hiệu hoá, client chuyển archived.',
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setActionMsg('');
+    setError('');
+    try {
+      const out = await offboardAgencyClient(access, clientId, {
+        reason: offboardReason,
+        note: offboardNote.trim() || undefined,
+      });
+      await reload(access);
+      const auditOut = await fetchClientOffboardAudit(access, clientId);
+      setOffboardAudit(auditOut.rows ?? []);
+      setShowOffboardConfirm(false);
+      setOffboardNote('');
+      const idem = out.idempotent ? ' (idempotent)' : '';
+      setActionMsg(
+        `Client đã offboard · ${out.tokens_revoked} token thu hồi · ${out.portal_users_deactivated} portal user vô hiệu${idem}`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Offboard thất bại');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function toggleChecklist(item: OnboardingItem) {
     const access = getAccessToken();
-    if (!access || !canWrite) return;
+    if (!access || !canMutate) return;
     setBusy(true);
     setActionMsg('');
     try {
@@ -233,7 +301,7 @@ export function AgencyClientDetailContent() {
 
   async function handleActivate(force = false) {
     const access = getAccessToken();
-    if (!access || !canWrite) return;
+    if (!access || !canMutate) return;
     setBusy(true);
     setActionMsg('');
     setError('');
@@ -259,7 +327,7 @@ export function AgencyClientDetailContent() {
 
   async function handleNudgeWorkflow() {
     const access = getAccessToken();
-    if (!access || !canWrite) return;
+    if (!access || !canMutate) return;
     setBusy(true);
     setActionMsg('');
     try {
@@ -276,7 +344,7 @@ export function AgencyClientDetailContent() {
 
   async function handleStartWorkflow() {
     const access = getAccessToken();
-    if (!access || !canWrite) return;
+    if (!access || !canMutate) return;
     setBusy(true);
     setActionMsg('');
     try {
@@ -296,7 +364,7 @@ export function AgencyClientDetailContent() {
   async function handleAddChannel(e: React.FormEvent) {
     e.preventDefault();
     const access = getAccessToken();
-    if (!access || !canWrite) return;
+    if (!access || !canMutate) return;
     setBusy(true);
     setActionMsg('');
     setError('');
@@ -329,7 +397,7 @@ export function AgencyClientDetailContent() {
   async function handleUpdateChannel(e: React.FormEvent) {
     e.preventDefault();
     const access = getAccessToken();
-    if (!access || !canWrite || !editChannelId) return;
+    if (!access || !canMutate || !editChannelId) return;
     setBusy(true);
     setActionMsg('');
     setError('');
@@ -347,7 +415,7 @@ export function AgencyClientDetailContent() {
 
   async function handleDeleteChannel(accountId: string, label: string) {
     const access = getAccessToken();
-    if (!access || !canWrite) return;
+    if (!access || !canMutate) return;
     if (!window.confirm(`Xóa channel account ${label}? Token vault cũng bị xóa.`)) return;
     setBusy(true);
     setActionMsg('');
@@ -368,7 +436,7 @@ export function AgencyClientDetailContent() {
 
   async function handleRevokeToken(accountId: string) {
     const access = getAccessToken();
-    if (!access || !canWrite) return;
+    if (!access || !canMutate) return;
     if (!window.confirm('Thu hồi token Meta trên account này?')) return;
     setBusy(true);
     setActionMsg('');
@@ -387,7 +455,7 @@ export function AgencyClientDetailContent() {
   async function handleSaveClient(e: React.FormEvent) {
     e.preventDefault();
     const access = getAccessToken();
-    if (!access || !canWrite) return;
+    if (!access || !canMutate) return;
     setBusy(true);
     setActionMsg('');
     setError('');
@@ -418,7 +486,7 @@ export function AgencyClientDetailContent() {
   async function handleConnectToken(e: React.FormEvent) {
     e.preventDefault();
     const access = getAccessToken();
-    if (!access || !canWrite || !tokenAccountId) return;
+    if (!access || !canMutate || !tokenAccountId) return;
     setBusy(true);
     setError('');
     setActionMsg('');
@@ -439,7 +507,7 @@ export function AgencyClientDetailContent() {
 
   async function handleSyncInsights() {
     const access = getAccessToken();
-    if (!access || !canWrite) return;
+    if (!access || !canMutate) return;
     setBusy(true);
     setActionMsg('');
     setError('');
@@ -455,7 +523,7 @@ export function AgencyClientDetailContent() {
 
   async function handleSyncGoogleInsights() {
     const access = getAccessToken();
-    if (!access || !canWrite) return;
+    if (!access || !canMutate) return;
     setBusy(true);
     setActionMsg('');
     setError('');
@@ -472,7 +540,7 @@ export function AgencyClientDetailContent() {
 
   async function handleGoogleOAuthConnect(accountId: string) {
     const access = getAccessToken();
-    if (!access || !canWrite) return;
+    if (!access || !canMutate) return;
     setBusy(true);
     setError('');
     try {
@@ -530,6 +598,11 @@ export function AgencyClientDetailContent() {
               </h2>
               <AgencyReadOnlyBadge user={user} />
               <span className={`agency-status-badge ${statusBadgeClass(client.status)}`}>{client.status}</span>
+              {tenantLocked ? (
+                <span className="agency-status-badge badge-paused" title="Tenant locked — mutations blocked">
+                  tenant locked
+                </span>
+              ) : null}
             </div>
             <p className="muted">AM: {client.owner_am_id || '—'} · Ngành: {client.industry_slug || '—'}</p>
 
@@ -559,7 +632,7 @@ export function AgencyClientDetailContent() {
             {tab === 'overview' ? (
               <>
                 <h3 style={{ fontSize: '1rem', marginTop: '0.5rem' }}>Thông tin client</h3>
-                {canWrite ? (
+                {canMutate ? (
                   <form className="agency-client-edit" onSubmit={(e) => void handleSaveClient(e)}>
                     <label>
                       Tên
@@ -623,8 +696,109 @@ export function AgencyClientDetailContent() {
                   </dl>
                 )}
 
+                {tenantLocked ? (
+                  <div style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid var(--border)', borderRadius: 8 }}>
+                    <h3 style={{ fontSize: '1rem', marginTop: 0 }}>Offboard audit</h3>
+                    <p className="muted" style={{ marginTop: 0 }}>
+                      Client đã archived — mọi mutation agency bị chặn (403 tenant_archived).
+                    </p>
+                    {offboardAudit.length > 0 ? (
+                      <table className="perf-table">
+                        <thead>
+                          <tr>
+                            <th>Thời điểm</th>
+                            <th>Người thực hiện</th>
+                            <th>Lý do</th>
+                            <th>Token</th>
+                            <th>Portal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {offboardAudit.map((row) => (
+                            <tr key={row.id}>
+                              <td>{row.created_at?.slice(0, 19).replace('T', ' ') ?? '—'}</td>
+                              <td>{row.initiated_by}</td>
+                              <td>
+                                {row.reason}
+                                {row.note ? ` · ${row.note}` : ''}
+                              </td>
+                              <td>{row.tokens_revoked}</td>
+                              <td>{row.portal_users_deactivated}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="muted">Chưa có audit row (DDL chưa apply?).</p>
+                    )}
+                  </div>
+                ) : canConfigure ? (
+                  <div style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid var(--border)', borderRadius: 8 }}>
+                    <h3 style={{ fontSize: '1rem', marginTop: 0, color: 'var(--danger, #b91c1c)' }}>
+                      Offboard client
+                    </h3>
+                    <p className="muted" style={{ marginTop: 0, fontSize: '0.9rem' }}>
+                      Thu hồi token kênh, vô hiệu hoá portal users, chuyển status → archived. Thao tác không thể hoàn
+                      tác tự động.
+                    </p>
+                    {showOffboardConfirm ? (
+                      <div style={{ display: 'grid', gap: '0.75rem', maxWidth: 420 }}>
+                        <label>
+                          Lý do
+                          <select
+                            value={offboardReason}
+                            onChange={(e) => setOffboardReason(e.target.value)}
+                            style={{ padding: '0.5rem', width: '100%' }}
+                          >
+                            {OFFBOARD_REASONS.map((r) => (
+                              <option key={r.value} value={r.value}>
+                                {r.label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          Ghi chú (tuỳ chọn)
+                          <textarea
+                            value={offboardNote}
+                            onChange={(e) => setOffboardNote(e.target.value)}
+                            rows={2}
+                          />
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className="btn btn-sm"
+                            disabled={busy}
+                            onClick={() => void handleOffboard()}
+                          >
+                            Xác nhận offboard
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            disabled={busy}
+                            onClick={() => setShowOffboardConfirm(false)}
+                          >
+                            Hủy
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={busy}
+                        onClick={() => setShowOffboardConfirm(true)}
+                      >
+                        Bắt đầu offboard…
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+
                 <h3 style={{ fontSize: '1rem', marginTop: '1.5rem' }}>Performance (Meta + Google, 7 ngày)</h3>
-                {canWrite ? (
+                {canMutate ? (
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
                     <button
                       type="button"
@@ -689,7 +863,7 @@ export function AgencyClientDetailContent() {
                 <ClientOnboardingWidget
                   client={client}
                   summary={onboarding}
-                  canWrite={canWrite}
+                  canWrite={canMutate}
                   busy={busy}
                   onToggleItem={(item) => void toggleChecklist(item)}
                   onActivate={(force) => void handleActivate(force)}
@@ -701,7 +875,7 @@ export function AgencyClientDetailContent() {
 
             {tab === 'channels' ? (
               <div style={{ marginTop: '1rem' }}>
-                {canWrite ? (
+                {canMutate ? (
                   <form onSubmit={(e) => void handleAddChannel(e)} style={{ display: 'grid', gap: '0.75rem', maxWidth: 480, marginBottom: '1.25rem' }}>
                     <h3 style={{ fontSize: '1rem', margin: 0 }}>Thêm channel account</h3>
                     <select
@@ -741,7 +915,7 @@ export function AgencyClientDetailContent() {
                   </form>
                 ) : null}
 
-                {editChannelId && canWrite ? (
+                {editChannelId && canMutate ? (
                   <form
                     onSubmit={(e) => void handleUpdateChannel(e)}
                     style={{ display: 'grid', gap: '0.75rem', maxWidth: 480, marginBottom: '1.25rem' }}
@@ -796,7 +970,7 @@ export function AgencyClientDetailContent() {
                       <th>Tên hiển thị</th>
                       <th>Token</th>
                       <th>Status</th>
-                      {canWrite ? <th /> : null}
+                      {canMutate ? <th /> : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -808,7 +982,7 @@ export function AgencyClientDetailContent() {
                         <td>{acc.display_name ?? '—'}</td>
                         <td>{acc.token_status ?? (acc.has_token ? 'ok' : '—')}</td>
                         <td>{acc.status ?? '—'}</td>
-                        {canWrite ? (
+                        {canMutate ? (
                           <td style={{ whiteSpace: 'nowrap' }}>
                             <button type="button" className="btn btn-secondary btn-sm" disabled={busy} onClick={() => startEditChannel(acc)}>
                               Sửa
@@ -818,7 +992,7 @@ export function AgencyClientDetailContent() {
                                 Thu hồi token
                               </button>
                             ) : null}{' '}
-                            {acc.channel === 'google' && canWrite ? (
+                            {acc.channel === 'google' && canMutate ? (
                               <button
                                 type="button"
                                 className="btn btn-secondary btn-sm"
@@ -842,7 +1016,7 @@ export function AgencyClientDetailContent() {
                     ))}
                     {(client.channel_accounts ?? []).length === 0 ? (
                       <tr>
-                        <td colSpan={canWrite ? 6 : 5} className="muted">
+                        <td colSpan={canMutate ? 6 : 5} className="muted">
                           Chưa có channel account — thêm Meta act_… ở form trên
                         </td>
                       </tr>
@@ -850,7 +1024,7 @@ export function AgencyClientDetailContent() {
                   </tbody>
                 </table>
 
-                {canWrite && (client.channel_accounts ?? []).some((a) => a.channel === 'meta') ? (
+                {canMutate && (client.channel_accounts ?? []).some((a) => a.channel === 'meta') ? (
                   <form onSubmit={(e) => void handleConnectToken(e)} style={{ marginTop: '1.25rem', display: 'grid', gap: '0.75rem', maxWidth: 480 }}>
                     <h3 style={{ fontSize: '1rem', margin: 0 }}>Connect Meta token (vault)</h3>
                     <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
@@ -883,7 +1057,7 @@ export function AgencyClientDetailContent() {
                       Lưu token + enqueue sync
                     </button>
                   </form>
-                ) : canWrite ? (
+                ) : canMutate ? (
                   <p className="muted" style={{ marginTop: '1rem' }}>
                     Thêm Meta channel account trước khi lưu token.
                   </p>
@@ -901,7 +1075,7 @@ export function AgencyClientDetailContent() {
                 {accessToken ? (
                   <HubCampaignMapsPanel
                     token={accessToken}
-                    canWrite={canWrite}
+                    canWrite={canMutate}
                     clientId={clientId}
                     clientLabel={`${client.code} · ${client.name}`}
                     onFeedback={setActionMsg}

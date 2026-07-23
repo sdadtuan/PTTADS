@@ -2363,6 +2363,7 @@ export interface AgencyClient {
   name: string;
   industry_slug: string | null;
   status: string;
+  tenant_locked?: boolean;
   owner_am_id: string | null;
   notes?: string | null;
   channels?: string;
@@ -2945,6 +2946,48 @@ export async function activateAgencyClient(
 ): Promise<AgencyClient> {
   const qs = force ? '?force=1' : '';
   return agencyMutate(token, `/api/v1/clients/${clientId}/activate${qs}`, { method: 'POST', body: '{}' });
+}
+
+export interface ClientOffboardAuditRow {
+  id: string;
+  client_id: string;
+  initiated_by: string;
+  reason: string;
+  note?: string | null;
+  tokens_revoked: number;
+  portal_users_deactivated: number;
+  previous_status: string | null;
+  created_at: string;
+}
+
+export interface OffboardClientResult {
+  ok: boolean;
+  client_id: string;
+  status: string;
+  tenant_locked: boolean;
+  tokens_revoked: number;
+  portal_users_deactivated: number;
+  event_id: string | null;
+  audit_id: string;
+  idempotent?: boolean;
+}
+
+export async function offboardAgencyClient(
+  token: string,
+  clientId: string,
+  body: { reason?: string; note?: string; archive_data?: boolean },
+): Promise<OffboardClientResult> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/offboard`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchClientOffboardAudit(
+  token: string,
+  clientId: string,
+): Promise<{ ok: boolean; client_id: string; rows: ClientOffboardAuditRow[] }> {
+  return agencyFetch(token, `/api/v1/clients/${clientId}/offboard/audit`);
 }
 
 export async function addClientChannelAccount(

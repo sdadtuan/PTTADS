@@ -18,6 +18,7 @@ DDL_V3_GOOGLE_SYNC_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v3-google-sy
 DDL_V4_HUB_SOP_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v4-hub-sop.sql")
 DDL_V5_CAMPAIGN_WRITES_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v5-campaign-writes.sql")
 DDL_V3_INGEST_CONFIG_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v3-leads-ingest-config.sql")
+DDL_V3_CLIENT_OFFBOARD_REL = Path("docs/specs/2026-07-23-postgresql-ddl-v3-client-offboard.sql")
 KPI_DICTIONARY_SEED_REL = Path("docs/specs/2026-07-17-kpi-dictionary-seed.sql")
 MIGRATION_VERSION = "2026-07-17-v2-leads"
 MIGRATION_V3_OLTP = "2026-07-17-v3-leads-oltp"
@@ -30,6 +31,7 @@ MIGRATION_V3_GOOGLE_SYNC = "2026-07-17-v3-google-sync"
 MIGRATION_V4_HUB_SOP = "2026-07-17-v4-hub-sop"
 MIGRATION_V5_CAMPAIGN_WRITES = "2026-07-17-v5-campaign-writes"
 MIGRATION_V3_INGEST_CONFIG = "2026-07-17-v3-ingest"
+MIGRATION_V3_CLIENT_OFFBOARD = "2026-07-23-v3-client-offboard"
 
 CRM_LEADS_COLUMNS: tuple[str, ...] = (
     "sqlite_lead_id",
@@ -105,6 +107,11 @@ def ddl_v5_campaign_writes_path() -> Path:
 def ddl_v3_leads_ingest_config_path() -> Path:
     base = Path(__file__).resolve().parents[1]
     return base / DDL_V3_INGEST_CONFIG_REL
+
+
+def ddl_v3_client_offboard_path() -> Path:
+    base = Path(__file__).resolve().parents[1]
+    return base / DDL_V3_CLIENT_OFFBOARD_REL
 
 
 def _apply_sql_file(path: Path) -> None:
@@ -563,6 +570,63 @@ def pg_campaign_writes_ready() -> bool:
 
 def apply_ddl_v5_campaign_writes(*, ddl_path: Path | None = None) -> bool:
     _apply_sql_file(ddl_path or ddl_v5_campaign_writes_path())
+    return True
+
+
+def pg_client_offboard_migration_applied() -> bool:
+    try:
+        from ptt_jobs.db import pg_available, pg_connection
+
+        if not pg_available():
+            return False
+        with pg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT 1 FROM schema_migrations
+                    WHERE version = %s
+                    LIMIT 1
+                    """,
+                    (MIGRATION_V3_CLIENT_OFFBOARD,),
+                )
+                return cur.fetchone() is not None
+    except Exception as exc:
+        logger.debug("pg_client_offboard_migration_applied: %s", exc)
+        return False
+
+
+def pg_client_offboard_ready() -> bool:
+    try:
+        from ptt_jobs.db import pg_available, pg_connection
+
+        if not pg_available():
+            return False
+        with pg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT COUNT(*)::int FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'client_offboard_audit'
+                    """
+                )
+                if int(cur.fetchone()[0] or 0) == 0:
+                    return False
+                cur.execute(
+                    """
+                    SELECT COUNT(*)::int FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'clients'
+                      AND column_name = 'tenant_locked'
+                    """
+                )
+                return int(cur.fetchone()[0] or 0) > 0
+    except Exception as exc:
+        logger.debug("pg_client_offboard_ready: %s", exc)
+        return False
+
+
+def apply_ddl_v3_client_offboard(*, ddl_path: Path | None = None) -> bool:
+    _apply_sql_file(ddl_path or ddl_v3_client_offboard_path())
     return True
 
 

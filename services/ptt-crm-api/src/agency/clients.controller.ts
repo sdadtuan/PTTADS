@@ -10,8 +10,11 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import { Request } from 'express';
+import { StaffJwtPayload } from '../staff-auth/staff-jwt.util';
 import { StaffOrInternalKeyGuard } from '../staff-auth/staff-or-internal-key.guard';
 import { PerformanceService } from '../performance/performance.service';
 import { PerformanceQuery } from '../performance/performance.types';
@@ -30,6 +33,8 @@ import {
   CreateHubCampaignMapBody,
   UpdateHubCampaignMapBody,
 } from './agency.types';
+import { OffboardClientBody, OffboardAuditListResponse, OffboardClientResponse } from './client-offboard.types';
+import { StaffAgencyConfigureGuard } from './guards/staff-agency-configure.guard';
 import { StaffAgencyViewGuard } from './guards/staff-agency-view.guard';
 import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
 
@@ -240,5 +245,25 @@ export class ClientsController {
   @UseGuards(StaffAgencyWriteGuard)
   async syncGoogleInsights(@Param('id') id: string) {
     return this.agency.syncGoogleClientInsights(id);
+  }
+
+  @Post(':id/offboard')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(StaffAgencyConfigureGuard)
+  async offboardClient(
+    @Param('id') id: string,
+    @Body() body: OffboardClientBody,
+    @Req() req: Request & { staffUser?: StaffJwtPayload; staffAuthVia?: 'internal' | 'jwt' },
+  ): Promise<OffboardClientResponse> {
+    const initiatedBy =
+      req.staffAuthVia === 'internal'
+        ? 'internal@pttads.vn'
+        : req.staffUser?.email?.trim() || 'staff@pttads.vn';
+    return this.agency.offboardClient(id.trim(), body ?? {}, initiatedBy);
+  }
+
+  @Get(':id/offboard/audit')
+  async offboardAudit(@Param('id') id: string): Promise<OffboardAuditListResponse> {
+    return this.agency.getOffboardAudit(id.trim());
   }
 }

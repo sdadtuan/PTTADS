@@ -55,6 +55,12 @@ import {
 } from './meta-migration.util';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { LeadsContractSqliteRepository } from '../leads-contract/leads-contract-sqlite.repository';
+import { ClientOffboardService } from './client-offboard.service';
+import {
+  OffboardAuditListResponse,
+  OffboardClientBody,
+  OffboardClientResponse,
+} from './client-offboard.types';
 
 const META_CAMPAIGN_ID_RE = /^[0-9]{5,20}$/;
 const VALID_HUB_CHANNELS = new Set(['meta', 'zalo', 'google']);
@@ -98,7 +104,12 @@ export class AgencyService {
     private readonly sideEffects: AgencySideEffectsService,
     private readonly workflows: WorkflowsService,
     private readonly contractSqlite: LeadsContractSqliteRepository,
+    private readonly clientOffboard: ClientOffboardService,
   ) {}
+
+  private async assertClientWritable(clientId: string): Promise<void> {
+    await this.clientOffboard.assertClientWritable(clientId);
+  }
 
   private async ensurePg(): Promise<void> {
     if (!(await this.repo.pgReady())) {
@@ -144,7 +155,23 @@ export class AgencyService {
     if (!client) {
       throw new NotFoundException({ error: 'Not found' });
     }
-    return client;
+    const lockState = await this.clientOffboard.getLockState(clientId);
+    return {
+      ...client,
+      tenant_locked: lockState?.tenant_locked ?? false,
+    };
+  }
+
+  async offboardClient(
+    clientId: string,
+    body: OffboardClientBody,
+    initiatedBy: string,
+  ): Promise<OffboardClientResponse> {
+    return this.clientOffboard.offboardClient(clientId, body, initiatedBy);
+  }
+
+  async getOffboardAudit(clientId: string): Promise<OffboardAuditListResponse> {
+    return this.clientOffboard.listAudit(clientId);
   }
 
   async createClient(body: {
@@ -729,6 +756,7 @@ export class AgencyService {
 
   async updateClient(clientId: string, body: UpdateClientBody): Promise<AgencyClientDetail> {
     await this.ensurePg();
+    await this.assertClientWritable(clientId);
     const row = await this.repo.updateClient(clientId, body);
     if (!row) {
       throw new NotFoundException({ error: 'Not found' });
@@ -850,6 +878,7 @@ export class AgencyService {
 
   async activateClient(clientId: string, force = false): Promise<AgencyClientDetail> {
     await this.ensurePg();
+    await this.assertClientWritable(clientId);
     const client = await this.repo.fetchClient(clientId);
     if (!client) {
       throw new NotFoundException({ error: 'Not found' });
@@ -892,6 +921,7 @@ export class AgencyService {
 
   async addChannelAccount(clientId: string, body: AddChannelAccountBody): Promise<AgencyClientDetail> {
     await this.ensurePg();
+    await this.assertClientWritable(clientId);
     const client = await this.repo.fetchClient(clientId);
     if (!client) {
       throw new NotFoundException({ error: 'Not found' });
@@ -919,6 +949,7 @@ export class AgencyService {
     body: UpdateChannelAccountBody,
   ): Promise<AgencyClientDetail> {
     await this.ensurePg();
+    await this.assertClientWritable(clientId);
     const client = await this.repo.fetchClient(clientId);
     if (!client) {
       throw new NotFoundException({ error: 'Not found' });
@@ -952,6 +983,7 @@ export class AgencyService {
 
   async deleteChannelAccount(clientId: string, accountId: string): Promise<{ ok: boolean }> {
     await this.ensurePg();
+    await this.assertClientWritable(clientId);
     const client = await this.repo.fetchClient(clientId);
     if (!client) {
       throw new NotFoundException({ error: 'Not found' });
@@ -969,6 +1001,7 @@ export class AgencyService {
     body: SetChannelTokenBody,
   ): Promise<AgencyClientDetail & { side_effects?: AgencySideEffectsSummary }> {
     await this.ensurePg();
+    await this.assertClientWritable(clientId);
     const client = await this.repo.fetchClient(clientId);
     if (!client) {
       throw new NotFoundException({ error: 'Not found' });
@@ -1016,6 +1049,7 @@ export class AgencyService {
 
   async syncClientInsights(clientId: string): Promise<{ ok: boolean; jobs_enqueued: AgencySideEffectsSummary['jobs_enqueued'] }> {
     await this.ensurePg();
+    await this.assertClientWritable(clientId);
     const client = await this.repo.fetchClient(clientId);
     if (!client) {
       throw new NotFoundException({ error: 'Not found' });
@@ -1040,6 +1074,7 @@ export class AgencyService {
 
   async syncGoogleClientInsights(clientId: string): Promise<{ ok: boolean; jobs_enqueued: AgencySideEffectsSummary['jobs_enqueued']; pilot?: ReturnType<typeof checkGoogleAdsPilot> }> {
     await this.ensurePg();
+    await this.assertClientWritable(clientId);
     const client = await this.repo.fetchClient(clientId);
     if (!client) {
       throw new NotFoundException({ error: 'Not found' });

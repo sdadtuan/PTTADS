@@ -23,6 +23,10 @@ export function creativeRejectedIdempotencyKey(
   return `creative:${creativeId}:rejected:v${version}`;
 }
 
+export function clientOffboardedIdempotencyKey(clientId: string): string {
+  return `client:${clientId}:offboarded`;
+}
+
 function isIdempotencyScalar(value: unknown): value is string | number {
   return typeof value === 'string' || typeof value === 'number';
 }
@@ -56,6 +60,12 @@ export function buildEventIdempotencyKey(
     const version = payload.version;
     if (typeof creativeId === 'string' && isIdempotencyScalar(version)) {
       return creativeRejectedIdempotencyKey(creativeId, version);
+    }
+  }
+  if (eventType === 'ClientOffboarded') {
+    const clientId = payload.client_id;
+    if (typeof clientId === 'string' && clientId.trim()) {
+      return clientOffboardedIdempotencyKey(clientId.trim());
     }
   }
   return null;

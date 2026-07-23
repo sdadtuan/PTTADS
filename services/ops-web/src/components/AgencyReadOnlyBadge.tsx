@@ -13,3 +13,7 @@ export function AgencyReadOnlyBadge({ user }: { user: StoredStaffUser | null }) 
 export function canAgencyWrite(user: StoredStaffUser | null): boolean {
   return hasCap(user, 'crm_agency', 'create');
 }
+
+export function canAgencyConfigure(user: StoredStaffUser | null): boolean {
+  return hasCap(user, 'crm_agency', 'configure');
+}

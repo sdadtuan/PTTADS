@@ -8,6 +8,7 @@ export interface AgencyClientRow {
   notes: string | null;
   created_at: string | null;
   updated_at: string | null;
+  tenant_locked?: boolean;
   channels?: string | null;
 }
 

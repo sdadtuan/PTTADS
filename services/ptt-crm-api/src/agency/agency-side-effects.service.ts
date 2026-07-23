@@ -63,6 +63,20 @@ export class AgencySideEffectsService {
     };
   }
 
+  async onClientOffboarded(
+    clientId: string,
+    payload: Record<string, unknown>,
+  ): Promise<string | null> {
+    return this.events.emit(
+      'ClientOffboarded',
+      'client',
+      clientId,
+      payload,
+      String(payload.initiated_by ?? 'system'),
+      `client:${clientId}:offboarded`,
+    );
+  }
+
   async enqueueMetaInsightsSync(
     clientId: string,
     targetDate?: string,
