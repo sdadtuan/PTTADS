@@ -119,5 +119,38 @@ describe('Webhooks v1 (Phase 0 P0-4)', () => {
     expect(res.body.mode).toBe('queue');
     expect(res.body.job_ids?.length).toBeGreaterThan(0);
     expect(res.body.handler).toBe('nest');
+    expect(res.body.resolved_client_id).toBe('550e8400-e29b-41d4-a716-446655440000');
+  });
+
+  it('POST /api/v1/webhooks/meta leadgen payload returns page_ids without Graph token', async () => {
+    if (!app) return;
+    const payload = {
+      object: 'page',
+      entry: [
+        {
+          id: '123456789012345',
+          changes: [
+            {
+              field: 'leadgen',
+              value: {
+                leadgen_id: 'lg_b31_smoke_001',
+                form_id: '2814926042203269',
+                page_id: '123456789012345',
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const body = Buffer.from(JSON.stringify(payload));
+    const res = await request(app.getHttpServer())
+      .post('/api/v1/webhooks/meta')
+      .set('Content-Type', 'application/json')
+      .send(body)
+      .expect(200);
+    expect(res.body.verified).toBe(true);
+    expect(res.body.handler).toBe('nest');
+    expect(res.body.page_ids).toContain('123456789012345');
+    expect(res.body.form_ids).toContain('2814926042203269');
   });
 });

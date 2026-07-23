@@ -46,6 +46,7 @@ export interface AgencyChannelAccount {
   token_expires_at?: string | null;
   credential_ref?: string | null;
   pixel_id?: string | null;
+  facebook_page_id?: string | null;
 }
 
 export interface AgencyStatsResponse {
@@ -124,12 +125,15 @@ export interface AddChannelAccountBody {
   channel: string;
   external_account_id: string;
   display_name?: string;
+  /** Meta Page ID for webhook → client resolution (digits only stored). */
+  facebook_page_id?: string;
 }
 
 export interface UpdateChannelAccountBody {
   display_name?: string;
   external_account_id?: string;
   status?: string;
+  facebook_page_id?: string;
 }
 
 export interface SetChannelTokenBody {

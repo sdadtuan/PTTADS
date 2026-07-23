@@ -85,6 +85,7 @@ export function AgencyClientDetailContent() {
     channel: 'meta',
     external_account_id: '',
     display_name: '',
+    facebook_page_id: '',
   });
   const [editForm, setEditForm] = useState<ClientEditForm>({
     name: '',
@@ -102,6 +103,7 @@ export function AgencyClientDetailContent() {
     external_account_id: '',
     display_name: '',
     status: 'active',
+    facebook_page_id: '',
   });
   const [accessToken, setAccessToken] = useState('');
 
@@ -245,7 +247,7 @@ export function AgencyClientDetailContent() {
     try {
       const updated = await addClientChannelAccount(access, clientId, channelForm);
       setClient(updated);
-      setChannelForm({ channel: 'meta', external_account_id: '', display_name: '' });
+      setChannelForm({ channel: 'meta', external_account_id: '', display_name: '', facebook_page_id: '' });
       setActionMsg('Đã thêm channel account');
       const metaAcc = (updated.channel_accounts ?? []).find((a) => a.channel === 'meta');
       if (metaAcc) setTokenAccountId(metaAcc.id);
@@ -262,6 +264,7 @@ export function AgencyClientDetailContent() {
       external_account_id: acc.external_account_id ?? '',
       display_name: acc.display_name ?? '',
       status: acc.status ?? 'active',
+      facebook_page_id: acc.facebook_page_id ?? '',
     });
     setActionMsg('');
     setError('');
@@ -674,6 +677,14 @@ export function AgencyClientDetailContent() {
                       onChange={(e) => setChannelForm((f) => ({ ...f, display_name: e.target.value }))}
                       style={{ padding: '0.5rem' }}
                     />
+                    {channelForm.channel === 'meta' ? (
+                      <input
+                        placeholder="Facebook Page ID (webhook routing — tuỳ chọn)"
+                        value={channelForm.facebook_page_id}
+                        onChange={(e) => setChannelForm((f) => ({ ...f, facebook_page_id: e.target.value }))}
+                        style={{ padding: '0.5rem' }}
+                      />
+                    ) : null}
                     <button type="submit" className="btn btn-sm" disabled={busy}>
                       Thêm channel
                     </button>
@@ -697,6 +708,12 @@ export function AgencyClientDetailContent() {
                       placeholder="Tên hiển thị"
                       value={editChannelForm.display_name}
                       onChange={(e) => setEditChannelForm((f) => ({ ...f, display_name: e.target.value }))}
+                      style={{ padding: '0.5rem' }}
+                    />
+                    <input
+                      placeholder="Facebook Page ID (webhook routing)"
+                      value={editChannelForm.facebook_page_id}
+                      onChange={(e) => setEditChannelForm((f) => ({ ...f, facebook_page_id: e.target.value }))}
                       style={{ padding: '0.5rem' }}
                     />
                     <select
@@ -725,6 +742,7 @@ export function AgencyClientDetailContent() {
                     <tr>
                       <th>Channel</th>
                       <th>External ID</th>
+                      <th>Page ID</th>
                       <th>Tên hiển thị</th>
                       <th>Token</th>
                       <th>Status</th>
@@ -736,6 +754,7 @@ export function AgencyClientDetailContent() {
                       <tr key={acc.id}>
                         <td>{acc.channel}</td>
                         <td>{acc.external_account_id ?? '—'}</td>
+                        <td>{acc.facebook_page_id ?? '—'}</td>
                         <td>{acc.display_name ?? '—'}</td>
                         <td>{acc.token_status ?? (acc.has_token ? 'ok' : '—')}</td>
                         <td>{acc.status ?? '—'}</td>

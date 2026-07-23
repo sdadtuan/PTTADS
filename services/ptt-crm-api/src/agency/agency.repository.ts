@@ -230,6 +230,10 @@ export class AgencyRepository implements OnModuleDestroy {
       meta && typeof meta === 'object'
         ? String(meta.pixel_id ?? meta.meta_pixel_id ?? '').trim() || null
         : null;
+    const facebookPageId =
+      meta && typeof meta === 'object'
+        ? normMetaPageId(String(meta.facebook_page_id ?? meta.page_id ?? ''))
+        : null;
     return {
       ...base,
       credential_ref: cred || null,
@@ -237,6 +241,7 @@ export class AgencyRepository implements OnModuleDestroy {
       token_status: tokenStatus,
       token_expires_at: expires ? expires.toISOString() : null,
       pixel_id: pixelId,
+      facebook_page_id: facebookPageId,
     };
   }
 
@@ -795,24 +800,48 @@ export class AgencyRepository implements OnModuleDestroy {
 
   async addChannelAccount(
     clientId: string,
-    params: { channel: string; external_account_id: string; display_name?: string },
+    params: {
+      channel: string;
+      external_account_id: string;
+      display_name?: string;
+      facebook_page_id?: string;
+    },
   ): Promise<AgencyChannelAccount> {
     const channel = params.channel.trim().toLowerCase();
     let ext = params.external_account_id.trim();
     if (channel === 'meta') {
       ext = ext.replace(/\D/g, '') || ext;
     }
+    const metaPatch = metaPagePatch(channel, params.facebook_page_id);
+    const vaultReady = await this.vaultColumnsReady();
     const result = await this.db.query(
-      `INSERT INTO client_channel_accounts (
-         client_id, channel, external_account_id, display_name, status
-       ) VALUES ($1::uuid, $2, $3, $4, 'active')
-       ON CONFLICT (client_id, channel, external_account_id)
-       DO UPDATE SET
-         display_name = COALESCE(NULLIF(EXCLUDED.display_name, ''), client_channel_accounts.display_name),
-         status = 'active',
-         updated_at = NOW()
-       RETURNING id::text, channel, external_account_id, display_name, status`,
-      [clientId, channel, ext, params.display_name?.trim() || null],
+      vaultReady
+        ? `INSERT INTO client_channel_accounts (
+             client_id, channel, external_account_id, display_name, status, meta
+           ) VALUES ($1::uuid, $2, $3, $4, 'active', COALESCE($5::jsonb, '{}'::jsonb))
+           ON CONFLICT (client_id, channel, external_account_id)
+           DO UPDATE SET
+             display_name = COALESCE(NULLIF(EXCLUDED.display_name, ''), client_channel_accounts.display_name),
+             status = 'active',
+             meta = CASE
+               WHEN $5::jsonb IS NOT NULL AND $5::jsonb <> '{}'::jsonb
+               THEN COALESCE(client_channel_accounts.meta, '{}'::jsonb) || $5::jsonb
+               ELSE client_channel_accounts.meta
+             END,
+             updated_at = NOW()
+           RETURNING id::text, channel, external_account_id, display_name, status`
+        : `INSERT INTO client_channel_accounts (
+             client_id, channel, external_account_id, display_name, status
+           ) VALUES ($1::uuid, $2, $3, $4, 'active')
+           ON CONFLICT (client_id, channel, external_account_id)
+           DO UPDATE SET
+             display_name = COALESCE(NULLIF(EXCLUDED.display_name, ''), client_channel_accounts.display_name),
+             status = 'active',
+             updated_at = NOW()
+           RETURNING id::text, channel, external_account_id, display_name, status`,
+      vaultReady
+        ? [clientId, channel, ext, params.display_name?.trim() || null, metaPatch ? JSON.stringify(metaPatch) : '{}']
+        : [clientId, channel, ext, params.display_name?.trim() || null],
     );
     const row = result.rows[0];
     return {
@@ -827,7 +856,12 @@ export class AgencyRepository implements OnModuleDestroy {
   async updateChannelAccount(
     clientId: string,
     accountId: string,
-    params: { display_name?: string; external_account_id?: string; status?: string },
+    params: {
+      display_name?: string;
+      external_account_id?: string;
+      status?: string;
+      facebook_page_id?: string;
+    },
   ): Promise<AgencyChannelAccount | null> {
     const existing = await this.fetchChannelAccount(clientId, accountId);
     if (!existing) return null;
@@ -852,6 +886,11 @@ export class AgencyRepository implements OnModuleDestroy {
     if (params.status !== undefined) {
       sets.push(`status = $${idx++}`);
       values.push(params.status.trim());
+    }
+    const metaPatch = metaPagePatch(existing.channel, params.facebook_page_id);
+    if (metaPatch) {
+      sets.push(`meta = COALESCE(meta, '{}'::jsonb) || $${idx++}::jsonb`);
+      values.push(JSON.stringify(metaPatch));
     }
     if (!sets.length) return existing;
 
@@ -1158,4 +1197,18 @@ export class AgencyRepository implements OnModuleDestroy {
 
     return { clients, summary, dateFrom, dateTo };
   }
+}
+
+function normMetaPageId(raw: string): string | null {
+  const id = String(raw ?? '')
+    .replace(/\D/g, '')
+    .trim();
+  return id || null;
+}
+
+function metaPagePatch(channel: string, facebookPageId?: string): Record<string, string> | null {
+  if (channel.trim().toLowerCase() !== 'meta') return null;
+  const pageId = normMetaPageId(facebookPageId ?? '');
+  if (!pageId) return null;
+  return { facebook_page_id: pageId, page_id: pageId };
 }

@@ -5,6 +5,7 @@ import {
   legacyRowToNormalizedLead as sharedLegacyRowToNormalizedLead,
   parseWebhookJson,
 } from './webhook-lead.mapper';
+import { extractMetaLeadgenContext } from './meta-webhook-context';
 import type { LegacyLeadRow, NormalizedLeadPayload } from './webhook-lead.types';
 
 export type { LegacyLeadRow, NormalizedLeadPayload } from './webhook-lead.types';
@@ -23,6 +24,8 @@ export interface MetaParseResult {
   channel: 'meta';
   leads: NormalizedLeadPayload[];
   events: Array<{ event_name: string; external_lead_id: string }>;
+  page_ids?: string[];
+  form_ids?: string[];
 }
 
 export function metaConfigFromEnv(): MetaWebhookConfig {
@@ -186,8 +189,14 @@ export async function parseMetaWebhook(input: {
   query: Record<string, string>;
   clientId: string;
   config?: MetaWebhookConfig;
+  resolvedClientId?: string | null;
+  pageAccessToken?: string | null;
 }): Promise<MetaParseResult> {
-  const config = input.config ?? metaConfigFromEnv();
+  const config = { ...(input.config ?? metaConfigFromEnv()) };
+  if (input.pageAccessToken?.trim()) {
+    config.pageAccessToken = input.pageAccessToken.trim();
+  }
+
   const mode = input.query['hub.mode'] ?? input.query.hub_mode;
   if (mode === 'subscribe') {
     const token = input.query['hub.verify_token'] ?? input.query.hub_verify_token ?? '';
@@ -212,12 +221,24 @@ export async function parseMetaWebhook(input: {
   }
 
   const payload = parseFacebookWebhookJson(input.rawBody);
+  const ctx = extractMetaLeadgenContext(payload);
+  const clientId =
+    input.resolvedClientId?.trim() ||
+    (input.clientId && input.clientId !== 'unknown' ? input.clientId : '') ||
+    'unknown';
+
   const rows = await parseFacebookWebhookPayload(payload, config);
-  const clientId = input.clientId || 'unknown';
   const leads = rows.map((row) => legacyRowToNormalizedLead(row, clientId));
   const events = leads.map((lead) => ({ event_name: 'Lead', external_lead_id: lead.external_lead_id }));
 
-  return { verified: true, channel: 'meta', leads, events };
+  return {
+    verified: true,
+    channel: 'meta',
+    leads,
+    events,
+    ...(ctx.pageIds.length ? { page_ids: ctx.pageIds } : {}),
+    ...(ctx.formIds.length ? { form_ids: ctx.formIds } : {}),
+  };
 }
 
 export function normalizeWebhookChannel(channel: string): string {

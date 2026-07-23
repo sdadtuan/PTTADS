@@ -353,6 +353,7 @@ export class AgencyService {
       channel,
       external_account_id: ext,
       display_name: body.display_name,
+      facebook_page_id: body.facebook_page_id,
     });
     return this.getClient(clientId);
   }
@@ -375,6 +376,7 @@ export class AgencyService {
         display_name: body.display_name,
         external_account_id: body.external_account_id,
         status: body.status?.trim(),
+        facebook_page_id: body.facebook_page_id,
       });
       if (!updated) {
         throw new NotFoundException({ error: 'account_not_found' });
