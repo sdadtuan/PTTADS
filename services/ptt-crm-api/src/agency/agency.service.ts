@@ -780,6 +780,7 @@ export class AgencyService {
     body: { completed: boolean; completed_by?: string; note?: string },
   ): Promise<OnboardingResponse> {
     await this.ensurePg();
+    await this.assertClientWritable(clientId);
     const client = await this.repo.fetchClient(clientId);
     if (!client) {
       throw new NotFoundException({ error: 'Not found' });
@@ -856,6 +857,7 @@ export class AgencyService {
 
   async nudgeOnboardingWorkflow(clientId: string) {
     await this.ensurePg();
+    await this.assertClientWritable(clientId);
     const client = await this.repo.fetchClient(clientId);
     if (!client) {
       throw new NotFoundException({ error: 'Not found' });
@@ -866,6 +868,7 @@ export class AgencyService {
 
   async startOnboardingWorkflow(clientId: string, startedBy?: string) {
     await this.ensurePg();
+    await this.assertClientWritable(clientId);
     const client = await this.repo.fetchClient(clientId);
     if (!client) {
       throw new NotFoundException({ error: 'Not found' });
@@ -1183,6 +1186,7 @@ export class AgencyService {
     if (!clientId || !Number.isFinite(hubCampaignId) || hubCampaignId <= 0) {
       throw new BadRequestException({ error: 'invalid_payload' });
     }
+    await this.assertClientWritable(clientId);
     validateExternalCampaignId('meta', externalId);
     const client = await this.repo.fetchClient(clientId);
     if (!client) {
@@ -1213,6 +1217,7 @@ export class AgencyService {
     if (!VALID_HUB_CHANNELS.has(channel)) {
       throw new BadRequestException({ error: 'invalid_channel' });
     }
+    await this.assertClientWritable(clientId);
     validateExternalCampaignId(channel, externalId);
     const client = await this.repo.fetchClient(clientId);
     if (!client) {
@@ -1271,6 +1276,7 @@ export class AgencyService {
     if (!existing) {
       throw new NotFoundException({ error: 'map_not_found' });
     }
+    await this.assertClientWritable(existing.client_id);
 
     const channel = existing.channel;
     let externalId: string | undefined;
@@ -1332,6 +1338,7 @@ export class AgencyService {
     if (!existing) {
       throw new NotFoundException({ error: 'map_not_found' });
     }
+    await this.assertClientWritable(existing.client_id);
     const ok = await this.repo.deleteHubCampaignMapById(mapId, clientId);
     if (!ok) {
       throw new NotFoundException({ error: 'map_not_found' });

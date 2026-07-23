@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AgencyModule } from '../agency/agency.module';
 import { PortalAuthController } from './portal-auth.controller';
 import { PortalAuthService } from './portal-auth.service';
 import { PortalCreativeNotifyService } from './portal-creative-notify.service';
@@ -8,6 +9,7 @@ import { PortalSettingsRepository } from './portal-settings.repository';
 import { PortalSettingsService } from './portal-settings.service';
 
 @Module({
+  imports: [AgencyModule],
   controllers: [PortalAuthController, PortalSettingsController],
   providers: [
     PortalAuthService,

@@ -98,6 +98,14 @@ export class ClientOffboardService {
   }
 
   async assertClientWritable(clientId: string): Promise<void> {
+    await this.assertTenantUnlocked(clientId);
+  }
+
+  async assertPortalTenantActive(clientId: string): Promise<void> {
+    await this.assertTenantUnlocked(clientId);
+  }
+
+  private async assertTenantUnlocked(clientId: string): Promise<void> {
     if (!(await this.repo.tenantLockedColumnReady())) {
       return;
     }

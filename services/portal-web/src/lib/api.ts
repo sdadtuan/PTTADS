@@ -133,6 +133,15 @@ export class ApiError extends Error {
   }
 }
 
+export function isTenantArchivedError(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false;
+  return err.message === 'tenant_archived' || err.status === 403;
+}
+
+export function tenantArchivedMessage(): string {
+  return 'Client đã archived — portal không còn truy cập được.';
+}
+
 async function parseJson<T>(res: Response): Promise<T> {
   const text = await res.text();
   if (!text) {

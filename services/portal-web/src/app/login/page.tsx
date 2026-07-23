@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { portalLogin } from '@/lib/api';
+import { isTenantArchivedError, portalLogin } from '@/lib/api';
 import { saveSession } from '@/lib/auth';
 
 export default function LoginPage() {
@@ -24,6 +24,10 @@ export default function LoginPage() {
       });
       router.push('/dashboard');
     } catch (err) {
+      if (isTenantArchivedError(err)) {
+        router.replace('/archived');
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Đăng nhập thất bại');
     } finally {
       setLoading(false);

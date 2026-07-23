@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { portalMe, portalRefresh } from '@/lib/api';
+import { portalMe, portalRefresh, isTenantArchivedError } from '@/lib/api';
 import {
   accessTokenExpiringSoon,
   clearSession,
@@ -71,8 +71,13 @@ export function usePortalAuth() {
           refreshToken: getRefreshToken() ?? undefined,
           expiresInSec: undefined,
         });
-      } catch {
+      } catch (err) {
         if (cancelled) return;
+        if (isTenantArchivedError(err)) {
+          clearSession();
+          router.replace('/archived');
+          return;
+        }
         clearSession();
         router.replace('/login');
       } finally {

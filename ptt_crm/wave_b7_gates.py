@@ -1,4 +1,4 @@
-"""Wave B7 — Client offboard + Flask retire gates (B7.1-S1 code)."""
+"""Wave B7 — Client offboard + tenant lock gates (B7.1-S1/S2)."""
 from __future__ import annotations
 
 import json
@@ -34,6 +34,10 @@ def _check_b7_modules() -> dict[str, Any]:
         ROOT / "services/ptt-crm-api/src/agency/client-offboard.repository.ts",
         ROOT / "services/ptt-crm-api/src/agency/guards/staff-agency-configure.guard.ts",
         ROOT / "services/ops-web/src/app/agency/clients/[id]/AgencyClientDetailContent.tsx",
+        ROOT / "services/ptt-crm-api/src/agency/client-offboard.service.spec.ts",
+        ROOT / "services/ptt-crm-api/src/portal/portal-jwt.guard.ts",
+        ROOT / "services/portal-web/src/app/archived/page.tsx",
+        ROOT / "services/portal-web/src/hooks/usePortalAuth.ts",
         ROOT / "scripts/apply_pg_ddl_v3_client_offboard.sh",
         ROOT / "scripts/wave_b7_gate.sh",
         ROOT / "scripts/wave_b7_smoke.sh",
@@ -63,14 +67,34 @@ def _check_pg_offboard_ddl() -> dict[str, Any]:
     }
 
 
+def _run_nest_jest() -> dict[str, Any]:
+    if _truthy("WAVE_B7_SKIP_JEST", "0"):
+        return {"id": "B7-G03", "ok": True, "label": "Nest jest B7 offboard (skipped)", "skipped": True}
+    api = ROOT / "services/ptt-crm-api"
+    proc = subprocess.run(
+        ["npm", "test", "--", "--testPathPattern=client-offboard", "--silent"],
+        cwd=str(api),
+        capture_output=True,
+        text=True,
+    )
+    ok = proc.returncode == 0
+    return {
+        "id": "B7-G03",
+        "ok": ok,
+        "label": "Nest jest client-offboard",
+        "returncode": proc.returncode,
+        "tail": (proc.stdout or proc.stderr)[-800:],
+    }
+
+
 def _run_nest_build() -> dict[str, Any]:
     if _truthy("WAVE_B7_SKIP_BUILD", "0"):
-        return {"id": "B7-G03", "ok": True, "label": "Nest build (skipped)", "skipped": True}
+        return {"id": "B7-G04", "ok": True, "label": "Nest build (skipped)", "skipped": True}
     api = ROOT / "services/ptt-crm-api"
     proc = subprocess.run(["npm", "run", "build"], cwd=str(api), capture_output=True, text=True)
     ok = proc.returncode == 0
     return {
-        "id": "B7-G03",
+        "id": "B7-G04",
         "ok": ok,
         "label": "Nest build (ptt-crm-api)",
         "returncode": proc.returncode,
@@ -80,7 +104,7 @@ def _run_nest_build() -> dict[str, Any]:
 
 def _run_b6_gate() -> dict[str, Any]:
     if _truthy("WAVE_B7_SKIP_B6_GATE", "0"):
-        return {"id": "B7-G04", "ok": True, "label": "Wave B6 regression gate (skipped)", "skipped": True}
+        return {"id": "B7-G05", "ok": True, "label": "Wave B6 regression gate (skipped)", "skipped": True}
     proc = subprocess.run(
         [sys.executable, "-m", "ptt_crm.wave_b6_gates"],
         cwd=str(ROOT),
@@ -90,7 +114,7 @@ def _run_b6_gate() -> dict[str, Any]:
     )
     ok = proc.returncode == 0
     return {
-        "id": "B7-G04",
+        "id": "B7-G05",
         "ok": ok,
         "label": "Wave B6 regression gate",
         "returncode": proc.returncode,
@@ -99,7 +123,7 @@ def _run_b6_gate() -> dict[str, Any]:
 
 
 def run_wave_b7_gates() -> dict[str, Any]:
-    checks = [_check_b7_modules(), _check_pg_offboard_ddl(), _run_nest_build(), _run_b6_gate()]
+    checks = [_check_b7_modules(), _check_pg_offboard_ddl(), _run_nest_jest(), _run_nest_build(), _run_b6_gate()]
     ok = all(c.get("ok") for c in checks)
     report = {"wave": "b7", "ok": ok, "generated_at": _now_iso(), "checks": checks}
     out = _artifacts_dir() / "wave-b7-gate-report.json"

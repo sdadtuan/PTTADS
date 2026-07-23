@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { Pool } from 'pg';
+import { ClientOffboardService } from '../agency/client-offboard.service';
 import { AppConfigService, PortalStubUser } from '../config/app-config.service';
 import { signPortalJwt, verifyPortalJwt, PortalJwtPayload, signPortalRefreshJwt, verifyPortalRefreshJwt } from './portal-jwt.util';
 import { mapKeycloakToPortalPayload, verifyKeycloakAccessToken } from './portal-keycloak.util';
@@ -23,7 +24,10 @@ export interface PortalLoginResult {
 export class PortalAuthService {
   private pool: Pool | null = null;
 
-  constructor(private readonly config: AppConfigService) {}
+  constructor(
+    private readonly config: AppConfigService,
+    private readonly tenantLock: ClientOffboardService,
+  ) {}
 
   private get db(): Pool {
     if (!this.pool) {
@@ -38,6 +42,7 @@ export class PortalAuthService {
     if (!user) {
       throw new UnauthorizedException({ error: 'Invalid credentials' });
     }
+    await this.tenantLock.assertPortalTenantActive(user.clientId);
     const token = signPortalJwt(
       {
         sub: user.id,
@@ -78,6 +83,7 @@ export class PortalAuthService {
     if (!user) {
       throw new UnauthorizedException({ error: 'Invalid refresh subject' });
     }
+    await this.tenantLock.assertPortalTenantActive(user.clientId);
     const token = signPortalJwt(
       {
         sub: user.id,
