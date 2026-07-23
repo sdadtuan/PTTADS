@@ -27,6 +27,10 @@ fi
 
 APPLY="${APPLY:-0}"
 ENV_FILE="${PTT_ENV_FILE:-/var/www/ptt/.env}"
+if [[ ! -f "$ENV_FILE" && -f "$ROOT/.env" ]]; then
+  ENV_FILE="$ROOT/.env"
+fi
+export PTT_ENV_FILE="$ENV_FILE"
 NGINX_SITE="${NGINX_RS_SITE:-/etc/nginx/sites-available/rs.pttads.vn}"
 NGINX_SRC="$ROOT/deploy/nginx-rs-delivery-admin-retired.conf"
 
@@ -36,26 +40,54 @@ export PTT_WEBHOOKS_NEST_META="${PTT_WEBHOOKS_NEST_META:-1}"
 export PTT_WEBHOOKS_FLASK_FALLBACK="${PTT_WEBHOOKS_FLASK_FALLBACK:-0}"
 export HORIZON1_SKIP_SOAK="${HORIZON1_SKIP_SOAK:-1}"
 export HORIZON1_SKIP_NEST_SMOKE="${HORIZON1_SKIP_NEST_SMOKE:-1}"
+export HORIZON1_SKIP_NGINX_REDIRECT_VERIFY="${HORIZON1_SKIP_NGINX_REDIRECT_VERIFY:-1}"
+export HORIZON1_SKIP_SYSTEMD="${HORIZON1_SKIP_SYSTEMD:-1}"
 
-echo "==> Meta Ads admin retirement — preflight"
+if [[ "$APPLY" != "1" ]]; then
+  export HORIZON1_SKIP_SOAK=1
+  export HORIZON1_SKIP_NEST_SMOKE=1
+  export HORIZON1_SKIP_NGINX_REDIRECT_VERIFY=1
+  export CRM_FACEBOOK_BACKGROUND=1
+  export CRM_FACEBOOK_BACKGROUND_IN_GUNICORN=0
+fi
+
+echo "==> Meta Ads admin retirement — preflight (B3.5 dry-run)"
+"$PYTHON" -m ptt_crm.meta_ads_retirement_preflight run || {
+  echo "FAIL meta ads retirement dry-run preflight — see .local-dev/horizon1-meta-ads-retirement-dry-run.json" >&2
+  exit 1
+}
+
+echo ""
+echo "==> Horizon 1 meta gates"
 "$PYTHON" -m ptt_crm.horizon1_meta_ads_gates || {
   echo "FAIL horizon1 meta gates — see .local-dev/horizon1-meta-ads-gate-report.json" >&2
   exit 1
 }
 
 echo ""
-echo "==> Plan"
+echo "==> Apply plan (partial retire — ptt.service keeps running)"
+echo "    Env file: $ENV_FILE"
 echo "    PTT_FLASK_META_ADS_ADMIN_RETIRED=1"
+echo "    HORIZON1_EXPECT_META_HUB_RETIRED=1"
+echo "    PTT_WEBHOOKS_NEST_ENABLED=1"
 echo "    PTT_WEBHOOKS_NEST_META=1"
 echo "    PTT_WEBHOOKS_FLASK_FALLBACK=0"
+echo "    CRM_FACEBOOK_BACKGROUND=1"
+echo "    CRM_FACEBOOK_BACKGROUND_IN_GUNICORN=0"
+echo "    HORIZON1_META_NGINX_REDIRECT_VERIFIED=1"
 echo "    nginx: /crm/facebook-ads → ops.pttads.vn/meta/facebook-ads"
-echo "    Flask ptt.service KEEPS RUNNING for other CRM routes"
-echo "    ptt-fb-autosync.service continues (decouple app.py separately)"
+echo "    Restart: ptt-crm-api ptt-ops-web ptt ptt-fb-autosync"
+echo "    Post-apply smoke: ./scripts/wave_b3_4_smoke.sh"
 
 if [[ "$APPLY" != "1" ]]; then
   echo ""
-  echo "DRY-RUN complete. Execute on VPS:"
+  echo "DRY-RUN complete (artifact: .local-dev/horizon1-meta-ads-retirement-dry-run.json)"
+  echo "Execute on VPS:"
   echo "  sudo -E APPLY=1 $0"
+  echo ""
+  echo "Rollback:"
+  echo "  PTT_FLASK_META_ADS_ADMIN_RETIRED=0 in $ENV_FILE"
+  echo "  Remove nginx /crm/facebook-ads redirect; reload nginx"
   exit 0
 fi
 
@@ -77,11 +109,14 @@ _set_env() {
 echo ""
 echo "==> Update $ENV_FILE"
 _set_env PTT_FLASK_META_ADS_ADMIN_RETIRED 1
+_set_env HORIZON1_EXPECT_META_HUB_RETIRED 1
 _set_env PTT_WEBHOOKS_NEST_ENABLED 1
 _set_env PTT_WEBHOOKS_NEST_META 1
 _set_env PTT_WEBHOOKS_FLASK_FALLBACK 0
 _set_env CRM_FACEBOOK_BACKGROUND 1
 _set_env CRM_FACEBOOK_BACKGROUND_IN_GUNICORN 0
+_set_env HORIZON1_SKIP_NGINX_REDIRECT_VERIFY 0
+_set_env HORIZON1_META_NGINX_REDIRECT_VERIFIED 1
 
 echo ""
 echo "==> Merge nginx redirect block"
@@ -107,6 +142,6 @@ done
 systemctl restart ptt-fb-autosync.service 2>/dev/null && echo "OK  restarted ptt-fb-autosync" || true
 
 echo ""
-echo "DONE Meta Ads admin retirement applied."
+echo "DONE Meta Ads admin retirement applied (B3.6)."
 echo "Verify: ./scripts/wave_b3_4_smoke.sh"
 echo "        curl -I https://rs.pttads.vn/crm/facebook-ads"

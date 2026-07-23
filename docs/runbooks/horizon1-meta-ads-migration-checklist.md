@@ -283,6 +283,7 @@ Sau khi ký → cập nhật SPEC agency Gate M1 → ✅
 | M1-G07 | Autosync standalone (warn if `app` import) |
 | M1-G08 | Soak ≥7d |
 | M1-G09 | `PTT_FLASK_META_ADS_ADMIN_RETIRED` |
+| M1-G11 | Meta retirement dry-run preflight artifact |
 
 ---
 

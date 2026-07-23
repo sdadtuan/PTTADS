@@ -133,6 +133,8 @@ def merge_signoff() -> dict[str, Any]:
             signoff["gates"]["nest_facebook_hub_smoke"] = bool(chk.get("ok"))
         if cid == "M1-G06":
             signoff["gates"]["flask_hub_redirect"] = bool(chk.get("ok"))
+        if cid == "M1-G11":
+            signoff["gates"]["meta_retirement_dry_run"] = bool(chk.get("ok"))
         if cid == "M1-G04":
             signoff["gates"]["webhook_nest_routing"] = bool(chk.get("ok"))
     _apply_staged_flags(signoff)
