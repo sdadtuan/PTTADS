@@ -60,6 +60,11 @@ export class ServiceLifecycleController {
     return this.serviceLifecycle.listTasks(id);
   }
 
+  @Get(':id/consult-brief')
+  consultBrief(@Param('id', ParseIntPipe) id: number) {
+    return this.serviceLifecycle.consultBrief(id);
+  }
+
   @Get(':id/marketing-plan/validation')
   marketingPlanValidation(@Param('id', ParseIntPipe) id: number) {
     return this.serviceLifecycle.marketingPlanValidation(id);
@@ -90,6 +95,12 @@ export class ServiceLifecycleController {
   @UseGuards(StaffServiceLifecycleWriteGuard)
   create(@Body() body: CreateServiceLifecycleBody) {
     return this.serviceLifecycle.create(body);
+  }
+
+  @Post(':id/consult-prefill')
+  @UseGuards(StaffServiceLifecycleWriteGuard)
+  consultPrefill(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>) {
+    return this.serviceLifecycle.consultPrefill(id, body);
   }
 
   @Post(':id/tasks')

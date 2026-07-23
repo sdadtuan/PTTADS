@@ -964,8 +964,34 @@ export async function patchServiceLifecycleTask(
 export async function fetchServiceLifecycleMarketingPlan(
   token: string,
   id: number,
-): Promise<{ plan: Record<string, unknown> | null; validation: { ok: boolean; messages: string[] } }> {
+): Promise<{
+  plan: Record<string, unknown> | null;
+  validation: { ok: boolean; messages: string[] };
+  tmmt_core_keys?: string[];
+  tmmt_prof_keys?: string[];
+  tmmt_min_filled?: number;
+  filled_count?: number;
+}> {
   return crmFetch(token, `/api/crm/service-lifecycle/${id}/marketing-plan`);
+}
+
+export async function fetchServiceLifecycleConsultBrief(
+  token: string,
+  id: number,
+): Promise<Record<string, unknown>> {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/consult-brief`);
+}
+
+export async function postServiceLifecycleConsultPrefill(
+  token: string,
+  id: number,
+  body: { overwrite?: boolean },
+): Promise<{ task_id: number | null; filled: number; fields: string[]; skipped_existing: string[] }> {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/consult-prefill`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 export async function patchServiceLifecycleMarketingPlan(

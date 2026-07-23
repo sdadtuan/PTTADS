@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { ConsultBriefPanel } from '@/components/ConsultBriefPanel';
 import { LifecycleFinanceActions } from '@/components/LifecycleFinanceActions';
 import {
   fetchServiceLifecycleAdvanceInfo,
@@ -10,7 +11,6 @@ import {
   fetchServiceLifecycleProgress,
   fetchServiceLifecycleTasks,
   patchServiceLifecycle,
-  patchServiceLifecycleMarketingPlan,
   patchServiceLifecycleTask,
 } from '@/lib/api';
 import { hasCap, type StoredStaffUser } from '@/lib/auth';
@@ -41,6 +41,7 @@ type Props = {
   initialStage: string;
   onStageChanged?: (stage: string) => void;
   onFinanceRefresh?: () => void;
+  onOpenTmmtTab?: () => void;
 };
 
 export function ServiceDeliveryWorkflowPanel({
@@ -50,19 +51,24 @@ export function ServiceDeliveryWorkflowPanel({
   initialStage,
   onStageChanged,
   onFinanceRefresh,
+  onOpenTmmtTab,
 }: Props) {
   const canEdit = hasCap(user, 'crm_board', 'edit');
   const [tab, setTab] = useState(initialStage);
   const [tasks, setTasks] = useState<Record<string, TaskRow[]>>({});
   const [progress, setProgress] = useState<Record<string, { total: number; done: number; pct: number }>>({});
   const [advance, setAdvance] = useState<Record<string, unknown>>({});
-  const [tmmt, setTmmt] = useState<{ plan: Record<string, unknown> | null; validation: { ok: boolean; messages: string[] } } | null>(null);
+  const [tmmtValidation, setTmmtValidation] = useState<{ ok: boolean; messages: string[] } | null>(null);
   const [finance, setFinance] = useState<Record<string, unknown> | null>(null);
   const [presales, setPresales] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setTab(initialStage);
+  }, [initialStage]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -80,9 +86,11 @@ export function ServiceDeliveryWorkflowPanel({
       setAdvance(advOut);
       setFinance(finOut);
       setPresales(psOut);
-      if (tab === 'onboard' || tab === 'deliver') {
+      if (tab === 'onboard') {
         const mp = await fetchServiceLifecycleMarketingPlan(token, lifecycleId);
-        setTmmt(mp);
+        setTmmtValidation(mp.validation);
+      } else {
+        setTmmtValidation(null);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Tải workflow thất bại');
@@ -127,26 +135,90 @@ export function ServiceDeliveryWorkflowPanel({
     }
   }
 
-  async function saveTmmtSummary(value: string) {
-    if (!tmmt?.plan || !canEdit) return;
-    setSaving(true);
-    try {
-      const sf = JSON.parse(String(tmmt.plan.strategy_framework_json ?? '{}')) as Record<string, string>;
-      sf.target_market = value;
-      const out = await patchServiceLifecycleMarketingPlan(token, lifecycleId, {
-        strategy_framework_json: JSON.stringify(sf),
-      });
-      setTmmt(out);
-      await reload();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Lưu TMMT thất bại');
-    } finally {
-      setSaving(false);
-    }
-  }
-
   const tabTasks = tasks[tab] ?? [];
   const tabProg = progress[tab] ?? { total: 0, done: 0, pct: 100 };
+  const showTmmtGate =
+    tab === 'onboard' &&
+    tmmtValidation &&
+    String(advance.current_stage ?? '') === 'onboard' &&
+    String(advance.next_stage ?? '') === 'deliver';
+
+  const workflowCard = (
+    <div className="card" style={{ padding: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+        <h3 style={{ margin: 0, fontSize: '1rem' }}>{STAGE_LABELS[tab] ?? tab}</h3>
+        <span className="muted">{tabProg.done}/{tabProg.total} task · {tabProg.pct}%</span>
+      </div>
+
+      {Boolean(advance.block_reason) && tab === String(advance.current_stage ?? '') ? (
+        <p className="error" style={{ marginTop: '0.5rem' }}>
+          {String(advance.block_reason)}
+        </p>
+      ) : null}
+
+      {showTmmtGate && !tmmtValidation.ok ? (
+        <div
+          style={{
+            marginTop: '0.75rem',
+            padding: '0.65rem 0.75rem',
+            borderRadius: 8,
+            border: '1px solid var(--accent)',
+            background: 'rgba(255,255,255,0.02)',
+          }}
+        >
+          <p className="error" style={{ margin: '0 0 0.35rem', fontWeight: 600 }}>Gate TMMT chưa pass</p>
+          <ul className="error" style={{ margin: '0 0 0.5rem', paddingLeft: '1.1rem' }}>
+            {tmmtValidation.messages.slice(0, 3).map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+          {onOpenTmmtTab ? (
+            <button type="button" className="btn btn-sm btn-secondary" onClick={onOpenTmmtTab}>
+              Mở tab TMMT chính thức
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {showTmmtGate && tmmtValidation.ok ? (
+        <p style={{ color: 'var(--accent)', marginTop: '0.75rem' }}>Gate TMMT ✓ — có thể chuyển Deliver</p>
+      ) : null}
+
+      <ul style={{ margin: '0.75rem 0 0', padding: 0, listStyle: 'none', display: 'grid', gap: '0.4rem' }}>
+        {tabTasks.length === 0 ? <li className="muted">Không có task.</li> : null}
+        {tabTasks.map((task) => (
+          <li
+            key={task.id}
+            style={{
+              display: 'flex',
+              gap: '0.5rem',
+              alignItems: 'flex-start',
+              padding: '0.45rem',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={task.is_done}
+              disabled={!canEdit || saving}
+              onChange={() => void toggleTask(task)}
+            />
+            <div>
+              <strong>{task.title}</strong>
+              {task.description ? <p className="muted" style={{ margin: '0.2rem 0 0' }}>{task.description}</p> : null}
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {canEdit && Boolean(advance.can_advance_forward) && tab === String(advance.current_stage ?? '') ? (
+        <button type="button" className="btn btn-sm" style={{ marginTop: '0.75rem' }} disabled={saving} onClick={() => void advanceForward()}>
+          Chuyển → {STAGE_LABELS[String(advance.next_stage)] ?? String(advance.next_stage)}
+        </button>
+      ) : null}
+    </div>
+  );
 
   return (
     <div style={{ display: 'grid', gap: '1rem' }}>
@@ -167,90 +239,14 @@ export function ServiceDeliveryWorkflowPanel({
         ))}
       </div>
 
-      <div className="card" style={{ padding: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem' }}>{STAGE_LABELS[tab] ?? tab}</h3>
-          <span className="muted">{tabProg.done}/{tabProg.total} task · {tabProg.pct}%</span>
+      {tab === 'consult' ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) min(320px, 38%)', gap: '1rem', alignItems: 'start' }}>
+          {workflowCard}
+          <ConsultBriefPanel token={token} user={user} lifecycleId={lifecycleId} onPrefilled={() => void reload()} />
         </div>
-
-        {Boolean(advance.block_reason) && tab === String(advance.current_stage ?? '') ? (
-          <p className="error" style={{ marginTop: '0.5rem' }}>
-            {String(advance.block_reason)}
-          </p>
-        ) : null}
-
-        <ul style={{ margin: '0.75rem 0 0', padding: 0, listStyle: 'none', display: 'grid', gap: '0.4rem' }}>
-          {tabTasks.length === 0 ? <li className="muted">Không có task.</li> : null}
-          {tabTasks.map((task) => (
-            <li
-              key={task.id}
-              style={{
-                display: 'flex',
-                gap: '0.5rem',
-                alignItems: 'flex-start',
-                padding: '0.45rem',
-                border: '1px solid var(--border)',
-                borderRadius: 8,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={task.is_done}
-                disabled={!canEdit || saving}
-                onChange={() => void toggleTask(task)}
-              />
-              <div>
-                <strong>{task.title}</strong>
-                {task.description ? <p className="muted" style={{ margin: '0.2rem 0 0' }}>{task.description}</p> : null}
-              </div>
-            </li>
-          ))}
-        </ul>
-
-        {canEdit && Boolean(advance.can_advance_forward) && tab === String(advance.current_stage ?? '') ? (
-          <button type="button" className="btn btn-sm" style={{ marginTop: '0.75rem' }} disabled={saving} onClick={() => void advanceForward()}>
-            Chuyển → {STAGE_LABELS[String(advance.next_stage)] ?? String(advance.next_stage)}
-          </button>
-        ) : null}
-      </div>
-
-      {(tab === 'onboard' || tab === 'deliver') && tmmt ? (
-        <div className="card" style={{ padding: '1rem' }}>
-          <h3 style={{ margin: '0 0 0.5rem', fontSize: '1rem' }}>TMMT chính thức</h3>
-          {!tmmt.validation.ok ? (
-            <ul className="error" style={{ margin: '0 0 0.5rem', paddingLeft: '1.1rem' }}>
-              {tmmt.validation.messages.map((m) => (
-                <li key={m}>{m}</li>
-              ))}
-            </ul>
-          ) : (
-            <p style={{ color: 'var(--accent)', margin: '0 0 0.5rem' }}>Gate TMMT ✓ — có thể chuyển Deliver</p>
-          )}
-          <label style={{ display: 'grid', gap: '0.35rem' }}>
-            <span className="muted">TMMT tóm tắt (target_market)</span>
-            <textarea
-              rows={2}
-              disabled={!canEdit || saving}
-              defaultValue={(() => {
-                try {
-                  const sf = JSON.parse(String(tmmt.plan?.strategy_framework_json ?? '{}')) as Record<string, string>;
-                  return sf.target_market ?? '';
-                } catch {
-                  return '';
-                }
-              })()}
-              onBlur={(e) => void saveTmmtSummary(e.target.value)}
-              style={{
-                background: 'var(--bg)',
-                border: '1px solid var(--border)',
-                borderRadius: 8,
-                padding: '0.55rem 0.75rem',
-                color: 'var(--text)',
-              }}
-            />
-          </label>
-        </div>
-      ) : null}
+      ) : (
+        workflowCard
+      )}
 
       {finance ? (
         <p className="muted" style={{ margin: 0, fontSize: '0.9rem' }}>

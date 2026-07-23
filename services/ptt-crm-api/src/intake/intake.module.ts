@@ -14,6 +14,6 @@ import { IntakeSqliteRepository } from './intake-sqlite.repository';
     StaffIntakeViewGuard,
     StaffIntakeWriteGuard,
   ],
-  exports: [IntakeService],
+  exports: [IntakeService, IntakeSqliteRepository],
 })
 export class IntakeModule {}

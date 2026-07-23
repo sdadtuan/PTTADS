@@ -1,6 +1,12 @@
-import { validateOfficialTmmt } from './lifecycle-marketing-plan.util';
+import { buildOfficialPlanPayload, validateOfficialTmmt } from './lifecycle-marketing-plan.util';
 
 describe('lifecycle-marketing-plan.util', () => {
+  it('buildOfficialPlanPayload includes filled_count', () => {
+    const payload = buildOfficialPlanPayload(null);
+    expect(payload.filled_count).toBe(0);
+    expect(payload.tmmt_core_keys.length).toBe(4);
+  });
+
   it('rejects missing plan', () => {
     const gate = validateOfficialTmmt(null);
     expect(gate.ok).toBe(false);

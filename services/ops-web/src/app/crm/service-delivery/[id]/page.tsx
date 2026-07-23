@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { LifecycleHubLinksPanel } from '@/components/LifecycleHubLinksPanel';
 import { LifecycleStaffPicker } from '@/components/LifecycleStaffPicker';
+import { LifecycleTmmtPanel } from '@/components/LifecycleTmmtPanel';
 import { OpsNav } from '@/components/OpsNav';
 import { ServiceDeliveryWorkflowPanel } from '@/components/ServiceDeliveryWorkflowPanel';
 import {
@@ -42,6 +43,7 @@ export default function CrmServiceDeliveryDetailPage() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [detailTab, setDetailTab] = useState<'workflow' | 'tmmt'>('workflow');
 
   const ensureAuth = useCallback(async (): Promise<string | null> => {
     let access = getAccessToken();
@@ -248,14 +250,42 @@ export default function CrmServiceDeliveryDetailPage() {
             onError={setError}
           />
 
-          <ServiceDeliveryWorkflowPanel
-            token={token}
-            user={user}
-            lifecycleId={lifecycleId}
-            initialStage={stage}
-            onStageChanged={setStage}
-            onFinanceRefresh={() => void reloadDetail(token)}
-          />
+          <div style={{ display: 'flex', gap: '0.35rem', marginBottom: '0.75rem' }}>
+            <button
+              type="button"
+              className={detailTab === 'workflow' ? 'btn btn-sm' : 'btn btn-sm btn-ghost'}
+              onClick={() => setDetailTab('workflow')}
+            >
+              Workflow
+            </button>
+            <button
+              type="button"
+              className={detailTab === 'tmmt' ? 'btn btn-sm' : 'btn btn-sm btn-ghost'}
+              onClick={() => setDetailTab('tmmt')}
+            >
+              TMMT chính thức
+            </button>
+          </div>
+
+          {detailTab === 'workflow' ? (
+            <ServiceDeliveryWorkflowPanel
+              token={token}
+              user={user}
+              lifecycleId={lifecycleId}
+              initialStage={stage}
+              onStageChanged={setStage}
+              onFinanceRefresh={() => void reloadDetail(token)}
+              onOpenTmmtTab={() => setDetailTab('tmmt')}
+            />
+          ) : (
+            <LifecycleTmmtPanel
+              token={token}
+              user={user}
+              lifecycleId={lifecycleId}
+              stage={stage}
+              onSaved={() => void reloadDetail(token)}
+            />
+          )}
 
           {events.length > 0 ? (
             <div className="card" style={{ marginTop: '1rem', padding: '1rem' }}>

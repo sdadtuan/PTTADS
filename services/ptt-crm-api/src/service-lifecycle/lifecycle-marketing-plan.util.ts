@@ -41,6 +41,74 @@ export function parsePlanContent(plan: Record<string, unknown> | null): {
   return { strategy_framework: sf, target_market_prof: prof };
 }
 
+export function mergeStrategyFramework(
+  existingJson: string | null | undefined,
+  patch: Record<string, string>,
+): string {
+  const { strategy_framework: current } = parsePlanContent({
+    strategy_framework_json: existingJson ?? '{}',
+  });
+  const merged = { ...current };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value != null) merged[key] = String(value);
+  }
+  return JSON.stringify(merged);
+}
+
+export function mergeTargetMarketProf(
+  existingJson: string | null | undefined,
+  patch: Record<string, string>,
+): string {
+  const { target_market_prof: current } = parsePlanContent({
+    target_market_prof_json: existingJson ?? '{}',
+  });
+  const merged = { ...current };
+  for (const [key, value] of Object.entries(patch)) {
+    if (value != null) merged[key] = String(value);
+  }
+  return JSON.stringify(merged);
+}
+
+export function buildOfficialPlanPayload(plan: Record<string, unknown> | null): {
+  plan: Record<string, unknown> | null;
+  validation: ReturnType<typeof validateOfficialTmmt>;
+  tmmt_core_keys: readonly string[];
+  tmmt_prof_keys: readonly string[];
+  tmmt_min_filled: number;
+  filled_count: number;
+} {
+  if (!plan) {
+    return {
+      plan: null,
+      validation: validateOfficialTmmt(null),
+      tmmt_core_keys: OFFICIAL_TMMT_CORE_KEYS,
+      tmmt_prof_keys: TARGET_MARKET_PROF_KEYS,
+      tmmt_min_filled: OFFICIAL_TMMT_MIN_FILLED,
+      filled_count: 0,
+    };
+  }
+  const { strategy_framework, target_market_prof } = parsePlanContent(plan);
+  const filledCount = TARGET_MARKET_PROF_KEYS.filter((k) =>
+    String(target_market_prof[k] ?? '').trim(),
+  ).length;
+  return {
+    plan: {
+      id: plan.id,
+      name: plan.name,
+      north_star: plan.north_star,
+      objectives: plan.objectives,
+      strategy_framework,
+      target_market_prof,
+      plan_kind: plan.plan_kind ?? 'official',
+    },
+    validation: validateOfficialTmmt(plan),
+    tmmt_core_keys: OFFICIAL_TMMT_CORE_KEYS,
+    tmmt_prof_keys: TARGET_MARKET_PROF_KEYS,
+    tmmt_min_filled: OFFICIAL_TMMT_MIN_FILLED,
+    filled_count: filledCount,
+  };
+}
+
 export function validateOfficialTmmt(plan: Record<string, unknown> | null): {
   ok: boolean;
   complete: boolean;

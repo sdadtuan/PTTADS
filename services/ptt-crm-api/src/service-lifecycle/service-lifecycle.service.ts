@@ -4,8 +4,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SvcFinanceService } from '../svc-finance/svc-finance.service';
-import { validateOfficialTmmt } from './lifecycle-marketing-plan.util';
+import { validateOfficialTmmt, buildOfficialPlanPayload, mergeStrategyFramework, mergeTargetMarketProf } from './lifecycle-marketing-plan.util';
 import { getStageAdvanceInfo, StageAdvanceError, validateStageAdvance } from './lifecycle-stage.util';
+import { LifecycleConsultService } from './lifecycle-consult.service';
 import { LifecycleTasksRepository } from './lifecycle-tasks.repository';
 import { ServiceLifecycleSqliteRepository } from './service-lifecycle-sqlite.repository';
 import {
@@ -21,6 +22,7 @@ export class ServiceLifecycleService {
     private readonly sqlite: ServiceLifecycleSqliteRepository,
     private readonly tasks: LifecycleTasksRepository,
     private readonly svcFinance: SvcFinanceService,
+    private readonly consult: LifecycleConsultService,
   ) {}
 
   list(serviceSlug?: string, amId?: string, includeDraft?: string) {
@@ -86,7 +88,15 @@ export class ServiceLifecycleService {
         'notes' in body && typeof body.notes === 'string'
           ? body.notes.trim().slice(0, 2000)
           : existing.notes;
-      return this.sqlite.advanceStage(id, toStage, notes);
+      const advanced = this.sqlite.advanceStage(id, toStage, notes);
+      if (toStage === 'consult' && advanced) {
+        try {
+          this.consult.prefillConsultTask(id, { overwrite: false });
+        } catch {
+          /* prefill is best-effort on advance */
+        }
+      }
+      return advanced;
     }
 
     if ('service_slug' in body && body.service_slug != null) {
@@ -173,7 +183,7 @@ export class ServiceLifecycleService {
   marketingPlan(id: number) {
     this.requireLifecycle(id);
     const plan = this.sqlite.getOfficialMarketingPlan(id);
-    return { plan, validation: validateOfficialTmmt(plan) };
+    return buildOfficialPlanPayload(plan);
   }
 
   patchMarketingPlan(id: number, body: Record<string, unknown>) {
@@ -181,11 +191,27 @@ export class ServiceLifecycleService {
     if (!lc.marketing_plan_id) {
       throw new NotFoundException({ error: 'Chưa có Kế hoạch MKT chính thức' });
     }
-    const plan = this.sqlite.updateOfficialMarketingPlan(lc.marketing_plan_id, body);
+    const existing = this.sqlite.getOfficialMarketingPlan(id);
+    const patch: Record<string, unknown> = { ...body };
+    if (body.strategy_framework && typeof body.strategy_framework === 'object') {
+      patch.strategy_framework_json = mergeStrategyFramework(
+        String(existing?.strategy_framework_json ?? '{}'),
+        body.strategy_framework as Record<string, string>,
+      );
+      delete patch.strategy_framework;
+    }
+    if (body.target_market_prof && typeof body.target_market_prof === 'object') {
+      patch.target_market_prof_json = mergeTargetMarketProf(
+        String(existing?.target_market_prof_json ?? '{}'),
+        body.target_market_prof as Record<string, string>,
+      );
+      delete patch.target_market_prof;
+    }
+    const plan = this.sqlite.updateOfficialMarketingPlan(lc.marketing_plan_id, patch);
     if (!plan) {
       throw new NotFoundException({ error: 'Không tìm thấy plan' });
     }
-    return { plan, validation: validateOfficialTmmt(plan) };
+    return buildOfficialPlanPayload(plan);
   }
 
   marketingPlanValidation(id: number) {
@@ -214,6 +240,14 @@ export class ServiceLifecycleService {
       throw new NotFoundException({ error: 'Không tìm thấy lifecycle' });
     }
     return ctx;
+  }
+
+  consultBrief(id: number) {
+    return this.consult.getConsultBrief(id);
+  }
+
+  consultPrefill(id: number, body: Record<string, unknown>) {
+    return this.consult.prefillConsultTask(id, { overwrite: Boolean(body.overwrite) });
   }
 
   private requireLifecycle(id: number) {
