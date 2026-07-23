@@ -28,7 +28,10 @@ def _truthy(name: str, default: str = "0") -> bool:
 
 def _check_b6_modules() -> dict[str, Any]:
     files = [
-        ROOT / "docs/specs/2026-07-23-wave-b6-s2-launch-board-design.md",
+        ROOT / "docs/specs/2026-07-23-wave-b6-s3-creative-e2e-design.md",
+        ROOT / "services/ptt-crm-api/src/crm-creatives/crm-creatives.controller.ts",
+        ROOT / "services/ptt-crm-api/src/launch-qa/launch-qa-creative-bridge.service.ts",
+        ROOT / "services/ops-web/src/app/crm/creatives/page.tsx",
         ROOT / "services/ptt-crm-api/src/launch-qa/launch-qa.controller.ts",
         ROOT / "services/ops-web/src/app/crm/launch-qa/page.tsx",
         ROOT / "services/ptt-crm-api/src/service-lifecycle/lifecycle-launch-gate.util.ts",
@@ -64,7 +67,7 @@ def _run_nest_jest() -> dict[str, Any]:
         "npm",
         "test",
         "--",
-        "--testPathPattern=lifecycle-launch-gate|lifecycle-launch-handover|launch-qa-auto-start|lifecycle-stage",
+        "--testPathPattern=lifecycle-launch|launch-qa-auto-start|launch-qa-creative-bridge|lifecycle-stage",
         "--silent",
     ]
     proc = subprocess.run(cmd, cwd=str(api), capture_output=True, text=True)

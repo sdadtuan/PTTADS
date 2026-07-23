@@ -173,6 +173,87 @@ export class CreativesRepository implements OnModuleDestroy {
     return (result.rows as CreativeDbRow[]).map((row) => this.mapRow(row));
   }
 
+  async listForStaff(input: {
+    status?: string;
+    clientId?: string;
+    externalCampaignId?: string;
+    limit?: number;
+  }): Promise<CreativeRow[]> {
+    const limit = Math.min(200, Math.max(1, input.limit ?? 100));
+    const clauses: string[] = [];
+    const params: unknown[] = [];
+    let idx = 1;
+    if (input.status && input.status !== 'all') {
+      clauses.push(`status = $${idx++}`);
+      params.push(input.status.trim());
+    }
+    if (input.clientId?.trim()) {
+      clauses.push(`client_id = $${idx++}::uuid`);
+      params.push(input.clientId.trim());
+    }
+    if (input.externalCampaignId?.trim()) {
+      clauses.push(`external_campaign_id = $${idx++}`);
+      params.push(input.externalCampaignId.trim());
+    }
+    params.push(limit);
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const result = await this.db.query(
+      `SELECT
+          id::text,
+          client_id::text,
+          title,
+          description,
+          external_campaign_id,
+          external_campaign_name,
+          version,
+          asset_url,
+          asset_type,
+          status,
+          submitted_by,
+          submitted_at,
+          reviewed_by,
+          reviewed_at,
+          review_note,
+          temporal_workflow_id
+        FROM creative_submissions
+        ${where}
+        ORDER BY submitted_at DESC
+        LIMIT $${idx}`,
+      params,
+    );
+    return (result.rows as CreativeDbRow[]).map((row) => this.mapRow(row));
+  }
+
+  async countByStatus(): Promise<Record<string, number>> {
+    const result = await this.db.query(
+      `SELECT status, COUNT(*)::int AS c FROM creative_submissions GROUP BY status`,
+    );
+    const out: Record<string, number> = {
+      all: 0,
+      pending_client: 0,
+      approved: 0,
+      rejected: 0,
+      withdrawn: 0,
+    };
+    for (const row of result.rows) {
+      const status = String(row.status ?? '');
+      const count = Number(row.c ?? 0);
+      out[status] = count;
+      out.all += count;
+    }
+    return out;
+  }
+
+  async maxVersionForCampaign(clientId: string, externalCampaignId: string): Promise<number> {
+    const result = await this.db.query(
+      `SELECT COALESCE(MAX(version), 0)::int AS max_v
+       FROM creative_submissions
+       WHERE client_id = $1::uuid AND external_campaign_id = $2`,
+      [clientId, externalCampaignId],
+    );
+    return Number(result.rows[0]?.max_v ?? 0);
+  }
+
   async listPending(clientId: string): Promise<CreativeRow[]> {
     const result = await this.db.query(
       `SELECT

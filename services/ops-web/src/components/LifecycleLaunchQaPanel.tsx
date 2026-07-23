@@ -52,6 +52,8 @@ type CreativeBriefPayload = {
     submitted_at: string;
   }>;
   has_approved_creative: boolean;
+  pending_creative?: { id: string; title: string; status: string; version: number } | null;
+  latest_rejected?: { id: string; title: string; review_note: string | null; version: number } | null;
   portal_hint?: string | null;
   message?: string | null;
 };
@@ -136,7 +138,7 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
     }
   }
 
-  async function onSubmitCreative(e: React.FormEvent) {
+  async function onSubmitCreative(e: React.FormEvent, resubmit = false) {
     e.preventDefault();
     if (!canEdit) return;
     setSaving(true);
@@ -146,8 +148,9 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
         title: creativeTitle.trim(),
         description: creativeDesc.trim(),
         asset_url: assetUrl.trim() || undefined,
+        resubmit,
       });
-      setMessage('Đã gửi creative — client duyệt trên portal');
+      setMessage(resubmit ? 'Đã gửi creative v mới — chờ client duyệt' : 'Đã gửi creative — chờ client duyệt portal');
       await reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gửi creative thất bại');
@@ -176,7 +179,11 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
             {data.external_campaign_id ? ` · Campaign ${data.external_campaign_id}` : ''}
             {' · '}
             <a href="/crm/launch-qa" className="nav-link">
-              Mở Launch board →
+              Launch board
+            </a>
+            {' · '}
+            <a href="/crm/creatives" className="nav-link">
+              Creative Hub
             </a>
           </p>
         </div>
@@ -290,6 +297,48 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
           </p>
         ) : null}
 
+        {brief?.pending_creative ? (
+          <p
+            style={{
+              margin: 0,
+              padding: '0.5rem 0.65rem',
+              borderRadius: 8,
+              border: '1px solid #c90',
+              fontSize: '0.85rem',
+            }}
+          >
+            Đang chờ client duyệt: <strong>{brief.pending_creative.title}</strong> (v
+            {brief.pending_creative.version})
+          </p>
+        ) : null}
+
+        {brief?.latest_rejected && !brief.pending_creative ? (
+          <div
+            style={{
+              margin: 0,
+              padding: '0.5rem 0.65rem',
+              borderRadius: 8,
+              border: '1px solid var(--danger, #c53030)',
+              fontSize: '0.85rem',
+            }}
+          >
+            <p style={{ margin: '0 0 0.35rem' }}>
+              Client từ chối v{brief.latest_rejected.version}
+              {brief.latest_rejected.review_note ? `: ${brief.latest_rejected.review_note}` : ''}
+            </p>
+            {canEdit ? (
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                disabled={saving}
+                onClick={() => void onSubmitCreative({ preventDefault: () => {} } as React.FormEvent, true)}
+              >
+                Gửi lại creative (v+1)
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
         {brief?.creatives && brief.creatives.length > 0 ? (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
@@ -320,7 +369,7 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
         )}
 
         {canEdit && data.has_context ? (
-          <form onSubmit={(e) => void onSubmitCreative(e)} style={{ display: 'grid', gap: '0.5rem' }}>
+          <form onSubmit={(e) => void onSubmitCreative(e, false)} style={{ display: 'grid', gap: '0.5rem' }}>
             <label style={{ display: 'grid', gap: '0.3rem' }}>
               <span className="muted">Tiêu đề</span>
               <input

@@ -29,6 +29,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/crm/service-delivery': 'Triển khai dịch vụ',
   '/crm/sop': 'Quy trình SOP',
   '/crm/launch-qa': 'Launch QA',
+  '/crm/creatives': 'Creative Hub',
   '/crm/sales': 'Kinh doanh',
   '/crm/kpi': 'KPI',
   '/crm/staff-kpi': 'KPI AM/SP',
@@ -130,6 +131,7 @@ function buildSections(
     marketing.push({ href: '/crm/marketing-plan', label: 'Kế hoạch marketing' });
     marketing.push({ href: '/crm/sop', label: 'Quy trình SOP' });
     marketing.push({ href: '/crm/launch-qa', label: 'Launch QA' });
+    marketing.push({ href: '/crm/creatives', label: 'Creative Hub' });
     marketing.push({ href: '/crm/service-delivery', label: 'Triển khai DV' });
   }
   if (marketing.length) sections.push({ label: 'CRM · Marketing', links: marketing });

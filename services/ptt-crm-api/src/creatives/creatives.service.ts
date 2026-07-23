@@ -12,6 +12,7 @@ import {
   creativeRejectedIdempotencyKey,
 } from '../events/event-idempotency';
 import { PortalJwtPayload } from '../portal/portal-jwt.util';
+import { LaunchQaCreativeBridgeService } from '../launch-qa/launch-qa-creative-bridge.service';
 import { CreativesRepository } from './creatives.repository';
 import {
   CreateCreativeBody,
@@ -27,6 +28,7 @@ export class CreativesService {
     private readonly repo: CreativesRepository,
     private readonly events: DomainEventService,
     private readonly temporal: TemporalCreativeService,
+    private readonly launchQaBridge: LaunchQaCreativeBridgeService,
   ) {}
 
   async listPending(clientId: string): Promise<CreativePendingResponse> {
@@ -152,11 +154,22 @@ export class CreativesService {
       workflowId: updated.temporal_workflow_id,
     });
 
+    let launchQaSync: Awaited<ReturnType<LaunchQaCreativeBridgeService['onCreativeApproved']>> | null =
+      null;
+    if (decision === 'approved') {
+      launchQaSync = await this.launchQaBridge.onCreativeApproved({
+        clientId: user.client_id,
+        externalCampaignId: updated.external_campaign_id,
+        reviewedBy: user.email,
+      });
+    }
+
     return {
       ok: true,
       creative: updated,
       event_id: eventId,
       temporal_signal: temporalSignal,
+      launch_qa_sync: launchQaSync,
     };
   }
 

@@ -31,6 +31,12 @@ export interface CreativeDecisionResponse {
   creative: CreativeRow;
   event_id: string | null;
   temporal_signal: 'sent' | 'stub' | 'skipped';
+  launch_qa_sync?: {
+    synced: boolean;
+    run_id?: string;
+    launch_ready?: boolean;
+    reason?: string;
+  } | null;
 }
 
 export interface CreateCreativeBody {

@@ -1,4 +1,5 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { CreativesRepository } from '../creatives/creatives.repository';
 import { LaunchQaPgRepository } from '../service-lifecycle/launch-qa-pg.repository';
 import { launchQaProgress } from '../service-lifecycle/lifecycle-launch-gate.util';
 import { LaunchQaLifecycleLookupService } from './launch-qa-lifecycle-lookup.service';
@@ -9,6 +10,7 @@ const VALID_STATUS_FILTERS = new Set(['all', 'in_progress', 'passed', 'failed', 
 export class LaunchQaHubService {
   constructor(
     private readonly repo: LaunchQaPgRepository,
+    private readonly creativesRepo: CreativesRepository,
     private readonly lifecycleLookup: LaunchQaLifecycleLookupService,
   ) {}
 
@@ -16,7 +18,16 @@ export class LaunchQaHubService {
     if (!(await this.repo.pgReady())) {
       throw new ServiceUnavailableException({ error: 'launch_qa_pg_unavailable' });
     }
-    return { ok: true, stats: await this.repo.countByStatus() };
+    const qaStats = await this.repo.countByStatus();
+    let pendingCreatives = 0;
+    if (await this.creativesRepo.pgCreativesReady()) {
+      const cStats = await this.creativesRepo.countByStatus();
+      pendingCreatives = cStats.pending_client ?? 0;
+    }
+    return {
+      ok: true,
+      stats: { ...qaStats, pending_creatives: pendingCreatives },
+    };
   }
 
   async listRuns(status?: string, limit = 100) {

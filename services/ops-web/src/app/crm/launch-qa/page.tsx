@@ -138,6 +138,24 @@ export default function CrmLaunchQaPage() {
         Checklist triển khai campaign — PG-first, link lifecycle khi có HĐ + campaign code.
       </p>
 
+      {(stats.pending_creatives ?? 0) > 0 ? (
+        <p
+          style={{
+            margin: '0 0 1rem',
+            padding: '0.55rem 0.75rem',
+            borderRadius: 8,
+            border: '1px solid #c90',
+            background: 'rgba(255, 200, 0, 0.04)',
+            fontSize: '0.9rem',
+          }}
+        >
+          {stats.pending_creatives} creative đang chờ client duyệt —{' '}
+          <Link href="/crm/creatives?status=pending_client" className="nav-link">
+            Mở Creative Hub
+          </Link>
+        </p>
+      ) : null}
+
       {loading ? <p className="muted">Đang tải…</p> : null}
       {error ? <p className="error">{error}</p> : null}
 

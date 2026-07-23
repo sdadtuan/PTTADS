@@ -345,6 +345,7 @@ export class ServiceLifecycleService {
       asset_url: body.asset_url != null ? String(body.asset_url) : undefined,
       asset_type: body.asset_type != null ? String(body.asset_type) : undefined,
       submitted_by: body.submitted_by != null ? String(body.submitted_by) : undefined,
+      resubmit: Boolean(body.resubmit),
     });
   }
 

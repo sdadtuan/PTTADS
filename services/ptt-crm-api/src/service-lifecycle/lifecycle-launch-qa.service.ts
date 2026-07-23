@@ -152,6 +152,8 @@ export class LifecycleLaunchQaService {
     const headline = String(sf.headline ?? sf.key_message ?? '').trim();
     const cta = String(sf.cta ?? sf.call_to_action ?? '').trim();
     const approved = creatives.find((c) => c.status === 'approved');
+    const latestRejected = creatives.find((c) => c.status === 'rejected');
+    const pending = creatives.find((c) => c.status === 'pending_client');
     return {
       lifecycle_id: lifecycleId,
       has_context: ctx.ok,
@@ -167,8 +169,10 @@ export class LifecycleLaunchQaService {
       },
       creatives,
       has_approved_creative: Boolean(approved),
+      pending_creative: pending ?? null,
+      latest_rejected: latestRejected ?? null,
       portal_hint: ctx.clientId
-        ? 'Client duyệt creative trên portal — checklist mục creative_approved cần approved.'
+        ? 'Client duyệt creative trên portal — approve sẽ auto-tick checklist creative_approved.'
         : null,
       message: ctx.ok ? null : ctx.message,
     };
@@ -182,6 +186,7 @@ export class LifecycleLaunchQaService {
       asset_url?: string;
       asset_type?: string;
       submitted_by?: string;
+      resubmit?: boolean;
     },
   ) {
     const ctx = this.resolveLaunchContext(lifecycleId);
@@ -193,12 +198,20 @@ export class LifecycleLaunchQaService {
     if (!title) {
       throw new BadRequestException({ error: 'title required' });
     }
+
+    let version = 1;
+    if (body.resubmit && (await this.creativesRepo.pgCreativesReady())) {
+      version =
+        (await this.creativesRepo.maxVersionForCampaign(ctx.clientId!, ctx.campaignCode!)) + 1;
+    }
+
     return this.creatives.submit({
       client_id: ctx.clientId!,
       title,
       description: body.description?.trim() || brief.suggested_brief.description || undefined,
       external_campaign_id: ctx.campaignCode!,
       external_campaign_name: ctx.campaignName,
+      version,
       asset_url: body.asset_url?.trim(),
       asset_type: body.asset_type?.trim() || 'image',
       submitted_by: body.submitted_by?.trim() || 'am@pttads.vn',

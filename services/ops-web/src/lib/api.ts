@@ -1113,6 +1113,8 @@ export async function fetchServiceLifecycleCreativeBrief(token: string, id: numb
     suggested_brief: { title: string; description: string; from_tmmt: boolean };
     creatives: Array<{ id: string; title: string; status: string; version: number; submitted_at: string }>;
     has_approved_creative: boolean;
+    pending_creative?: { id: string; title: string; status: string; version: number } | null;
+    latest_rejected?: { id: string; title: string; review_note: string | null; version: number } | null;
     portal_hint?: string | null;
     message?: string | null;
   }>(token, `/api/crm/service-lifecycle/${id}/creative-brief`);
@@ -1121,7 +1123,7 @@ export async function fetchServiceLifecycleCreativeBrief(token: string, id: numb
 export async function postServiceLifecycleCreativeSubmit(
   token: string,
   id: number,
-  body: { title?: string; description?: string; asset_url?: string; asset_type?: string },
+  body: { title?: string; description?: string; asset_url?: string; asset_type?: string; resubmit?: boolean },
 ) {
   return crmFetch(token, `/api/crm/service-lifecycle/${id}/creative-submit`, {
     method: 'POST',
@@ -1132,6 +1134,51 @@ export async function postServiceLifecycleCreativeSubmit(
 
 export async function fetchLaunchQaStats(token: string) {
   return crmFetch<{ ok: boolean; stats: Record<string, number> }>(token, '/api/crm/launch-qa/stats');
+}
+
+export async function fetchCrmCreativesStats(token: string) {
+  return crmFetch<{ ok: boolean; stats: Record<string, number> }>(token, '/api/crm/creatives/stats');
+}
+
+export async function fetchCrmCreatives(token: string, status = 'all', limit = 100) {
+  const qs = new URLSearchParams({ status, limit: String(limit) });
+  return crmFetch<{
+    ok: boolean;
+    count: number;
+    rows: Array<{
+      id: string;
+      client_id: string;
+      title: string;
+      status: string;
+      version: number;
+      external_campaign_id: string | null;
+      external_campaign_name: string | null;
+      submitted_at: string;
+      reviewed_at: string | null;
+      review_note: string | null;
+      lifecycle_id: number | null;
+    }>;
+  }>(token, `/api/crm/creatives?${qs.toString()}`);
+}
+
+export async function postCrmCreativeSubmit(
+  token: string,
+  body: {
+    client_id?: string;
+    external_campaign_id?: string;
+    external_campaign_name?: string;
+    title?: string;
+    description?: string;
+    asset_url?: string;
+    asset_type?: string;
+    resubmit?: boolean;
+  },
+) {
+  return crmFetch(token, '/api/crm/creatives/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 export async function fetchLaunchQaRuns(token: string, status = 'all', limit = 100) {
