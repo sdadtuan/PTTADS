@@ -1788,6 +1788,12 @@ export interface FacebookAdsMigrationStatus {
   gate_m1_g06_live?: boolean | null;
   nginx_redirect_live_skipped?: boolean;
   nginx_deploy_config_ok?: boolean;
+  gate_m1_g11?: boolean;
+  retirement_dry_run_ok?: boolean | null;
+  retirement_dry_run_artifact_present?: boolean;
+  retirement_env_pending_changes?: number | null;
+  retirement_env_already_applied?: boolean | null;
+  retirement_next_apply_command?: string;
 }
 
 export interface HubMapRow {

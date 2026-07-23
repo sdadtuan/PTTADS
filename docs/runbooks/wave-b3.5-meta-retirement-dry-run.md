@@ -44,6 +44,35 @@ Verify artifact:
 python3 -m ptt_crm.meta_ads_retirement_preflight verify
 ```
 
+## API migration-status (mở rộng)
+
+`GET /api/v1/facebook-ads/migration-status`:
+
+```json
+{
+  "gate_m1_g09": true,
+  "gate_m1_g06": true,
+  "gate_m1_g11": true,
+  "retirement_dry_run_ok": true,
+  "retirement_env_pending_changes": 9,
+  "retirement_env_already_applied": false,
+  "retirement_next_apply_command": "sudo -E APPLY=1 ./scripts/close_flask_retirement_meta_ads.sh"
+}
+```
+
+## Verify script
+
+```bash
+./scripts/verify_meta_ads_retirement_dry_run.sh        # verify artifact
+./scripts/verify_meta_ads_retirement_dry_run.sh run    # regenerate + verify
+```
+
+Horizon 1 pack:
+
+```bash
+./scripts/horizon1_meta_ads_pack.sh b3.5
+```
+
 ## Gate M1-G11
 
 ```bash

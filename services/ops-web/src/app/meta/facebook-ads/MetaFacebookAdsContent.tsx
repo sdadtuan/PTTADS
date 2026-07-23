@@ -220,6 +220,16 @@ export function MetaFacebookAdsContent() {
             Hub Meta canonical trên ops-web · Flask <code>/crm/facebook-ads</code> đã retire (M1-G09).
             Bookmark cũ trên rs.pttads.vn sẽ redirect về đây
             {migration.gate_m1_g06 ? ' (M1-G06 ✓)' : migration.nginx_redirect_live_skipped ? ' — chưa verify live redirect' : ' — M1-G06 pending'}.
+            {migration.gate_m1_g11
+              ? ' · Dry-run retirement OK (M1-G11 ✓)'
+              : migration.retirement_dry_run_artifact_present === false
+                ? ' · Chưa chạy dry-run B3.5 (./scripts/wave_b3_5_deploy.sh)'
+                : migration.retirement_env_already_applied
+                  ? ' · Env retirement đã apply — sẵn sàng B3.6 verify'
+                  : typeof migration.retirement_env_pending_changes === 'number' &&
+                      migration.retirement_env_pending_changes > 0
+                    ? ` · Dry-run: ${migration.retirement_env_pending_changes} env flag pending (B3.6 APPLY)`
+                    : ' · M1-G11 pending'}
           </p>
         </div>
       ) : null}

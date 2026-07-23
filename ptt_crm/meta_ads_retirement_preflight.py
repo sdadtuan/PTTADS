@@ -264,6 +264,23 @@ def run_dry_run_preflight(*, write_artifact: bool = True) -> dict[str, Any]:
     return report
 
 
+def retirement_dry_run_status() -> dict[str, Any]:
+    """Summary for migration-status API / ops-web (B3.5)."""
+    artifact = verify_dry_run_artifact()
+    env_diff = planned_env_diff()
+    return {
+        "gate_m1_g11": bool(artifact.get("ok")),
+        "dry_run_artifact_ok": artifact.get("ok"),
+        "dry_run_artifact_path": artifact.get("path"),
+        "dry_run_artifact_error": artifact.get("error"),
+        "dry_run_generated_at": artifact.get("generated_at"),
+        "env_pending_changes": env_diff.get("pending_changes"),
+        "env_already_applied": env_diff.get("already_applied"),
+        "env_file": env_diff.get("env_file"),
+        "next_apply_command": "sudo -E APPLY=1 ./scripts/close_flask_retirement_meta_ads.sh",
+    }
+
+
 def verify_dry_run_artifact(path: Path | None = None) -> dict[str, Any]:
     dest = path or (_artifacts_dir() / "horizon1-meta-ads-retirement-dry-run.json")
     if not dest.is_file():

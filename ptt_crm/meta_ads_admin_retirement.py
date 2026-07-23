@@ -10,6 +10,7 @@ from ptt_crm.config import (
     meta_ads_ops_web_hub_url,
 )
 from ptt_crm.meta_ads_nginx_redirect import nginx_redirect_status
+from ptt_crm.meta_ads_retirement_preflight import retirement_dry_run_status
 
 
 def flask_meta_ads_admin_redirect() -> tuple[str, int] | None:
@@ -22,6 +23,7 @@ def flask_meta_ads_admin_redirect() -> tuple[str, int] | None:
 def migration_status(*, include_nginx_live: bool = False) -> dict[str, Any]:
     retired = meta_ads_admin_retired()
     nginx = nginx_redirect_status(include_live=include_nginx_live)
+    dry_run = retirement_dry_run_status()
     return {
         "ok": True,
         "flask_meta_ads_admin_retired": retired,
@@ -36,4 +38,9 @@ def migration_status(*, include_nginx_live: bool = False) -> dict[str, Any]:
         "nginx_redirect_live_skipped": nginx["live_verify_skipped"],
         "nginx_deploy_config_ok": nginx["deploy_nginx"]["ok"],
         "nginx_live_site_configured": nginx["live_nginx_site"].get("configured"),
+        "gate_m1_g11": bool(dry_run["gate_m1_g11"]),
+        "retirement_dry_run_ok": dry_run.get("dry_run_artifact_ok"),
+        "retirement_env_pending_changes": dry_run.get("env_pending_changes"),
+        "retirement_env_already_applied": dry_run.get("env_already_applied"),
+        "retirement_next_apply_command": dry_run.get("next_apply_command"),
     }

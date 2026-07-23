@@ -91,6 +91,13 @@ class DryRunPreflightTests(unittest.TestCase):
         self.assertTrue(check["ok"])
         self.assertTrue(check.get("skipped"))
 
+    def test_retirement_dry_run_status(self) -> None:
+        from ptt_crm.meta_ads_retirement_preflight import retirement_dry_run_status
+
+        out = retirement_dry_run_status()
+        self.assertIn("gate_m1_g11", out)
+        self.assertIn("next_apply_command", out)
+
     def test_horizon1_gate_m1_g11_with_artifact(self) -> None:
         from ptt_crm.horizon1_meta_ads_gates import _check_meta_retirement_dry_run
 

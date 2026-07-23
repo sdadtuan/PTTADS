@@ -53,6 +53,17 @@ export HORIZON1_EXPECT_META_RETIREMENT_DRY_RUN=1
 "$PYTHON" -m ptt_crm.horizon1_meta_ads_gates
 
 echo ""
+echo "-- persist dry-run verified flag (Nest migration-status fallback) --"
+if [[ -f "$ENV_FILE" ]]; then
+  touch "$ENV_FILE"
+  if grep -q '^HORIZON1_META_RETIREMENT_DRY_RUN_VERIFIED=' "$ENV_FILE" 2>/dev/null; then
+    sed -i.bak 's|^HORIZON1_META_RETIREMENT_DRY_RUN_VERIFIED=.*|HORIZON1_META_RETIREMENT_DRY_RUN_VERIFIED=1|' "$ENV_FILE"
+  else
+    echo 'HORIZON1_META_RETIREMENT_DRY_RUN_VERIFIED=1' >>"$ENV_FILE"
+  fi
+fi
+
+echo ""
 echo "Wave B3.5 dry-run OK."
 echo "Next: sudo -E APPLY=1 ./scripts/close_flask_retirement_meta_ads.sh  (B3.6)"
 echo "Smoke: ./scripts/wave_b3_5_smoke.sh"

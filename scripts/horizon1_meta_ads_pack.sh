@@ -9,6 +9,7 @@
 #   ./scripts/horizon1_meta_ads_pack.sh execute-local # M1-A..F staging automation (local/CI)
 #   ./scripts/horizon1_meta_ads_pack.sh metrics     # M1-E pilot metrics
 #   ./scripts/horizon1_meta_ads_pack.sh meta-retire # partial Flask Meta hub retire (dry-run / APPLY=1)
+#   ./scripts/horizon1_meta_ads_pack.sh b3.5         # Wave B3.5 retirement dry-run (M1-G11)
 #
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -99,6 +100,16 @@ case "$MODE" in
   meta-retire)
     chmod +x "$ROOT/scripts/close_flask_retirement_meta_ads.sh"
     sudo -E "$ROOT/scripts/close_flask_retirement_meta_ads.sh"
+    ;;
+  b3.5)
+    chmod +x "$ROOT/scripts/wave_b3_5_deploy.sh" "$ROOT/scripts/wave_b3_5_smoke.sh"
+    export HORIZON1_SKIP_SOAK=1
+    export HORIZON1_SKIP_NEST_SMOKE=1
+    export HORIZON1_SKIP_NGINX_REDIRECT_VERIFY=1
+    export CRM_FACEBOOK_BACKGROUND=1
+    export CRM_FACEBOOK_BACKGROUND_IN_GUNICORN=0
+    "$ROOT/scripts/wave_b3_5_deploy.sh"
+    "$ROOT/scripts/wave_b3_5_smoke.sh"
     ;;
   *)
     echo "Unknown mode: $MODE" >&2

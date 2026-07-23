@@ -307,6 +307,7 @@ export class AgencyService {
     const retired = this.isEnvTruthy('PTT_FLASK_META_ADS_ADMIN_RETIRED');
     const opsWeb = (process.env.PTT_OPS_WEB_URL ?? 'https://ops.pttads.vn').replace(/\/$/, '');
     const nginx = this.metaNginxRedirectStatus(opsWeb);
+    const dryRun = this.metaRetirementDryRunStatus();
     const gateM1G06 = Boolean(nginx.gate_m1_g06);
     return {
       ok: true,
@@ -323,8 +324,66 @@ export class AgencyService {
       gate_m1_g06_live: nginx.gate_m1_g06_live,
       nginx_redirect_live_skipped: nginx.live_verify_skipped,
       nginx_deploy_config_ok: nginx.deploy_config_ok,
+      gate_m1_g11: dryRun.gate_m1_g11,
+      retirement_dry_run_ok: dryRun.dry_run_artifact_ok,
+      retirement_dry_run_artifact_present: dryRun.artifact_present,
+      retirement_env_pending_changes: dryRun.env_pending_changes,
+      retirement_env_already_applied: dryRun.env_already_applied,
+      retirement_next_apply_command: dryRun.next_apply_command,
       horizon1_expect_meta_hub_retired: this.isEnvTruthy('HORIZON1_EXPECT_META_HUB_RETIRED'),
     };
+  }
+
+  private metaRetirementDryRunStatus(): {
+    gate_m1_g11: boolean;
+    dry_run_artifact_ok: boolean | null;
+    artifact_present: boolean;
+    env_pending_changes: number | null;
+    env_already_applied: boolean | null;
+    next_apply_command: string;
+  } {
+    const root = path.resolve(process.cwd(), '../..');
+    const artifactPath = path.join(root, '.local-dev/horizon1-meta-ads-retirement-dry-run.json');
+    const nextApply = 'sudo -E APPLY=1 ./scripts/close_flask_retirement_meta_ads.sh';
+    try {
+      const raw = fs.readFileSync(artifactPath, 'utf8');
+      const data = JSON.parse(raw) as {
+        ok?: boolean;
+        dry_run?: boolean;
+        steps?: { env_diff?: { pending_changes?: number; already_applied?: boolean } };
+      };
+      if (data.dry_run !== true) {
+        return {
+          gate_m1_g11: false,
+          dry_run_artifact_ok: false,
+          artifact_present: true,
+          env_pending_changes: null,
+          env_already_applied: null,
+          next_apply_command: nextApply,
+        };
+      }
+      const envDiff = data.steps?.env_diff;
+      return {
+        gate_m1_g11: Boolean(data.ok),
+        dry_run_artifact_ok: Boolean(data.ok),
+        artifact_present: true,
+        env_pending_changes:
+          typeof envDiff?.pending_changes === 'number' ? envDiff.pending_changes : null,
+        env_already_applied:
+          typeof envDiff?.already_applied === 'boolean' ? envDiff.already_applied : null,
+        next_apply_command: nextApply,
+      };
+    } catch {
+      const verified = this.isEnvTruthy('HORIZON1_META_RETIREMENT_DRY_RUN_VERIFIED', '0');
+      return {
+        gate_m1_g11: verified,
+        dry_run_artifact_ok: verified ? true : null,
+        artifact_present: false,
+        env_pending_changes: null,
+        env_already_applied: null,
+        next_apply_command: nextApply,
+      };
+    }
   }
 
   private metaNginxRedirectStatus(_opsWebBase: string): {

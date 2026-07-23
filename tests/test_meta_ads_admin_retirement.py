@@ -42,6 +42,12 @@ class MetaAdsAdminRetirementTests(unittest.TestCase):
             self.assertTrue(status["gate_m1_g09"])
             self.assertIn("/meta/facebook-ads", status["ops_web_hub_url"])
 
+    def test_migration_status_includes_dry_run_fields(self) -> None:
+        with patch.dict(os.environ, {"PTT_FLASK_META_ADS_ADMIN_RETIRED": "1"}, clear=False):
+            status = migration_status()
+            self.assertIn("gate_m1_g11", status)
+            self.assertIn("retirement_env_pending_changes", status)
+
     def test_horizon1_gate_m1_g09(self) -> None:
         from ptt_crm.horizon1_meta_ads_gates import _check_meta_admin_retired_flag
 

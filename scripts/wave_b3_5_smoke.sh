@@ -12,6 +12,10 @@ if [[ -x "$ROOT/.venv/bin/python" ]]; then
   PYTHON="$ROOT/.venv/bin/python"
 fi
 
+BASE="${BASE:-http://127.0.0.1:3000}"
+EMAIL="${ADMIN_EMAIL:-admin@pttads.vn}"
+PASS="${ADMIN_PASSWORD:-}"
+
 fail=0
 ok() { echo "OK  $*"; }
 bad() { echo "FAIL $*"; fail=1; }
@@ -77,6 +81,43 @@ print('pending env', d['steps']['env_diff']['pending_changes'])
   ok "artifact apply_plan partial_retire"
 else
   bad "missing $art"
+fi
+
+chmod +x "$ROOT/scripts/verify_meta_ads_retirement_dry_run.sh"
+if "$ROOT/scripts/verify_meta_ads_retirement_dry_run.sh" verify >/dev/null; then
+  ok "verify_meta_ads_retirement_dry_run.sh"
+else
+  bad "verify_meta_ads_retirement_dry_run.sh"
+fi
+
+if [[ -n "$PASS" ]]; then
+  TOKEN="$(
+    curl -sf "$BASE/api/v1/staff/auth/login" \
+      -H 'Content-Type: application/json' \
+      -d "{\"email\":\"$EMAIL\",\"password\":\"$PASS\"}" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))"
+  )"
+  if [[ -n "$TOKEN" ]]; then
+    mig_resp="$(mktemp)"
+    mig_code="$(curl -s -o "$mig_resp" -w "%{http_code}" \
+      "$BASE/api/v1/facebook-ads/migration-status" -H "Authorization: Bearer $TOKEN")"
+    if [[ "$mig_code" == "200" ]]; then
+      python3 -c "
+import json
+b = json.load(open('$mig_resp'))
+assert 'gate_m1_g11' in b, b
+print('gate_m1_g11', b.get('gate_m1_g11'), 'pending', b.get('retirement_env_pending_changes'))
+"
+      ok "GET migration-status gate_m1_g11"
+    else
+      bad "GET migration-status HTTP $mig_code"
+    fi
+    rm -f "$mig_resp"
+  else
+    bad "staff login"
+  fi
+else
+  echo "SKIP migration-status API (set ADMIN_PASSWORD)"
 fi
 
 echo ""
