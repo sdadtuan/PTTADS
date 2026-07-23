@@ -3,6 +3,7 @@ import { AppConfigService } from '../config/app-config.service';
 import { SopSqliteRepository } from '../sop/sop-sqlite.repository';
 import { SvcFinanceService } from '../svc-finance/svc-finance.service';
 import { LifecycleConsultService } from './lifecycle-consult.service';
+import { LifecycleLaunchQaService } from './lifecycle-launch-qa.service';
 import {
   buildOfficialPlanPayload,
   mergeStrategyFramework,
@@ -10,6 +11,7 @@ import {
   validateOfficialTmmt,
 } from './lifecycle-marketing-plan.util';
 import { paymentGateFromSummary } from './lifecycle-payment-gate.util';
+import type { LaunchQaGateResult } from './lifecycle-launch-gate.util';
 import { getStageAdvanceInfo, StageAdvanceError, validateStageAdvance } from './lifecycle-stage.util';
 import { LifecycleTasksRepository } from './lifecycle-tasks.repository';
 import { ServiceLifecycleSqliteRepository } from './service-lifecycle-sqlite.repository';
@@ -29,6 +31,7 @@ export class ServiceLifecycleService {
     private readonly consult: LifecycleConsultService,
     private readonly sopSqlite: SopSqliteRepository,
     private readonly config: AppConfigService,
+    private readonly lifecycleLaunchQa: LifecycleLaunchQaService,
   ) {}
 
   list(serviceSlug?: string, amId?: string, includeDraft?: string) {
@@ -66,7 +69,7 @@ export class ServiceLifecycleService {
     return this.sqlite.createDraft(body);
   }
 
-  patch(id: number, body: PatchServiceLifecycleBody) {
+  async patch(id: number, body: PatchServiceLifecycleBody) {
     const existing = this.sqlite.getLifecycleById(id);
     if (!existing) {
       throw new NotFoundException({ error: 'Không tìm thấy lifecycle' });
@@ -103,6 +106,13 @@ export class ServiceLifecycleService {
           /* prefill is best-effort on advance */
         }
       }
+      if (toStage === 'deliver' && advanced) {
+        try {
+          await this.lifecycleLaunchQa.maybeAutoStartOnDeliver(id);
+        } catch {
+          /* auto-start is best-effort on advance */
+        }
+      }
       return advanced;
     }
 
@@ -120,7 +130,7 @@ export class ServiceLifecycleService {
     return updated;
   }
 
-  advanceInfo(id: number) {
+  async advanceInfo(id: number) {
     const lc = this.requireLifecycle(id);
     const prog = this.tasks.getProgress(id)[lc.stage] ?? { done: 0, total: 0 };
     const complete = this.tasks.isStageComplete(id, lc.stage);
@@ -132,6 +142,14 @@ export class ServiceLifecycleService {
       lc.stage === 'handover'
         ? paymentGateFromSummary(this.svcFinance.summary(id) as { outstanding_vnd?: number })
         : undefined;
+    let launchQaGate: LaunchQaGateResult | undefined;
+    if (lc.stage === 'deliver') {
+      try {
+        launchQaGate = await this.lifecycleLaunchQa.launchQaGateForLifecycle(id);
+      } catch {
+        launchQaGate = undefined;
+      }
+    }
     return getStageAdvanceInfo({
       currentStage: lc.stage,
       currentStageComplete: complete,
@@ -139,6 +157,7 @@ export class ServiceLifecycleService {
       currentTotal: prog.total,
       tmmtGate,
       paymentGate,
+      launchQaGate,
     });
   }
 
@@ -295,6 +314,37 @@ export class ServiceLifecycleService {
 
   consultPrefill(id: number, body: Record<string, unknown>) {
     return this.consult.prefillConsultTask(id, { overwrite: Boolean(body.overwrite) });
+  }
+
+  launchQa(id: number) {
+    return this.lifecycleLaunchQa.launchQa(id);
+  }
+
+  startLaunchQa(id: number, startedBy?: string) {
+    return this.lifecycleLaunchQa.startLaunchQa(id, startedBy);
+  }
+
+  patchLaunchQaChecklist(
+    id: number,
+    itemKey: string,
+    body: { completed?: boolean; note?: string },
+    completedBy?: string,
+  ) {
+    return this.lifecycleLaunchQa.patchChecklistItem(id, itemKey, body, completedBy);
+  }
+
+  creativeBrief(id: number) {
+    return this.lifecycleLaunchQa.creativeBrief(id);
+  }
+
+  submitCreative(id: number, body: Record<string, unknown>) {
+    return this.lifecycleLaunchQa.submitCreative(id, {
+      title: body.title != null ? String(body.title) : undefined,
+      description: body.description != null ? String(body.description) : undefined,
+      asset_url: body.asset_url != null ? String(body.asset_url) : undefined,
+      asset_type: body.asset_type != null ? String(body.asset_type) : undefined,
+      submitted_by: body.submitted_by != null ? String(body.submitted_by) : undefined,
+    });
   }
 
   private requireLifecycle(id: number) {

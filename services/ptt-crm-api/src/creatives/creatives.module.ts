@@ -10,5 +10,6 @@ import { TemporalCreativeService } from './temporal-creative.service';
   imports: [PortalModule, EventsModule],
   controllers: [CreativesController],
   providers: [CreativesRepository, CreativesService, TemporalCreativeService],
+  exports: [CreativesRepository, CreativesService],
 })
 export class CreativesModule {}

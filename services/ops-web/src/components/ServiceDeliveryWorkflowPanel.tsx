@@ -30,6 +30,14 @@ type PaymentGate = {
   messages?: string[];
 };
 
+type LaunchQaGate = {
+  ok?: boolean;
+  warn_only?: boolean;
+  launch_ready?: boolean;
+  progress_percent?: number;
+  messages?: string[];
+};
+
 type TaskRow = {
   id: number;
   title: string;
@@ -47,6 +55,7 @@ type Props = {
   onFinanceRefresh?: () => void;
   onOpenTmmtTab?: () => void;
   onOpenFinanceTab?: () => void;
+  onOpenLaunchQaTab?: () => void;
 };
 
 export function ServiceDeliveryWorkflowPanel({
@@ -58,6 +67,7 @@ export function ServiceDeliveryWorkflowPanel({
   onFinanceRefresh,
   onOpenTmmtTab,
   onOpenFinanceTab,
+  onOpenLaunchQaTab,
 }: Props) {
   const canEdit = hasCap(user, 'crm_board', 'edit');
   const [tab, setTab] = useState(initialStage);
@@ -118,11 +128,19 @@ export function ServiceDeliveryWorkflowPanel({
   }
 
   const paymentGate = advance.payment_gate as PaymentGate | undefined;
+  const launchQaGate = advance.launch_qa_gate as LaunchQaGate | undefined;
   const showPaymentGate =
     tab === 'handover' &&
     String(advance.current_stage ?? '') === 'handover' &&
     String(advance.next_stage ?? '') === 'retain' &&
     Boolean(paymentGate?.requires_confirm);
+
+  const showLaunchQaGate =
+    tab === 'deliver' &&
+    String(advance.current_stage ?? '') === 'deliver' &&
+    String(advance.next_stage ?? '') === 'handover' &&
+    launchQaGate &&
+    !launchQaGate.ok;
 
   async function advanceForward() {
     const nxt = String(advance.next_stage ?? '');
@@ -202,6 +220,34 @@ export function ServiceDeliveryWorkflowPanel({
 
       {showTmmtGate && tmmtValidation.ok ? (
         <p style={{ color: 'var(--accent)', marginTop: '0.75rem' }}>Gate TMMT ✓ — có thể chuyển Deliver</p>
+      ) : null}
+
+      {showLaunchQaGate ? (
+        <div
+          style={{
+            marginTop: '0.75rem',
+            padding: '0.65rem 0.75rem',
+            borderRadius: 8,
+            border: '1px solid #c90',
+            background: 'rgba(255, 200, 0, 0.04)',
+          }}
+        >
+          <p style={{ margin: '0 0 0.35rem', fontWeight: 600, color: '#c90' }}>
+            Gate Launch QA — chưa launch_ready
+          </p>
+          <p style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>
+            {(launchQaGate?.messages ?? [])[0] ??
+              `Checklist ${launchQaGate?.progress_percent ?? 0}% — hoàn thiện trước bàn giao`}
+          </p>
+          {onOpenLaunchQaTab ? (
+            <button type="button" className="btn btn-sm btn-secondary" onClick={onOpenLaunchQaTab}>
+              Mở tab Launch QA
+            </button>
+          ) : null}
+          <p className="muted" style={{ margin: '0.5rem 0 0', fontSize: '0.8rem' }}>
+            Cảnh báo only — vẫn có thể chuyển Handover nếu task giai đoạn đã xong.
+          </p>
+        </div>
       ) : null}
 
       {showPaymentGate ? (

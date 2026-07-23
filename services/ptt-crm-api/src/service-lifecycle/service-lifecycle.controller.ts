@@ -95,6 +95,16 @@ export class ServiceLifecycleController {
     return this.serviceLifecycle.sop(id);
   }
 
+  @Get(':id/launch-qa')
+  launchQa(@Param('id', ParseIntPipe) id: number) {
+    return this.serviceLifecycle.launchQa(id);
+  }
+
+  @Get(':id/creative-brief')
+  creativeBrief(@Param('id', ParseIntPipe) id: number) {
+    return this.serviceLifecycle.creativeBrief(id);
+  }
+
   @Get(':id')
   detail(@Param('id', ParseIntPipe) id: number) {
     return this.serviceLifecycle.detail(id);
@@ -111,6 +121,19 @@ export class ServiceLifecycleController {
   @UseGuards(StaffServiceLifecycleWriteGuard)
   consultPrefill(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>) {
     return this.serviceLifecycle.consultPrefill(id, body);
+  }
+
+  @Post(':id/launch-qa/start')
+  @UseGuards(StaffServiceLifecycleWriteGuard)
+  startLaunchQa(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+    const staff = (req as Request & { staffUser?: { email?: string } }).staffUser;
+    return this.serviceLifecycle.startLaunchQa(id, staff?.email);
+  }
+
+  @Post(':id/creative-submit')
+  @UseGuards(StaffServiceLifecycleWriteGuard)
+  submitCreative(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>) {
+    return this.serviceLifecycle.submitCreative(id, body);
   }
 
   @Post(':id/tasks')
@@ -150,6 +173,26 @@ export class ServiceLifecycleController {
   @UseGuards(StaffServiceLifecycleWriteGuard)
   patchMarketingPlan(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>) {
     return this.serviceLifecycle.patchMarketingPlan(id, body);
+  }
+
+  @Patch(':id/launch-qa/checklist/:itemKey')
+  @UseGuards(StaffServiceLifecycleWriteGuard)
+  patchLaunchQaChecklist(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('itemKey') itemKey: string,
+    @Body() body: Record<string, unknown>,
+    @Req() req: Request,
+  ) {
+    const staff = (req as Request & { staffUser?: { email?: string } }).staffUser;
+    return this.serviceLifecycle.patchLaunchQaChecklist(
+      id,
+      itemKey,
+      {
+        completed: body.completed != null ? Boolean(body.completed) : undefined,
+        note: body.note != null ? String(body.note) : undefined,
+      },
+      staff?.email,
+    );
   }
 
   @Patch(':id')

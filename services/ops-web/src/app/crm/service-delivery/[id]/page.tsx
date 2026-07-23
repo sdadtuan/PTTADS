@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { LifecycleLaunchQaPanel } from '@/components/LifecycleLaunchQaPanel';
 import { LifecycleFinancePanel } from '@/components/LifecycleFinancePanel';
 import { LifecycleHubLinksPanel } from '@/components/LifecycleHubLinksPanel';
 import { LifecycleSopPanel } from '@/components/LifecycleSopPanel';
@@ -46,7 +47,7 @@ export default function CrmServiceDeliveryDetailPage() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [detailTab, setDetailTab] = useState<'workflow' | 'tmmt' | 'finance' | 'sop'>('workflow');
+  const [detailTab, setDetailTab] = useState<'workflow' | 'tmmt' | 'finance' | 'sop' | 'launch_qa'>('workflow');
 
   const ensureAuth = useCallback(async (): Promise<string | null> => {
     let access = getAccessToken();
@@ -117,7 +118,7 @@ export default function CrmServiceDeliveryDetailPage() {
 
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab === 'workflow' || tab === 'tmmt' || tab === 'finance' || tab === 'sop') {
+    if (tab === 'workflow' || tab === 'tmmt' || tab === 'finance' || tab === 'sop' || tab === 'launch_qa') {
       setDetailTab(tab);
     }
   }, [searchParams]);
@@ -289,6 +290,13 @@ export default function CrmServiceDeliveryDetailPage() {
             >
               SOP Launch
             </button>
+            <button
+              type="button"
+              className={detailTab === 'launch_qa' ? 'btn btn-sm' : 'btn btn-sm btn-ghost'}
+              onClick={() => setDetailTab('launch_qa')}
+            >
+              Launch QA
+            </button>
           </div>
 
           {detailTab === 'workflow' ? (
@@ -301,6 +309,7 @@ export default function CrmServiceDeliveryDetailPage() {
               onFinanceRefresh={() => void reloadDetail(token)}
               onOpenTmmtTab={() => setDetailTab('tmmt')}
               onOpenFinanceTab={() => setDetailTab('finance')}
+              onOpenLaunchQaTab={() => setDetailTab('launch_qa')}
             />
           ) : detailTab === 'tmmt' ? (
             <LifecycleTmmtPanel
@@ -317,8 +326,10 @@ export default function CrmServiceDeliveryDetailPage() {
               lifecycleId={lifecycleId}
               onSaved={() => void reloadDetail(token)}
             />
-          ) : (
+          ) : detailTab === 'sop' ? (
             <LifecycleSopPanel token={token} lifecycleId={lifecycleId} />
+          ) : (
+            <LifecycleLaunchQaPanel token={token} user={user} lifecycleId={lifecycleId} />
           )}
 
           {events.length > 0 ? (

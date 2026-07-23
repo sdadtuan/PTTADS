@@ -64,6 +64,7 @@ export class AppConfigService {
   readonly crmServiceDeliveryNest: boolean;
   readonly sopAutoStartOnLaunch: boolean;
   readonly sopOverdueEscalate: boolean;
+  readonly launchQaAutoStartOnDeliver: boolean;
 
   constructor() {
     this.port = Number(process.env.PORT ?? process.env.CRM_API_PORT ?? 3000);
@@ -141,6 +142,9 @@ export class AppConfigService {
     );
     this.sopOverdueEscalate = ['1', 'true', 'yes', 'on'].includes(
       (process.env.PTT_SOP_OVERDUE_ESCALATE ?? '0').trim().toLowerCase(),
+    );
+    this.launchQaAutoStartOnDeliver = ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_LAUNCH_QA_AUTO_START_ON_DELIVER ?? '0').trim().toLowerCase(),
     );
   }
 

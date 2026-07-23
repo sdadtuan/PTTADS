@@ -1069,6 +1069,67 @@ export async function fetchServiceLifecycleSop(token: string, id: number) {
   }>(token, `/api/crm/service-lifecycle/${id}/sop`);
 }
 
+export async function fetchServiceLifecycleLaunchQa(token: string, id: number) {
+  return crmFetch<{
+    lifecycle_id: number;
+    auto_start_enabled: boolean;
+    has_context: boolean;
+    client_id?: string;
+    external_campaign_id?: string;
+    campaign_name?: string;
+    run: {
+      id: string;
+      status: string;
+      launch_ready: boolean;
+      checklist: Record<string, { label?: string; completed?: boolean; note?: string }>;
+      started_at: string;
+      completed_at: string | null;
+    } | null;
+    progress: { total: number; completed: number; percent: number };
+    gate: { ok: boolean; launch_ready: boolean; progress_percent: number; messages: string[] };
+    message?: string | null;
+  }>(token, `/api/crm/service-lifecycle/${id}/launch-qa`);
+}
+
+export async function postServiceLifecycleLaunchQaStart(token: string, id: number) {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/launch-qa/start`, { method: 'POST' });
+}
+
+export async function patchServiceLifecycleLaunchQaChecklist(
+  token: string,
+  id: number,
+  itemKey: string,
+  body: { completed?: boolean; note?: string },
+) {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/launch-qa/checklist/${encodeURIComponent(itemKey)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchServiceLifecycleCreativeBrief(token: string, id: number) {
+  return crmFetch<{
+    suggested_brief: { title: string; description: string; from_tmmt: boolean };
+    creatives: Array<{ id: string; title: string; status: string; version: number; submitted_at: string }>;
+    has_approved_creative: boolean;
+    portal_hint?: string | null;
+    message?: string | null;
+  }>(token, `/api/crm/service-lifecycle/${id}/creative-brief`);
+}
+
+export async function postServiceLifecycleCreativeSubmit(
+  token: string,
+  id: number,
+  body: { title?: string; description?: string; asset_url?: string; asset_type?: string },
+) {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/creative-submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 export async function createServiceLifecycleExpense(
   token: string,
   lifecycleId: number,

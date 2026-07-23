@@ -140,6 +140,39 @@ export class CreativesRepository implements OnModuleDestroy {
     return row ? this.mapRow(row) : null;
   }
 
+  async listForCampaign(
+    clientId: string,
+    externalCampaignId: string,
+    limit = 10,
+  ): Promise<CreativeRow[]> {
+    const result = await this.db.query(
+      `SELECT
+          id::text,
+          client_id::text,
+          title,
+          description,
+          external_campaign_id,
+          external_campaign_name,
+          version,
+          asset_url,
+          asset_type,
+          status,
+          submitted_by,
+          submitted_at,
+          reviewed_by,
+          reviewed_at,
+          review_note,
+          temporal_workflow_id
+        FROM creative_submissions
+        WHERE client_id = $1::uuid
+          AND external_campaign_id = $2
+        ORDER BY submitted_at DESC
+        LIMIT $3`,
+      [clientId, externalCampaignId, Math.max(1, limit)],
+    );
+    return (result.rows as CreativeDbRow[]).map((row) => this.mapRow(row));
+  }
+
   async listPending(clientId: string): Promise<CreativeRow[]> {
     const result = await this.db.query(
       `SELECT

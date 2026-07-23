@@ -60,6 +60,14 @@ export function getStageAdvanceInfo(input: {
   currentTotal: number;
   tmmtGate?: { ok: boolean; messages?: string[] };
   paymentGate?: { ok: boolean; requires_confirm?: boolean; messages?: string[]; outstanding_vnd?: number };
+  launchQaGate?: {
+    ok: boolean;
+    warn_only: true;
+    launch_ready: boolean;
+    progress_percent: number;
+    status: string | null;
+    messages: string[];
+  };
 }): {
   current_stage: string;
   next_stage: string | null;
@@ -74,8 +82,17 @@ export function getStageAdvanceInfo(input: {
     outstanding_vnd: number;
     messages: string[];
   };
+  launch_qa_gate?: {
+    ok: boolean;
+    warn_only: true;
+    launch_ready: boolean;
+    progress_percent: number;
+    status: string | null;
+    messages: string[];
+  };
 } {
-  const { currentStage, currentStageComplete, currentDone, currentTotal, tmmtGate, paymentGate } = input;
+  const { currentStage, currentStageComplete, currentDone, currentTotal, tmmtGate, paymentGate, launchQaGate } =
+    input;
   const nxt = nextStage(currentStage);
   let blockReason = '';
   let canForward = false;
@@ -109,6 +126,17 @@ export function getStageAdvanceInfo(input: {
           messages: paymentGate.messages ?? [],
         }
       : undefined;
+  const launchQaGateOut =
+    nxt === 'handover' && currentStage === 'deliver' && launchQaGate
+      ? {
+          ok: launchQaGate.ok,
+          warn_only: true as const,
+          launch_ready: launchQaGate.launch_ready,
+          progress_percent: launchQaGate.progress_percent,
+          status: launchQaGate.status,
+          messages: launchQaGate.messages,
+        }
+      : undefined;
   return {
     current_stage: currentStage,
     next_stage: nxt,
@@ -118,5 +146,6 @@ export function getStageAdvanceInfo(input: {
     current_done: currentDone,
     current_total: currentTotal,
     payment_gate: paymentGateOut,
+    launch_qa_gate: launchQaGateOut,
   };
 }
