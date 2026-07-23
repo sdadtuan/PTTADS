@@ -453,7 +453,9 @@ export class AgencyService {
     return { ok: true, pilot: googleAdsPilotStatus(clientId) };
   }
 
-  googleOAuthStart(agencyClientId: string, accountId?: string) {
+  async googleOAuthStart(agencyClientId: string, accountId?: string) {
+    await this.ensurePg();
+    await this.assertClientWritable(agencyClientId.trim());
     if (!googleOAuthConfigured()) {
       throw new ServiceUnavailableException({
         error: 'missing_google_oauth_env',
@@ -473,6 +475,7 @@ export class AgencyService {
       throw new BadRequestException({ error: 'invalid_oauth_state' });
     }
     await this.ensurePg();
+    await this.assertClientWritable(agencyClientId);
     const tokens = await exchangeGoogleAuthorizationCode(code);
     let targetAccountId = accountId;
     if (!targetAccountId) {

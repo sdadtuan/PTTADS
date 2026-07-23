@@ -32,6 +32,7 @@ export default function AgencyPage() {
   const [stats, setStats] = useState<{ pg_ready: boolean; clients: Record<string, number>; jobs: Record<string, number> } | null>(null);
   const [unread, setUnread] = useState(0);
   const [q, setQ] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -79,7 +80,10 @@ export default function AgencyPage() {
       try {
         const [st, list, notif] = await Promise.all([
           fetchAgencyStats(access),
-          fetchAgencyClients(access, { q: q.trim() || undefined }),
+          fetchAgencyClients(access, {
+            q: q.trim() || undefined,
+            status: statusFilter || undefined,
+          }),
           fetchAgencyNotifications(access).catch(() => ({ notifications: [], unread: 0 })),
         ]);
         setStats(st);
@@ -91,7 +95,7 @@ export default function AgencyPage() {
         setLoading(false);
       }
     })();
-  }, [ensureAuth, q]);
+  }, [ensureAuth, q, statusFilter]);
 
   function logout() {
     clearSession();
@@ -111,6 +115,7 @@ export default function AgencyPage() {
   const deadJobs = stats?.jobs?.dead ?? 0;
   const onboardingCount = stats?.clients?.onboarding ?? 0;
   const activeCount = stats?.clients?.active ?? 0;
+  const archivedCount = stats?.clients?.archived ?? 0;
   const canWrite = canAgencyWrite(user);
 
   return (
@@ -149,6 +154,10 @@ export default function AgencyPage() {
             <strong>{pendingJobs}</strong>
             <span className="muted">Jobs pending</span>
           </div>
+          <div className="agency-stat-card">
+            <strong>{archivedCount}</strong>
+            <span className="muted">Archived</span>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
           {canWrite ? (
@@ -175,7 +184,12 @@ export default function AgencyPage() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (token) void fetchAgencyClients(token, { q: q.trim() || undefined }).then((r) => setClients(r.clients));
+            if (token) {
+              void fetchAgencyClients(token, {
+                q: q.trim() || undefined,
+                status: statusFilter || undefined,
+              }).then((r) => setClients(r.clients));
+            }
           }}
           style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}
         >
@@ -193,6 +207,24 @@ export default function AgencyPage() {
               color: 'var(--text)',
             }}
           />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            style={{
+              background: 'var(--bg)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              padding: '0.55rem 0.75rem',
+              color: 'var(--text)',
+            }}
+          >
+            <option value="">Tất cả trạng thái</option>
+            <option value="active">active</option>
+            <option value="onboarding">onboarding</option>
+            <option value="prospect">prospect</option>
+            <option value="paused">paused</option>
+            <option value="archived">archived</option>
+          </select>
           <button type="submit" className="btn btn-sm" disabled={loading}>
             Lọc
           </button>
@@ -221,8 +253,19 @@ export default function AgencyPage() {
                   </td>
                   <td>{c.name}</td>
                   <td>
-                    <span className={`agency-status-badge badge-${c.status === 'active' ? 'active' : c.status === 'onboarding' ? 'onboarding' : 'prospect'}`}>
+                    <span
+                      className={`agency-status-badge badge-${
+                        c.status === 'active'
+                          ? 'active'
+                          : c.status === 'onboarding'
+                            ? 'onboarding'
+                            : c.status === 'archived' || c.tenant_locked
+                              ? 'paused'
+                              : 'prospect'
+                      }`}
+                    >
                       {c.status}
+                      {c.tenant_locked ? ' · locked' : ''}
                     </span>
                   </td>
                   <td>{c.channels || '—'}</td>

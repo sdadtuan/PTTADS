@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { AgencySideEffectsService } from './agency-side-effects.service';
 import { ClientOffboardRepository } from './client-offboard.repository';
+import { ClientOffboardFollowUpService } from './client-offboard-follow-up.service';
 import {
   OFFBOARD_REASONS,
   OffboardAuditListResponse,
@@ -19,6 +20,7 @@ export class ClientOffboardService {
   constructor(
     private readonly repo: ClientOffboardRepository,
     private readonly sideEffects: AgencySideEffectsService,
+    private readonly followUp: ClientOffboardFollowUpService,
   ) {}
 
   async offboardClient(
@@ -59,6 +61,7 @@ export class ClientOffboardService {
     }
 
     let eventId: string | null = null;
+    let followUp: { jobs_cancelled: number; workflow_cancelled: boolean } | undefined;
     if (!outcome.idempotent) {
       eventId = await this.sideEffects.onClientOffboarded(clientId, {
         client_id: clientId,
@@ -70,6 +73,7 @@ export class ClientOffboardService {
         initiated_by: initiatedBy,
         archive_data: body.archive_data !== false,
       });
+      followUp = await this.followUp.run(clientId);
     }
 
     return {
@@ -82,6 +86,7 @@ export class ClientOffboardService {
       event_id: eventId,
       audit_id: outcome.audit.id,
       idempotent: outcome.idempotent,
+      follow_up: followUp,
     };
   }
 

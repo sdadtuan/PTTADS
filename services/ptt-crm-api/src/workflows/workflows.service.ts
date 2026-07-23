@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 import { AppConfigService } from '../config/app-config.service';
 import { TemporalClientService } from '../temporal/temporal-client.service';
@@ -41,6 +41,7 @@ export class WorkflowsService implements OnModuleDestroy {
     if (!clientId) {
       throw new BadRequestException({ error: 'client_id required' });
     }
+    await this.assertClientNotArchived(clientId);
     if (!(await this.clientExists(clientId))) {
       throw new NotFoundException({ error: 'client_not_found' });
     }
@@ -60,6 +61,7 @@ export class WorkflowsService implements OnModuleDestroy {
   }
 
   async nudgeOnboarding(clientId: string) {
+    await this.assertClientNotArchived(clientId.trim());
     const wfId = this.temporal.onboardingWorkflowId(clientId.trim());
     const signal = await this.temporal.signalWorkflow(wfId, 'checklist_updated', {});
     return { ok: true, workflow_id: wfId, temporal_signal: signal };
@@ -151,5 +153,23 @@ export class WorkflowsService implements OnModuleDestroy {
       clientId,
     ]);
     return (result.rowCount ?? 0) > 0;
+  }
+
+  private async assertClientNotArchived(clientId: string): Promise<void> {
+    try {
+      const result = await this.db.query(
+        `SELECT tenant_locked FROM clients WHERE id = $1::uuid LIMIT 1`,
+        [clientId],
+      );
+      const row = result.rows[0] as { tenant_locked?: boolean } | undefined;
+      if (row && Boolean(row.tenant_locked)) {
+        throw new ForbiddenException({ error: 'tenant_archived', client_id: clientId });
+      }
+    } catch (err) {
+      if (err instanceof ForbiddenException) {
+        throw err;
+      }
+      // tenant_locked column may be absent before B7.1 DDL — ignore lookup errors
+    }
   }
 }

@@ -95,6 +95,7 @@ export class AgencyRepository implements OnModuleDestroy {
     const result = await this.db.query(
       `SELECT c.id::text, c.code, c.name, c.industry_slug, c.status, c.owner_am_id,
               c.notes, c.created_at, c.updated_at,
+              COALESCE(c.tenant_locked, FALSE) AS tenant_locked,
               COALESCE(ch.channels, '') AS channels
        FROM clients c
        LEFT JOIN LATERAL (
@@ -119,6 +120,7 @@ export class AgencyRepository implements OnModuleDestroy {
       created_at: iso(row.created_at),
       updated_at: iso(row.updated_at),
       channels: row.channels ?? '',
+      tenant_locked: Boolean(row.tenant_locked),
     }));
   }
 

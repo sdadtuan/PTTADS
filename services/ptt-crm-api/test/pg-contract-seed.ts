@@ -6,7 +6,7 @@ const DATABASE_URL =
   process.env.PTT_DATABASE_URL ??
   'postgresql://ptt:ptt_dev@127.0.0.1:5432/ptt_agency';
 
-const E2E_CLIENT_ID = '550e8400-e29b-41d4-a716-446655440000';
+export const E2E_CLIENT_ID = '550e8400-e29b-41d4-a716-446655440000';
 
 export async function ensureE2eTestClient(): Promise<void> {
   const pool = new Pool({ connectionString: DATABASE_URL });
@@ -212,6 +212,43 @@ export async function pgReplicaReady(): Promise<boolean> {
     return Number(result.rows[0]?.c ?? 0) > 0;
   } catch {
     return false;
+  } finally {
+    await pool.end();
+  }
+}
+
+export async function pgClientOffboardReady(): Promise<boolean> {
+  const pool = new Pool({ connectionString: DATABASE_URL });
+  try {
+    const result = await pool.query(
+      `SELECT COUNT(*)::int AS c FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = 'client_offboard_audit'`,
+    );
+    if (Number(result.rows[0]?.c ?? 0) === 0) {
+      return false;
+    }
+    const col = await pool.query(
+      `SELECT COUNT(*)::int AS c FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'clients' AND column_name = 'tenant_locked'`,
+    );
+    return Number(col.rows[0]?.c ?? 0) > 0;
+  } catch {
+    return false;
+  } finally {
+    await pool.end();
+  }
+}
+
+export async function resetE2eClientActive(): Promise<void> {
+  const pool = new Pool({ connectionString: DATABASE_URL });
+  try {
+    await pool.query(
+      `UPDATE clients
+       SET status = 'active', tenant_locked = FALSE, updated_at = NOW()
+       WHERE id = $1::uuid`,
+      [E2E_CLIENT_ID],
+    );
+    await pool.query(`DELETE FROM client_offboard_audit WHERE client_id = $1::uuid`, [E2E_CLIENT_ID]);
   } finally {
     await pool.end();
   }

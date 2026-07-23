@@ -94,6 +94,24 @@ export class TemporalClientService implements OnModuleDestroy {
     }
   }
 
+  async cancelWorkflow(workflowId: string, reason = 'client_offboarded'): Promise<boolean> {
+    if (!this.isEnabled()) {
+      return false;
+    }
+    try {
+      const temporal = await this.getClient();
+      const handle: WorkflowHandle = temporal.workflow.getHandle(workflowId);
+      await handle.cancel();
+      this.logger.log(`Temporal cancel wf=${workflowId} reason=${reason}`);
+      return true;
+    } catch (err) {
+      this.logger.debug(
+        `Temporal cancel skipped wf=${workflowId}: ${err instanceof Error ? err.message : err}`,
+      );
+      return false;
+    }
+  }
+
   async describeWorkflow(workflowId: string): Promise<{
     workflow_id: string;
     status: string;

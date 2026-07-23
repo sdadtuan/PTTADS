@@ -10,6 +10,7 @@ import { AgencySideEffectsService } from './agency-side-effects.service';
 import { AgencyRepository } from './agency.repository';
 import { AgencyService } from './agency.service';
 import { ClientOffboardRepository } from './client-offboard.repository';
+import { ClientOffboardFollowUpService } from './client-offboard-follow-up.service';
 import { ClientOffboardService } from './client-offboard.service';
 import { ClientsController } from './clients.controller';
 import {
@@ -27,6 +28,7 @@ import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
     AgencyRepository,
     AgencySideEffectsService,
     ClientOffboardRepository,
+    ClientOffboardFollowUpService,
     ClientOffboardService,
     StaffAgencyViewGuard,
     StaffFacebookAdsViewGuard,

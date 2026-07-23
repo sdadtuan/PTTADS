@@ -35,6 +35,10 @@ export interface OffboardClientResponse {
   event_id: string | null;
   audit_id: string;
   idempotent?: boolean;
+  follow_up?: {
+    jobs_cancelled: number;
+    workflow_cancelled: boolean;
+  };
 }
 
 export interface OffboardAuditListResponse {

@@ -13,7 +13,10 @@ describe('ClientOffboardService', () => {
   const sideEffects = {
     onClientOffboarded: jest.fn(),
   };
-  const service = new ClientOffboardService(repo as never, sideEffects as never);
+  const followUp = {
+    run: jest.fn().mockResolvedValue({ jobs_cancelled: 0, workflow_cancelled: false }),
+  };
+  const service = new ClientOffboardService(repo as never, sideEffects as never, followUp as never);
 
   beforeEach(() => {
     jest.resetAllMocks();
@@ -61,6 +64,7 @@ describe('ClientOffboardService', () => {
     const out = await service.offboardClient('client-1', { reason: 'other', note: 'test' }, 'am@pttads.vn');
     expect(out.event_id).toBe('evt-1');
     expect(sideEffects.onClientOffboarded).toHaveBeenCalled();
+    expect(followUp.run).toHaveBeenCalledWith('client-1');
   });
 
   it('offboard fails when DDL not ready', async () => {

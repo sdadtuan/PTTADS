@@ -177,4 +177,25 @@ export class JobQueueRepository implements OnModuleDestroy {
       clientId: this.normalizeClientUuid(input.clientId),
     });
   }
+
+  async cancelPendingJobsForClient(clientId: string): Promise<number> {
+    if (!this.config.jobsEnabled) {
+      return 0;
+    }
+    const normalized = this.normalizeClientUuid(clientId);
+    if (!normalized) {
+      return 0;
+    }
+    const result = await this.db.query(
+      `UPDATE job_queue
+       SET status = 'dead',
+           last_error = 'cancelled:client_offboarded',
+           finished_at = NOW(),
+           updated_at = NOW()
+       WHERE client_id = $1::uuid
+         AND status = 'pending'`,
+      [normalized],
+    );
+    return result.rowCount ?? 0;
+  }
 }

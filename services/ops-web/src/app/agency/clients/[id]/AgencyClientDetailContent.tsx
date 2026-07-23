@@ -269,8 +269,11 @@ export function AgencyClientDetailContent() {
       setShowOffboardConfirm(false);
       setOffboardNote('');
       const idem = out.idempotent ? ' (idempotent)' : '';
+      const follow = out.follow_up
+        ? ` · ${out.follow_up.jobs_cancelled} job cancelled · workflow ${out.follow_up.workflow_cancelled ? 'cancelled' : 'skip'}`
+        : '';
       setActionMsg(
-        `Client đã offboard · ${out.tokens_revoked} token thu hồi · ${out.portal_users_deactivated} portal user vô hiệu${idem}`,
+        `Client đã offboard · ${out.tokens_revoked} token thu hồi · ${out.portal_users_deactivated} portal user vô hiệu${follow}${idem}`,
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Offboard thất bại');
