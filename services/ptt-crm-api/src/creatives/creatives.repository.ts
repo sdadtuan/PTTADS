@@ -224,6 +224,48 @@ export class CreativesRepository implements OnModuleDestroy {
     return (result.rows as CreativeDbRow[]).map((row) => this.mapRow(row));
   }
 
+  async listHistoryForClient(clientId: string, days = 30, limit = 100): Promise<CreativeRow[]> {
+    const safeDays = Math.min(90, Math.max(1, days));
+    const safeLimit = Math.min(200, Math.max(1, limit));
+    const result = await this.db.query(
+      `SELECT
+          id::text,
+          client_id::text,
+          title,
+          description,
+          external_campaign_id,
+          external_campaign_name,
+          version,
+          asset_url,
+          asset_type,
+          status,
+          submitted_by,
+          submitted_at,
+          reviewed_by,
+          reviewed_at,
+          review_note,
+          temporal_workflow_id
+        FROM creative_submissions
+        WHERE client_id = $1::uuid
+          AND status IN ('approved', 'rejected')
+          AND COALESCE(reviewed_at, submitted_at) >= NOW() - ($2::int || ' days')::interval
+        ORDER BY COALESCE(reviewed_at, submitted_at) DESC
+        LIMIT $3`,
+      [clientId, safeDays, safeLimit],
+    );
+    return (result.rows as CreativeDbRow[]).map((row) => this.mapRow(row));
+  }
+
+  async countPending(clientId: string): Promise<number> {
+    const result = await this.db.query(
+      `SELECT COUNT(*)::int AS c
+       FROM creative_submissions
+       WHERE client_id = $1::uuid AND status = 'pending_client'`,
+      [clientId],
+    );
+    return Number(result.rows[0]?.c ?? 0);
+  }
+
   async countByStatus(): Promise<Record<string, number>> {
     const result = await this.db.query(
       `SELECT status, COUNT(*)::int AS c FROM creative_submissions GROUP BY status`,

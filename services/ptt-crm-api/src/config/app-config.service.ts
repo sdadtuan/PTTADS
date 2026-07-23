@@ -33,6 +33,9 @@ export class AppConfigService {
   readonly leadsCreateIdMode: LeadsCreateIdMode;
   readonly portalJwtSecret: string;
   readonly portalJwtTtlSec: number;
+  readonly portalRefreshTtlSec: number;
+  readonly portalEmailNotifyEnabled: boolean;
+  readonly portalEmailWebhookUrl: string | null;
   readonly portalStubUsers: PortalStubUser[];
   readonly portalCorsOrigins: string[];
   readonly opsCorsOrigins: string[];
@@ -92,6 +95,14 @@ export class AppConfigService {
       300,
       Number(process.env.PTT_PORTAL_JWT_TTL_SEC ?? 28800) || 28800,
     );
+    this.portalRefreshTtlSec = Math.max(
+      3600,
+      Number(process.env.PTT_PORTAL_REFRESH_TTL_SEC ?? 2592000) || 2592000,
+    );
+    this.portalEmailNotifyEnabled = ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_PORTAL_EMAIL_NOTIFY ?? '0').trim().toLowerCase(),
+    );
+    this.portalEmailWebhookUrl = (process.env.PTT_PORTAL_EMAIL_WEBHOOK_URL ?? '').trim() || null;
     this.portalStubUsers = this.parsePortalStubUsers();
     this.portalCorsOrigins = this.parsePortalCorsOrigins();
     this.opsCorsOrigins = this.parseOpsCorsOrigins();

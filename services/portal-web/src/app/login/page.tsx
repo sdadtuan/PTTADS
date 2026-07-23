@@ -18,7 +18,10 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const out = await portalLogin(email.trim(), password);
-      saveSession(out.access_token, out.user);
+      saveSession(out.access_token, out.user, {
+        refreshToken: out.refresh_token,
+        expiresInSec: out.expires_in,
+      });
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Đăng nhập thất bại');

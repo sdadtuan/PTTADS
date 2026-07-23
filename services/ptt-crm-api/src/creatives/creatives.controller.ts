@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { InternalKeyGuard } from '../auth/internal-key.guard';
 import { PortalJwtGuard, PortalUser } from '../portal/portal-jwt.guard';
 import { PortalJwtPayload } from '../portal/portal-jwt.util';
@@ -7,6 +7,7 @@ import {
   CreateCreativeBody,
   CreateCreativeResponse,
   CreativeDecisionResponse,
+  CreativeHistoryResponse,
   CreativePendingResponse,
   RejectCreativeBody,
 } from './creatives.types';
@@ -25,6 +26,21 @@ export class CreativesController {
   @UseGuards(PortalJwtGuard)
   async listPending(@PortalUser() user: PortalJwtPayload): Promise<CreativePendingResponse> {
     return this.creatives.listPending(user.client_id);
+  }
+
+  @Get('history')
+  @UseGuards(PortalJwtGuard)
+  async listHistory(
+    @PortalUser() user: PortalJwtPayload,
+    @Query('days') days?: string,
+  ): Promise<CreativeHistoryResponse> {
+    return this.creatives.listHistory(user.client_id, Number(days) || 30);
+  }
+
+  @Get('pending/count')
+  @UseGuards(PortalJwtGuard)
+  async pendingCount(@PortalUser() user: PortalJwtPayload): Promise<{ ok: boolean; count: number }> {
+    return this.creatives.pendingCount(user.client_id);
   }
 
   @Post(':id/approve')

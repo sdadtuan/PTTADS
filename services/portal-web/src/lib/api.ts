@@ -95,9 +95,32 @@ export interface CreativeDecisionResponse {
 
 export interface LoginResponse {
   access_token: string;
+  refresh_token?: string;
   token_type: string;
   expires_in: number;
+  refresh_expires_in?: number;
   user: PortalUser;
+}
+
+export interface PortalSettingsResponse {
+  ok: boolean;
+  client_id: string;
+  client_name: string | null;
+  display_name: string | null;
+  logo_url: string | null;
+  am_contact_name: string | null;
+  am_contact_email: string | null;
+  accent_color: string | null;
+  updated_at: string | null;
+  table_ready: boolean;
+}
+
+export interface CreativeHistoryResponse {
+  ok: boolean;
+  client_id: string;
+  days: number;
+  count: number;
+  rows: CreativeRow[];
 }
 
 export class ApiError extends Error {
@@ -131,6 +154,19 @@ export async function portalLogin(email: string, password: string): Promise<Logi
   const body = await parseJson<LoginResponse & { error?: string; message?: string }>(res);
   if (!res.ok) {
     throw new ApiError(body.error ?? body.message ?? 'Login failed', res.status);
+  }
+  return body;
+}
+
+export async function portalRefresh(refreshToken: string): Promise<LoginResponse> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/auth/refresh`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+  const body = await parseJson<LoginResponse & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Refresh failed', res.status);
   }
   return body;
 }
@@ -171,6 +207,86 @@ export async function fetchPerformance(
     throw new ApiError(body.error ?? body.message ?? 'Performance fetch failed', res.status);
   }
   return body;
+}
+
+export async function fetchCreativeHistory(
+  token: string,
+  days = 30,
+): Promise<CreativeHistoryResponse> {
+  const res = await fetch(`${API_BASE}/api/v1/creatives/history?days=${days}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await parseJson<CreativeHistoryResponse & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Creative history fetch failed', res.status);
+  }
+  return body;
+}
+
+export async function fetchPendingCreativeCount(token: string): Promise<number> {
+  const res = await fetch(`${API_BASE}/api/v1/creatives/pending/count`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await parseJson<{ ok?: boolean; count?: number; error?: string }>(res);
+  if (!res.ok) {
+    return 0;
+  }
+  return Number(body.count ?? 0);
+}
+
+export async function fetchPortalSettings(token: string): Promise<PortalSettingsResponse> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/settings`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await parseJson<PortalSettingsResponse & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Settings fetch failed', res.status);
+  }
+  return body;
+}
+
+export async function patchPortalSettings(
+  token: string,
+  input: Partial<
+    Pick<
+      PortalSettingsResponse,
+      'display_name' | 'logo_url' | 'am_contact_name' | 'am_contact_email' | 'accent_color'
+    >
+  >,
+): Promise<PortalSettingsResponse> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/settings`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  });
+  const body = await parseJson<PortalSettingsResponse & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Settings update failed', res.status);
+  }
+  return body;
+}
+
+export function performanceExportUrl(params?: {
+  from?: string;
+  to?: string;
+  group_by?: 'day' | 'campaign';
+  channel?: PerformanceChannel;
+  format?: 'csv' | 'pdf';
+}): string {
+  const qs = new URLSearchParams();
+  if (params?.from) qs.set('from', params.from);
+  if (params?.to) qs.set('to', params.to);
+  if (params?.group_by) qs.set('group_by', params.group_by);
+  if (params?.channel) qs.set('channel', params.channel);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const ext = params?.format === 'pdf' ? 'export.pdf' : 'export.csv';
+  return `${API_BASE}/api/v1/performance/${ext}${suffix}`;
 }
 
 export async function fetchPendingCreatives(token: string): Promise<CreativePendingResponse> {

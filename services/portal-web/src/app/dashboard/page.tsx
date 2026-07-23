@@ -1,57 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { PerformancePanel } from '@/components/PerformancePanel';
-import { PortalNav } from '@/components/PortalNav';
-import { portalMe } from '@/lib/api';
-import { clearSession, getStoredUser, getToken, type StoredUser } from '@/lib/auth';
+import { PortalPageShell } from '@/components/PortalPageShell';
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<StoredUser | null>(null);
-  const [token, setToken] = useState('');
-
-  useEffect(() => {
-    const authToken = getToken();
-    const cached = getStoredUser();
-    if (!authToken) {
-      router.replace('/login');
-      return;
-    }
-    setToken(authToken);
-    if (cached) {
-      setUser(cached);
-    }
-    portalMe(authToken)
-      .then((me) => setUser(me))
-      .catch(() => {
-        clearSession();
-        router.replace('/login');
-      });
-  }, [router]);
-
-  function logout() {
-    clearSession();
-    router.push('/login');
-  }
-
-  if (!user || !token) {
-    return (
-      <main style={{ padding: '2rem' }}>
-        <p className="muted">Đang tải…</p>
-      </main>
-    );
-  }
-
   return (
-    <main style={{ maxWidth: 1100, margin: '0 auto', padding: '1.5rem' }}>
-      <PortalNav user={user} onLogout={logout} />
-      <PerformancePanel
-        token={token}
-        title="Performance Meta + Google"
-        subtitle="Tất cả kênh"
-      />
-    </main>
+    <PortalPageShell>
+      {({ token }) => (
+        <PerformancePanel token={token} title="Performance Meta + Google" subtitle="Tất cả kênh" />
+      )}
+    </PortalPageShell>
   );
 }

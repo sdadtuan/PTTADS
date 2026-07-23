@@ -61,6 +61,21 @@ test.describe('Client portal E2E', () => {
     await expect(page.getByText(title)).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole('button', { name: /^Duyệt$/i }).first().click();
+    await page.getByRole('button', { name: /xác nhận duyệt/i }).click();
     await expect(page.getByText(title)).not.toBeVisible({ timeout: 15_000 });
+  });
+
+  test('creative history tab loads', async ({ page }) => {
+    await loginAsApprover(page);
+    await page.getByRole('link', { name: /creative inbox/i }).click();
+    await page.getByRole('button', { name: /lịch sử 30 ngày/i }).click();
+    await expect(page.getByRole('button', { name: /lịch sử 30 ngày/i })).toBeVisible();
+  });
+
+  test('settings page loads for approver', async ({ page }) => {
+    await loginAsApprover(page);
+    await page.getByRole('link', { name: /cài đặt/i }).click();
+    await expect(page).toHaveURL(/\/settings/);
+    await expect(page.getByText(/Branding/i)).toBeVisible();
   });
 });

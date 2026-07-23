@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CreativeRow } from '@/lib/api';
 import { fmtDate } from '@/lib/format';
 
@@ -11,14 +11,47 @@ interface CreativeInboxProps {
   onReject: (id: string, note: string) => Promise<void>;
 }
 
+function CreativeAssetPreview({ row }: { row: CreativeRow }) {
+  if (!row.asset_url) {
+    return null;
+  }
+  const isImage = row.asset_type === 'image' || /\.(png|jpe?g|gif|webp)(\?|$)/i.test(row.asset_url);
+  if (isImage) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={row.asset_url}
+        alt={row.title}
+        style={{ maxWidth: '100%', maxHeight: 220, borderRadius: 8, marginTop: '0.75rem' }}
+      />
+    );
+  }
+  return (
+    <p className="muted" style={{ margin: '0.75rem 0 0' }}>
+      Asset:{' '}
+      <a href={row.asset_url} target="_blank" rel="noreferrer">
+        mở preview ({row.asset_type || 'file'})
+      </a>
+    </p>
+  );
+}
+
 export function CreativeInbox({ rows, canApprove, onApprove, onReject }: CreativeInboxProps) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
   const [rejectNote, setRejectNote] = useState('');
   const [error, setError] = useState('');
 
   if (rows.length === 0) {
-    return <p className="muted">Không có creative đang chờ duyệt.</p>;
+    return (
+      <div className="card" style={{ padding: '1.25rem', textAlign: 'center' }}>
+        <p style={{ margin: 0, fontWeight: 600 }}>Không có creative đang chờ duyệt</p>
+        <p className="muted" style={{ margin: '0.5rem 0 0' }}>
+          AM sẽ gửi creative mới qua workflow Launch QA khi sẵn sàng.
+        </p>
+      </div>
+    );
   }
 
   async function handleApprove(id: string) {
@@ -26,6 +59,7 @@ export function CreativeInbox({ rows, canApprove, onApprove, onReject }: Creativ
     setError('');
     try {
       await onApprove(id);
+      setConfirmId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Duyệt thất bại');
     } finally {
@@ -53,7 +87,7 @@ export function CreativeInbox({ rows, canApprove, onApprove, onReject }: Creativ
       {rows.map((row) => (
         <article key={row.id} className="creative-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
-            <div>
+            <div style={{ flex: 1, minWidth: 240 }}>
               <h3 style={{ margin: '0 0 0.35rem', fontSize: '1rem' }}>{row.title}</h3>
               <p className="muted" style={{ margin: 0 }}>
                 v{row.version}
@@ -64,14 +98,7 @@ export function CreativeInbox({ rows, canApprove, onApprove, onReject }: Creativ
               {row.description && (
                 <p style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>{row.description}</p>
               )}
-              {row.asset_url && (
-                <p className="muted" style={{ margin: '0.35rem 0 0', fontSize: '0.8rem' }}>
-                  Asset:{' '}
-                  <a href={row.asset_url} target="_blank" rel="noreferrer">
-                    xem file
-                  </a>
-                </p>
-              )}
+              <CreativeAssetPreview row={row} />
             </div>
             {canApprove && row.status === 'pending_client' && (
               <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
@@ -79,7 +106,7 @@ export function CreativeInbox({ rows, canApprove, onApprove, onReject }: Creativ
                   type="button"
                   className="btn"
                   disabled={busyId === row.id}
-                  onClick={() => void handleApprove(row.id)}
+                  onClick={() => setConfirmId(row.id)}
                 >
                   Duyệt
                 </button>
@@ -97,26 +124,32 @@ export function CreativeInbox({ rows, canApprove, onApprove, onReject }: Creativ
               </div>
             )}
           </div>
+          {confirmId === row.id && (
+            <div className="card" style={{ marginTop: '0.75rem', padding: '0.75rem' }}>
+              <p style={{ margin: '0 0 0.5rem' }}>Xác nhận duyệt creative này? Hành động sẽ đồng bộ Launch QA.</p>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="button" className="btn" disabled={busyId === row.id} onClick={() => void handleApprove(row.id)}>
+                  Xác nhận duyệt
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => setConfirmId(null)}>
+                  Huỷ
+                </button>
+              </div>
+            </div>
+          )}
           {rejectId === row.id && (
-            <div style={{ marginTop: '0.75rem' }}>
-              <label className="muted" htmlFor={`reject-${row.id}`} style={{ fontSize: '0.85rem' }}>
-                Lý do (tuỳ chọn)
-              </label>
+            <div className="card" style={{ marginTop: '0.75rem', padding: '0.75rem' }}>
+              <label htmlFor={`reject-${row.id}`}>Lý do từ chối (tuỳ chọn)</label>
               <textarea
                 id={`reject-${row.id}`}
-                className="field-textarea"
-                rows={2}
+                rows={3}
                 value={rejectNote}
                 onChange={(e) => setRejectNote(e.target.value)}
+                style={{ width: '100%', marginTop: '0.35rem' }}
               />
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  className="btn btn-danger"
-                  disabled={busyId === row.id}
-                  onClick={() => void handleReject(row.id)}
-                >
-                  Xác nhận từ chối
+                <button type="button" className="btn btn-secondary" disabled={busyId === row.id} onClick={() => void handleReject(row.id)}>
+                  Gửi từ chối
                 </button>
                 <button type="button" className="btn btn-secondary" onClick={() => setRejectId(null)}>
                   Huỷ

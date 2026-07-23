@@ -8,6 +8,10 @@ class PortalLoginBody {
   password!: string;
 }
 
+class PortalRefreshBody {
+  refresh_token!: string;
+}
+
 @Controller('api/v1/portal/auth')
 export class PortalAuthController {
   constructor(private readonly auth: PortalAuthService) {}
@@ -16,6 +20,12 @@ export class PortalAuthController {
   @HttpCode(HttpStatus.OK)
   async login(@Body() body: PortalLoginBody): Promise<PortalLoginResult> {
     return this.auth.login(body.email ?? '', body.password ?? '');
+  }
+
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  async refresh(@Body() body: PortalRefreshBody): Promise<PortalLoginResult> {
+    return this.auth.refresh(body.refresh_token ?? '');
   }
 
   @Get('me')

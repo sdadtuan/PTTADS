@@ -12,12 +12,14 @@ import {
   creativeRejectedIdempotencyKey,
 } from '../events/event-idempotency';
 import { PortalJwtPayload } from '../portal/portal-jwt.util';
+import { PortalCreativeNotifyService } from '../portal/portal-creative-notify.service';
 import { LaunchQaCreativeBridgeService } from '../launch-qa/launch-qa-creative-bridge.service';
 import { CreativesRepository } from './creatives.repository';
 import {
   CreateCreativeBody,
   CreateCreativeResponse,
   CreativeDecisionResponse,
+  CreativeHistoryResponse,
   CreativePendingResponse,
 } from './creatives.types';
 import { TemporalCreativeService } from './temporal-creative.service';
@@ -29,12 +31,26 @@ export class CreativesService {
     private readonly events: DomainEventService,
     private readonly temporal: TemporalCreativeService,
     private readonly launchQaBridge: LaunchQaCreativeBridgeService,
+    private readonly portalNotify: PortalCreativeNotifyService,
   ) {}
 
   async listPending(clientId: string): Promise<CreativePendingResponse> {
     await this.ensureReady();
     const rows = await this.repo.listPending(clientId);
     return { ok: true, client_id: clientId, count: rows.length, rows };
+  }
+
+  async listHistory(clientId: string, days = 30): Promise<CreativeHistoryResponse> {
+    await this.ensureReady();
+    const safeDays = Math.min(90, Math.max(1, Number(days) || 30));
+    const rows = await this.repo.listHistoryForClient(clientId, safeDays);
+    return { ok: true, client_id: clientId, days: safeDays, count: rows.length, rows };
+  }
+
+  async pendingCount(clientId: string): Promise<{ ok: boolean; count: number }> {
+    await this.ensureReady();
+    const count = await this.repo.countPending(clientId);
+    return { ok: true, count };
   }
 
   async submit(body: CreateCreativeBody): Promise<CreateCreativeResponse> {
@@ -164,12 +180,15 @@ export class CreativesService {
       });
     }
 
+    const notify = await this.portalNotify.notifyDecision(updated, decision, user.email, note);
+
     return {
       ok: true,
       creative: updated,
       event_id: eventId,
       temporal_signal: temporalSignal,
       launch_qa_sync: launchQaSync,
+      notify,
     };
   }
 

@@ -26,6 +26,14 @@ export interface CreativePendingResponse {
   rows: CreativeRow[];
 }
 
+export interface CreativeHistoryResponse {
+  ok: boolean;
+  client_id: string;
+  days: number;
+  count: number;
+  rows: CreativeRow[];
+}
+
 export interface CreativeDecisionResponse {
   ok: boolean;
   creative: CreativeRow;
@@ -37,6 +45,10 @@ export interface CreativeDecisionResponse {
     launch_ready?: boolean;
     reason?: string;
   } | null;
+  notify?: {
+    inbox: { ok: boolean; notification_id?: string | null; error?: string };
+    email: { ok: boolean; stub?: boolean; skipped?: boolean; error?: string };
+  };
 }
 
 export interface CreateCreativeBody {

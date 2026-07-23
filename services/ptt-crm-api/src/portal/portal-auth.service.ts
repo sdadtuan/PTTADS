@@ -1,14 +1,16 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { Pool } from 'pg';
 import { AppConfigService, PortalStubUser } from '../config/app-config.service';
-import { signPortalJwt, verifyPortalJwt, PortalJwtPayload } from './portal-jwt.util';
+import { signPortalJwt, verifyPortalJwt, PortalJwtPayload, signPortalRefreshJwt, verifyPortalRefreshJwt } from './portal-jwt.util';
 import { mapKeycloakToPortalPayload, verifyKeycloakAccessToken } from './portal-keycloak.util';
 import { hashPortalPassword, verifyPortalPassword } from './portal-password.util';
 
 export interface PortalLoginResult {
   access_token: string;
+  refresh_token: string;
   token_type: 'Bearer';
   expires_in: number;
+  refresh_expires_in: number;
   user: {
     id: string;
     email: string;
@@ -46,10 +48,58 @@ export class PortalAuthService {
       this.config.portalJwtSecret,
       this.config.portalJwtTtlSec,
     );
+    const refreshToken = signPortalRefreshJwt(
+      user.id,
+      user.clientId,
+      this.config.portalJwtSecret,
+      this.config.portalRefreshTtlSec,
+    );
     return {
       access_token: token,
+      refresh_token: refreshToken,
       token_type: 'Bearer',
       expires_in: this.config.portalJwtTtlSec,
+      refresh_expires_in: this.config.portalRefreshTtlSec,
+      user: {
+        id: user.id,
+        email: user.email,
+        client_id: user.clientId,
+        role: user.role,
+      },
+    };
+  }
+
+  async refresh(refreshToken: string): Promise<PortalLoginResult> {
+    const payload = verifyPortalRefreshJwt(refreshToken, this.config.portalJwtSecret);
+    if (!payload) {
+      throw new UnauthorizedException({ error: 'Invalid or expired refresh token' });
+    }
+    const user = await this.resolveUserById(payload.sub, payload.client_id);
+    if (!user) {
+      throw new UnauthorizedException({ error: 'Invalid refresh subject' });
+    }
+    const token = signPortalJwt(
+      {
+        sub: user.id,
+        email: user.email,
+        client_id: user.clientId,
+        role: user.role,
+      },
+      this.config.portalJwtSecret,
+      this.config.portalJwtTtlSec,
+    );
+    const nextRefresh = signPortalRefreshJwt(
+      user.id,
+      user.clientId,
+      this.config.portalJwtSecret,
+      this.config.portalRefreshTtlSec,
+    );
+    return {
+      access_token: token,
+      refresh_token: nextRefresh,
+      token_type: 'Bearer',
+      expires_in: this.config.portalJwtTtlSec,
+      refresh_expires_in: this.config.portalRefreshTtlSec,
       user: {
         id: user.id,
         email: user.email,
@@ -133,6 +183,44 @@ export class PortalAuthService {
         email: row.email,
         clientId: row.client_id,
         password,
+        role: row.role === 'approver' ? 'approver' : 'viewer',
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private async resolveUserById(
+    userId: string,
+    clientId: string,
+  ): Promise<(PortalStubUser & { id: string }) | null> {
+    if (userId.startsWith('stub:') && this.config.portalAllowStubUsers) {
+      const email = userId.slice('stub:'.length);
+      const stub = this.config.portalStubUsers.find((u) => u.email === email && u.clientId === clientId);
+      if (stub) {
+        return { ...stub, id: userId };
+      }
+      return null;
+    }
+    try {
+      const result = await this.db.query(
+        `SELECT id::text, client_id::text, email, role
+         FROM portal_client_users
+         WHERE id = $1::uuid AND client_id = $2::uuid AND active IS TRUE
+         LIMIT 1`,
+        [userId, clientId],
+      );
+      const row = result.rows[0] as
+        | { id: string; client_id: string; email: string; role: string }
+        | undefined;
+      if (!row) {
+        return null;
+      }
+      return {
+        id: row.id,
+        email: row.email,
+        clientId: row.client_id,
+        password: '',
         role: row.role === 'approver' ? 'approver' : 'viewer',
       };
     } catch {

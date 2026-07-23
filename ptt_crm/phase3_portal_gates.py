@@ -225,6 +225,110 @@ def verify_creative_approve_flow() -> dict[str, Any]:
     }
 
 
+def verify_portal_refresh(login_step: dict[str, Any]) -> dict[str, Any]:
+    email = os.environ.get("PORTAL_E2E_APPROVER_EMAIL", "approver@demo.local")
+    password = os.environ.get("PORTAL_E2E_APPROVER_PASSWORD", "demo123")
+    status, body = _http_json(
+        "POST",
+        f"{_api_base()}/api/v1/portal/auth/login",
+        body={"email": email, "password": password},
+    )
+    refresh = body.get("refresh_token")
+    if status != 200 or not refresh:
+        return {"id": "P3-G07", "ok": False, "label": "Portal refresh token", "error": "no refresh_token"}
+    ref_status, ref = _http_json(
+        "POST",
+        f"{_api_base()}/api/v1/portal/auth/refresh",
+        body={"refresh_token": refresh},
+    )
+    ok = ref_status == 200 and bool(ref.get("access_token")) and bool(ref.get("user", {}).get("client_id"))
+    return {
+        "id": "P3-G07",
+        "ok": ok,
+        "label": "Portal auth refresh",
+        "status": ref_status,
+    }
+
+
+def verify_cross_tenant_performance() -> dict[str, Any]:
+    email = os.environ.get("PORTAL_E2E_APPROVER_EMAIL", "approver@demo.local")
+    password = os.environ.get("PORTAL_E2E_APPROVER_PASSWORD", "demo123")
+    other_client = os.environ.get("PORTAL_E2E_OTHER_CLIENT_ID", "00000000-0000-4000-8000-000000000001")
+    _, login = _http_json(
+        "POST",
+        f"{_api_base()}/api/v1/portal/auth/login",
+        body={"email": email, "password": password},
+    )
+    token = login.get("access_token")
+    if not token:
+        return {"id": "P3-G08", "ok": False, "label": "Cross-tenant 403", "error": "login failed"}
+    perf_status, perf = _http_json(
+        "GET",
+        f"{_api_base()}/api/v1/performance?client_id={other_client}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    ok = perf_status == 403
+    return {
+        "id": "P3-G08",
+        "ok": ok,
+        "label": "Cross-tenant performance forbidden",
+        "status": perf_status,
+        "body": perf,
+    }
+
+
+def verify_creative_history() -> dict[str, Any]:
+    email = os.environ.get("PORTAL_E2E_APPROVER_EMAIL", "approver@demo.local")
+    password = os.environ.get("PORTAL_E2E_APPROVER_PASSWORD", "demo123")
+    _, login = _http_json(
+        "POST",
+        f"{_api_base()}/api/v1/portal/auth/login",
+        body={"email": email, "password": password},
+    )
+    token = login.get("access_token")
+    if not token:
+        return {"id": "P3-G09", "ok": False, "label": "Creative history API", "error": "login failed"}
+    hist_status, hist = _http_json(
+        "GET",
+        f"{_api_base()}/api/v1/creatives/history?days=30",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    ok = hist_status == 200 and hist.get("ok") is True and isinstance(hist.get("rows"), list)
+    return {
+        "id": "P3-G09",
+        "ok": ok,
+        "label": "Creative history API",
+        "status": hist_status,
+        "count": hist.get("count"),
+    }
+
+
+def verify_portal_settings() -> dict[str, Any]:
+    email = os.environ.get("PORTAL_E2E_APPROVER_EMAIL", "approver@demo.local")
+    password = os.environ.get("PORTAL_E2E_APPROVER_PASSWORD", "demo123")
+    _, login = _http_json(
+        "POST",
+        f"{_api_base()}/api/v1/portal/auth/login",
+        body={"email": email, "password": password},
+    )
+    token = login.get("access_token")
+    if not token:
+        return {"id": "P3-G10", "ok": False, "label": "Portal settings API", "error": "login failed"}
+    set_status, settings = _http_json(
+        "GET",
+        f"{_api_base()}/api/v1/portal/settings",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    ok = set_status == 200 and settings.get("ok") is True and bool(settings.get("client_id"))
+    return {
+        "id": "P3-G10",
+        "ok": ok,
+        "label": "Portal settings API",
+        "status": set_status,
+        "table_ready": settings.get("table_ready"),
+    }
+
+
 def verify_portal_build() -> dict[str, Any]:
     portal_dir = ROOT / "services" / "portal-web"
     proc = subprocess.run(
@@ -253,6 +357,10 @@ def run_portal_mvp_gate(*, skip_build: bool = False) -> dict[str, Any]:
     steps["performance"] = verify_performance_api(steps["portal_login"])
     steps["meta_performance"] = verify_meta_performance_api(steps["portal_login"])
     steps["creative_approve"] = verify_creative_approve_flow()
+    steps["portal_refresh"] = verify_portal_refresh(steps["portal_login"])
+    steps["cross_tenant"] = verify_cross_tenant_performance()
+    steps["creative_history"] = verify_creative_history()
+    steps["portal_settings"] = verify_portal_settings()
     if not skip_build:
         steps["portal_build"] = verify_portal_build()
     all_ok = all(bool(s.get("ok")) for s in steps.values())

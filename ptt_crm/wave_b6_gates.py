@@ -28,6 +28,11 @@ def _truthy(name: str, default: str = "0") -> bool:
 
 def _check_b6_modules() -> dict[str, Any]:
     files = [
+        ROOT / "docs/specs/2026-07-23-wave-b6-s7-portal-mvp-prod-design.md",
+        ROOT / "services/ptt-crm-api/src/portal/portal-settings.controller.ts",
+        ROOT / "services/ptt-crm-api/src/portal/portal-creative-notify.service.ts",
+        ROOT / "services/portal-web/src/middleware.ts",
+        ROOT / "services/portal-web/src/app/settings/page.tsx",
         ROOT / "docs/specs/2026-07-23-wave-b6-s6-google-ads-e2e-design.md",
         ROOT / "services/ptt-crm-api/src/agency/google-ads-pilot.util.ts",
         ROOT / "services/ptt-crm-api/src/agency/google-oauth.util.ts",
