@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { AgencyModule } from '../agency/agency.module';
 import { CampaignWritesModule } from '../campaign-writes/campaign-writes.module';
 import { CreativesModule } from '../creatives/creatives.module';
 import { IntakeModule } from '../intake/intake.module';
@@ -15,6 +16,7 @@ import { LaunchQaAutoStartService } from './launch-qa-auto-start.service';
 import { LaunchQaPgRepository } from './launch-qa-pg.repository';
 import { LifecycleConsultService } from './lifecycle-consult.service';
 import { LifecycleLaunchQaService } from './lifecycle-launch-qa.service';
+import { LifecycleOnboardingService } from './lifecycle-onboarding.service';
 import { LifecycleTasksRepository } from './lifecycle-tasks.repository';
 import { ServiceLifecycleController } from './service-lifecycle.controller';
 import { ServiceLifecycleSqliteRepository } from './service-lifecycle-sqlite.repository';
@@ -23,6 +25,7 @@ import { ServiceLifecycleService } from './service-lifecycle.service';
 @Module({
   imports: [
     StaffAuthModule,
+    AgencyModule,
     SvcFinanceModule,
     IntakeModule,
     SopModule,
@@ -38,6 +41,7 @@ import { ServiceLifecycleService } from './service-lifecycle.service';
     LifecycleTasksRepository,
     LifecycleConsultService,
     LifecycleLaunchQaService,
+    LifecycleOnboardingService,
     LaunchQaPgRepository,
     LaunchQaAutoStartService,
     StaffServiceLifecycleViewGuard,

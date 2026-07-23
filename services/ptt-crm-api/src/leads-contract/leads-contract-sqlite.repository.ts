@@ -464,6 +464,47 @@ export class LeadsContractSqliteRepository implements OnModuleDestroy {
     return rows.map((r) => this.mapContract(r));
   }
 
+  /** Reverse lookup: agency client UUID → active service lifecycles via contract. */
+  findLifecyclesByAgencyClientId(
+    clientId: string,
+    limit = 10,
+  ): Array<{
+    lifecycle_id: number;
+    stage: string;
+    status: string;
+    service_slug: string;
+    contract_id: number;
+    contract_title: string;
+    updated_at: string;
+  }> {
+    const cid = clientId.trim();
+    if (!cid) return [];
+    try {
+      const rows = this.database
+        .prepare(
+          `SELECT sl.id AS lifecycle_id, sl.stage, sl.status, sl.service_slug, sl.updated_at,
+                  ct.id AS contract_id, ct.title AS contract_title
+           FROM crm_service_lifecycle sl
+           INNER JOIN crm_contracts ct ON ct.id = sl.contract_id
+           WHERE TRIM(COALESCE(ct.agency_client_id, '')) = ?
+           ORDER BY sl.updated_at DESC
+           LIMIT ?`,
+        )
+        .all(cid, limit) as Array<Record<string, unknown>>;
+      return rows.map((row) => ({
+        lifecycle_id: Number(row.lifecycle_id),
+        stage: String(row.stage ?? ''),
+        status: String(row.status ?? ''),
+        service_slug: String(row.service_slug ?? ''),
+        contract_id: Number(row.contract_id),
+        contract_title: String(row.contract_title ?? ''),
+        updated_at: String(row.updated_at ?? ''),
+      }));
+    } catch {
+      return [];
+    }
+  }
+
   rejectApproval(approvalId: number, actor: string, decisionNotes: string): ContractApprovalRow {
     const appr = this.database.prepare('SELECT * FROM crm_contract_approvals WHERE id = ?').get(approvalId) as
       | Record<string, unknown>

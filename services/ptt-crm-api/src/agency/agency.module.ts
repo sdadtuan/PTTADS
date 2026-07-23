@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { EventsModule } from '../events/events.module';
+import { LeadsContractModule } from '../leads-contract/leads-contract.module';
 import { PerformanceModule } from '../performance/performance.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
@@ -16,7 +17,7 @@ import {
 import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
 
 @Module({
-  imports: [StaffAuthModule, PerformanceModule, EventsModule, WebhooksModule, WorkflowsModule],
+  imports: [StaffAuthModule, PerformanceModule, EventsModule, WebhooksModule, WorkflowsModule, LeadsContractModule],
   controllers: [ClientsController, AgencyOpsController],
   providers: [
     AgencyService,

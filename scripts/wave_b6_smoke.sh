@@ -6,6 +6,7 @@ BASE="${BASE:-http://127.0.0.1:3000}"
 EMAIL="${ADMIN_EMAIL:-admin@pttads.vn}"
 PASS="${ADMIN_PASSWORD:-}"
 LIFECYCLE_ID="${LIFECYCLE_ID:-}"
+CLIENT_ID="${CLIENT_ID:-}"
 
 if [[ -z "$PASS" ]]; then
   echo "Set ADMIN_PASSWORD" >&2
@@ -37,7 +38,7 @@ fi
 
 if [[ -n "$LIFECYCLE_ID" ]]; then
   ok "lifecycle id=$LIFECYCLE_ID"
-  for path in launch-qa creative-brief budget-brief; do
+  for path in launch-qa creative-brief budget-brief onboarding-brief; do
     code="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/crm/service-lifecycle/$LIFECYCLE_ID/$path" "${AUTH[@]}")"
     [[ "$code" =~ ^2 ]] && ok "GET service-lifecycle/:id/$path (HTTP $code)" || bad "GET lifecycle $path (HTTP $code)"
   done
@@ -57,6 +58,13 @@ if [[ -n "$LIFECYCLE_ID" ]]; then
   [[ "$cw_list" =~ ^2 ]] && ok "GET /crm/campaign-writes (HTTP $cw_list)" || bad "GET campaign-writes (HTTP $cw_list)"
 else
   bad "no LIFECYCLE_ID — skip B6 lifecycle routes"
+fi
+
+if [[ -n "$CLIENT_ID" ]]; then
+  ob_sum="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/v1/clients/$CLIENT_ID/onboarding/summary" "${AUTH[@]}")"
+  [[ "$ob_sum" =~ ^2 ]] && ok "GET clients/:id/onboarding/summary (HTTP $ob_sum)" || bad "GET onboarding/summary (HTTP $ob_sum)"
+else
+  echo "SKIP onboarding/summary — set CLIENT_ID to test agency onboarding API"
 fi
 
 echo ""

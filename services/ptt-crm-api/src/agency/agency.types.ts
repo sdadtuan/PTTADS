@@ -105,6 +105,35 @@ export interface OnboardingResponse {
   side_effects?: AgencySideEffectsSummary;
 }
 
+export interface OnboardingWorkflowSnapshot {
+  workflow_id: string;
+  status: string;
+  run_id: string | null;
+  found: boolean;
+  temporal_enabled: boolean;
+}
+
+export interface OnboardingLifecycleLink {
+  lifecycle_id: number;
+  stage: string;
+  status: string;
+  service_slug: string;
+  contract_id: number;
+  contract_title: string;
+  service_delivery_url: string;
+}
+
+export interface OnboardingSummaryResponse extends OnboardingResponse {
+  client_id: string;
+  client_status: string;
+  client_code: string;
+  client_name: string;
+  workflow: OnboardingWorkflowSnapshot;
+  strict_onboarding: boolean;
+  activation_ready: boolean;
+  linked_lifecycles: OnboardingLifecycleLink[];
+}
+
 export interface KpiDefinitionRow {
   code: string;
   name: string;

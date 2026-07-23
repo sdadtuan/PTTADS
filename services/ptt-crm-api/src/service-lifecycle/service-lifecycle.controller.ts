@@ -110,6 +110,11 @@ export class ServiceLifecycleController {
     return this.serviceLifecycle.creativeBrief(id);
   }
 
+  @Get(':id/onboarding-brief')
+  onboardingBrief(@Param('id', ParseIntPipe) id: number) {
+    return this.serviceLifecycle.onboardingBrief(id);
+  }
+
   @Get(':id')
   detail(@Param('id', ParseIntPipe) id: number) {
     return this.serviceLifecycle.detail(id);

@@ -4,6 +4,7 @@ import { SopSqliteRepository } from '../sop/sop-sqlite.repository';
 import { SvcFinanceService } from '../svc-finance/svc-finance.service';
 import { LifecycleConsultService } from './lifecycle-consult.service';
 import { LifecycleLaunchQaService } from './lifecycle-launch-qa.service';
+import { LifecycleOnboardingService } from './lifecycle-onboarding.service';
 import {
   buildOfficialPlanPayload,
   mergeStrategyFramework,
@@ -32,6 +33,7 @@ export class ServiceLifecycleService {
     private readonly sopSqlite: SopSqliteRepository,
     private readonly config: AppConfigService,
     private readonly lifecycleLaunchQa: LifecycleLaunchQaService,
+    private readonly lifecycleOnboarding: LifecycleOnboardingService,
   ) {}
 
   list(serviceSlug?: string, amId?: string, includeDraft?: string) {
@@ -351,6 +353,10 @@ export class ServiceLifecycleService {
 
   budgetBrief(id: number) {
     return this.lifecycleLaunchQa.budgetBrief(id);
+  }
+
+  onboardingBrief(id: number) {
+    return this.lifecycleOnboarding.onboardingBrief(id);
   }
 
   submitBudget(id: number, body: { daily_budget_vnd?: number; submitted_by?: string }) {

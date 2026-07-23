@@ -28,6 +28,11 @@ def _truthy(name: str, default: str = "0") -> bool:
 
 def _check_b6_modules() -> dict[str, Any]:
     files = [
+        ROOT / "docs/specs/2026-07-23-wave-b6-s5-onboarding-widget-design.md",
+        ROOT / "services/ptt-crm-api/src/service-lifecycle/lifecycle-onboarding.service.ts",
+        ROOT / "services/ptt-crm-api/src/agency/clients.controller.ts",
+        ROOT / "services/ops-web/src/components/ClientOnboardingWidget.tsx",
+        ROOT / "services/ops-web/src/components/LifecycleOnboardingPanel.tsx",
         ROOT / "docs/specs/2026-07-23-wave-b6-s4-campaign-write-e2e-design.md",
         ROOT / "services/ptt-crm-api/src/crm-campaign-writes/crm-campaign-writes.controller.ts",
         ROOT / "services/ptt-crm-api/src/launch-qa/launch-qa-campaign-write-bridge.service.ts",

@@ -336,7 +336,7 @@ export class ServiceLifecycleSqliteRepository implements OnModuleDestroy {
     }
 
     const agencyLink = agencyClientId
-      ? `/agency/clients/${encodeURIComponent(agencyClientId)}?tab=contracts`
+      ? `/agency/clients/${encodeURIComponent(agencyClientId)}?tab=checklist`
       : null;
     const hubLink =
       agencyClientId && campaignId

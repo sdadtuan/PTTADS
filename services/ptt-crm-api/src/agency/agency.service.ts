@@ -16,6 +16,8 @@ import {
   JobsListResponse,
   NotificationsListResponse,
   OnboardingResponse,
+  OnboardingSummaryResponse,
+  OnboardingWorkflowSnapshot,
   KpiDefinitionRow,
   AddChannelAccountBody,
   UpdateChannelAccountBody,
@@ -43,6 +45,7 @@ import {
   writeManualUat,
 } from './meta-migration.util';
 import { WorkflowsService } from '../workflows/workflows.service';
+import { LeadsContractSqliteRepository } from '../leads-contract/leads-contract-sqlite.repository';
 
 const META_CAMPAIGN_ID_RE = /^[0-9]{5,20}$/;
 const VALID_HUB_CHANNELS = new Set(['meta', 'zalo', 'google']);
@@ -85,6 +88,7 @@ export class AgencyService {
     private readonly repo: AgencyRepository,
     private readonly sideEffects: AgencySideEffectsService,
     private readonly workflows: WorkflowsService,
+    private readonly contractSqlite: LeadsContractSqliteRepository,
   ) {}
 
   private async ensurePg(): Promise<void> {
@@ -591,6 +595,80 @@ export class AgencyService {
       throw new NotFoundException({ error: 'Not found' });
     }
     return this.workflows.onboardingStatus(clientId);
+  }
+
+  private buildWorkflowSnapshot(raw: {
+    workflow_id?: string;
+    status?: string;
+    run_id?: string | null;
+    found?: boolean;
+  }): OnboardingWorkflowSnapshot {
+    const temporalEnabled = Boolean(process.env.TEMPORAL_ADDRESS?.trim());
+    return {
+      workflow_id: String(raw.workflow_id ?? ''),
+      status: String(raw.status ?? 'UNKNOWN'),
+      run_id: raw.run_id ?? null,
+      found: Boolean(raw.found),
+      temporal_enabled: temporalEnabled,
+    };
+  }
+
+  async getOnboardingSummary(clientId: string): Promise<OnboardingSummaryResponse> {
+    await this.ensurePg();
+    const client = await this.repo.fetchClient(clientId);
+    if (!client) {
+      throw new NotFoundException({ error: 'Not found' });
+    }
+    const [onboarding, wfRaw] = await Promise.all([
+      this.getOnboarding(clientId),
+      this.workflows.onboardingStatus(clientId),
+    ]);
+    const workflow = this.buildWorkflowSnapshot(wfRaw);
+    const linked = this.contractSqlite.findLifecyclesByAgencyClientId(clientId).map((row) => ({
+      lifecycle_id: row.lifecycle_id,
+      stage: row.stage,
+      status: row.status,
+      service_slug: row.service_slug,
+      contract_id: row.contract_id,
+      contract_title: row.contract_title,
+      service_delivery_url: `/crm/service-delivery/${row.lifecycle_id}`,
+    }));
+    const strict = strictOnboardingEnabled();
+    const activationReady =
+      client.status === 'active' || onboarding.progress.percent >= 100 || !strict;
+    return {
+      ...onboarding,
+      client_id: clientId,
+      client_status: client.status,
+      client_code: client.code,
+      client_name: client.name,
+      workflow,
+      strict_onboarding: strict,
+      activation_ready: activationReady,
+      linked_lifecycles: linked,
+    };
+  }
+
+  async nudgeOnboardingWorkflow(clientId: string) {
+    await this.ensurePg();
+    const client = await this.repo.fetchClient(clientId);
+    if (!client) {
+      throw new NotFoundException({ error: 'Not found' });
+    }
+    const out = await this.workflows.nudgeOnboarding(clientId);
+    return { client_id: clientId, ...out };
+  }
+
+  async startOnboardingWorkflow(clientId: string, startedBy?: string) {
+    await this.ensurePg();
+    const client = await this.repo.fetchClient(clientId);
+    if (!client) {
+      throw new NotFoundException({ error: 'Not found' });
+    }
+    return this.workflows.startOnboarding({
+      client_id: clientId,
+      started_by: startedBy?.trim() || 'am@pttads.vn',
+    });
   }
 
   async activateClient(clientId: string, force = false): Promise<AgencyClientDetail> {

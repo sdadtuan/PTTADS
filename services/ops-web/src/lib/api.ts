@@ -1069,6 +1069,10 @@ export async function fetchServiceLifecycleSop(token: string, id: number) {
   }>(token, `/api/crm/service-lifecycle/${id}/sop`);
 }
 
+export async function fetchServiceLifecycleOnboardingBrief(token: string, id: number) {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/onboarding-brief`);
+}
+
 export async function fetchServiceLifecycleLaunchQa(token: string, id: number) {
   return crmFetch<{
     lifecycle_id: number;
@@ -2767,6 +2771,56 @@ export interface OnboardingItem {
 export interface OnboardingResponse {
   items: OnboardingItem[];
   progress: { total: number; completed: number; percent: number };
+}
+
+export interface OnboardingSummaryResponse extends OnboardingResponse {
+  client_id: string;
+  client_status: string;
+  client_code: string;
+  client_name: string;
+  workflow: {
+    workflow_id: string;
+    status: string;
+    run_id: string | null;
+    found: boolean;
+    temporal_enabled: boolean;
+  };
+  strict_onboarding: boolean;
+  activation_ready: boolean;
+  linked_lifecycles: Array<{
+    lifecycle_id: number;
+    stage: string;
+    status: string;
+    service_slug: string;
+    contract_id: number;
+    contract_title: string;
+    service_delivery_url: string;
+  }>;
+}
+
+export async function fetchClientOnboardingSummary(
+  token: string,
+  clientId: string,
+): Promise<OnboardingSummaryResponse> {
+  return agencyFetch(token, `/api/v1/clients/${clientId}/onboarding/summary`);
+}
+
+export async function postClientOnboardingNudge(
+  token: string,
+  clientId: string,
+): Promise<{ ok: boolean; temporal_signal?: string }> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/onboarding/nudge`, { method: 'POST', body: '{}' });
+}
+
+export async function postClientOnboardingStartWorkflow(
+  token: string,
+  clientId: string,
+  body?: { started_by?: string },
+): Promise<{ ok: boolean; workflow_started?: boolean }> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/onboarding/start-workflow`, {
+    method: 'POST',
+    body: JSON.stringify(body ?? {}),
+  });
 }
 
 export async function fetchClientOnboarding(

@@ -22,6 +22,7 @@ import {
   CreateClientBody,
   HubCampaignMapsResponse,
   OnboardingResponse,
+  OnboardingSummaryResponse,
   UpdateClientBody,
   AddChannelAccountBody,
   UpdateChannelAccountBody,
@@ -148,6 +149,28 @@ export class ClientsController {
   @Get(':id/onboarding/workflow-status')
   async onboardingWorkflowStatus(@Param('id') id: string) {
     return this.agency.getOnboardingWorkflowStatus(id);
+  }
+
+  @Get(':id/onboarding/summary')
+  async onboardingSummary(@Param('id') id: string): Promise<OnboardingSummaryResponse> {
+    return this.agency.getOnboardingSummary(id);
+  }
+
+  @Post(':id/onboarding/nudge')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(StaffAgencyWriteGuard)
+  async nudgeOnboardingWorkflow(@Param('id') id: string) {
+    return this.agency.nudgeOnboardingWorkflow(id);
+  }
+
+  @Post(':id/onboarding/start-workflow')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(StaffAgencyWriteGuard)
+  async startOnboardingWorkflow(
+    @Param('id') id: string,
+    @Body() body: { started_by?: string },
+  ) {
+    return this.agency.startOnboardingWorkflow(id, body?.started_by);
   }
 
   @Get(':id/onboarding')

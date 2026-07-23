@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { ConsultBriefPanel } from '@/components/ConsultBriefPanel';
+import { LifecycleOnboardingPanel } from '@/components/LifecycleOnboardingPanel';
 import {
   fetchServiceLifecycleAdvanceInfo,
   fetchServiceLifecycleMarketingPlan,
@@ -361,7 +362,12 @@ export function ServiceDeliveryWorkflowPanel({
           <ConsultBriefPanel token={token} user={user} lifecycleId={lifecycleId} onPrefilled={() => void reload()} />
         </div>
       ) : (
-        workflowCard
+        <>
+          {tab === 'onboard' ? (
+            <LifecycleOnboardingPanel token={token} user={user} lifecycleId={lifecycleId} stage={tab} />
+          ) : null}
+          {workflowCard}
+        </>
       )}
     </div>
   );

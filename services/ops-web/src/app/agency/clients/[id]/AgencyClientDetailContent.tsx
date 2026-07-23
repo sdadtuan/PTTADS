@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { ClientOnboardingWidget } from '@/components/ClientOnboardingWidget';
 import { OpsNav } from '@/components/OpsNav';
 import { AgencyReadOnlyBadge, canAgencyWrite } from '@/components/AgencyReadOnlyBadge';
 import { HubCampaignMapsPanel } from '@/components/HubCampaignMapsPanel';
@@ -13,12 +14,13 @@ import {
   fetchAgencyClientContracts,
   fetchAgencyClient,
   fetchClientLeads,
-  fetchClientOnboarding,
+  fetchClientOnboardingSummary,
   fetchClientPerformance,
-  fetchOnboardingWorkflowStatus,
   patchAgencyClient,
   patchClientChannelAccount,
   patchClientOnboardingItem,
+  postClientOnboardingNudge,
+  postClientOnboardingStartWorkflow,
   setClientChannelToken,
   staffMe,
   staffRefresh,
@@ -29,7 +31,7 @@ import type {
   AgencyClient,
   ClientLeadSummary,
   OnboardingItem,
-  OnboardingResponse,
+  OnboardingSummaryResponse,
   PerformanceRow,
 } from '@/lib/api';
 import {
@@ -76,7 +78,7 @@ export function AgencyClientDetailContent() {
 
   const [user, setUser] = useState<StoredStaffUser | null>(null);
   const [client, setClient] = useState<AgencyClient | null>(null);
-  const [onboarding, setOnboarding] = useState<OnboardingResponse | null>(null);
+  const [onboarding, setOnboarding] = useState<OnboardingSummaryResponse | null>(null);
   const [perfRows, setPerfRows] = useState<PerformanceRow[]>([]);
   const [error, setError] = useState('');
   const [actionMsg, setActionMsg] = useState('');
@@ -95,7 +97,6 @@ export function AgencyClientDetailContent() {
     notes: '',
     status: 'prospect',
   });
-  const [workflowStatus, setWorkflowStatus] = useState<string>('');
   const [clientLeads, setClientLeads] = useState<ClientLeadSummary[]>([]);
   const [clientContracts, setClientContracts] = useState<
     Array<{ id: number; title: string; status: string; amount_vnd: number; lead_id: number | null }>
@@ -149,17 +150,15 @@ export function AgencyClientDetailContent() {
 
   const reload = useCallback(
     async (access: string) => {
-      const [detail, perf, ob, wf, leadsOut] = await Promise.all([
+      const [detail, perf, ob, leadsOut] = await Promise.all([
         fetchAgencyClient(access, clientId),
         fetchClientPerformance(access, clientId, { group_by: 'campaign' }),
-        fetchClientOnboarding(access, clientId),
-        fetchOnboardingWorkflowStatus(access, clientId).catch(() => ({ ok: false, status: '' })),
+        fetchClientOnboardingSummary(access, clientId),
         fetchClientLeads(access, clientId).catch(() => ({ leads: [] })),
       ]);
       setClient(detail);
       setPerfRows(perf.rows ?? []);
       setOnboarding(ob);
-      setWorkflowStatus(wf.status ?? (wf.ok ? 'unknown' : 'off'));
       setClientLeads(leadsOut.leads ?? []);
       setEditForm({
         name: detail.name ?? '',
@@ -220,7 +219,8 @@ export function AgencyClientDetailContent() {
         completed: !item.completed,
         completed_by: user?.email ?? user?.display_name ?? 'staff',
       });
-      setOnboarding(out);
+      const summary = await fetchClientOnboardingSummary(access, clientId);
+      setOnboarding(summary);
       setActionMsg('Đã cập nhật checklist');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Cập nhật checklist thất bại');
@@ -238,6 +238,8 @@ export function AgencyClientDetailContent() {
     try {
       const updated = await activateAgencyClient(access, clientId, force);
       setClient(updated);
+      const summary = await fetchClientOnboardingSummary(access, clientId);
+      setOnboarding(summary);
       const fx = updated.side_effects;
       if (fx?.jobs_enqueued?.length) {
         setActionMsg(
@@ -248,6 +250,42 @@ export function AgencyClientDetailContent() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Kích hoạt thất bại');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleNudgeWorkflow() {
+    const access = getAccessToken();
+    if (!access || !canWrite) return;
+    setBusy(true);
+    setActionMsg('');
+    try {
+      await postClientOnboardingNudge(access, clientId);
+      const summary = await fetchClientOnboardingSummary(access, clientId);
+      setOnboarding(summary);
+      setActionMsg('Đã gửi nudge workflow');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nudge workflow thất bại');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleStartWorkflow() {
+    const access = getAccessToken();
+    if (!access || !canWrite) return;
+    setBusy(true);
+    setActionMsg('');
+    try {
+      await postClientOnboardingStartWorkflow(access, clientId, {
+        started_by: user?.email ?? user?.display_name ?? 'staff',
+      });
+      const summary = await fetchClientOnboardingSummary(access, clientId);
+      setOnboarding(summary);
+      setActionMsg('Đã khởi tạo onboarding workflow');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Khởi tạo workflow thất bại');
     } finally {
       setBusy(false);
     }
@@ -427,8 +465,6 @@ export function AgencyClientDetailContent() {
   }
 
   const progress = onboarding?.progress ?? { total: 0, completed: 0, percent: 0 };
-  const activateDisabled =
-    !canWrite || client?.status === 'active' || (progress.percent < 100 && client?.status === 'onboarding');
 
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '1.5rem' }}>
@@ -597,72 +633,18 @@ export function AgencyClientDetailContent() {
               </>
             ) : null}
 
-            {tab === 'checklist' ? (
+            {tab === 'checklist' && onboarding ? (
               <div style={{ marginTop: '1rem' }}>
-                <div className="onboarding-progress" aria-label="Tiến độ checklist">
-                  <div className="onboarding-progress-bar" style={{ width: `${progress.percent}%` }} />
-                </div>
-                <p className="muted">{progress.percent}% · {progress.completed}/{progress.total} mục</p>
-                {workflowStatus ? (
-                  <p className="muted">Temporal workflow: {workflowStatus}</p>
-                ) : null}
-                <ul className="onboarding-list">
-                  {(onboarding?.items ?? []).map((item) => (
-                    <li key={item.id} className="onboarding-item">
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={item.completed}
-                          disabled={!canWrite || busy}
-                          onChange={() => void toggleChecklist(item)}
-                        />
-                        <span>{item.label}</span>
-                      </label>
-                      {item.note ? <span className="muted"> · {item.note}</span> : null}
-                    </li>
-                  ))}
-                </ul>
-                <div style={{ marginTop: '1rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                  {client.status === 'active' ? (
-                    <p className="muted" style={{ margin: 0 }}>
-                      Client đã <strong>active</strong> — không cần kích hoạt lại.{' '}
-                      <Link href="/agency/jobs" className="nav-link">
-                        Xem jobs
-                      </Link>
-                    </p>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="btn btn-sm"
-                        disabled={activateDisabled || busy}
-                        onClick={() => void handleActivate(false)}
-                      >
-                        Kích hoạt client
-                      </button>
-                      {canWrite && progress.percent < 100 ? (
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          disabled={busy}
-                          onClick={() => {
-                            if (window.confirm('Bỏ qua checklist và kích hoạt (force)?')) {
-                              void handleActivate(true);
-                            }
-                          }}
-                        >
-                          Force activate
-                        </button>
-                      ) : null}
-                    </>
-                  )}
-                </div>
-                {activateDisabled && client.status !== 'active' && !canWrite ? (
-                  <p className="muted">Chế độ chỉ xem — không thể sửa checklist hoặc kích hoạt.</p>
-                ) : null}
-                {activateDisabled && client.status !== 'active' && canWrite ? (
-                  <p className="muted">Hoàn thành checklist trước khi kích hoạt (PTT_CLIENT_STRICT_ONBOARDING).</p>
-                ) : null}
+                <ClientOnboardingWidget
+                  client={client}
+                  summary={onboarding}
+                  canWrite={canWrite}
+                  busy={busy}
+                  onToggleItem={(item) => void toggleChecklist(item)}
+                  onActivate={(force) => void handleActivate(force)}
+                  onNudgeWorkflow={() => void handleNudgeWorkflow()}
+                  onStartWorkflow={() => void handleStartWorkflow()}
+                />
               </div>
             ) : null}
 
