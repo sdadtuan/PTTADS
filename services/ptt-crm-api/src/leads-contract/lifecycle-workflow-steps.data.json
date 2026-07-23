@@ -1,0 +1,1073 @@
+{
+  "dich-vu-seo-tong-the": {
+    "onboard": [
+      {
+        "title": "Kickoff & nhận access",
+        "description": "Nhận access GSC, GA4, hosting. Setup tool theo dõi. Đo baseline traffic và số từ khóa đang ranking.",
+        "ai_prompt_key": "kickoff_brief",
+        "form_fields": [
+          {
+            "key": "start_date",
+            "label": "Ngày bắt đầu",
+            "type": "date"
+          },
+          {
+            "key": "gsc_access",
+            "label": "GSC access",
+            "type": "text"
+          },
+          {
+            "key": "ga4_access",
+            "label": "GA4 access",
+            "type": "text"
+          },
+          {
+            "key": "assigned_sp",
+            "label": "SEO Specialist phụ trách",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "deliver": [
+      {
+        "title": "Triển khai SEO tháng",
+        "description": "On-page: meta tags, heading, nội dung theo từ khóa. Technical: fix lỗi crawl, sitemap. Off-page: link building. Báo cáo tháng.",
+        "ai_prompt_key": "progress_report",
+        "form_fields": [
+          {
+            "key": "report_period",
+            "label": "Tháng báo cáo",
+            "type": "text"
+          },
+          {
+            "key": "completed_tasks",
+            "label": "Công việc đã làm",
+            "type": "textarea"
+          },
+          {
+            "key": "metrics",
+            "label": "Traffic / Ranking tháng này",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "handover": [
+      {
+        "title": "Báo cáo nghiệm thu SEO",
+        "description": "Tổng hợp: traffic tăng trưởng, số từ khóa top 10, DA so với baseline.",
+        "ai_prompt_key": "handover_report",
+        "form_fields": [
+          {
+            "key": "kpi_target",
+            "label": "KPI cam kết ban đầu",
+            "type": "textarea"
+          },
+          {
+            "key": "kpi_actual",
+            "label": "KPI đạt được thực tế",
+            "type": "textarea"
+          },
+          {
+            "key": "traffic_growth_pct",
+            "label": "Tăng trưởng traffic (%)",
+            "type": "number"
+          }
+        ]
+      }
+    ],
+    "retain": [
+      {
+        "title": "Gia hạn & upsell",
+        "description": "Nhắc gia hạn trước 30 ngày. Gợi ý upsell: content marketing, AEO, Google Ads.",
+        "ai_prompt_key": "upsell_suggest",
+        "form_fields": [
+          {
+            "key": "months_active",
+            "label": "Số tháng sử dụng",
+            "type": "number"
+          },
+          {
+            "key": "kpi_summary",
+            "label": "Tóm tắt KPI đạt được",
+            "type": "textarea"
+          }
+        ]
+      }
+    ]
+  },
+  "dich-vu-aeo": {
+    "onboard": [
+      {
+        "title": "Kickoff AEO & đo baseline",
+        "description": "Đo baseline tần suất xuất hiện trong AI search. Setup tracking tool. Brief content specialist.",
+        "ai_prompt_key": "kickoff_brief",
+        "form_fields": [
+          {
+            "key": "start_date",
+            "label": "Ngày bắt đầu",
+            "type": "date"
+          },
+          {
+            "key": "baseline_aeo",
+            "label": "Baseline AI search presence",
+            "type": "text"
+          },
+          {
+            "key": "assigned_sp",
+            "label": "Content Specialist phụ trách",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "deliver": [
+      {
+        "title": "Sản xuất AEO content tháng",
+        "description": "Tạo FAQ content, schema markup, E-E-A-T signals theo kế hoạch. Monitor AI search weekly. Báo cáo tháng.",
+        "ai_prompt_key": "progress_report",
+        "form_fields": [
+          {
+            "key": "report_period",
+            "label": "Tháng báo cáo",
+            "type": "text"
+          },
+          {
+            "key": "completed_tasks",
+            "label": "Content đã tạo",
+            "type": "textarea"
+          },
+          {
+            "key": "metrics",
+            "label": "Tần suất AI search tháng này",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "handover": [
+      {
+        "title": "Báo cáo nghiệm thu AEO",
+        "description": "Tổng hợp: tần suất xuất hiện, loại query được cover, so với baseline.",
+        "ai_prompt_key": "handover_report",
+        "form_fields": [
+          {
+            "key": "kpi_target",
+            "label": "KPI cam kết",
+            "type": "textarea"
+          },
+          {
+            "key": "kpi_actual",
+            "label": "KPI đạt được",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "retain": [
+      {
+        "title": "Gia hạn AEO & upsell",
+        "description": "Nhắc gia hạn. Gợi ý upsell: SEO tổng thể, content marketing.",
+        "ai_prompt_key": "upsell_suggest",
+        "form_fields": [
+          {
+            "key": "months_active",
+            "label": "Số tháng sử dụng",
+            "type": "number"
+          },
+          {
+            "key": "kpi_summary",
+            "label": "Tóm tắt KPI",
+            "type": "textarea"
+          }
+        ]
+      }
+    ]
+  },
+  "dich-vu-seo-local": {
+    "onboard": [
+      {
+        "title": "GBP setup & citation plan",
+        "description": "Tối ưu GBP đầy đủ. Lên danh sách citation sites. Setup tracking Local Pack.",
+        "ai_prompt_key": "kickoff_brief",
+        "form_fields": [
+          {
+            "key": "start_date",
+            "label": "Ngày bắt đầu",
+            "type": "date"
+          },
+          {
+            "key": "gbp_url",
+            "label": "GBP profile URL",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "deliver": [
+      {
+        "title": "Triển khai SEO Local tháng",
+        "description": "GBP posts weekly, citation building, review management, local content. Báo cáo tháng.",
+        "ai_prompt_key": "progress_report",
+        "form_fields": [
+          {
+            "key": "report_period",
+            "label": "Tháng báo cáo",
+            "type": "text"
+          },
+          {
+            "key": "gbp_views",
+            "label": "GBP views tháng này",
+            "type": "number"
+          },
+          {
+            "key": "local_pack_pct",
+            "label": "Xuất hiện Local Pack (%)",
+            "type": "number"
+          }
+        ]
+      }
+    ],
+    "handover": [
+      {
+        "title": "Báo cáo nghiệm thu SEO Local",
+        "description": "Kết quả: GBP views tăng, Local Pack ranking, review count so với baseline.",
+        "ai_prompt_key": "handover_report",
+        "form_fields": [
+          {
+            "key": "kpi_target",
+            "label": "KPI cam kết",
+            "type": "textarea"
+          },
+          {
+            "key": "kpi_actual",
+            "label": "KPI đạt được",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "retain": [
+      {
+        "title": "Gia hạn SEO Local & upsell",
+        "description": "Nhắc gia hạn. Gợi ý upsell: SEO tổng thể, Google Ads Maps.",
+        "ai_prompt_key": "upsell_suggest",
+        "form_fields": [
+          {
+            "key": "months_active",
+            "label": "Số tháng sử dụng",
+            "type": "number"
+          },
+          {
+            "key": "kpi_summary",
+            "label": "Tóm tắt KPI",
+            "type": "textarea"
+          }
+        ]
+      }
+    ]
+  },
+  "dich-vu-seo-audit": {
+    "onboard": [
+      {
+        "title": "Nhận access & bắt đầu audit",
+        "description": "Nhận access GSC, GA4, hosting. Bắt đầu crawl và phân tích.",
+        "ai_prompt_key": "kickoff_brief",
+        "form_fields": [
+          {
+            "key": "start_date",
+            "label": "Ngày bắt đầu",
+            "type": "date"
+          },
+          {
+            "key": "gsc_access",
+            "label": "GSC access",
+            "type": "text"
+          },
+          {
+            "key": "ga4_access",
+            "label": "GA4 access",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "deliver": [
+      {
+        "title": "Thực hiện audit & viết báo cáo",
+        "description": "Chạy audit đầy đủ: technical, on-page, backlink, content, competitor. Viết báo cáo với action items ưu tiên.",
+        "ai_prompt_key": "progress_report",
+        "form_fields": [
+          {
+            "key": "report_period",
+            "label": "Tiến độ",
+            "type": "text"
+          },
+          {
+            "key": "completed_tasks",
+            "label": "Hạng mục đã audit xong",
+            "type": "textarea"
+          },
+          {
+            "key": "issues_found",
+            "label": "Số issues phát hiện",
+            "type": "number"
+          }
+        ]
+      }
+    ],
+    "handover": [
+      {
+        "title": "Giao báo cáo & thuyết trình",
+        "description": "Giao báo cáo hoàn chỉnh. Thuyết trình kết quả và hướng dẫn action items ưu tiên. KH ký nhận.",
+        "ai_prompt_key": "handover_report",
+        "form_fields": [
+          {
+            "key": "kpi_target",
+            "label": "Deliverables đã cam kết",
+            "type": "textarea"
+          },
+          {
+            "key": "kpi_actual",
+            "label": "Deliverables đã giao",
+            "type": "textarea"
+          },
+          {
+            "key": "issues_critical",
+            "label": "Số issues critical",
+            "type": "number"
+          }
+        ]
+      }
+    ],
+    "retain": [
+      {
+        "title": "Upsell SEO triển khai sau audit",
+        "description": "Đề xuất KH thuê SEO tổng thể để implement action items trong báo cáo.",
+        "ai_prompt_key": "upsell_suggest",
+        "form_fields": [
+          {
+            "key": "months_active",
+            "label": "Ngày từ khi nhận báo cáo",
+            "type": "number"
+          },
+          {
+            "key": "kpi_summary",
+            "label": "Issues quan trọng cần fix",
+            "type": "textarea"
+          }
+        ]
+      }
+    ]
+  },
+  "dich-vu-quan-tri-website": {
+    "onboard": [
+      {
+        "title": "Nhận access & setup backup",
+        "description": "Nhận admin website, hosting, domain. Setup backup tự động. Security scan lần đầu.",
+        "ai_prompt_key": "kickoff_brief",
+        "form_fields": [
+          {
+            "key": "start_date",
+            "label": "Ngày bắt đầu",
+            "type": "date"
+          },
+          {
+            "key": "admin_access",
+            "label": "Admin access",
+            "type": "text"
+          },
+          {
+            "key": "hosting_access",
+            "label": "Hosting access",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "deliver": [
+      {
+        "title": "Quản trị tháng",
+        "description": "Cập nhật content, fix lỗi, update plugin/theme, backup check, báo cáo uptime tháng.",
+        "ai_prompt_key": "progress_report",
+        "form_fields": [
+          {
+            "key": "report_period",
+            "label": "Tháng báo cáo",
+            "type": "text"
+          },
+          {
+            "key": "completed_tasks",
+            "label": "Công việc tháng này",
+            "type": "textarea"
+          },
+          {
+            "key": "uptime_pct",
+            "label": "Uptime (%)",
+            "type": "number"
+          }
+        ]
+      }
+    ],
+    "handover": [
+      {
+        "title": "Báo cáo & nghiệm thu",
+        "description": "Tổng kết: số lần cập nhật, uptime, lỗi đã fix, security incidents.",
+        "ai_prompt_key": "handover_report",
+        "form_fields": [
+          {
+            "key": "kpi_target",
+            "label": "SLA cam kết",
+            "type": "textarea"
+          },
+          {
+            "key": "kpi_actual",
+            "label": "Kết quả thực tế",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "retain": [
+      {
+        "title": "Gia hạn & upsell",
+        "description": "Nhắc gia hạn. Đề xuất upsell: SEO, redesign nếu website cũ.",
+        "ai_prompt_key": "upsell_suggest",
+        "form_fields": [
+          {
+            "key": "months_active",
+            "label": "Số tháng sử dụng",
+            "type": "number"
+          },
+          {
+            "key": "kpi_summary",
+            "label": "Tóm tắt hiệu suất",
+            "type": "textarea"
+          }
+        ]
+      }
+    ]
+  },
+  "thiet-ke-website": {
+    "onboard": [
+      {
+        "title": "Nhận brand assets & confirm sitemap",
+        "description": "Nhận: logo, màu sắc, font, nội dung trang, ảnh. Confirm sitemap và wireframe sơ bộ.",
+        "ai_prompt_key": "kickoff_brief",
+        "form_fields": [
+          {
+            "key": "start_date",
+            "label": "Ngày bắt đầu",
+            "type": "date"
+          },
+          {
+            "key": "brand_assets",
+            "label": "Brand assets đã nhận",
+            "type": "textarea"
+          },
+          {
+            "key": "sitemap",
+            "label": "Sitemap đã confirm",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "deliver": [
+      {
+        "title": "Thiết kế & revision",
+        "description": "Thiết kế mockup → KH review → chỉnh sửa (tối đa 2 vòng) → final design.",
+        "ai_prompt_key": "progress_report",
+        "form_fields": [
+          {
+            "key": "report_period",
+            "label": "Tuần",
+            "type": "text"
+          },
+          {
+            "key": "completed_tasks",
+            "label": "Trang đã thiết kế xong",
+            "type": "textarea"
+          },
+          {
+            "key": "revision_round",
+            "label": "Vòng revision hiện tại",
+            "type": "number"
+          }
+        ]
+      }
+    ],
+    "handover": [
+      {
+        "title": "Bàn giao file thiết kế",
+        "description": "Giao file Figma/PSD, export assets, hướng dẫn sử dụng. KH ký nghiệm thu.",
+        "ai_prompt_key": "handover_report",
+        "form_fields": [
+          {
+            "key": "kpi_target",
+            "label": "Deliverables cam kết",
+            "type": "textarea"
+          },
+          {
+            "key": "kpi_actual",
+            "label": "Files đã bàn giao",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "retain": [
+      {
+        "title": "Upsell sau thiết kế",
+        "description": "Đề xuất: code website từ design, SEO, quản trị website, landing page thêm.",
+        "ai_prompt_key": "upsell_suggest",
+        "form_fields": [
+          {
+            "key": "months_active",
+            "label": "Ngày từ khi bàn giao",
+            "type": "number"
+          },
+          {
+            "key": "kpi_summary",
+            "label": "Sản phẩm đã bàn giao",
+            "type": "textarea"
+          }
+        ]
+      }
+    ]
+  },
+  "thiet-ke-website-tron-goi": {
+    "onboard": [
+      {
+        "title": "Kickoff & setup hosting/domain",
+        "description": "Nhận brand assets, nội dung. Setup hosting/domain. Lên kế hoạch sprint.",
+        "ai_prompt_key": "kickoff_brief",
+        "form_fields": [
+          {
+            "key": "start_date",
+            "label": "Ngày bắt đầu",
+            "type": "date"
+          },
+          {
+            "key": "hosting_info",
+            "label": "Hosting/domain info",
+            "type": "text"
+          },
+          {
+            "key": "sprint_plan",
+            "label": "Kế hoạch sprint",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "deliver": [
+      {
+        "title": "Design → Dev → Testing → Staging",
+        "description": "Thiết kế mockup → code → test → staging → KH review → điều chỉnh → go-live.",
+        "ai_prompt_key": "progress_report",
+        "form_fields": [
+          {
+            "key": "report_period",
+            "label": "Tuần/Sprint",
+            "type": "text"
+          },
+          {
+            "key": "completed_tasks",
+            "label": "Milestone đã hoàn thành",
+            "type": "textarea"
+          },
+          {
+            "key": "current_phase",
+            "label": "Phase hiện tại",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "handover": [
+      {
+        "title": "Go-live & bàn giao website",
+        "description": "Deploy production. Bàn giao: source code, admin access, hướng dẫn. Training AM.",
+        "ai_prompt_key": "handover_report",
+        "form_fields": [
+          {
+            "key": "kpi_target",
+            "label": "Deliverables cam kết",
+            "type": "textarea"
+          },
+          {
+            "key": "kpi_actual",
+            "label": "Đã bàn giao",
+            "type": "textarea"
+          },
+          {
+            "key": "live_url",
+            "label": "URL live",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "retain": [
+      {
+        "title": "Hậu mãi 1 tháng & upsell",
+        "description": "Hỗ trợ 1 tháng sau go-live. Đề xuất: quản trị website, SEO, quảng cáo.",
+        "ai_prompt_key": "upsell_suggest",
+        "form_fields": [
+          {
+            "key": "months_active",
+            "label": "Ngày từ go-live",
+            "type": "number"
+          },
+          {
+            "key": "kpi_summary",
+            "label": "Tình trạng website sau go-live",
+            "type": "textarea"
+          }
+        ]
+      }
+    ]
+  },
+  "thiet-ke-landing-page": {
+    "onboard": [
+      {
+        "title": "Nhận brief & assets",
+        "description": "Nhận: logo, ảnh sản phẩm, copy draft, màu sắc thương hiệu.",
+        "ai_prompt_key": "kickoff_brief",
+        "form_fields": [
+          {
+            "key": "start_date",
+            "label": "Ngày bắt đầu",
+            "type": "date"
+          },
+          {
+            "key": "assets_received",
+            "label": "Assets đã nhận",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "deliver": [
+      {
+        "title": "Thiết kế & revision LP",
+        "description": "Design mockup → KH review → chỉnh sửa → export/code.",
+        "ai_prompt_key": "progress_report",
+        "form_fields": [
+          {
+            "key": "report_period",
+            "label": "Ngày",
+            "type": "text"
+          },
+          {
+            "key": "completed_tasks",
+            "label": "Đã hoàn thành",
+            "type": "textarea"
+          },
+          {
+            "key": "revision_round",
+            "label": "Vòng revision",
+            "type": "number"
+          }
+        ]
+      }
+    ],
+    "handover": [
+      {
+        "title": "Bàn giao landing page",
+        "description": "Giao file design + code. Test mobile/desktop. Hướng dẫn nhúng vào website.",
+        "ai_prompt_key": "handover_report",
+        "form_fields": [
+          {
+            "key": "kpi_target",
+            "label": "Deliverables cam kết",
+            "type": "textarea"
+          },
+          {
+            "key": "kpi_actual",
+            "label": "Đã bàn giao",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "retain": [
+      {
+        "title": "Upsell sau landing page",
+        "description": "Đề xuất: A/B test version mới, chạy Ads vào LP, website đầy đủ.",
+        "ai_prompt_key": "upsell_suggest",
+        "form_fields": [
+          {
+            "key": "months_active",
+            "label": "Ngày từ bàn giao",
+            "type": "number"
+          },
+          {
+            "key": "kpi_summary",
+            "label": "Hiệu suất LP (CVR, leads...)",
+            "type": "textarea"
+          }
+        ]
+      }
+    ]
+  },
+  "quang-cao-facebook": {
+    "onboard": [
+      {
+        "title": "Setup BM, Pixel & campaign",
+        "description": "Setup Business Manager, pixel, custom audience. Tạo campaign structure đầu tiên. Brief creative.",
+        "ai_prompt_key": "kickoff_brief",
+        "form_fields": [
+          {
+            "key": "start_date",
+            "label": "Ngày launch",
+            "type": "date"
+          },
+          {
+            "key": "bm_id",
+            "label": "Business Manager ID",
+            "type": "text"
+          },
+          {
+            "key": "pixel_status",
+            "label": "Pixel status",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "deliver": [
+      {
+        "title": "Vận hành & tối ưu tháng",
+        "description": "Monitor daily, A/B test creative, tối ưu targeting và bidding, scale winning ads. Báo cáo tháng.",
+        "ai_prompt_key": "progress_report",
+        "form_fields": [
+          {
+            "key": "report_period",
+            "label": "Tháng báo cáo",
+            "type": "text"
+          },
+          {
+            "key": "spend",
+            "label": "Tổng spend (VND)",
+            "type": "number"
+          },
+          {
+            "key": "metrics",
+            "label": "CTR / CPL / ROAS tháng này",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "handover": [
+      {
+        "title": "Báo cáo nghiệm thu Facebook Ads",
+        "description": "Tổng kết: tổng spend, leads/sales, ROI, bài học tối ưu.",
+        "ai_prompt_key": "handover_report",
+        "form_fields": [
+          {
+            "key": "kpi_target",
+            "label": "KPI cam kết",
+            "type": "textarea"
+          },
+          {
+            "key": "kpi_actual",
+            "label": "KPI đạt được",
+            "type": "textarea"
+          },
+          {
+            "key": "total_spend",
+            "label": "Tổng spend (VND)",
+            "type": "number"
+          }
+        ]
+      }
+    ],
+    "retain": [
+      {
+        "title": "Gia hạn & upsell Ads",
+        "description": "Nhắc gia hạn. Đề xuất: tăng ngân sách, thêm kênh Google Ads, retargeting.",
+        "ai_prompt_key": "upsell_suggest",
+        "form_fields": [
+          {
+            "key": "months_active",
+            "label": "Số tháng chạy Ads",
+            "type": "number"
+          },
+          {
+            "key": "kpi_summary",
+            "label": "Performance tổng hợp",
+            "type": "textarea"
+          }
+        ]
+      }
+    ]
+  },
+  "quang-cao-google": {
+    "onboard": [
+      {
+        "title": "Setup account & conversion tracking",
+        "description": "Setup Google Ads account, conversion tracking, campaign structure, ad copy đầu tiên.",
+        "ai_prompt_key": "kickoff_brief",
+        "form_fields": [
+          {
+            "key": "start_date",
+            "label": "Ngày launch",
+            "type": "date"
+          },
+          {
+            "key": "account_id",
+            "label": "Google Ads Account ID",
+            "type": "text"
+          },
+          {
+            "key": "conversion_tracking",
+            "label": "Conversion tracking status",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "deliver": [
+      {
+        "title": "Vận hành & tối ưu Google Ads",
+        "description": "Monitor daily, tối ưu bid, negative keywords, Quality Score, A/B test ad copy.",
+        "ai_prompt_key": "progress_report",
+        "form_fields": [
+          {
+            "key": "report_period",
+            "label": "Tháng báo cáo",
+            "type": "text"
+          },
+          {
+            "key": "spend",
+            "label": "Tổng spend (VND)",
+            "type": "number"
+          },
+          {
+            "key": "metrics",
+            "label": "Impression Share / CPA / Conversions",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "handover": [
+      {
+        "title": "Báo cáo nghiệm thu Google Ads",
+        "description": "Tổng kết: spend, conversions, CPA, ROAS so với mục tiêu.",
+        "ai_prompt_key": "handover_report",
+        "form_fields": [
+          {
+            "key": "kpi_target",
+            "label": "KPI cam kết",
+            "type": "textarea"
+          },
+          {
+            "key": "kpi_actual",
+            "label": "KPI đạt được",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "retain": [
+      {
+        "title": "Gia hạn & upsell Google Ads",
+        "description": "Nhắc gia hạn. Đề xuất: mở rộng Shopping/Display/PMax, thêm Facebook Ads.",
+        "ai_prompt_key": "upsell_suggest",
+        "form_fields": [
+          {
+            "key": "months_active",
+            "label": "Số tháng chạy Ads",
+            "type": "number"
+          },
+          {
+            "key": "kpi_summary",
+            "label": "Performance tổng hợp",
+            "type": "textarea"
+          }
+        ]
+      }
+    ]
+  },
+  "thue-tai-khoan-quang-cao": {
+    "onboard": [
+      {
+        "title": "Setup tài khoản & hướng dẫn KH",
+        "description": "Cấu hình tài khoản, payment method, Business Manager. Hướng dẫn quy tắc sử dụng.",
+        "ai_prompt_key": "kickoff_brief",
+        "form_fields": [
+          {
+            "key": "start_date",
+            "label": "Ngày bắt đầu",
+            "type": "date"
+          },
+          {
+            "key": "account_setup",
+            "label": "Thông tin tài khoản đã setup",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "deliver": [
+      {
+        "title": "Monitor tài khoản tháng",
+        "description": "Monitor daily, xử lý cảnh báo trong 2h, báo cáo spend tháng trước ngày 5.",
+        "ai_prompt_key": "progress_report",
+        "form_fields": [
+          {
+            "key": "report_period",
+            "label": "Tháng báo cáo",
+            "type": "text"
+          },
+          {
+            "key": "total_spend",
+            "label": "Tổng spend tháng (VND)",
+            "type": "number"
+          },
+          {
+            "key": "account_status",
+            "label": "Tình trạng tài khoản",
+            "type": "text"
+          }
+        ]
+      }
+    ],
+    "handover": [
+      {
+        "title": "Báo cáo & hóa đơn",
+        "description": "Gửi báo cáo spend chi tiết, hóa đơn minh bạch. Tổng kết SLA đã thực hiện.",
+        "ai_prompt_key": "handover_report",
+        "form_fields": [
+          {
+            "key": "kpi_target",
+            "label": "SLA cam kết",
+            "type": "textarea"
+          },
+          {
+            "key": "kpi_actual",
+            "label": "Kết quả thực tế",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "retain": [
+      {
+        "title": "Gia hạn & upsell quản lý Ads",
+        "description": "Nhắc gia hạn. Đề xuất upgrade: thuê tài khoản + quản lý Ads toàn diện.",
+        "ai_prompt_key": "upsell_suggest",
+        "form_fields": [
+          {
+            "key": "months_active",
+            "label": "Số tháng thuê",
+            "type": "number"
+          },
+          {
+            "key": "kpi_summary",
+            "label": "Uptime và tình trạng tài khoản",
+            "type": "textarea"
+          }
+        ]
+      }
+    ]
+  },
+  "tiep-thi-noi-dung": {
+    "onboard": [
+      {
+        "title": "Strategy brief & content calendar tháng 1",
+        "description": "Nhận brand guideline, tone of voice, từ khóa ưu tiên. Confirm content calendar tháng 1.",
+        "ai_prompt_key": "kickoff_brief",
+        "form_fields": [
+          {
+            "key": "start_date",
+            "label": "Ngày bắt đầu",
+            "type": "date"
+          },
+          {
+            "key": "tone_of_voice",
+            "label": "Tone of voice",
+            "type": "text"
+          },
+          {
+            "key": "content_calendar",
+            "label": "Content calendar tháng 1",
+            "type": "textarea"
+          }
+        ]
+      }
+    ],
+    "deliver": [
+      {
+        "title": "Sản xuất content tháng",
+        "description": "Viết bài theo brief, review SEO on-page, KH duyệt, publish đúng lịch. Báo cáo tháng.",
+        "ai_prompt_key": "progress_report",
+        "form_fields": [
+          {
+            "key": "report_period",
+            "label": "Tháng báo cáo",
+            "type": "text"
+          },
+          {
+            "key": "articles_published",
+            "label": "Số bài đã publish",
+            "type": "number"
+          },
+          {
+            "key": "organic_traffic",
+            "label": "Traffic từ content tháng này",
+            "type": "number"
+          }
+        ]
+      }
+    ],
+    "handover": [
+      {
+        "title": "Báo cáo nghiệm thu content",
+        "description": "Tổng hợp: số bài publish, traffic tăng trưởng, từ khóa vào top 20.",
+        "ai_prompt_key": "handover_report",
+        "form_fields": [
+          {
+            "key": "kpi_target",
+            "label": "KPI cam kết",
+            "type": "textarea"
+          },
+          {
+            "key": "kpi_actual",
+            "label": "KPI đạt được",
+            "type": "textarea"
+          },
+          {
+            "key": "traffic_growth_pct",
+            "label": "Tăng trưởng traffic (%)",
+            "type": "number"
+          }
+        ]
+      }
+    ],
+    "retain": [
+      {
+        "title": "Gia hạn & upsell content",
+        "description": "Nhắc gia hạn. Đề xuất: tăng số bài, thêm kênh (video/infographic), SEO tổng thể.",
+        "ai_prompt_key": "upsell_suggest",
+        "form_fields": [
+          {
+            "key": "months_active",
+            "label": "Số tháng sử dụng",
+            "type": "number"
+          },
+          {
+            "key": "kpi_summary",
+            "label": "Traffic và ranking tổng hợp",
+            "type": "textarea"
+          }
+        ]
+      }
+    ]
+  }
+}

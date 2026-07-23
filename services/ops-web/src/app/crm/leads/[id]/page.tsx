@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
 import { LeadFunnelPanel } from '@/components/LeadFunnelPanel';
+import { LeadContractPanel } from '@/components/LeadContractPanel';
 import {
   assignLead,
   createLeadActivity,
@@ -325,6 +326,16 @@ export default function CrmLeadDetailPage() {
 
             {getAccessToken() ? (
               <LeadFunnelPanel
+                token={getAccessToken()!}
+                leadId={leadId}
+                user={user}
+                onMessage={setMessage}
+                onError={setError}
+              />
+            ) : null}
+
+            {getAccessToken() ? (
+              <LeadContractPanel
                 token={getAccessToken()!}
                 leadId={leadId}
                 user={user}

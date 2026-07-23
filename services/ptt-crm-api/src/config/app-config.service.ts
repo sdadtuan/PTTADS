@@ -61,6 +61,7 @@ export class AppConfigService {
   readonly temporalTaskQueue: string;
   readonly crmLeadsFunnelNest: boolean;
   readonly presalesOnLead: boolean;
+  readonly crmServiceDeliveryNest: boolean;
 
   constructor() {
     this.port = Number(process.env.PORT ?? process.env.CRM_API_PORT ?? 3000);
@@ -129,6 +130,9 @@ export class AppConfigService {
     );
     this.presalesOnLead = ['1', 'true', 'yes', 'on'].includes(
       (process.env.PTT_PRESALES_ON_LEAD ?? '1').trim().toLowerCase(),
+    );
+    this.crmServiceDeliveryNest = ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_CRM_SERVICE_DELIVERY_NEST ?? '0').trim().toLowerCase(),
     );
   }
 

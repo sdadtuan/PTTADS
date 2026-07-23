@@ -10,6 +10,7 @@ import {
   activateAgencyClient,
   addClientChannelAccount,
   deleteClientChannelAccount,
+  fetchAgencyClientContracts,
   fetchAgencyClient,
   fetchClientLeads,
   fetchClientOnboarding,
@@ -42,7 +43,7 @@ import {
   type StoredStaffUser,
 } from '@/lib/auth';
 
-type TabId = 'overview' | 'checklist' | 'channels' | 'campaigns' | 'leads';
+type TabId = 'overview' | 'checklist' | 'channels' | 'campaigns' | 'leads' | 'contracts';
 
 const CLIENT_STATUSES = ['prospect', 'onboarding', 'active', 'paused'] as const;
 
@@ -96,6 +97,9 @@ export function AgencyClientDetailContent() {
   });
   const [workflowStatus, setWorkflowStatus] = useState<string>('');
   const [clientLeads, setClientLeads] = useState<ClientLeadSummary[]>([]);
+  const [clientContracts, setClientContracts] = useState<
+    Array<{ id: number; title: string; status: string; amount_vnd: number; lead_id: number | null }>
+  >([]);
   const [tokenAccountId, setTokenAccountId] = useState('');
   const [tokenValue, setTokenValue] = useState('');
   const [editChannelId, setEditChannelId] = useState<string | null>(null);
@@ -185,6 +189,18 @@ export function AgencyClientDetailContent() {
       }
     })();
   }, [ensureAuth, clientId, reload]);
+
+  useEffect(() => {
+    if (tab !== 'contracts' || !accessToken || !clientId) return;
+    void (async () => {
+      try {
+        const out = await fetchAgencyClientContracts(accessToken, clientId);
+        setClientContracts(out.contracts ?? []);
+      } catch {
+        setClientContracts([]);
+      }
+    })();
+  }, [tab, accessToken, clientId]);
 
   function setTab(next: TabId) {
     const qs = new URLSearchParams(searchParams.toString());
@@ -447,6 +463,7 @@ export function AgencyClientDetailContent() {
                   ['channels', 'Kênh ads'],
                   ['campaigns', 'Campaign map'],
                   ['leads', `Leads (${clientLeads.length})`],
+                  ['contracts', `Hợp đồng (${clientContracts.length})`],
                 ] as const
               ).map(([id, label]) => (
                 <button
@@ -883,6 +900,46 @@ export function AgencyClientDetailContent() {
                       <tr>
                         <td colSpan={6} className="muted">
                           Chưa có lead gắn client này (agency_client_id)
+                        </td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+
+            {tab === 'contracts' ? (
+              <div style={{ marginTop: '1rem', overflowX: 'auto' }}>
+                <table className="perf-table">
+                  <thead>
+                    <tr>
+                      <th>HĐ</th>
+                      <th>Trạng thái</th>
+                      <th>Giá trị</th>
+                      <th>Lead</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientContracts.map((ct) => (
+                      <tr key={ct.id}>
+                        <td>{ct.title}</td>
+                        <td>{ct.status}</td>
+                        <td>{fmtVnd(ct.amount_vnd)}</td>
+                        <td>
+                          {ct.lead_id ? (
+                            <Link href={`/crm/leads/${ct.lead_id}`} className="nav-link">
+                              #{ct.lead_id}
+                            </Link>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {clientContracts.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="muted">
+                          Chưa có hợp đồng gắn client này
                         </td>
                       </tr>
                     ) : null}

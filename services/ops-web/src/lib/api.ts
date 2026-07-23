@@ -420,6 +420,129 @@ export async function patchLeadPresalesTask(
   });
 }
 
+// --- Wave B5 S0: Contract → lifecycle promote ---
+
+export interface ContractReadinessCheck {
+  key: string;
+  ok: boolean;
+  label: string;
+  message?: string;
+}
+
+export interface LeadContractRow {
+  id: number;
+  lead_id: number | null;
+  title: string;
+  status: string;
+  amount_vnd: number;
+  service_slug: string;
+  signed_on: string;
+  notes: string;
+}
+
+export interface ContractApprovalRow {
+  id: number;
+  contract_id: number;
+  lead_id: number;
+  status: string;
+  requested_by: string;
+  decided_by: string;
+  amount_vnd: number;
+  notes: string;
+  decision_notes: string;
+  created_at: string;
+  contract_title?: string;
+  lead_name?: string;
+}
+
+export async function fetchLeadContractReadiness(token: string, leadId: number) {
+  return leadFunnelMutate<{
+    ok: boolean;
+    checks: ContractReadinessCheck[];
+    contract: LeadContractRow | null;
+    approval: ContractApprovalRow | null;
+  }>(token, `/api/v1/leads/${leadId}/contract/readiness`, { method: 'GET' });
+}
+
+export async function fetchLeadContract(token: string, leadId: number) {
+  return leadFunnelMutate<{ contract: LeadContractRow | null; approval: ContractApprovalRow | null }>(
+    token,
+    `/api/v1/leads/${leadId}/contract`,
+    { method: 'GET' },
+  );
+}
+
+export async function createLeadContract(
+  token: string,
+  leadId: number,
+  body: { title?: string; amount_vnd?: number; notes?: string },
+) {
+  return leadFunnelMutate<LeadContractRow>(token, `/api/v1/leads/${leadId}/contract`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchLeadContract(
+  token: string,
+  leadId: number,
+  contractId: number,
+  body: { title?: string; amount_vnd?: number; notes?: string },
+) {
+  return leadFunnelMutate<LeadContractRow>(token, `/api/v1/leads/${leadId}/contract/${contractId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function submitLeadContract(
+  token: string,
+  leadId: number,
+  contractId: number,
+  body: { notes?: string },
+) {
+  return leadFunnelMutate<ContractApprovalRow>(
+    token,
+    `/api/v1/leads/${leadId}/contract/${contractId}/submit`,
+    { method: 'POST', body: JSON.stringify(body) },
+  );
+}
+
+export async function fetchPendingContractApprovals(token: string, limit = 50) {
+  return leadFunnelMutate<{ approvals: ContractApprovalRow[] }>(
+    token,
+    `/api/v1/contracts/approvals/pending?limit=${limit}`,
+    { method: 'GET' },
+  );
+}
+
+export async function approveContractApproval(token: string, approvalId: number) {
+  return leadFunnelMutate<{
+    lifecycle_id: number;
+    customer_id: number;
+    contract: LeadContractRow;
+  }>(token, `/api/v1/contracts/approvals/${approvalId}/approve`, { method: 'POST', body: '{}' });
+}
+
+export async function rejectContractApproval(
+  token: string,
+  approvalId: number,
+  body: { decision_notes?: string },
+) {
+  return leadFunnelMutate<ContractApprovalRow>(token, `/api/v1/contracts/approvals/${approvalId}/reject`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchAgencyClientContracts(token: string, clientId: string) {
+  return leadFunnelMutate<{ contracts: LeadContractRow[] }>(
+    token,
+    `/api/v1/agency/clients/${encodeURIComponent(clientId)}/contracts`,
+    { method: 'GET' },
+  );
+}
+
 export async function patchLeadLegacy(
   token: string,
   id: number,

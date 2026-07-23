@@ -19,6 +19,7 @@ import { CreativesModule } from './creatives/creatives.module';
 import { FinanceModule } from './finance/finance.module';
 import { HealthModule } from './health/health.module';
 import { LeadsFunnelModule } from './leads-funnel/leads-funnel.module';
+import { LeadsContractModule } from './leads-contract/leads-contract.module';
 import { LeadsModule } from './leads/leads.module';
 import { ObservabilityModule } from './observability/observability.module';
 import { PerformanceModule } from './performance/performance.module';
@@ -43,6 +44,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     HealthModule,
     LeadsModule,
     LeadsFunnelModule,
+    LeadsContractModule,
     CatalogModule,
     CrmLeadsLegacyModule,
     CustomersModule,

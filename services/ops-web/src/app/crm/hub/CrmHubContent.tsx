@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
 import { AgencyReadOnlyBadge, canAgencyWrite } from '@/components/AgencyReadOnlyBadge';
 import { HubCampaignMapsPanel } from '@/components/HubCampaignMapsPanel';
+import { ContractApprovalsPanel } from '@/components/ContractApprovalsPanel';
 import { staffMe, staffRefresh } from '@/lib/api';
 import {
   clearSession,
@@ -18,11 +19,15 @@ import {
   type StoredStaffUser,
 } from '@/lib/auth';
 
+type HubTab = 'campaigns' | 'contracts';
+
 export function CrmHubContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const clientFilter = searchParams.get('client_id') ?? '';
   const campaignFilter = searchParams.get('campaign_id') ?? '';
+  const tabParam = searchParams.get('hub_tab');
+  const [hubTab, setHubTab] = useState<HubTab>(tabParam === 'contracts' ? 'contracts' : 'campaigns');
 
   const [user, setUser] = useState<StoredStaffUser | null>(null);
   const [error, setError] = useState('');
@@ -43,8 +48,8 @@ export function CrmHubContent() {
       const me = await staffMe(access);
       setUser(me);
       updateStoredUser(me);
-      if (!hasCap(me, 'crm_agency', 'view')) {
-        setError('Không có quyền Hub map');
+      if (!hasCap(me, 'crm_agency', 'view') && !hasCap(me, 'crm_leads', 'assign')) {
+        setError('Không có quyền Hub');
         return null;
       }
       setAccessToken(access);
@@ -85,9 +90,29 @@ export function CrmHubContent() {
       <OpsNav user={user} onLogout={logout} />
       <div className="card">
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginBottom: '0.5rem' }}>
-          <h2 style={{ margin: 0, flex: '1 1 auto', fontSize: '1.25rem' }}>Hub campaign map</h2>
+          <h2 style={{ margin: 0, flex: '1 1 auto', fontSize: '1.25rem' }}>Hub · Agency</h2>
           <AgencyReadOnlyBadge user={user} />
         </div>
+
+        <div className="agency-tabs" role="tablist" style={{ marginBottom: '1rem' }}>
+          <button
+            type="button"
+            role="tab"
+            className={`agency-tab${hubTab === 'campaigns' ? ' is-active' : ''}`}
+            onClick={() => setHubTab('campaigns')}
+          >
+            Campaign map
+          </button>
+          <button
+            type="button"
+            role="tab"
+            className={`agency-tab${hubTab === 'contracts' ? ' is-active' : ''}`}
+            onClick={() => setHubTab('contracts')}
+          >
+            HĐ chờ duyệt
+          </button>
+        </div>
+
         {clientFilter ? (
           <p className="muted" style={{ marginTop: 0 }}>
             Lọc client:{' '}
@@ -100,20 +125,29 @@ export function CrmHubContent() {
             </Link>
           </p>
         ) : null}
-        {campaignFilter ? (
-          <p className="muted">Lọc hub_campaign_id={campaignFilter}</p>
-        ) : null}
         {error ? <p className="error">{error}</p> : null}
         {msg ? <p className="muted">{msg}</p> : null}
 
-        {accessToken ? (
-          <HubCampaignMapsPanel
+        {hubTab === 'campaigns' && accessToken ? (
+          <>
+            {campaignFilter ? <p className="muted">Lọc hub_campaign_id={campaignFilter}</p> : null}
+            <HubCampaignMapsPanel
+              token={accessToken}
+              canWrite={canWrite}
+              showClientColumn
+              filterClientId={clientFilter || undefined}
+              filterCampaignId={campaignFilter || undefined}
+              onFeedback={setMsg}
+              onError={setError}
+            />
+          </>
+        ) : null}
+
+        {hubTab === 'contracts' && accessToken ? (
+          <ContractApprovalsPanel
             token={accessToken}
-            canWrite={canWrite}
-            showClientColumn
-            filterClientId={clientFilter || undefined}
-            filterCampaignId={campaignFilter || undefined}
-            onFeedback={setMsg}
+            user={user}
+            onMessage={setMsg}
             onError={setError}
           />
         ) : null}

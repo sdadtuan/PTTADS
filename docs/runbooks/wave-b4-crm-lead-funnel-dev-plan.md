@@ -344,7 +344,7 @@ Hoàn thành B4 **không** tắt Flask toàn hệ thống. Vẫn còn (Wave B5�
 
 | Module | Wave |
 |--------|------|
-| Service delivery lifecycle (Hub → SOP → workflow) | B5 |
+| Service delivery lifecycle (Hub → SOP → workflow) | B5 — [`wave-b5-dev-plan.md`](./wave-b5-dev-plan.md) |
 | Launch QA + Creative brief | B6 |
 | Offboard + **Phase 5 stop `ptt.service`** | B7 |
 
