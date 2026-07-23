@@ -156,6 +156,24 @@ export default function CrmLaunchQaPage() {
         </p>
       ) : null}
 
+      {(stats.pending_campaign_writes ?? 0) > 0 ? (
+        <p
+          style={{
+            margin: '0 0 1rem',
+            padding: '0.55rem 0.75rem',
+            borderRadius: 8,
+            border: '1px solid #c90',
+            background: 'rgba(255, 200, 0, 0.04)',
+            fontSize: '0.9rem',
+          }}
+        >
+          {stats.pending_campaign_writes} campaign write chờ duyệt —{' '}
+          <Link href="/crm/campaign-writes?status=pending_approval" className="nav-link">
+            Mở Campaign Write Hub
+          </Link>
+        </p>
+      ) : null}
+
       {loading ? <p className="muted">Đang tải…</p> : null}
       {error ? <p className="error">{error}</p> : null}
 

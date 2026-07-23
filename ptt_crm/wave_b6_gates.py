@@ -28,7 +28,10 @@ def _truthy(name: str, default: str = "0") -> bool:
 
 def _check_b6_modules() -> dict[str, Any]:
     files = [
-        ROOT / "docs/specs/2026-07-23-wave-b6-s3-creative-e2e-design.md",
+        ROOT / "docs/specs/2026-07-23-wave-b6-s4-campaign-write-e2e-design.md",
+        ROOT / "services/ptt-crm-api/src/crm-campaign-writes/crm-campaign-writes.controller.ts",
+        ROOT / "services/ptt-crm-api/src/launch-qa/launch-qa-campaign-write-bridge.service.ts",
+        ROOT / "services/ops-web/src/app/crm/campaign-writes/page.tsx",
         ROOT / "services/ptt-crm-api/src/crm-creatives/crm-creatives.controller.ts",
         ROOT / "services/ptt-crm-api/src/launch-qa/launch-qa-creative-bridge.service.ts",
         ROOT / "services/ops-web/src/app/crm/creatives/page.tsx",
@@ -67,7 +70,7 @@ def _run_nest_jest() -> dict[str, Any]:
         "npm",
         "test",
         "--",
-        "--testPathPattern=lifecycle-launch|launch-qa-auto-start|launch-qa-creative-bridge|lifecycle-stage",
+        "--testPathPattern=lifecycle-launch|launch-qa-auto-start|launch-qa-creative-bridge|launch-qa-campaign-write-bridge|lifecycle-stage",
         "--silent",
     ]
     proc = subprocess.run(cmd, cwd=str(api), capture_output=True, text=True)

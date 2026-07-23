@@ -9,5 +9,6 @@ import { TemporalCampaignWriteService } from './temporal-campaign-write.service'
   imports: [EventsModule],
   controllers: [CampaignWritesController],
   providers: [CampaignWritesRepository, CampaignWritesService, TemporalCampaignWriteService],
+  exports: [CampaignWritesRepository, CampaignWritesService],
 })
 export class CampaignWritesModule {}

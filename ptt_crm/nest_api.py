@@ -85,3 +85,7 @@ def approve_campaign_write(request_id: str, body: dict[str, Any]) -> tuple[int, 
 
 def reject_campaign_write(request_id: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     return nest_request("POST", f"/api/v1/campaign-writes/{request_id}/reject", body=body)
+
+
+def sync_launch_qa_budget_confirmed(body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    return nest_request("POST", "/api/internal/launch-qa/sync-budget-confirmed", body=body)

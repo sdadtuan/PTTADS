@@ -20,6 +20,7 @@ import { FinanceModule } from './finance/finance.module';
 import { HealthModule } from './health/health.module';
 import { LaunchQaModule } from './launch-qa/launch-qa.module';
 import { CrmCreativesModule } from './crm-creatives/crm-creatives.module';
+import { CrmCampaignWritesModule } from './crm-campaign-writes/crm-campaign-writes.module';
 import { LeadsFunnelModule } from './leads-funnel/leads-funnel.module';
 import { LeadsContractModule } from './leads-contract/leads-contract.module';
 import { LeadsModule } from './leads/leads.module';
@@ -64,6 +65,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     ServiceLifecycleModule,
     LaunchQaModule,
     CrmCreativesModule,
+    CrmCampaignWritesModule,
     SvcFinanceModule,
     CrmBoardModule,
     SopModule,

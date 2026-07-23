@@ -37,7 +37,7 @@ fi
 
 if [[ -n "$LIFECYCLE_ID" ]]; then
   ok "lifecycle id=$LIFECYCLE_ID"
-  for path in launch-qa creative-brief; do
+  for path in launch-qa creative-brief budget-brief; do
     code="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/crm/service-lifecycle/$LIFECYCLE_ID/$path" "${AUTH[@]}")"
     [[ "$code" =~ ^2 ]] && ok "GET service-lifecycle/:id/$path (HTTP $code)" || bad "GET lifecycle $path (HTTP $code)"
   done
@@ -51,6 +51,10 @@ if [[ -n "$LIFECYCLE_ID" ]]; then
   [[ "$cr_stats" =~ ^2 ]] && ok "GET /crm/creatives/stats (HTTP $cr_stats)" || bad "GET creatives/stats (HTTP $cr_stats)"
   cr_list="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/crm/creatives?status=all" "${AUTH[@]}")"
   [[ "$cr_list" =~ ^2 ]] && ok "GET /crm/creatives (HTTP $cr_list)" || bad "GET creatives (HTTP $cr_list)"
+  cw_stats="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/crm/campaign-writes/stats" "${AUTH[@]}")"
+  [[ "$cw_stats" =~ ^2 ]] && ok "GET /crm/campaign-writes/stats (HTTP $cw_stats)" || bad "GET campaign-writes/stats (HTTP $cw_stats)"
+  cw_list="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/crm/campaign-writes?status=all" "${AUTH[@]}")"
+  [[ "$cw_list" =~ ^2 ]] && ok "GET /crm/campaign-writes (HTTP $cw_list)" || bad "GET campaign-writes (HTTP $cw_list)"
 else
   bad "no LIFECYCLE_ID — skip B6 lifecycle routes"
 fi

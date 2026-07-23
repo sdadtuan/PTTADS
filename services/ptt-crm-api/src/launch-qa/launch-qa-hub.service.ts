@@ -1,4 +1,6 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { CampaignWritesRepository } from '../campaign-writes/campaign-writes.repository';
+import { checkCampaignWritePilot } from '../campaign-writes/meta-campaign-write-pilot.util';
 import { CreativesRepository } from '../creatives/creatives.repository';
 import { LaunchQaPgRepository } from '../service-lifecycle/launch-qa-pg.repository';
 import { launchQaProgress } from '../service-lifecycle/lifecycle-launch-gate.util';
@@ -11,6 +13,7 @@ export class LaunchQaHubService {
   constructor(
     private readonly repo: LaunchQaPgRepository,
     private readonly creativesRepo: CreativesRepository,
+    private readonly campaignWritesRepo: CampaignWritesRepository,
     private readonly lifecycleLookup: LaunchQaLifecycleLookupService,
   ) {}
 
@@ -20,13 +23,22 @@ export class LaunchQaHubService {
     }
     const qaStats = await this.repo.countByStatus();
     let pendingCreatives = 0;
+    let pendingCampaignWrites = 0;
     if (await this.creativesRepo.pgCreativesReady()) {
       const cStats = await this.creativesRepo.countByStatus();
       pendingCreatives = cStats.pending_client ?? 0;
     }
+    if (await this.campaignWritesRepo.tableReady()) {
+      const wStats = await this.campaignWritesRepo.countByStatus();
+      pendingCampaignWrites = wStats.pending_approval ?? 0;
+    }
     return {
       ok: true,
-      stats: { ...qaStats, pending_creatives: pendingCreatives },
+      stats: {
+        ...qaStats,
+        pending_creatives: pendingCreatives,
+        pending_campaign_writes: pendingCampaignWrites,
+      },
     };
   }
 

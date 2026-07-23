@@ -349,6 +349,14 @@ export class ServiceLifecycleService {
     });
   }
 
+  budgetBrief(id: number) {
+    return this.lifecycleLaunchQa.budgetBrief(id);
+  }
+
+  submitBudget(id: number, body: { daily_budget_vnd?: number; submitted_by?: string }) {
+    return this.lifecycleLaunchQa.submitBudget(id, body);
+  }
+
   private requireLifecycle(id: number) {
     const lc = this.sqlite.getLifecycleById(id);
     if (!lc) {

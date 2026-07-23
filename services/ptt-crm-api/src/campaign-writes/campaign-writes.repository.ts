@@ -94,6 +94,70 @@ export class CampaignWritesRepository implements OnModuleDestroy {
     return result.rows.map((r) => this.mapRow(r));
   }
 
+  async listForStaff(input: {
+    status?: string;
+    clientId?: string;
+    externalCampaignId?: string;
+    limit?: number;
+  }): Promise<CampaignWriteRow[]> {
+    const params: unknown[] = [];
+    const clauses: string[] = [];
+    if (input.status) {
+      params.push(input.status);
+      clauses.push(`status = $${params.length}`);
+    }
+    if (input.clientId) {
+      params.push(input.clientId);
+      clauses.push(`client_id = $${params.length}::uuid`);
+    }
+    if (input.externalCampaignId) {
+      params.push(input.externalCampaignId);
+      clauses.push(`external_campaign_id = $${params.length}`);
+    }
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+    const limit = Math.min(Math.max(input.limit ?? 100, 1), 200);
+    params.push(limit);
+    const result = await this.db.query(
+      `SELECT id::text, client_id::text, channel, external_account_id,
+              external_campaign_id, external_campaign_name, change_type,
+              old_value, new_value, status, submitted_by,
+              approved_by, approved_at, executed_at, execution_error,
+              temporal_workflow_id, created_at
+       FROM campaign_write_requests
+       ${where}
+       ORDER BY created_at DESC
+       LIMIT $${params.length}`,
+      params,
+    );
+    return result.rows.map((r) => this.mapRow(r));
+  }
+
+  async listForCampaign(clientId: string, externalCampaignId: string, limit = 10): Promise<CampaignWriteRow[]> {
+    return this.listForStaff({ clientId, externalCampaignId, limit });
+  }
+
+  async countByStatus(): Promise<Record<string, number>> {
+    const result = await this.db.query(
+      `SELECT status, COUNT(*)::int AS c FROM campaign_write_requests GROUP BY status`,
+    );
+    const out: Record<string, number> = {
+      all: 0,
+      pending_approval: 0,
+      approved: 0,
+      rejected: 0,
+      executed: 0,
+      execution_failed: 0,
+      withdrawn: 0,
+    };
+    for (const row of result.rows) {
+      const status = String(row.status ?? '');
+      const count = Number(row.c ?? 0);
+      out[status] = count;
+      out.all += count;
+    }
+    return out;
+  }
+
   async findById(id: string): Promise<CampaignWriteRow | null> {
     const result = await this.db.query(
       `SELECT id::text, client_id::text, channel, external_account_id,

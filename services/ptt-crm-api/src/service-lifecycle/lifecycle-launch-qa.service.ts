@@ -5,6 +5,9 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { AppConfigService } from '../config/app-config.service';
+import { CampaignWritesRepository } from '../campaign-writes/campaign-writes.repository';
+import { CampaignWritesService } from '../campaign-writes/campaign-writes.service';
+import { checkCampaignWritePilot } from '../campaign-writes/meta-campaign-write-pilot.util';
 import { CreativesRepository } from '../creatives/creatives.repository';
 import { CreativesService } from '../creatives/creatives.service';
 import { WorkflowsService } from '../workflows/workflows.service';
@@ -22,6 +25,8 @@ export class LifecycleLaunchQaService {
     private readonly autoStart: LaunchQaAutoStartService,
     private readonly creatives: CreativesService,
     private readonly creativesRepo: CreativesRepository,
+    private readonly campaignWrites: CampaignWritesService,
+    private readonly campaignWritesRepo: CampaignWritesRepository,
     private readonly workflows: WorkflowsService,
     private readonly config: AppConfigService,
   ) {}
@@ -216,6 +221,85 @@ export class LifecycleLaunchQaService {
       asset_type: body.asset_type?.trim() || 'image',
       submitted_by: body.submitted_by?.trim() || 'am@pttads.vn',
     });
+  }
+
+  async budgetBrief(lifecycleId: number) {
+    const ctx = this.resolveLaunchContext(lifecycleId);
+    const plan = this.sqlite.getOfficialMarketingPlan(lifecycleId);
+    const sf = this.parseJson(
+      plan?.strategy_framework_json != null ? String(plan.strategy_framework_json) : undefined,
+    );
+    const suggestedBudget = this.extractSuggestedBudgetVnd(sf);
+    let writes: Awaited<ReturnType<CampaignWritesRepository['listForCampaign']>> = [];
+    if (ctx.ok && (await this.campaignWritesRepo.tableReady())) {
+      writes = await this.campaignWritesRepo.listForCampaign(ctx.clientId!, ctx.campaignCode!, 10);
+    }
+    const pending = writes.find((w) => w.status === 'pending_approval');
+    const latestFailed = writes.find((w) => w.status === 'execution_failed');
+    const executed = writes.find((w) => w.status === 'executed' && w.change_type === 'daily_budget');
+    const pilot =
+      ctx.ok && ctx.clientId && ctx.campaignCode
+        ? checkCampaignWritePilot(ctx.clientId, ctx.campaignCode)
+        : null;
+    return {
+      lifecycle_id: lifecycleId,
+      has_context: ctx.ok,
+      client_id: ctx.clientId,
+      external_campaign_id: ctx.campaignCode,
+      campaign_name: ctx.campaignName,
+      suggested_budget_vnd: suggestedBudget,
+      from_tmmt: suggestedBudget != null,
+      writes,
+      has_executed_budget: Boolean(executed),
+      pending_write: pending ?? null,
+      latest_execution_failed: latestFailed ?? null,
+      pilot_check: pilot,
+      hint: ctx.clientId
+        ? 'GDKD duyệt trên Campaign Write Hub — executed sẽ auto-tick budget_confirmed.'
+        : null,
+      message: ctx.ok ? null : ctx.message,
+    };
+  }
+
+  async submitBudget(
+    lifecycleId: number,
+    body: {
+      daily_budget_vnd?: number;
+      submitted_by?: string;
+    },
+  ) {
+    const ctx = this.resolveLaunchContext(lifecycleId);
+    if (!ctx.ok) {
+      throw new BadRequestException({ error: ctx.message ?? 'missing_context' });
+    }
+    const brief = await this.budgetBrief(lifecycleId);
+    const budget = Number(body.daily_budget_vnd ?? brief.suggested_budget_vnd);
+    if (!Number.isFinite(budget) || budget < 0) {
+      throw new BadRequestException({ error: 'daily_budget_vnd required' });
+    }
+    const pilot = checkCampaignWritePilot(ctx.clientId!, ctx.campaignCode!);
+    const out = await this.campaignWrites.submit({
+      client_id: ctx.clientId!,
+      external_campaign_id: ctx.campaignCode!,
+      external_campaign_name: ctx.campaignName,
+      change_type: 'daily_budget',
+      new_value: { daily_budget_vnd: Math.round(budget) },
+      submitted_by: body.submitted_by?.trim() || 'am@pttads.vn',
+    });
+    return {
+      ...out,
+      pilot_check: pilot,
+    };
+  }
+
+  private extractSuggestedBudgetVnd(sf: Record<string, string>): number | null {
+    for (const key of ['daily_budget', 'daily_budget_vnd', 'budget', 'monthly_budget']) {
+      const raw = sf[key];
+      if (raw == null || raw === '') continue;
+      const n = Number(String(raw).replace(/[^\d.-]/g, ''));
+      if (Number.isFinite(n) && n >= 0) return Math.round(n);
+    }
+    return null;
   }
 
   async launchQaGateForLifecycle(lifecycleId: number, launchQaConfirm?: boolean) {

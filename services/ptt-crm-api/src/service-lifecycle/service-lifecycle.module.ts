@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CampaignWritesModule } from '../campaign-writes/campaign-writes.module';
 import { CreativesModule } from '../creatives/creatives.module';
 import { IntakeModule } from '../intake/intake.module';
 import { SopModule } from '../sop/sop.module';
@@ -26,6 +27,7 @@ import { ServiceLifecycleService } from './service-lifecycle.service';
     IntakeModule,
     SopModule,
     CreativesModule,
+    CampaignWritesModule,
     TemporalModule,
     WorkflowsModule,
   ],

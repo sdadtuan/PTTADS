@@ -95,6 +95,11 @@ export class ServiceLifecycleController {
     return this.serviceLifecycle.sop(id);
   }
 
+  @Get(':id/budget-brief')
+  budgetBrief(@Param('id', ParseIntPipe) id: number) {
+    return this.serviceLifecycle.budgetBrief(id);
+  }
+
   @Get(':id/launch-qa')
   launchQa(@Param('id', ParseIntPipe) id: number) {
     return this.serviceLifecycle.launchQa(id);
@@ -128,6 +133,16 @@ export class ServiceLifecycleController {
   startLaunchQa(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
     const staff = (req as Request & { staffUser?: { email?: string } }).staffUser;
     return this.serviceLifecycle.startLaunchQa(id, staff?.email);
+  }
+
+  @Post(':id/budget-submit')
+  @UseGuards(StaffServiceLifecycleWriteGuard)
+  submitBudget(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: Request) {
+    const staff = (req as Request & { staffUser?: { email?: string } }).staffUser;
+    return this.serviceLifecycle.submitBudget(id, {
+      daily_budget_vnd: body.daily_budget_vnd != null ? Number(body.daily_budget_vnd) : undefined,
+      submitted_by: staff?.email,
+    });
   }
 
   @Post(':id/creative-submit')

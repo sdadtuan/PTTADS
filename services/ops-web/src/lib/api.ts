@@ -1181,6 +1181,91 @@ export async function postCrmCreativeSubmit(
   });
 }
 
+export async function fetchCrmCampaignWritesStats(token: string) {
+  return crmFetch<{ ok: boolean; stats: Record<string, number> }>(token, '/api/crm/campaign-writes/stats');
+}
+
+export async function fetchCrmCampaignWrites(token: string, status = 'all', limit = 100) {
+  const qs = new URLSearchParams({ status, limit: String(limit) });
+  return crmFetch<{
+    ok: boolean;
+    count: number;
+    rows: Array<{
+      id: string;
+      client_id: string;
+      external_campaign_id: string;
+      external_campaign_name: string | null;
+      change_type: string;
+      new_value: Record<string, unknown>;
+      status: string;
+      submitted_by: string;
+      approved_by: string | null;
+      executed_at: string | null;
+      execution_error: string | null;
+      created_at: string;
+      lifecycle_id: number | null;
+    }>;
+  }>(token, `/api/crm/campaign-writes?${qs.toString()}`);
+}
+
+export async function postCrmCampaignWriteSubmit(
+  token: string,
+  body: {
+    client_id?: string;
+    external_campaign_id?: string;
+    external_campaign_name?: string;
+    daily_budget_vnd?: number;
+  },
+) {
+  return crmFetch(token, '/api/crm/campaign-writes/submit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function postCrmCampaignWriteApprove(token: string, id: string, note?: string) {
+  return crmFetch(token, `/api/crm/campaign-writes/${id}/approve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ note }),
+  });
+}
+
+export async function postCrmCampaignWriteReject(token: string, id: string, note?: string) {
+  return crmFetch(token, `/api/crm/campaign-writes/${id}/reject`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ note }),
+  });
+}
+
+export async function fetchServiceLifecycleBudgetBrief(token: string, id: number) {
+  return crmFetch<{
+    suggested_budget_vnd: number | null;
+    from_tmmt: boolean;
+    has_executed_budget: boolean;
+    pending_write?: {
+      id: string;
+      status: string;
+      new_value: Record<string, unknown>;
+      created_at: string;
+    } | null;
+    latest_execution_failed?: { id: string; execution_error: string | null } | null;
+    pilot_check?: { warning?: string | null; stub_mode?: boolean } | null;
+    hint?: string | null;
+    message?: string | null;
+  }>(token, `/api/crm/service-lifecycle/${id}/budget-brief`);
+}
+
+export async function postServiceLifecycleBudgetSubmit(token: string, id: number, dailyBudgetVnd: number) {
+  return crmFetch(token, `/api/crm/service-lifecycle/${id}/budget-submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ daily_budget_vnd: dailyBudgetVnd }),
+  });
+}
+
 export async function fetchLaunchQaRuns(token: string, status = 'all', limit = 100) {
   const qs = new URLSearchParams({ status, limit: String(limit) });
   return crmFetch<{

@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
+  fetchServiceLifecycleBudgetBrief,
   fetchServiceLifecycleCreativeBrief,
   fetchServiceLifecycleLaunchQa,
   patchServiceLifecycleLaunchQaChecklist,
+  postServiceLifecycleBudgetSubmit,
   postServiceLifecycleCreativeSubmit,
   postServiceLifecycleLaunchQaStart,
 } from '@/lib/api';
@@ -58,6 +60,22 @@ type CreativeBriefPayload = {
   message?: string | null;
 };
 
+type BudgetBriefPayload = {
+  suggested_budget_vnd: number | null;
+  from_tmmt: boolean;
+  has_executed_budget: boolean;
+  pending_write?: {
+    id: string;
+    status: string;
+    new_value: Record<string, unknown>;
+    created_at: string;
+  } | null;
+  latest_execution_failed?: { id: string; execution_error: string | null } | null;
+  pilot_check?: { warning?: string | null; stub_mode?: boolean } | null;
+  hint?: string | null;
+  message?: string | null;
+};
+
 interface Props {
   token: string;
   user: StoredStaffUser;
@@ -75,6 +93,7 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
   const canEdit = hasCap(user, 'crm_board', 'edit');
   const [data, setData] = useState<LaunchQaPayload | null>(null);
   const [brief, setBrief] = useState<CreativeBriefPayload | null>(null);
+  const [budgetBrief, setBudgetBrief] = useState<BudgetBriefPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -82,22 +101,28 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
   const [creativeTitle, setCreativeTitle] = useState('');
   const [creativeDesc, setCreativeDesc] = useState('');
   const [assetUrl, setAssetUrl] = useState('');
+  const [budgetVnd, setBudgetVnd] = useState('');
 
   const reload = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [qa, br] = await Promise.all([
+      const [qa, br, bb] = await Promise.all([
         fetchServiceLifecycleLaunchQa(token, lifecycleId),
         fetchServiceLifecycleCreativeBrief(token, lifecycleId),
+        fetchServiceLifecycleBudgetBrief(token, lifecycleId),
       ]);
       setData(qa);
       setBrief(br);
+      setBudgetBrief(bb);
       if (!creativeTitle && br.suggested_brief?.title) {
         setCreativeTitle(br.suggested_brief.title);
       }
       if (!creativeDesc && br.suggested_brief?.description) {
         setCreativeDesc(br.suggested_brief.description);
+      }
+      if (!budgetVnd && bb.suggested_budget_vnd != null) {
+        setBudgetVnd(String(bb.suggested_budget_vnd));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Tải Launch QA thất bại');
@@ -159,6 +184,32 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
     }
   }
 
+  async function onSubmitBudget(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canEdit) return;
+    const budget = Number(budgetVnd);
+    if (!Number.isFinite(budget) || budget < 0) return;
+    setSaving(true);
+    setMessage('');
+    setError('');
+    try {
+      const out = (await postServiceLifecycleBudgetSubmit(token, lifecycleId, budget)) as {
+        pilot_check?: { warning?: string | null };
+      };
+      const warn = out.pilot_check?.warning;
+      setMessage(
+        warn
+          ? `Đã gửi đổi budget — ${warn}`
+          : 'Đã gửi đổi budget — chờ GDKD duyệt trên Campaign Write Hub',
+      );
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Gửi budget thất bại');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) return <p className="muted">Đang tải Launch QA…</p>;
   if (error) return <p className="error">{error}</p>;
   if (!data) return null;
@@ -184,6 +235,10 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
             {' · '}
             <a href="/crm/creatives" className="nav-link">
               Creative Hub
+            </a>
+            {' · '}
+            <a href="/crm/campaign-writes" className="nav-link">
+              Campaign Write
             </a>
           </p>
         </div>
@@ -286,6 +341,83 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
             </ul>
           </>
         )}
+      </div>
+
+      <div className="card" style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>
+        <h3 style={{ margin: 0, fontSize: '1rem' }}>Meta budget write</h3>
+        {budgetBrief?.message ? <p className="muted" style={{ margin: 0 }}>{budgetBrief.message}</p> : null}
+        {budgetBrief?.hint ? (
+          <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+            {budgetBrief.hint}
+          </p>
+        ) : null}
+        {budgetBrief?.pilot_check?.warning ? (
+          <p style={{ margin: 0, fontSize: '0.85rem', color: '#c90' }}>
+            Pilot: {budgetBrief.pilot_check.warning}
+          </p>
+        ) : null}
+        {budgetBrief?.pending_write ? (
+          <p
+            style={{
+              margin: 0,
+              padding: '0.5rem 0.65rem',
+              borderRadius: 8,
+              border: '1px solid #c90',
+              fontSize: '0.85rem',
+            }}
+          >
+            Chờ GDKD duyệt budget{' '}
+            {Number(budgetBrief.pending_write.new_value?.daily_budget_vnd ?? 0).toLocaleString('vi-VN')} VND
+          </p>
+        ) : null}
+        {budgetBrief?.latest_execution_failed && !budgetBrief.pending_write ? (
+          <p
+            style={{
+              margin: 0,
+              padding: '0.5rem 0.65rem',
+              borderRadius: 8,
+              border: '1px solid var(--danger, #c53030)',
+              fontSize: '0.85rem',
+            }}
+          >
+            Execution failed
+            {budgetBrief.latest_execution_failed.execution_error
+              ? `: ${budgetBrief.latest_execution_failed.execution_error}`
+              : ''}
+          </p>
+        ) : null}
+        {budgetBrief?.has_executed_budget ? (
+          <p style={{ margin: 0, color: 'var(--accent)', fontSize: '0.85rem' }}>
+            Đã có budget write executed — checklist budget_confirmed có thể đã auto-tick.
+          </p>
+        ) : null}
+        {canEdit && data.has_context ? (
+          <form onSubmit={(e) => void onSubmitBudget(e)} style={{ display: 'grid', gap: '0.5rem' }}>
+            <label style={{ display: 'grid', gap: '0.3rem' }}>
+              <span className="muted">
+                Daily budget VND
+                {budgetBrief?.from_tmmt ? ' (gợi ý từ TMMT)' : ''}
+              </span>
+              <input
+                type="number"
+                min={0}
+                value={budgetVnd}
+                onChange={(e) => setBudgetVnd(e.target.value)}
+                disabled={saving}
+                style={{
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 8,
+                  padding: '0.45rem 0.65rem',
+                  color: 'var(--text)',
+                }}
+              />
+            </label>
+            <button type="submit" className="btn btn-sm" disabled={saving}>
+              Gửi đổi budget Meta
+            </button>
+          </form>
+        ) : null}
       </div>
 
       <div className="card" style={{ padding: '1rem', display: 'grid', gap: '0.75rem' }}>

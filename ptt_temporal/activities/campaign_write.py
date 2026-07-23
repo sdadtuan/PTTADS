@@ -81,6 +81,7 @@ async def mark_campaign_write_executed(inp: MarkCampaignWriteInput) -> dict[str,
     from ptt_jobs.db import pg_connection
 
     status = "executed" if inp.ok else "execution_failed"
+    row_meta: tuple[str, str, str] | None = None
     with pg_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -91,8 +92,35 @@ async def mark_campaign_write_executed(inp: MarkCampaignWriteInput) -> dict[str,
                     execution_error = %s,
                     updated_at = NOW()
                 WHERE id = %s::uuid
+                RETURNING client_id::text, external_campaign_id, change_type
                 """,
                 (status, inp.ok, inp.error, inp.request_id),
             )
+            fetched = cur.fetchone()
+            if fetched:
+                row_meta = (str(fetched[0]), str(fetched[1]), str(fetched[2]))
         conn.commit()
+
+    if inp.ok and row_meta and row_meta[2] == "daily_budget":
+        try:
+            from ptt_crm.nest_api import sync_launch_qa_budget_confirmed
+
+            code, payload = sync_launch_qa_budget_confirmed(
+                {
+                    "client_id": row_meta[0],
+                    "external_campaign_id": row_meta[1],
+                    "request_id": inp.request_id,
+                    "executed_by": "system@campaign-write",
+                }
+            )
+            if code >= 400 or not payload.get("synced"):
+                logger.warning(
+                    "launch_qa budget bridge skipped request=%s code=%s payload=%s",
+                    inp.request_id,
+                    code,
+                    payload,
+                )
+        except Exception as exc:
+            logger.warning("launch_qa budget bridge failed request=%s: %s", inp.request_id, exc)
+
     return {"ok": True, "status": status}

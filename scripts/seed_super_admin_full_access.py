@@ -70,6 +70,8 @@ AGGREGATE_CAPS: tuple[tuple[str, str], ...] = (
     ("crm_facebook_ads", "edit"),
     ("crm_facebook_ads", "create"),
     ("crm_facebook_ads", "configure"),
+    ("meta_campaign_write", "view"),
+    ("meta_campaign_write", "approve"),
     ("crm_facebook_ads", "delete"),
     ("crm_facebook_ads", "export"),
     ("crm_leads", "assign"),

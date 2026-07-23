@@ -70,6 +70,8 @@ const DEFAULT_STUB_CAPS: StaffSectionCap[] = [
   { section: 'crm_agency', action: 'view' },
   { section: 'crm_agency', action: 'create' },
   { section: 'crm_facebook_ads', action: 'view' },
+  { section: 'meta_campaign_write', action: 'view' },
+  { section: 'meta_campaign_write', action: 'approve' },
   { section: 'crm_seo', action: 'view' },
   { section: 'crm_email_mkt', action: 'view' },
   { section: 'crm_email_mkt', action: 'write' },

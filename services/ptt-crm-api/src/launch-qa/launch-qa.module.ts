@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { InternalKeyGuard } from '../auth/internal-key.guard';
+import { CampaignWritesRepository } from '../campaign-writes/campaign-writes.repository';
 import { CreativesRepository } from '../creatives/creatives.repository';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { LaunchQaPgRepository } from '../service-lifecycle/launch-qa-pg.repository';
@@ -7,22 +9,32 @@ import {
 } from '../service-lifecycle/guards/staff-service-lifecycle.guard';
 import { ServiceLifecycleSqliteRepository } from '../service-lifecycle/service-lifecycle-sqlite.repository';
 import { LaunchQaController } from './launch-qa.controller';
+import { LaunchQaCampaignWriteBridgeService } from './launch-qa-campaign-write-bridge.service';
 import { LaunchQaCreativeBridgeService } from './launch-qa-creative-bridge.service';
 import { LaunchQaHubService } from './launch-qa-hub.service';
+import { LaunchQaInternalController } from './launch-qa-internal.controller';
 import { LaunchQaLifecycleLookupService } from './launch-qa-lifecycle-lookup.service';
 
 @Module({
   imports: [StaffAuthModule],
-  controllers: [LaunchQaController],
+  controllers: [LaunchQaController, LaunchQaInternalController],
   providers: [
     LaunchQaHubService,
     LaunchQaLifecycleLookupService,
     LaunchQaCreativeBridgeService,
+    LaunchQaCampaignWriteBridgeService,
     LaunchQaPgRepository,
     CreativesRepository,
+    CampaignWritesRepository,
     ServiceLifecycleSqliteRepository,
     StaffServiceLifecycleViewGuard,
+    InternalKeyGuard,
   ],
-  exports: [LaunchQaPgRepository, LaunchQaCreativeBridgeService, LaunchQaLifecycleLookupService],
+  exports: [
+    LaunchQaPgRepository,
+    LaunchQaCreativeBridgeService,
+    LaunchQaCampaignWriteBridgeService,
+    LaunchQaLifecycleLookupService,
+  ],
 })
 export class LaunchQaModule {}
