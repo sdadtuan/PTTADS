@@ -1739,16 +1739,41 @@ export interface FacebookHubClient {
   leads_crm: number;
   cpl: number | null;
   campaigns: number;
+  unmapped_campaigns: number;
   over_target_rows: number;
+  meta_has_token?: boolean;
+  token_status?: string;
+}
+
+export interface FacebookHubAlert {
+  severity: 'warn' | 'danger';
+  message: string;
+  link: string;
+  link_label: string;
 }
 
 export interface FacebookHubResponse {
   ok: boolean;
   summary: Record<string, unknown>;
   clients: FacebookHubClient[];
-  alerts: string[];
+  alerts: FacebookHubAlert[];
   date_from: string;
   date_to: string;
+  window_days?: number;
+  filters?: {
+    client_id?: string | null;
+    status?: string | null;
+    q?: string | null;
+  };
+}
+
+export interface FacebookHubQuery {
+  days?: number;
+  date_to?: string;
+  date_from?: string;
+  status?: string;
+  client_id?: string;
+  q?: string;
 }
 
 export interface HubMapRow {
@@ -1847,9 +1872,44 @@ export async function fetchClientPerformance(
 
 export async function fetchFacebookHub(
   token: string,
-  days = 7,
+  params: FacebookHubQuery = {},
 ): Promise<FacebookHubResponse> {
-  return agencyFetch(token, `/api/v1/facebook-ads/hub?days=${days}`);
+  const qs = new URLSearchParams();
+  if (params.days != null) qs.set('days', String(params.days));
+  if (params.date_to) qs.set('date_to', params.date_to);
+  if (params.date_from) qs.set('date_from', params.date_from);
+  if (params.status) qs.set('status', params.status);
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.q) qs.set('q', params.q);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return agencyFetch(token, `/api/v1/facebook-ads/hub${suffix}`);
+}
+
+export async function downloadFacebookHubExport(
+  token: string,
+  params: FacebookHubQuery & { scope?: 'clients' | 'campaigns' } = {},
+): Promise<{ blob: Blob; filename: string }> {
+  const qs = new URLSearchParams();
+  if (params.days != null) qs.set('days', String(params.days));
+  if (params.date_to) qs.set('date_to', params.date_to);
+  if (params.date_from) qs.set('date_from', params.date_from);
+  if (params.status) qs.set('status', params.status);
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.q) qs.set('q', params.q);
+  if (params.scope) qs.set('scope', params.scope);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const res = await fetch(`${API_BASE}/api/v1/facebook-ads/hub/export${suffix}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Export failed (${res.status})`);
+  }
+  const cd = res.headers.get('content-disposition') ?? '';
+  const match = /filename="([^"]+)"/.exec(cd);
+  const filename = match?.[1] ?? 'meta-hub-export.csv';
+  const blob = await res.blob();
+  return { blob, filename };
 }
 
 export async function fetchHubCampaignMaps(

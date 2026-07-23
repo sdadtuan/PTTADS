@@ -247,6 +247,13 @@ export interface FacebookHubClientRow {
   token_status: string;
 }
 
+export interface FacebookHubAlert {
+  severity: 'warn' | 'danger';
+  message: string;
+  link: string;
+  link_label: string;
+}
+
 export interface FacebookHubResponse {
   ok: boolean;
   pg_ready: boolean;
@@ -255,5 +262,10 @@ export interface FacebookHubResponse {
   window_days: number;
   summary: Record<string, unknown>;
   clients: FacebookHubClientRow[];
-  alerts: string[];
+  alerts: FacebookHubAlert[];
+  filters?: {
+    client_id?: string | null;
+    status?: string | null;
+    q?: string | null;
+  };
 }

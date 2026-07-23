@@ -7,6 +7,7 @@ import {
   AgencySideEffectsSummary,
   AgencyStatsResponse,
   FacebookHubResponse,
+  FacebookHubAlert,
   HubCampaignMapsResponse,
   HubCampaignGlobalRow,
   HubCampaignMapRow,
@@ -26,6 +27,12 @@ import {
   ClientLeadRow,
 } from './agency.types';
 import { TokenVaultError } from './token-vault.util';
+import {
+  buildFacebookHubCampaignsCsv,
+  buildFacebookHubClientsCsv,
+  facebookHubExportFilename,
+  normalizeHubClientUuid,
+} from './facebook-hub.util';
 import { WorkflowsService } from '../workflows/workflows.service';
 
 const META_CAMPAIGN_ID_RE = /^[0-9]{5,20}$/;
@@ -215,26 +222,106 @@ export class AgencyService {
     days?: string;
     to?: string;
     date_to?: string;
+    from?: string;
+    date_from?: string;
     status?: string;
+    client_id?: string;
+    q?: string;
   }): Promise<FacebookHubResponse> {
     await this.ensurePg();
     const windowDays = Math.min(Math.max(Number(query.days ?? 7) || 7, 1), 90);
     const dateTo = (query.to ?? query.date_to ?? '').trim() || undefined;
-    const { clients, summary, dateFrom, dateTo: dateEnd } = await this.repo.facebookHubSummary({
-      windowDays,
-      dateTo,
-      status: query.status?.trim() || undefined,
-    });
+    const dateFrom = (query.from ?? query.date_from ?? '').trim() || undefined;
+    const clientId = normalizeHubClientUuid(query.client_id);
+    const q = query.q?.trim() || undefined;
+    const status = query.status?.trim() || undefined;
 
-    const alerts: string[] = [];
-    if (Number(summary.unmapped_campaigns ?? 0) > 0) {
-      alerts.push(`${summary.unmapped_campaigns} campaign chưa map Hub`);
-    }
-    if (Number(summary.over_target_rows ?? 0) > 0) {
-      alerts.push(`${summary.over_target_rows} dòng CPL vượt target`);
+    const { clients, summary, dateFrom: df, dateTo: dt, windowDays: wd } =
+      await this.repo.facebookHubSummary({
+        windowDays,
+        dateTo,
+        dateFrom,
+        status,
+        clientId: clientId ?? undefined,
+        q,
+      });
+
+    const alerts = this.buildFacebookHubAlerts(summary);
+
+    return {
+      ok: true,
+      pg_ready: true,
+      date_from: df,
+      date_to: dt,
+      window_days: wd,
+      summary,
+      clients,
+      alerts,
+      filters: {
+        client_id: clientId,
+        status: status ?? null,
+        q: q ?? null,
+      },
+    };
+  }
+
+  async facebookHubExportCsv(query: {
+    days?: string;
+    to?: string;
+    date_to?: string;
+    from?: string;
+    date_from?: string;
+    status?: string;
+    client_id?: string;
+    q?: string;
+    scope?: string;
+  }): Promise<{ csv: string; filename: string }> {
+    await this.ensurePg();
+    const hub = await this.facebookHub(query);
+    const scope = (query.scope ?? 'clients').trim().toLowerCase();
+    const meta = { dateFrom: hub.date_from, dateTo: hub.date_to };
+
+    if (scope === 'campaigns') {
+      const rows = await this.repo.facebookHubCampaignExport({
+        dateFrom: hub.date_from,
+        dateTo: hub.date_to,
+        clientId: hub.filters?.client_id ?? undefined,
+        status: hub.filters?.status ?? undefined,
+        q: hub.filters?.q ?? undefined,
+      });
+      return {
+        csv: buildFacebookHubCampaignsCsv(rows, meta),
+        filename: facebookHubExportFilename('campaigns', meta.dateFrom, meta.dateTo),
+      };
     }
 
-    return { ok: true, pg_ready: true, date_from: dateFrom, date_to: dateEnd, window_days: windowDays, summary, clients, alerts };
+    return {
+      csv: buildFacebookHubClientsCsv(hub.clients, meta),
+      filename: facebookHubExportFilename('clients', meta.dateFrom, meta.dateTo),
+    };
+  }
+
+  private buildFacebookHubAlerts(summary: Record<string, unknown>): FacebookHubAlert[] {
+    const alerts: FacebookHubAlert[] = [];
+    const unmapped = Number(summary.unmapped_campaigns ?? 0);
+    const overTarget = Number(summary.over_target_rows ?? 0);
+    if (unmapped > 0) {
+      alerts.push({
+        severity: 'warn',
+        message: `${unmapped} campaign Meta chưa map Hub`,
+        link: '/crm/hub',
+        link_label: 'Mở Hub map',
+      });
+    }
+    if (overTarget > 0) {
+      alerts.push({
+        severity: 'warn',
+        message: `${overTarget} dòng CPL vượt target trong kỳ đã chọn`,
+        link: '/meta/facebook-ads',
+        link_label: 'Xem bảng client',
+      });
+    }
+    return alerts;
   }
 
   private onboardingProgressFromItems(

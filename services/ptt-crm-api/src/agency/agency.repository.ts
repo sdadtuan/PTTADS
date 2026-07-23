@@ -17,6 +17,10 @@ import {
   JobRow,
   NotificationRow,
 } from './agency.types';
+import {
+  FacebookHubCampaignExportRow,
+  resolveFacebookHubDateWindow,
+} from './facebook-hub.util';
 
 function iso(value: unknown): string | null {
   if (value == null) return null;
@@ -1087,16 +1091,18 @@ export class AgencyRepository implements OnModuleDestroy {
   }
 
   async facebookHubSummary(params: {
-    windowDays: number;
+    windowDays?: number;
     dateTo?: string;
+    dateFrom?: string;
     status?: string;
-  }): Promise<{ clients: FacebookHubClientRow[]; summary: Record<string, unknown>; dateFrom: string; dateTo: string }> {
-    const days = Math.max(1, Math.min(params.windowDays, 90));
-    const end = params.dateTo ? new Date(params.dateTo) : new Date(Date.now() - 86400000);
-    const start = new Date(end);
-    start.setUTCDate(start.getUTCDate() - (days - 1));
-    const dateFrom = start.toISOString().slice(0, 10);
-    const dateTo = end.toISOString().slice(0, 10);
+    clientId?: string;
+    q?: string;
+  }): Promise<{ clients: FacebookHubClientRow[]; summary: Record<string, unknown>; dateFrom: string; dateTo: string; windowDays: number }> {
+    const { dateFrom, dateTo, windowDays } = resolveFacebookHubDateWindow({
+      days: params.windowDays,
+      dateTo: params.dateTo,
+      dateFrom: params.dateFrom,
+    });
 
     const clientClauses = ['1=1'];
     const sqlParams: unknown[] = [dateFrom, dateTo];
@@ -1104,6 +1110,15 @@ export class AgencyRepository implements OnModuleDestroy {
     if (params.status) {
       clientClauses.push(`c.status = $${idx++}`);
       sqlParams.push(params.status);
+    }
+    if (params.clientId) {
+      clientClauses.push(`c.id = $${idx++}::uuid`);
+      sqlParams.push(params.clientId);
+    }
+    if (params.q) {
+      clientClauses.push(`(c.code ILIKE $${idx} OR c.name ILIKE $${idx})`);
+      sqlParams.push(`%${params.q}%`);
+      idx++;
     }
 
     const result = await this.db.query(
@@ -1195,7 +1210,71 @@ export class AgencyRepository implements OnModuleDestroy {
       unmapped_campaigns: unmapped,
     };
 
-    return { clients, summary, dateFrom, dateTo };
+    return { clients, summary, dateFrom, dateTo, windowDays };
+  }
+
+  async facebookHubCampaignExport(params: {
+    dateFrom: string;
+    dateTo: string;
+    clientId?: string;
+    status?: string;
+    q?: string;
+  }): Promise<FacebookHubCampaignExportRow[]> {
+    const clauses = [`dp.channel = 'meta'`, `dp.performance_date BETWEEN $1::date AND $2::date`];
+    const sqlParams: unknown[] = [params.dateFrom, params.dateTo];
+    let idx = 3;
+
+    if (params.clientId) {
+      clauses.push(`dp.client_id = $${idx++}::uuid`);
+      sqlParams.push(params.clientId);
+    }
+    if (params.status) {
+      clauses.push(`c.status = $${idx++}`);
+      sqlParams.push(params.status);
+    }
+    if (params.q) {
+      clauses.push(`(c.code ILIKE $${idx} OR c.name ILIKE $${idx})`);
+      sqlParams.push(`%${params.q}%`);
+      idx++;
+    }
+
+    const result = await this.db.query(
+      `SELECT c.id::text AS client_id,
+              c.code AS client_code,
+              c.name AS client_name,
+              dp.external_campaign_id,
+              MAX(hcm.external_campaign_name) AS external_campaign_name,
+              SUM(dp.spend) AS spend,
+              SUM(dp.leads_crm) AS leads_crm,
+              MAX(hcm.target_cpl_vnd) AS target_cpl_vnd,
+              BOOL_OR(dp.hub_campaign_map_id IS NOT NULL) AS hub_mapped
+       FROM daily_performance dp
+       JOIN clients c ON c.id = dp.client_id
+       LEFT JOIN hub_campaign_map hcm ON hcm.id = dp.hub_campaign_map_id
+       WHERE ${clauses.join(' AND ')}
+       GROUP BY c.id, c.code, c.name, dp.external_campaign_id
+       ORDER BY SUM(dp.spend) DESC, c.code ASC, dp.external_campaign_id ASC
+       LIMIT 5000`,
+      sqlParams,
+    );
+
+    return result.rows.map((row) => {
+      const spend = Number(row.spend ?? 0);
+      const leads = Math.trunc(Number(row.leads_crm ?? 0));
+      return {
+        client_id: String(row.client_id),
+        client_code: row.client_code ?? null,
+        client_name: row.client_name ?? null,
+        external_campaign_id: row.external_campaign_id ?? null,
+        external_campaign_name: row.external_campaign_name ?? null,
+        spend: Math.round(spend * 100) / 100,
+        leads_crm: leads,
+        cpl: computeCpl(spend, leads),
+        target_cpl_vnd:
+          row.target_cpl_vnd != null ? Math.trunc(Number(row.target_cpl_vnd)) : null,
+        hub_mapped: Boolean(row.hub_mapped),
+      };
+    });
   }
 }
 

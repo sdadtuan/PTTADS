@@ -3,14 +3,17 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { StaffOrInternalKeyGuard } from '../staff-auth/staff-or-internal-key.guard';
 import { AgencyService } from './agency.service';
 import {
@@ -124,9 +127,52 @@ export class AgencyOpsController {
     @Query('days') days?: string,
     @Query('to') to?: string,
     @Query('date_to') dateTo?: string,
+    @Query('from') from?: string,
+    @Query('date_from') dateFrom?: string,
     @Query('status') status?: string,
+    @Query('client_id') clientId?: string,
+    @Query('q') q?: string,
   ): Promise<FacebookHubResponse> {
-    return this.agency.facebookHub({ days, to, date_to: dateTo, status });
+    return this.agency.facebookHub({
+      days,
+      to,
+      date_to: dateTo,
+      from,
+      date_from: dateFrom,
+      status,
+      client_id: clientId,
+      q,
+    });
+  }
+
+  @Get('facebook-ads/hub/export')
+  @UseGuards(StaffOrInternalKeyGuard, StaffFacebookAdsViewGuard)
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  async facebookHubExport(
+    @Res({ passthrough: true }) res: Response,
+    @Query('days') days?: string,
+    @Query('to') to?: string,
+    @Query('date_to') dateTo?: string,
+    @Query('from') from?: string,
+    @Query('date_from') dateFrom?: string,
+    @Query('status') status?: string,
+    @Query('client_id') clientId?: string,
+    @Query('q') q?: string,
+    @Query('scope') scope?: string,
+  ): Promise<string> {
+    const out = await this.agency.facebookHubExportCsv({
+      days,
+      to,
+      date_to: dateTo,
+      from,
+      date_from: dateFrom,
+      status,
+      client_id: clientId,
+      q,
+      scope,
+    });
+    res.setHeader('Content-Disposition', `attachment; filename="${out.filename}"`);
+    return out.csv;
   }
 
   @Get('crm/hub-campaign-maps')
