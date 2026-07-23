@@ -1780,8 +1780,12 @@ export interface FacebookAdsMigrationStatus {
   ok: boolean;
   flask_meta_ads_admin_retired: boolean;
   ops_web_hub_url: string;
+  ops_web_hub_path?: string;
   legacy_rs_path?: string;
   canonical_upstream: string;
+  webhooks_nest_meta?: boolean;
+  webhooks_flask_fallback?: boolean;
+  horizon1_expect_meta_hub_retired?: boolean;
   gate_m1_g09: boolean;
   gate_m1_g06?: boolean;
   gate_m1_g06_config?: boolean;

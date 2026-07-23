@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { MetaMigrationPanel } from '@/components/MetaMigrationPanel';
 import { OpsNav } from '@/components/OpsNav';
 import {
   downloadFacebookHubExport,
@@ -207,37 +208,7 @@ export function MetaFacebookAdsContent() {
     <main style={{ maxWidth: 1200, margin: '0 auto', padding: '1.5rem' }}>
       <OpsNav user={user} onLogout={logout} />
 
-      {migration?.flask_meta_ads_admin_retired ? (
-        <div
-          className="card"
-          style={{
-            marginBottom: '1rem',
-            borderLeft: '4px solid var(--accent, #2563eb)',
-            padding: '0.75rem 1rem',
-          }}
-        >
-          <p style={{ margin: 0 }}>
-            Hub Meta canonical trên ops-web · Flask <code>/crm/facebook-ads</code> đã retire (M1-G09).
-            Bookmark cũ trên rs.pttads.vn sẽ redirect về đây
-            {migration.gate_m1_g06 ? ' (M1-G06 ✓)' : migration.nginx_redirect_live_skipped ? ' — chưa verify live redirect' : ' — M1-G06 pending'}.
-            {migration.gate_m1_g11
-              ? ' · Dry-run retirement OK (M1-G11 ✓)'
-              : migration.retirement_dry_run_artifact_present === false
-                ? ' · Chưa chạy dry-run B3.5 (./scripts/wave_b3_5_deploy.sh)'
-                : migration.retirement_env_already_applied
-                  ? ' · Env retirement đã apply — sẵn sàng B3.6 verify'
-                  : typeof migration.retirement_env_pending_changes === 'number' &&
-                      migration.retirement_env_pending_changes > 0
-                    ? ` · Dry-run: ${migration.retirement_env_pending_changes} env flag pending (B3.6 APPLY)`
-                    : ' · M1-G11 pending'}
-            {migration.gate_m1_g12
-              ? ' · Prod APPLY OK (M1-G12 ✓)'
-              : migration.retirement_apply_artifact_present === false && migration.flask_meta_ads_admin_retired
-                ? ' · Chưa APPLY B3.6 trên VPS'
-                : ''}
-          </p>
-        </div>
-      ) : null}
+      {migration ? <MetaMigrationPanel status={migration} /> : null}
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <h1 style={{ marginTop: 0, fontSize: '1.25rem' }}>Meta Ads Hub</h1>

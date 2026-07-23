@@ -1223,3 +1223,234 @@ body:has(.ops-sidebar) main {
 .hub-meta-campaign-id {
   font-family: ui-monospace, monospace;
 }
+
+/* —— Meta Ads migration panel (Horizon 1) —— */
+
+.meta-migration-panel {
+  margin-bottom: 1rem;
+  border-left: 4px solid var(--accent);
+  padding: 1rem 1.25rem;
+}
+
+.meta-migration-panel--complete {
+  border-left-color: var(--success);
+}
+
+.meta-migration-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+}
+
+.meta-migration-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.meta-migration-title {
+  margin: 0.15rem 0 0;
+  font-size: 1.05rem;
+}
+
+.meta-migration-subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.88rem;
+}
+
+.meta-migration-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.meta-migration-progress-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--primary-700);
+}
+
+.meta-migration-progress {
+  margin: 0.85rem 0 0.75rem;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(57, 139, 67, 0.12);
+  overflow: hidden;
+}
+
+.meta-migration-progress-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand-lime), var(--primary-800));
+  transition: width 0.25s ease;
+}
+
+.meta-migration-hint,
+.meta-migration-complete-note {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+}
+
+.meta-migration-complete-note {
+  color: var(--primary-700);
+}
+
+.meta-migration-section-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.92rem;
+}
+
+.meta-migration-gate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.meta-migration-gate-row {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+}
+
+@media (min-width: 720px) {
+  .meta-migration-gate-row {
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    align-items: center;
+  }
+}
+
+.meta-migration-gate-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+}
+
+.meta-migration-gate-id {
+  font-family: ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--primary-800);
+}
+
+.meta-migration-gate-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.65rem;
+}
+
+.meta-migration-gate-detail {
+  font-size: 0.8rem;
+}
+
+.meta-migration-pill {
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.12rem 0.45rem;
+}
+
+.meta-migration-pill--pass {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.meta-migration-pill--warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.meta-migration-pill--pending {
+  background: #e8eef0;
+  color: #5c6f63;
+}
+
+.meta-migration-details {
+  margin-top: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.75rem;
+  background: var(--surface);
+}
+
+.meta-migration-details summary {
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.meta-migration-uat-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.meta-migration-uat-list li {
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+}
+
+@media (min-width: 720px) {
+  .meta-migration-uat-list li {
+    grid-template-columns: 2rem minmax(0, 1fr) auto;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+}
+
+.meta-migration-uat-id {
+  font-weight: 700;
+  color: var(--primary-800);
+}
+
+.meta-migration-uat-field {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.meta-migration-ops-dl {
+  margin: 0.65rem 0 0;
+  display: grid;
+  gap: 0.45rem;
+  font-size: 0.82rem;
+}
+
+.meta-migration-ops-dl dt {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.meta-migration-ops-dl dd {
+  margin: 0;
+}
+
+.meta-migration-ops-dl code {
+  display: block;
+  margin-top: 0.15rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-soft);
+  font-size: 0.78rem;
+  overflow-x: auto;
+}
+
+.meta-migration-footer {
+  margin: 0.75rem 0 0;
+  font-size: 0.82rem;
+}
