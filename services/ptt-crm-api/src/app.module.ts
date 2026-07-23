@@ -18,6 +18,7 @@ import { ConfigModule } from './config/config.module';
 import { CreativesModule } from './creatives/creatives.module';
 import { FinanceModule } from './finance/finance.module';
 import { HealthModule } from './health/health.module';
+import { LeadsFunnelModule } from './leads-funnel/leads-funnel.module';
 import { LeadsModule } from './leads/leads.module';
 import { ObservabilityModule } from './observability/observability.module';
 import { PerformanceModule } from './performance/performance.module';
@@ -41,6 +42,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     ObservabilityModule,
     HealthModule,
     LeadsModule,
+    LeadsFunnelModule,
     CatalogModule,
     CrmLeadsLegacyModule,
     CustomersModule,

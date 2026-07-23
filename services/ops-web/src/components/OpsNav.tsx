@@ -105,6 +105,9 @@ function buildSections(
   const care: NavLink[] = [];
   if (hasCap(user, 'crm_leads', 'view')) {
     care.push({ href: '/crm/leads', label: 'Quản lý Lead' });
+    if (hasCap(user, 'crm_leads', 'assign')) {
+      care.push({ href: '/crm/leads/review-queue', label: 'Phải tra soát (B2)' });
+    }
     care.push({ href: '/crm/catalog', label: 'Catalog' });
   }
   if (hasCap(user, 'crm_board_customers', 'view')) {

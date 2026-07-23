@@ -270,6 +270,114 @@ export async function assignLead(
   return out.lead;
 }
 
+// --- Wave B4: Lead funnel (care / review queue / presales) ---
+
+export interface LeadFunnelSnapshot {
+  lead_id: number;
+  care_pipeline: {
+    current_stage_key: string;
+    current_stage_label: string;
+    all_complete: boolean;
+    stages: Array<{ key: string; label: string; hint: string; done: boolean; current: boolean }>;
+  };
+  presales_care_gate: { complete: boolean; message: string };
+  review_queue: { active: boolean; message?: string; hours_waiting?: number | null };
+  presales_on_lead_enabled: boolean;
+  presales: {
+    presales: { id: number; stage: string; service_slug: string; status: string };
+    tasks: Record<string, Array<{ id: number; title: string; is_done: boolean }>>;
+    advance: { can_advance_forward: boolean; block_reason: string; next_stage: string | null };
+  } | null;
+}
+
+async function leadFunnelMutate<T>(token: string, path: string, init: RequestInit): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: { ...authHeaders(token), 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+  });
+  const body = await parseJson<T & { error?: string; message?: string }>(res);
+  if (!res.ok) throw new ApiError(body.error ?? body.message ?? 'Lead funnel API failed', res.status);
+  return body;
+}
+
+export async function fetchLeadFunnel(token: string, leadId: number): Promise<LeadFunnelSnapshot> {
+  return leadFunnelMutate(token, `/api/v1/leads/${leadId}/funnel`, { method: 'GET' });
+}
+
+export async function submitLeadCareReport(
+  token: string,
+  leadId: number,
+  body: { stage?: string; content?: string; care_status?: string },
+): Promise<{ ok: boolean; funnel: LeadFunnelSnapshot }> {
+  return leadFunnelMutate(token, `/api/v1/leads/${leadId}/care-pipeline/report`, {
+    method: 'POST',
+    body: JSON.stringify({ stage: 'first_contact', care_status: 'da_lien_he_thanh_cong', ...body }),
+  });
+}
+
+export async function completeLeadCareStage(
+  token: string,
+  leadId: number,
+  note: string,
+): Promise<{ ok: boolean; funnel: LeadFunnelSnapshot }> {
+  return leadFunnelMutate(token, `/api/v1/leads/${leadId}/care-pipeline/complete`, {
+    method: 'POST',
+    body: JSON.stringify({ stage: 'first_contact', note }),
+  });
+}
+
+export async function fetchReviewQueueCount(token: string): Promise<{ count: number }> {
+  return leadFunnelMutate(token, '/api/v1/leads/review-queue/count', { method: 'GET' });
+}
+
+export async function fetchReviewQueueLeads(
+  token: string,
+  limit = 50,
+): Promise<{ leads: Array<{ id: number; full_name: string; phone: string; review_queue: { message?: string } }> }> {
+  return leadFunnelMutate(token, `/api/v1/leads/review-queue?limit=${limit}`, { method: 'GET' });
+}
+
+export async function releaseLeadReviewQueue(
+  token: string,
+  leadId: number,
+  body: { mode: 'auto' | 'manual'; owner_id?: number; note?: string },
+): Promise<{ ok: boolean }> {
+  return leadFunnelMutate(token, `/api/v1/leads/${leadId}/review-queue/release`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function ensureLeadPresales(
+  token: string,
+  leadId: number,
+  serviceSlug: string,
+): Promise<{ ok: boolean; funnel: LeadFunnelSnapshot }> {
+  return leadFunnelMutate(token, `/api/v1/leads/${leadId}/presales`, {
+    method: 'POST',
+    body: JSON.stringify({ service_slug: serviceSlug }),
+  });
+}
+
+export async function advanceLeadPresales(
+  token: string,
+  leadId: number,
+): Promise<{ ok: boolean; funnel: LeadFunnelSnapshot }> {
+  return leadFunnelMutate(token, `/api/v1/leads/${leadId}/presales/advance`, { method: 'POST', body: '{}' });
+}
+
+export async function patchLeadPresalesTask(
+  token: string,
+  leadId: number,
+  taskId: number,
+  body: { is_done?: boolean },
+): Promise<{ ok: boolean; funnel: LeadFunnelSnapshot }> {
+  return leadFunnelMutate(token, `/api/v1/leads/${leadId}/presales/tasks/${taskId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
 export async function patchLeadLegacy(
   token: string,
   id: number,

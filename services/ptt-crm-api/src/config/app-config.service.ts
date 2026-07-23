@@ -59,6 +59,8 @@ export class AppConfigService {
   readonly temporalAddress: string | null;
   readonly temporalNamespace: string;
   readonly temporalTaskQueue: string;
+  readonly crmLeadsFunnelNest: boolean;
+  readonly presalesOnLead: boolean;
 
   constructor() {
     this.port = Number(process.env.PORT ?? process.env.CRM_API_PORT ?? 3000);
@@ -122,6 +124,12 @@ export class AppConfigService {
     this.temporalAddress = (process.env.PTT_TEMPORAL_ADDRESS ?? '').trim() || null;
     this.temporalNamespace = (process.env.PTT_TEMPORAL_NAMESPACE ?? 'default').trim();
     this.temporalTaskQueue = (process.env.PTT_TEMPORAL_TASK_QUEUE ?? 'ptt-agency').trim();
+    this.crmLeadsFunnelNest = ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_CRM_LEADS_FUNNEL_NEST ?? '1').trim().toLowerCase(),
+    );
+    this.presalesOnLead = ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_PRESALES_ON_LEAD ?? '1').trim().toLowerCase(),
+    );
   }
 
   private parsePortalCorsOrigins(): string[] {

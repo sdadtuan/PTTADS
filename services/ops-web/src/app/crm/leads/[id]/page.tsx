@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
+import { LeadFunnelPanel } from '@/components/LeadFunnelPanel';
 import {
   assignLead,
   createLeadActivity,
@@ -322,7 +323,17 @@ export default function CrmLeadDetailPage() {
               <dd style={{ margin: 0 }}>{lead.created_at?.slice(0, 10) ?? '—'}</dd>
             </dl>
 
-            <form onSubmit={(e) => void onSaveStatus(e)} style={{ display: 'grid', gap: '0.85rem' }}>
+            {getAccessToken() ? (
+              <LeadFunnelPanel
+                token={getAccessToken()!}
+                leadId={leadId}
+                user={user}
+                onMessage={setMessage}
+                onError={setError}
+              />
+            ) : null}
+
+            <form onSubmit={(e) => void onSaveStatus(e)} style={{ display: 'grid', gap: '0.85rem', marginTop: '1rem' }}>
               <label style={{ display: 'grid', gap: '0.35rem' }}>
                 <span className="muted">Trạng thái</span>
                 <select

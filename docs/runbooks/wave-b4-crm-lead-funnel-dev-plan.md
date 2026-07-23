@@ -3,7 +3,7 @@
 > **Phạm vi:** Port workflow kinh doanh Lead funnel từ Flask/Python sang Nest + ops-web — **FR-CRM-04** (B2 review queue) và **FR-CRM-05** (presales gates + KH MKT sơ bộ).  
 > **Không nhầm với:** Meta Horizon 1 **B4** (campaign write pilot) trong [`horizon1-meta-ads-migration-checklist.md`](./horizon1-meta-ads-migration-checklist.md).
 
-**Trạng thái:** Planning · chưa có `wave_b4_deploy.sh`  
+**Trạng thái:** Implemented (Nest SQLite bridge + ops-web v1) · deploy: `./scripts/wave_b4_deploy.sh`  
 **Cập nhật:** 2026-07-23  
 **Production:** Staff/API `https://rs.pttads.vn` · ops-web `/crm/leads/*`
 
