@@ -130,6 +130,8 @@ export interface EnsurePresalesBody {
 
 export interface AdvancePresalesBody {
   to_stage?: PresalesStage;
+  confirm?: boolean;
+  override_reason?: string;
 }
 
 export interface PatchPresalesTaskBody {

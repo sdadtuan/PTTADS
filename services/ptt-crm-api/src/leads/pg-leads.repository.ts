@@ -99,6 +99,25 @@ export class PgLeadsRepository implements OnModuleDestroy {
       );
       params.push(like, like, like);
     }
+    if (query.review_queue_filter === 'only') {
+      const ids = query.review_queue_ids ?? [];
+      if (ids.length === 0) {
+        clauses.push('FALSE');
+      } else {
+        const base = params.length;
+        const placeholders = ids.map((_, i) => `$${base + i + 1}`).join(', ');
+        clauses.push(`l.sqlite_lead_id IN (${placeholders})`);
+        params.push(...ids);
+      }
+    } else if (query.review_queue_filter === 'hide') {
+      const ids = query.review_queue_ids ?? [];
+      if (ids.length > 0) {
+        const base = params.length;
+        const placeholders = ids.map((_, i) => `$${base + i + 1}`).join(', ');
+        clauses.push(`l.sqlite_lead_id NOT IN (${placeholders})`);
+        params.push(...ids);
+      }
+    }
 
     return {
       sql: clauses.length ? ` WHERE ${clauses.join(' AND ')}` : '',

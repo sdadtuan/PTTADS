@@ -1,6 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { AppConfigService } from '../config/app-config.service';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
+import { StaffJwtPayload } from '../staff-auth/staff-jwt.util';
 import {
+  AdvancePresalesBody,
   CompleteCareStageBody,
   EnsurePresalesBody,
   LeadFunnelSnapshot,
@@ -18,6 +21,7 @@ export class LeadsFunnelService {
   constructor(
     private readonly repo: LeadsFunnelSqliteRepository,
     private readonly config: AppConfigService,
+    private readonly staffAuth: StaffAuthService,
   ) {}
 
   getFunnel(leadId: number): LeadFunnelSnapshot {
@@ -95,13 +99,22 @@ export class LeadsFunnelService {
     return { ok: true, funnel: this.getFunnel(leadId) };
   }
 
-  advancePresales(leadId: number) {
+  advancePresales(leadId: number, body: AdvancePresalesBody, allowOverride = false) {
     try {
-      this.repo.advancePresales(leadId);
+      this.repo.advancePresales(leadId, {
+        confirm: Boolean(body.confirm),
+        overrideReason: body.override_reason,
+        allowOverride,
+      });
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : String(err));
     }
     return { ok: true, funnel: this.getFunnel(leadId) };
+  }
+
+  async staffHasAssignCap(staffUser: StaffJwtPayload): Promise<boolean> {
+    const me = await this.staffAuth.me(staffUser);
+    return this.staffAuth.hasCap(me.caps, 'crm_leads', 'assign');
   }
 
   patchPresalesTask(

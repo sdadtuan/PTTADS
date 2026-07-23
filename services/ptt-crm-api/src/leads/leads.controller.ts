@@ -17,6 +17,7 @@ import { InternalKeyGuard } from '../auth/internal-key.guard';
 import { StaffOrInternalKeyGuard } from '../staff-auth/staff-or-internal-key.guard';
 import { WriteEnabledGuard } from './guards/write-enabled.guard';
 import { StaffLeadsWriteGuard } from './guards/staff-leads-write.guard';
+import { LeadNotInReviewQueueGuard } from '../leads-funnel/guards/lead-not-in-review-queue.guard';
 import { LeadsService } from './leads.service';
 import { LeadsWriteService } from './leads-write.service';
 import {
@@ -41,7 +42,7 @@ export class LeadsController {
   }
 
   @Patch(':id')
-  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard, WriteEnabledGuard)
+  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard, WriteEnabledGuard, LeadNotInReviewQueueGuard)
   async patchLead(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: PatchLeadV1Body,
@@ -60,7 +61,11 @@ export class LeadsController {
     @Query('q') q?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('review_queue_only') reviewQueueOnly?: string,
+    @Query('hide_review_queue') hideReviewQueue?: string,
   ): Promise<LeadsListResponseV1> {
+    const truthy = (v?: string) => v === '1' || v === 'true';
+    const hideExplicitFalse = hideReviewQueue === '0' || hideReviewQueue === 'false';
     return this.leadsService.listLeads({
       client_id: clientId,
       status,
@@ -69,6 +74,8 @@ export class LeadsController {
       q,
       limit: limit !== undefined ? Number(limit) : undefined,
       offset: offset !== undefined ? Number(offset) : undefined,
+      review_queue_only: truthy(reviewQueueOnly),
+      hide_review_queue: hideExplicitFalse ? false : undefined,
     });
   }
 

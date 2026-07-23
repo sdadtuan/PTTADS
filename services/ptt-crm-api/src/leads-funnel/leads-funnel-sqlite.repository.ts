@@ -38,6 +38,10 @@ import {
   reviewQueuePublicState,
 } from './review-queue.util';
 import { PRESALES_STAGES } from './leads-funnel.types';
+import {
+  consultAdvanceBlockReason,
+  validatePresalesConsultAdvance,
+} from './presales-consult-gate.util';
 
 @Injectable()
 export class LeadsFunnelSqliteRepository implements OnModuleDestroy {
@@ -195,12 +199,50 @@ export class LeadsFunnelSqliteRepository implements OnModuleDestroy {
     };
   }
 
-  assertNotInReviewQueue(leadId: number): void {
+  isLeadInReviewQueue(leadId: number): boolean {
     const row = this.fetchLeadRow(leadId);
-    if (!row) throw new Error('Không tìm thấy lead.');
-    if (isLeadInReviewQueue(parseLeadMeta(row.meta_json))) {
+    if (!row) return false;
+    return isLeadInReviewQueue(parseLeadMeta(row.meta_json));
+  }
+
+  listReviewQueueLeadIds(): number[] {
+    const rows = this.database
+      .prepare(
+        `SELECT l.id FROM crm_leads l
+         WHERE COALESCE(json_extract(l.meta_json, '$.review_queue.active'), '') = 'true'
+           AND COALESCE(l.is_duplicate, 0) = 0`,
+      )
+      .all() as Array<{ id: number }>;
+    return rows.map((r) => Number(r.id));
+  }
+
+  assertNotInReviewQueue(leadId: number): void {
+    if (this.isLeadInReviewQueue(leadId)) {
       throw new Error('Lead đang ở danh mục Phải tra soát — chỉ GDKD được xử lý.');
     }
+  }
+
+  private consultAdvanceGate(leadId: number, presalesId: number) {
+    const sessions = this.database
+      .prepare(
+        `SELECT status, mode, decision, bant_total FROM crm_lead_intake_sessions
+         WHERE lead_id = ? ORDER BY updated_at DESC, id DESC LIMIT 20`,
+      )
+      .all(leadId) as Array<{
+      status: string;
+      mode: string;
+      decision: string;
+      bant_total: number;
+    }>;
+    const leadTasks = this.database
+      .prepare(
+        `SELECT COUNT(*) AS total, SUM(CASE WHEN is_done = 1 THEN 1 ELSE 0 END) AS done
+         FROM crm_lead_presales_tasks WHERE presales_id = ? AND stage = 'lead'`,
+      )
+      .get(presalesId) as { total: number; done: number };
+    const leadTaskDone =
+      Number(leadTasks.total) === 0 || Number(leadTasks.done) >= Number(leadTasks.total);
+    return validatePresalesConsultAdvance({ leadTaskDone, sessions });
   }
 
   submitCareReport(
@@ -599,6 +641,13 @@ export class LeadsFunnelSqliteRepository implements OnModuleDestroy {
       blockReason = 'Đã ở giai đoạn Proposal — chờ ký HĐ để tạo Lifecycle.';
     } else if (!currentComplete) {
       blockReason = 'Hoàn thành tất cả task giai đoạn hiện tại trước khi chuyển bước.';
+    } else if (nextStage === 'consult' && current === 'lead') {
+      const gate = this.consultAdvanceGate(leadId, ps.id);
+      if (!gate.ok || gate.requires_confirm) {
+        blockReason = gate.messages[0] || 'Chưa đủ điều kiện chuyển Tư vấn';
+      } else {
+        canAdvance = true;
+      }
     } else if (nextStage === 'proposal' && current === 'consult') {
       const plan = this.getPreliminaryPlan(ps.id);
       const val = validatePreliminaryPlan(plan);
@@ -652,11 +701,27 @@ export class LeadsFunnelSqliteRepository implements OnModuleDestroy {
       .run(...params);
   }
 
-  advancePresales(leadId: number): PresalesRow {
+  advancePresales(
+    leadId: number,
+    opts: { confirm?: boolean; overrideReason?: string; allowOverride?: boolean } = {},
+  ): PresalesRow {
     this.assertNotInReviewQueue(leadId);
     const snap = this.getPresalesSnapshot(leadId);
     if (!snap) throw new Error('Không tìm thấy pre-sales');
-    if (!snap.advance.can_advance_forward || !snap.advance.next_stage) {
+    if (!snap.advance.next_stage) {
+      throw new Error(snap.advance.block_reason || 'Không thể chuyển giai đoạn');
+    }
+    if (snap.advance.next_stage === 'consult' && snap.advance.current_stage === 'lead') {
+      const gate = this.consultAdvanceGate(leadId, snap.presales.id);
+      const block = consultAdvanceBlockReason(gate, Boolean(opts.confirm));
+      if (block) throw new Error(block);
+      if (opts.overrideReason?.trim()) {
+        const note = `Director override: ${opts.overrideReason.trim().slice(0, 500)}`;
+        this.database
+          .prepare('UPDATE crm_lead_presales SET notes = TRIM(notes || char(10) || ?) WHERE id = ?')
+          .run(note, snap.presales.id);
+      }
+    } else if (!snap.advance.can_advance_forward) {
       throw new Error(snap.advance.block_reason || 'Không thể chuyển giai đoạn');
     }
     const ts = this.ts();

@@ -1,0 +1,9 @@
+[Unit]
+Description=Hourly B2 review queue sync (Wave B4)
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -51,6 +51,9 @@ fi
 care_code="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/v1/leads/$LEAD_ID/care-pipeline" "${AUTH[@]}")"
 [[ "$care_code" =~ ^2 ]] && ok "GET care-pipeline (HTTP $care_code)" || bad "GET care-pipeline (HTTP $care_code)"
 
+list_code="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/v1/leads?limit=1&hide_review_queue=0" "${AUTH[@]}")"
+[[ "$list_code" =~ ^2 ]] && ok "GET leads hide_review_queue=0 (HTTP $list_code)" || bad "GET leads filter (HTTP $list_code)"
+
 echo ""
 if [[ "$fail" -eq 0 ]]; then
   echo "Wave B4 smoke PASSED"

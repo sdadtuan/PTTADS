@@ -52,6 +52,8 @@ export interface PgLeadRow {
   created_at: Date | string | null;
 }
 
+export type ReviewQueueListFilter = 'only' | 'hide';
+
 export interface ListLeadsQuery {
   client_id?: string;
   status?: string;
@@ -60,6 +62,12 @@ export interface ListLeadsQuery {
   q?: string;
   limit?: number;
   offset?: number;
+  review_queue_only?: boolean;
+  /** When false, include review-queue leads in the main list. Default hide when funnel enabled. */
+  hide_review_queue?: boolean;
+  review_queue_filter?: ReviewQueueListFilter;
+  /** Populated by LeadsService when filtering PG reads via SQLite funnel state. */
+  review_queue_ids?: number[];
 }
 
 export interface CreateLeadV1Body {

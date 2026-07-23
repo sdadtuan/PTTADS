@@ -20,6 +20,7 @@ import { StaffJwtPayload } from '../staff-auth/staff-jwt.util';
 import { StaffLeadsViewGuard } from '../leads/guards/staff-leads-view.guard';
 import { StaffLeadsWriteGuard } from '../leads/guards/staff-leads-write.guard';
 import {
+  AdvancePresalesBody,
   CompleteCareStageBody,
   EnsurePresalesBody,
   PatchMarketingPlanBody,
@@ -28,6 +29,7 @@ import {
 } from './leads-funnel.types';
 import { LeadsFunnelEnabledGuard, PresalesOnLeadGuard } from './guards/leads-funnel-enabled.guard';
 import { StaffLeadsGdkdGuard } from './guards/staff-leads-gdkd.guard';
+import { LeadNotInReviewQueueGuard } from './guards/lead-not-in-review-queue.guard';
 import { LeadsFunnelService } from './leads-funnel.service';
 
 @Controller('api/v1/leads')
@@ -87,7 +89,7 @@ export class LeadsFunnelController {
 
   @Post(':id/care-pipeline/report')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard)
+  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard, LeadNotInReviewQueueGuard)
   submitCareReport(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: CompleteCareStageBody,
@@ -102,7 +104,7 @@ export class LeadsFunnelController {
 
   @Post(':id/care-pipeline/complete')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard)
+  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard, LeadNotInReviewQueueGuard)
   completeCareStage(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: CompleteCareStageBody,
@@ -138,7 +140,7 @@ export class LeadsFunnelController {
 
   @Post(':id/presales')
   @HttpCode(HttpStatus.CREATED)
-  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard, PresalesOnLeadGuard)
+  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard, PresalesOnLeadGuard, LeadNotInReviewQueueGuard)
   ensurePresales(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: EnsurePresalesBody,
@@ -153,17 +155,24 @@ export class LeadsFunnelController {
 
   @Post(':id/presales/advance')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard, PresalesOnLeadGuard)
-  advancePresales(@Param('id', ParseIntPipe) id: number) {
+  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard, PresalesOnLeadGuard, LeadNotInReviewQueueGuard)
+  async advancePresales(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: AdvancePresalesBody,
+    @Req() req: Request & { staffUser?: StaffJwtPayload },
+  ) {
     try {
-      return this.funnel.advancePresales(id);
+      const allowOverride = req.staffUser
+        ? await this.funnel.staffHasAssignCap(req.staffUser)
+        : false;
+      return this.funnel.advancePresales(id, body, allowOverride);
     } catch (err) {
       this.badRequest(err);
     }
   }
 
   @Patch(':id/presales/tasks/:taskId')
-  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard, PresalesOnLeadGuard)
+  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard, PresalesOnLeadGuard, LeadNotInReviewQueueGuard)
   patchPresalesTask(
     @Param('id', ParseIntPipe) id: number,
     @Param('taskId', ParseIntPipe) taskId: number,
@@ -180,7 +189,7 @@ export class LeadsFunnelController {
   }
 
   @Patch(':id/presales/marketing-plan')
-  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard, PresalesOnLeadGuard)
+  @UseGuards(StaffOrInternalKeyGuard, StaffLeadsWriteGuard, PresalesOnLeadGuard, LeadNotInReviewQueueGuard)
   patchMarketingPlan(@Param('id', ParseIntPipe) id: number, @Body() body: PatchMarketingPlanBody) {
     return this.funnel.patchMarketingPlan(id, body);
   }

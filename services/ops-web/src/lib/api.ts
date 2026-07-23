@@ -104,13 +104,14 @@ export async function staffMe(token: string): Promise<StaffMeResponse> {
 
 export async function fetchLeads(
   token: string,
-  params?: { q?: string; status?: string; limit?: number; offset?: number },
+  params?: { q?: string; status?: string; limit?: number; offset?: number; hide_review_queue?: boolean },
 ): Promise<LeadsListResponse> {
   const qs = new URLSearchParams();
   if (params?.q) qs.set('q', params.q);
   if (params?.status) qs.set('status', params.status);
   if (params?.limit !== undefined) qs.set('limit', String(params.limit));
   if (params?.offset !== undefined) qs.set('offset', String(params.offset));
+  if (params?.hide_review_queue === false) qs.set('hide_review_queue', '0');
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   const res = await fetch(`${API_BASE}/api/v1/leads${suffix}`, {
     headers: authHeaders(token),
@@ -362,8 +363,30 @@ export async function ensureLeadPresales(
 export async function advanceLeadPresales(
   token: string,
   leadId: number,
+  body: { confirm?: boolean; override_reason?: string } = {},
 ): Promise<{ ok: boolean; funnel: LeadFunnelSnapshot }> {
-  return leadFunnelMutate(token, `/api/v1/leads/${leadId}/presales/advance`, { method: 'POST', body: '{}' });
+  return leadFunnelMutate(token, `/api/v1/leads/${leadId}/presales/advance`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchLeadPresalesMarketingPlan(
+  token: string,
+  leadId: number,
+): Promise<{ ok: boolean; plan: Record<string, unknown>; validation: { ok: boolean; messages: string[] } }> {
+  return leadFunnelMutate(token, `/api/v1/leads/${leadId}/presales/marketing-plan`, { method: 'GET' });
+}
+
+export async function patchLeadPresalesMarketingPlan(
+  token: string,
+  leadId: number,
+  body: { name?: string; north_star?: string; objectives?: string; strategy_framework?: Record<string, string> },
+): Promise<{ ok: boolean; funnel: LeadFunnelSnapshot; validation: { ok: boolean; messages: string[] } }> {
+  return leadFunnelMutate(token, `/api/v1/leads/${leadId}/presales/marketing-plan`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
 }
 
 export async function patchLeadPresalesTask(

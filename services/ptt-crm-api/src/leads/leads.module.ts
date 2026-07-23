@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { EventsModule } from '../events/events.module';
+import { LeadsFunnelModule } from '../leads-funnel/leads-funnel.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { LeadsController } from './leads.controller';
 import { LeadsRepository } from './leads.repository';
@@ -13,7 +14,7 @@ import { StaffLeadsViewGuard } from './guards/staff-leads-view.guard';
 import { WriteEnabledGuard } from './guards/write-enabled.guard';
 
 @Module({
-  imports: [EventsModule, StaffAuthModule],
+  imports: [EventsModule, StaffAuthModule, forwardRef(() => LeadsFunnelModule)],
   controllers: [LeadsController],
   providers: [
     LeadsService,

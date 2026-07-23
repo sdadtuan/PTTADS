@@ -58,3 +58,4 @@ fi
 
 echo ""
 echo "Next: ADMIN_PASSWORD='...' LEAD_ID=<id> ./scripts/wave_b4_smoke.sh"
+echo "Cron: sudo cp deploy/ptt-lead-review-queue-sync.* /etc/systemd/system/ && sudo systemctl enable --now ptt-lead-review-queue-sync.timer"

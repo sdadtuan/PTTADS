@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import type { StoredStaffUser } from '@/lib/auth';
-import { hasCap } from '@/lib/auth';
+import { getAccessToken, hasCap } from '@/lib/auth';
+import { fetchReviewQueueCount } from '@/lib/api';
 import { emailJourneysEnabled, emailModuleEnabled } from '@/lib/email-flags';
 
 interface OpsNavProps {
@@ -93,6 +95,7 @@ function buildSections(
   user: StoredStaffUser | null,
   emailPendingApprovals?: number,
   agencyUnread?: number,
+  reviewQueueCount?: number,
 ): NavSection[] {
   const sections: NavSection[] = [];
 
@@ -106,7 +109,10 @@ function buildSections(
   if (hasCap(user, 'crm_leads', 'view')) {
     care.push({ href: '/crm/leads', label: 'Quản lý Lead' });
     if (hasCap(user, 'crm_leads', 'assign')) {
-      care.push({ href: '/crm/leads/review-queue', label: 'Phải tra soát (B2)' });
+      care.push({
+        href: '/crm/leads/review-queue',
+        label: `Phải tra soát (B2)${navBadge(reviewQueueCount)}`,
+      });
     }
     care.push({ href: '/crm/catalog', label: 'Catalog' });
   }
@@ -229,7 +235,18 @@ function buildSections(
 
 export function OpsNav({ user, onLogout, emailPendingApprovals, agencyUnread }: OpsNavProps) {
   const pathname = usePathname();
-  const sections = buildSections(user, emailPendingApprovals, agencyUnread);
+  const [reviewQueueCount, setReviewQueueCount] = useState<number | undefined>();
+
+  useEffect(() => {
+    if (!user || !hasCap(user, 'crm_leads', 'assign')) return;
+    const token = getAccessToken();
+    if (!token) return;
+    void fetchReviewQueueCount(token)
+      .then((out) => setReviewQueueCount(out.count))
+      .catch(() => setReviewQueueCount(undefined));
+  }, [user, pathname]);
+
+  const sections = buildSections(user, emailPendingApprovals, agencyUnread, reviewQueueCount);
   const pageTitle = pageTitleFor(pathname);
 
   return (

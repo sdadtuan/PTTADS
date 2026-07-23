@@ -17,6 +17,7 @@ import { Request } from 'express';
 import { StaffOrInternalKeyGuard } from '../staff-auth/staff-or-internal-key.guard';
 import { StaffJwtPayload } from '../staff-auth/staff-jwt.util';
 import { StaffLeadsWriteGuard } from '../leads/guards/staff-leads-write.guard';
+import { LeadNotInReviewQueueGuard } from '../leads-funnel/guards/lead-not-in-review-queue.guard';
 import { StaffLeadsViewGuard } from '../leads/guards/staff-leads-view.guard';
 import { LeadsRepository } from '../leads/leads.repository';
 import { LeadsWriteService } from '../leads/leads-write.service';
@@ -50,7 +51,7 @@ export class CrmLeadsLegacyController {
 
   @Post(':id/activities')
   @HttpCode(HttpStatus.CREATED)
-  @UseGuards(StaffLeadsWriteGuard)
+  @UseGuards(StaffLeadsWriteGuard, LeadNotInReviewQueueGuard)
   createActivity(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: CreateLeadActivityBody,
@@ -66,7 +67,7 @@ export class CrmLeadsLegacyController {
   }
 
   @Post(':id/assign')
-  @UseGuards(StaffLeadsWriteGuard)
+  @UseGuards(StaffLeadsWriteGuard, LeadNotInReviewQueueGuard)
   assign(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: AssignLeadBody,
@@ -76,7 +77,7 @@ export class CrmLeadsLegacyController {
   }
 
   @Patch(':id')
-  @UseGuards(StaffLeadsWriteGuard)
+  @UseGuards(StaffLeadsWriteGuard, LeadNotInReviewQueueGuard)
   async patchLead(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: PatchLeadV1Body & { audit_note?: string },

@@ -6,12 +6,21 @@ import {
   completeLeadCareStage,
   ensureLeadPresales,
   fetchLeadFunnel,
+  fetchLeadPresalesMarketingPlan,
+  patchLeadPresalesMarketingPlan,
   patchLeadPresalesTask,
   releaseLeadReviewQueue,
   submitLeadCareReport,
   type LeadFunnelSnapshot,
 } from '@/lib/api';
 import { hasCap, type StoredStaffUser } from '@/lib/auth';
+
+const FUNNEL_STEPS = [
+  { key: 'b2', label: 'B2 Liên hệ' },
+  { key: 'lead', label: 'Pre-sales Lead' },
+  { key: 'consult', label: 'Tư vấn' },
+  { key: 'proposal', label: 'Báo giá' },
+] as const;
 
 interface Props {
   token: string;
@@ -28,12 +37,37 @@ export function LeadFunnelPanel({ token, leadId, user, serviceSlug, onMessage, o
   const [careNote, setCareNote] = useState('');
   const [careReport, setCareReport] = useState('Đã liên hệ KH — xác nhận nhu cầu');
   const [busy, setBusy] = useState(false);
+  const [planNorthStar, setPlanNorthStar] = useState('');
+  const [planObjectives, setPlanObjectives] = useState('');
+  const [planMarketMessage, setPlanMarketMessage] = useState('');
+  const [planMediaReach, setPlanMediaReach] = useState('');
+  const [planConversion, setPlanConversion] = useState('');
+  const [planValidation, setPlanValidation] = useState<string[]>([]);
 
   const reload = useCallback(async () => {
     setLoading(true);
     try {
       const snap = await fetchLeadFunnel(token, leadId);
       setFunnel(snap);
+      if (snap.presales && ['consult', 'proposal'].includes(snap.presales.presales.stage)) {
+        try {
+          const mp = await fetchLeadPresalesMarketingPlan(token, leadId);
+          setPlanNorthStar(String(mp.plan.north_star ?? ''));
+          setPlanObjectives(String(mp.plan.objectives ?? ''));
+          let sf: Record<string, string> = {};
+          try {
+            sf = JSON.parse(String(mp.plan.strategy_framework_json ?? '{}')) as Record<string, string>;
+          } catch {
+            sf = {};
+          }
+          setPlanMarketMessage(sf.market_message ?? '');
+          setPlanMediaReach(sf.media_reach ?? '');
+          setPlanConversion(sf.conversion_strategy ?? '');
+          setPlanValidation(mp.validation.messages ?? []);
+        } catch {
+          setPlanValidation([]);
+        }
+      }
     } catch (err) {
       onError?.(err instanceof Error ? err.message : 'Tải funnel thất bại');
     } finally {
@@ -59,6 +93,13 @@ export function LeadFunnelPanel({ token, leadId, user, serviceSlug, onMessage, o
     }
   }
 
+  function activeStepKey(): string {
+    if (!funnel) return 'b2';
+    if (!funnel.care_pipeline.all_complete) return 'b2';
+    if (!funnel.presales) return 'lead';
+    return funnel.presales.presales.stage;
+  }
+
   if (loading && !funnel) {
     return <p className="muted">Đang tải funnel B2 / pre-sales…</p>;
   }
@@ -66,10 +107,39 @@ export function LeadFunnelPanel({ token, leadId, user, serviceSlug, onMessage, o
 
   const b2Stage = funnel.care_pipeline.stages[0];
   const inReview = funnel.review_queue.active;
+  const activeStep = activeStepKey();
 
   return (
     <section className="card stack-gap" style={{ marginTop: '1rem' }}>
       <h2 style={{ margin: 0, fontSize: '1.1rem' }}>Funnel B2 → Pre-sales</h2>
+
+      <div className="funnel-stepper" style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+        {FUNNEL_STEPS.map((step, idx) => {
+          const presalesIdx = funnel.presales
+            ? FUNNEL_STEPS.findIndex((s) => s.key === funnel.presales!.presales.stage)
+            : -1;
+          const done =
+            step.key === 'b2'
+              ? funnel.care_pipeline.all_complete
+              : presalesIdx >= idx;
+          const current = step.key === activeStep;
+          return (
+            <span
+              key={step.key}
+              className={`badge${current ? ' badge-active' : ''}`}
+              style={{
+                padding: '0.25rem 0.5rem',
+                borderRadius: 999,
+                fontSize: '0.8rem',
+                background: current ? '#1d4ed8' : done ? '#dcfce7' : '#f3f4f6',
+                color: current ? '#fff' : done ? '#166534' : '#374151',
+              }}
+            >
+              {step.label}
+            </span>
+          );
+        })}
+      </div>
 
       {inReview && (
         <div className="banner banner-warn">
@@ -206,13 +276,30 @@ export function LeadFunnelPanel({ token, leadId, user, serviceSlug, onMessage, o
                 <button
                   type="button"
                   className="btn btn-sm"
-                  disabled={busy || !funnel.presales.advance.can_advance_forward}
+                  disabled={busy}
                   title={funnel.presales.advance.block_reason}
                   onClick={() =>
                     void run(async () => {
-                      const out = await advanceLeadPresales(token, leadId);
+                      const reason = funnel.presales?.advance.block_reason ?? '';
+                      const needsConfirm =
+                        !funnel.presales?.advance.can_advance_forward &&
+                        (reason.includes('Nurture') ||
+                          reason.includes('BANT') ||
+                          reason.includes('cân nhắc'));
+                      if (
+                        !funnel.presales?.advance.can_advance_forward &&
+                        !needsConfirm &&
+                        !window.confirm(reason || 'Không thể chuyển giai đoạn')
+                      ) {
+                        return;
+                      }
+                      if (needsConfirm && !window.confirm(reason || 'Xác nhận chuyển giai đoạn?')) {
+                        return;
+                      }
+                      const out = await advanceLeadPresales(token, leadId, { confirm: true });
                       setFunnel(out.funnel);
                       onMessage?.('Đã chuyển giai đoạn pre-sales');
+                      await reload();
                     })
                   }
                 >
@@ -223,6 +310,94 @@ export function LeadFunnelPanel({ token, leadId, user, serviceSlug, onMessage, o
                 <p className="muted" style={{ fontSize: '0.85rem' }}>
                   {funnel.presales.advance.block_reason}
                 </p>
+              )}
+
+              {['consult', 'proposal'].includes(funnel.presales.presales.stage) && (
+                <div className="stack-gap" style={{ marginTop: '1rem' }}>
+                  <h4 style={{ margin: 0 }}>KH Marketing sơ bộ</h4>
+                  {planValidation.length > 0 && (
+                    <ul className="muted" style={{ fontSize: '0.85rem', margin: 0, paddingLeft: '1.1rem' }}>
+                      {planValidation.map((m) => (
+                        <li key={m}>{m}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <label>
+                    North Star
+                    <input
+                      type="text"
+                      value={planNorthStar}
+                      disabled={!canEdit || busy}
+                      onChange={(e) => setPlanNorthStar(e.target.value)}
+                      style={{ width: '100%', marginTop: '0.25rem' }}
+                    />
+                  </label>
+                  <label>
+                    Mục tiêu
+                    <textarea
+                      rows={2}
+                      value={planObjectives}
+                      disabled={!canEdit || busy}
+                      onChange={(e) => setPlanObjectives(e.target.value)}
+                      style={{ width: '100%', marginTop: '0.25rem' }}
+                    />
+                  </label>
+                  <label>
+                    Thông điệp thị trường
+                    <textarea
+                      rows={2}
+                      value={planMarketMessage}
+                      disabled={!canEdit || busy}
+                      onChange={(e) => setPlanMarketMessage(e.target.value)}
+                      style={{ width: '100%', marginTop: '0.25rem' }}
+                    />
+                  </label>
+                  <label>
+                    Kênh tiếp cận
+                    <textarea
+                      rows={2}
+                      value={planMediaReach}
+                      disabled={!canEdit || busy}
+                      onChange={(e) => setPlanMediaReach(e.target.value)}
+                      style={{ width: '100%', marginTop: '0.25rem' }}
+                    />
+                  </label>
+                  <label>
+                    Chiến lược chuyển đổi
+                    <textarea
+                      rows={2}
+                      value={planConversion}
+                      disabled={!canEdit || busy}
+                      onChange={(e) => setPlanConversion(e.target.value)}
+                      style={{ width: '100%', marginTop: '0.25rem' }}
+                    />
+                  </label>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      className="btn btn-sm"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          const out = await patchLeadPresalesMarketingPlan(token, leadId, {
+                            north_star: planNorthStar,
+                            objectives: planObjectives,
+                            strategy_framework: {
+                              market_message: planMarketMessage,
+                              media_reach: planMediaReach,
+                              conversion_strategy: planConversion,
+                            },
+                          });
+                          setFunnel(out.funnel);
+                          setPlanValidation(out.validation.messages ?? []);
+                          onMessage?.('Đã lưu KH MKT sơ bộ');
+                        })
+                      }
+                    >
+                      Lưu KH MKT sơ bộ
+                    </button>
+                  )}
+                </div>
               )}
             </>
           )}

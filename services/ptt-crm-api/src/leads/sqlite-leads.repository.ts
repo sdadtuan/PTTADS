@@ -1,6 +1,7 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, Optional } from '@nestjs/common';
 import { DatabaseSync } from 'node:sqlite';
 import { AppConfigService } from '../config/app-config.service';
+import { LeadsFunnelSqliteRepository } from '../leads-funnel/leads-funnel-sqlite.repository';
 import { leadRowToV1 } from './lead-v1.mapper';
 import { LeadRow, LeadV1, ListLeadsQuery } from './leads.types';
 
@@ -14,7 +15,10 @@ export class SqliteLeadsRepository implements OnModuleDestroy {
   private db: DatabaseSync | null = null;
   private overridePath: string | null = null;
 
-  constructor(private readonly config: AppConfigService) {}
+  constructor(
+    private readonly config: AppConfigService,
+    @Optional() private readonly funnelRepo?: LeadsFunnelSqliteRepository,
+  ) {}
 
   useDatabasePath(dbPath: string): void {
     this.close();
@@ -111,6 +115,11 @@ export class SqliteLeadsRepository implements OnModuleDestroy {
       const like = `%${query.q.trim()}%`;
       clauses.push('(l.full_name LIKE ? OR l.phone LIKE ? OR l.email LIKE ?)');
       params.push(like, like, like);
+    }
+    if (query.review_queue_filter === 'only') {
+      clauses.push("COALESCE(json_extract(l.meta_json, '$.review_queue.active'), '') = 'true'");
+    } else if (query.review_queue_filter === 'hide') {
+      clauses.push("COALESCE(json_extract(l.meta_json, '$.review_queue.active'), '') != 'true'");
     }
 
     return {
