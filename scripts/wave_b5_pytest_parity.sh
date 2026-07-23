@@ -16,4 +16,5 @@ export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
   tests/test_crm_svc_tasks.py \
   tests/test_crm_lead_presales_marketing_plan.py \
   tests/test_crm_svc_finance_presales_on_lead.py \
+  tests/test_crm_svc_consult_bridge.py \
   -q "$@"

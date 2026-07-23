@@ -67,6 +67,13 @@ export interface SopRunTaskRow {
   updated_at: string;
 }
 
+export interface SopOverdueTaskRow extends SopRunTaskRow {
+  run_name: string;
+  run_status: string;
+  lifecycle_id: number | null;
+  days_overdue: number;
+}
+
 export interface CreateSopRunBody {
   name: string;
   template_id?: number | null;

@@ -1,14 +1,17 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
 import {
   createSopRun,
+  fetchSopOverdueTasks,
   fetchSopRuns,
   fetchSopTemplates,
   staffMe,
   staffRefresh,
+  type SopOverdueTaskRow,
   type SopRunRow,
   type SopTemplateRow,
 } from '@/lib/api';
@@ -28,6 +31,8 @@ export default function CrmSopPage() {
   const [user, setUser] = useState<StoredStaffUser | null>(null);
   const [templates, setTemplates] = useState<SopTemplateRow[]>([]);
   const [runs, setRuns] = useState<SopRunRow[]>([]);
+  const [overdue, setOverdue] = useState<SopOverdueTaskRow[]>([]);
+  const [overdueEnabled, setOverdueEnabled] = useState(false);
   const [runName, setRunName] = useState('');
   const [templateId, setTemplateId] = useState('');
   const [error, setError] = useState('');
@@ -69,9 +74,15 @@ export default function CrmSopPage() {
   }, [router]);
 
   const load = useCallback(async (access: string) => {
-    const [tpl, runRows] = await Promise.all([fetchSopTemplates(access), fetchSopRuns(access, 'all')]);
+    const [tpl, runRows, od] = await Promise.all([
+      fetchSopTemplates(access),
+      fetchSopRuns(access, 'all'),
+      fetchSopOverdueTasks(access, 100),
+    ]);
     setTemplates(tpl);
     setRuns(runRows);
+    setOverdue(od.tasks ?? []);
+    setOverdueEnabled(Boolean(od.overdue_enabled));
   }, []);
 
   useEffect(() => {
@@ -127,10 +138,74 @@ export default function CrmSopPage() {
   return (
     <main style={{ maxWidth: 960, margin: '0 auto', padding: '1.5rem' }}>
       <OpsNav user={user} onLogout={logout} />
+      <h1 style={{ margin: '0 0 0.35rem', fontSize: '1.25rem' }}>SOP Hub</h1>
+      <p className="muted" style={{ margin: '0 0 1rem', fontSize: '0.9rem' }}>
+        Launch checklist · template MKT-LAUNCH-14D · liên kết lifecycle qua tab SOP Launch
+      </p>
+
+      {loading ? <p className="muted">Đang tải…</p> : null}
+      {error ? <p className="error">{error}</p> : null}
+
+      {overdue.length > 0 ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: '1rem',
+            padding: '1rem',
+            border: '1px solid var(--danger, #c53030)',
+            background: 'rgba(197, 48, 48, 0.08)',
+          }}
+        >
+          <h2 style={{ margin: '0 0 0.35rem', fontSize: '1rem', color: 'var(--danger, #c53030)' }}>
+            {overdue.length} task SOP quá hạn
+          </h2>
+          <p className="muted" style={{ margin: '0 0 0.75rem', fontSize: '0.85rem' }}>
+            Escalate ops (FR-SD-03)
+            {overdueEnabled ? ' · PTT_SOP_OVERDUE_ESCALATE=1' : ' · bật PTT_SOP_OVERDUE_ESCALATE trên prod'}
+          </p>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead>
+                <tr className="muted">
+                  <th style={{ textAlign: 'left', padding: '0.35rem' }}>Run</th>
+                  <th style={{ textAlign: 'left', padding: '0.35rem' }}>Task</th>
+                  <th style={{ textAlign: 'left', padding: '0.35rem' }}>Hạn</th>
+                  <th style={{ textAlign: 'left', padding: '0.35rem' }}>Quá</th>
+                  <th style={{ textAlign: 'left', padding: '0.35rem' }}>Lifecycle</th>
+                </tr>
+              </thead>
+              <tbody>
+                {overdue.map((t) => (
+                  <tr key={t.id} style={{ borderTop: '1px solid var(--border)' }}>
+                    <td style={{ padding: '0.35rem' }}>
+                      #{t.run_id} · {t.run_name}
+                    </td>
+                    <td style={{ padding: '0.35rem' }}>{t.title}</td>
+                    <td style={{ padding: '0.35rem' }}>{t.due_date}</td>
+                    <td style={{ padding: '0.35rem' }}>{t.days_overdue} ngày</td>
+                    <td style={{ padding: '0.35rem' }}>
+                      {t.lifecycle_id ? (
+                        <Link href={`/crm/service-delivery/${t.lifecycle_id}?tab=sop`} className="nav-link">
+                          #{t.lifecycle_id}
+                        </Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : !loading ? (
+        <p className="muted" style={{ marginBottom: '1rem' }}>
+          Không có task SOP quá hạn.
+        </p>
+      ) : null}
+
       <div className="card" style={{ marginBottom: '1rem' }}>
         <h2 style={{ marginTop: 0, fontSize: '1.15rem' }}>SOP Templates</h2>
-        {loading ? <p className="muted">Đang tải…</p> : null}
-        {error ? <p className="error">{error}</p> : null}
         {templates.length === 0 && !loading ? <p className="muted">Chưa có template.</p> : null}
         <ul style={{ margin: 0, paddingLeft: '1.1rem' }}>
           {templates.map((t) => (
@@ -148,6 +223,11 @@ export default function CrmSopPage() {
             <li key={r.id}>
               #{r.id} · {r.name} — {r.status}
               {r.template_name ? ` · ${r.template_name}` : ''}
+              {(r.stats?.overdue ?? 0) > 0 ? (
+                <span style={{ color: 'var(--danger)', marginLeft: '0.35rem' }}>
+                  ({r.stats?.overdue} quá hạn)
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>

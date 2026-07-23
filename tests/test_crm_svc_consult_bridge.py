@@ -17,6 +17,14 @@ from crm_svc_consult_bridge import (
 from crm_svc_tasks import ensure_schema as tasks_schema, seed_tasks, update_task
 
 
+def _anthropic_available() -> bool:
+    try:
+        import anthropic  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
 def _insert_completed_intake(
     conn: sqlite3.Connection,
     lifecycle_id: int,
@@ -445,6 +453,7 @@ class TestBuildAiContextForConsult(unittest.TestCase):
         self.assertIn("GSC", ctx["red_flags"])
         self.assertEqual(ctx["current_status"], "Website mới")
 
+    @unittest.skipUnless(_anthropic_available(), "anthropic not installed")
     def test_run_ai_assist_prompt_contains_intake_excerpt(self):
         import os
         from unittest.mock import MagicMock, patch

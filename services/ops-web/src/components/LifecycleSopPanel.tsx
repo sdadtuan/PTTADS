@@ -132,6 +132,25 @@ export function LifecycleSopPanel({ token, lifecycleId }: Props) {
             ) : null}
           </p>
 
+          {(stats?.overdue ?? 0) > 0 ? (
+            <p
+              style={{
+                margin: 0,
+                padding: '0.5rem 0.65rem',
+                borderRadius: 8,
+                fontSize: '0.85rem',
+                border: '1px solid var(--danger, #c53030)',
+                background: 'rgba(197, 48, 48, 0.08)',
+                color: 'var(--danger, #c53030)',
+              }}
+            >
+              {stats?.overdue} task quá hạn — xử lý trên{' '}
+              <Link href="/crm/sop" className="nav-link">
+                SOP Hub
+              </Link>
+            </p>
+          ) : null}
+
           {data.tasks.length > 0 ? (
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>

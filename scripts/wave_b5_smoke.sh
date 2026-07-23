@@ -81,6 +81,9 @@ sop_tpl_code="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/crm/sop/templa
 sop_runs_code="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/crm/sop/runs?status=all" "${AUTH[@]}")"
 [[ "$sop_runs_code" =~ ^2 ]] && ok "GET /crm/sop/runs (HTTP $sop_runs_code)" || bad "GET sop/runs (HTTP $sop_runs_code)"
 
+sop_od_code="$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/crm/sop/overdue-tasks" "${AUTH[@]}")"
+[[ "$sop_od_code" =~ ^2 ]] && ok "GET /crm/sop/overdue-tasks (HTTP $sop_od_code)" || bad "GET sop/overdue-tasks (HTTP $sop_od_code)"
+
 echo ""
 if [[ "$fail" -eq 0 ]]; then
   echo "Wave B5 smoke PASSED"

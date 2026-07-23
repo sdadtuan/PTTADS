@@ -65,6 +65,7 @@ def _check_nest_modules() -> dict[str, Any]:
         ROOT / "docs/specs/2026-07-23-wave-b5-s3-tmmt-consult-design.md",
         ROOT / "docs/specs/2026-07-23-wave-b5-s4-finance-handoff-design.md",
         ROOT / "docs/specs/2026-07-23-wave-b5-s5-sop-cutover-design.md",
+        ROOT / "docs/specs/2026-07-23-wave-b5-s6-closure-design.md",
     ]
     missing = [str(p.relative_to(ROOT)) for p in files if not p.is_file()]
     return {
@@ -82,6 +83,7 @@ def _check_scripts() -> dict[str, Any]:
         ROOT / "scripts/wave_b5_pytest_parity.sh",
         ROOT / "scripts/wave_b5_deploy.sh",
         ROOT / "scripts/wave_b5_smoke.sh",
+        ROOT / "scripts/wave_b5_signoff.sh",
     ]
     missing = [str(p.relative_to(ROOT)) for p in scripts if not p.is_file()]
     return {"id": "B5-G04", "ok": not missing, "label": "Wave B5 gate/deploy scripts", "missing": missing}
@@ -97,6 +99,7 @@ def _run_pytest_parity() -> dict[str, Any]:
         "tests/test_crm_svc_tasks.py",
         "tests/test_crm_lead_presales_marketing_plan.py",
         "tests/test_crm_svc_finance_presales_on_lead.py",
+        "tests/test_crm_svc_consult_bridge.py",
     ]
     cmd = [sys.executable, "-m", "pytest", *tests, "-q", "--tb=no"]
     env = os.environ.copy()

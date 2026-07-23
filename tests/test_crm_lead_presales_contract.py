@@ -240,6 +240,21 @@ class LeadPresalesContractTests(unittest.TestCase):
         conn.execute(
             "UPDATE crm_lead_presales SET stage = 'proposal' WHERE id = ?", (pid,)
         )
+        from crm_lead_presales_marketing_plan import update_preliminary_plan
+
+        update_preliminary_plan(
+            conn,
+            pid,
+            {
+                "name": "KH MKT sơ bộ Test",
+                "north_star": "Tăng lead chất lượng",
+                "strategy_framework": {
+                    "market_message": "USP",
+                    "media_reach": "Facebook",
+                    "conversion_strategy": "Landing",
+                },
+            },
+        )
         conn.commit()
         return pid
 

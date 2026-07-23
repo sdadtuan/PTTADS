@@ -10,6 +10,7 @@ PTT_CRM_SERVICE_DELIVERY_NEST=1
 PTT_CRM_LEADS_FUNNEL_NEST=1
 PTT_PRESALES_ON_LEAD=1
 PTT_SOP_AUTO_START_ON_LAUNCH=1   # nếu FR-SD-02 trong release
+PTT_SOP_OVERDUE_ESCALATE=1      # S6 — banner overdue trên /crm/sop
 ```
 
 **Automated gates:**
@@ -19,7 +20,9 @@ cd /var/www/ptt
 WAVE_B5_UPDATE_ENV=1 ./scripts/wave_b5_deploy.sh
 ./scripts/wave_b5_gate.sh
 ./scripts/wave_b5_pytest_parity.sh
+./scripts/wave_b5_signoff.sh
 ADMIN_PASSWORD='...' ./scripts/wave_b5_s0_smoke.sh
+ADMIN_PASSWORD='...' ./scripts/wave_b5_smoke.sh
 ```
 
 ---
@@ -36,8 +39,9 @@ ADMIN_PASSWORD='...' ./scripts/wave_b5_s0_smoke.sh
 | 6 | Gate TMMT block Onboard→Deliver khi chưa đủ | ☐ | |
 | 7 | Chi phí pre-sales hiển thị sau promote | ☐ | Finance panel |
 | 8 | SOP run auto sau GDKD approve (nếu bật flag) | ☐ | `/crm/sop/runs` |
-| 9 | `wave_b5_gate.sh` + pytest parity PASS | ☐ | |
-| 10 | Manual UAT §9–13 signed | ☐ | |
+| 9 | SOP overdue banner trên `/crm/sop` (FR-SD-03 ops) | ☐ | `PTT_SOP_OVERDUE_ESCALATE=1` |
+| 10 | `wave_b5_signoff.sh` + gate + pytest PASS | ☐ | `.local-dev/wave-b5-signoff-evidence.json` |
+| 11 | Manual UAT §9–13 signed | ☐ | |
 
 **PO ký:** ___________________ **Ngày:** ___________
 

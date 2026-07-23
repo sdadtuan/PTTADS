@@ -35,6 +35,11 @@ export class SopController {
     return this.sop.getTemplate(id);
   }
 
+  @Get('overdue-tasks')
+  listOverdueTasks(@Query('limit') limit?: string) {
+    return this.sop.listOverdueTasks(limit);
+  }
+
   @Get('runs')
   listRuns(@Query('status') status?: string) {
     return this.sop.listRuns(status);

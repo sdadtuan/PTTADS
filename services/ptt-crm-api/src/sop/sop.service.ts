@@ -3,12 +3,16 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { AppConfigService } from '../config/app-config.service';
 import { SopSqliteRepository } from './sop-sqlite.repository';
 import { CreateSopRunBody, isValidDateYmd } from './sop.types';
 
 @Injectable()
 export class SopService {
-  constructor(private readonly sqlite: SopSqliteRepository) {}
+  constructor(
+    private readonly sqlite: SopSqliteRepository,
+    private readonly config: AppConfigService,
+  ) {}
 
   listTemplates(includeInactive?: string) {
     const raw = String(includeInactive ?? '').trim().toLowerCase();
@@ -72,5 +76,16 @@ export class SopService {
 
     const generateTasks = body.generate_tasks !== false;
     return this.sqlite.createRun(body, generateTasks);
+  }
+
+  listOverdueTasks(limit?: string) {
+    const raw = String(limit ?? '100').trim();
+    const n = Number(raw);
+    const tasks = this.sqlite.listOverdueTasks(Number.isFinite(n) && n > 0 ? n : 100);
+    return {
+      overdue_enabled: this.config.sopOverdueEscalate,
+      total: tasks.length,
+      tasks,
+    };
   }
 }

@@ -1114,6 +1114,27 @@ export async function fetchSopRuns(token: string, status = 'active'): Promise<So
   return out.runs ?? [];
 }
 
+export interface SopOverdueTaskRow {
+  id: number;
+  run_id: number;
+  title: string;
+  role: string;
+  due_date: string;
+  status: string;
+  days_overdue: number;
+  run_name: string;
+  run_status: string;
+  lifecycle_id: number | null;
+}
+
+export async function fetchSopOverdueTasks(token: string, limit = 100) {
+  return crmFetch<{
+    overdue_enabled: boolean;
+    total: number;
+    tasks: SopOverdueTaskRow[];
+  }>(token, `/api/crm/sop/overdue-tasks?limit=${limit}`);
+}
+
 export async function createSopRun(
   token: string,
   body: { name: string; template_id?: number; start_date?: string },

@@ -63,6 +63,7 @@ export class AppConfigService {
   readonly presalesOnLead: boolean;
   readonly crmServiceDeliveryNest: boolean;
   readonly sopAutoStartOnLaunch: boolean;
+  readonly sopOverdueEscalate: boolean;
 
   constructor() {
     this.port = Number(process.env.PORT ?? process.env.CRM_API_PORT ?? 3000);
@@ -137,6 +138,9 @@ export class AppConfigService {
     );
     this.sopAutoStartOnLaunch = ['1', 'true', 'yes', 'on'].includes(
       (process.env.PTT_SOP_AUTO_START_ON_LAUNCH ?? '0').trim().toLowerCase(),
+    );
+    this.sopOverdueEscalate = ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_SOP_OVERDUE_ESCALATE ?? '0').trim().toLowerCase(),
     );
   }
 

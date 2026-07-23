@@ -11,6 +11,7 @@ import {
   SopRunRow,
   SopRunStats,
   SopRunTaskRow,
+  SopOverdueTaskRow,
   SopStepRow,
   SopTemplateRow,
 } from './sop.types';
@@ -177,6 +178,51 @@ export class SopSqliteRepository implements OnModuleDestroy {
       created_at: String(row.created_at ?? ''),
       updated_at: String(row.updated_at ?? ''),
     }));
+  }
+
+  listOverdueTasks(limit = 100): SopOverdueTaskRow[] {
+    const today = new Date().toISOString().slice(0, 10);
+    const cap = Math.min(Math.max(Number(limit) || 100, 1), 500);
+    const rows = this.database
+      .prepare(
+        `SELECT t.id, t.run_id, t.step_id, t.position, t.title, t.description, t.role,
+                t.due_date, t.status, t.notes, t.checklist_json, t.created_at, t.updated_at,
+                r.name AS run_name, r.status AS run_status, lc.id AS lifecycle_id
+         FROM crm_sop_run_tasks t
+         INNER JOIN crm_sop_runs r ON r.id = t.run_id
+         LEFT JOIN crm_service_lifecycle lc ON lc.sop_run_id = r.id
+         WHERE t.status NOT IN ('done', 'skipped')
+           AND t.due_date != '' AND t.due_date < ?
+         ORDER BY t.due_date ASC, t.run_id ASC, t.position ASC
+         LIMIT ?`,
+      )
+      .all(today, cap) as unknown as Array<Record<string, unknown>>;
+    return rows.map((row) => {
+      const due = String(row.due_date ?? '');
+      const dueMs = due ? new Date(`${due}T00:00:00Z`).getTime() : 0;
+      const todayMs = new Date(`${today}T00:00:00Z`).getTime();
+      const daysOverdue =
+        dueMs && Number.isFinite(dueMs) ? Math.max(0, Math.floor((todayMs - dueMs) / 86400000)) : 0;
+      return {
+        id: Number(row.id),
+        run_id: Number(row.run_id),
+        step_id: row.step_id != null ? Number(row.step_id) : null,
+        position: Number(row.position ?? 0),
+        title: String(row.title ?? ''),
+        description: String(row.description ?? ''),
+        role: String(row.role ?? ''),
+        due_date: due,
+        status: String(row.status ?? 'todo'),
+        notes: String(row.notes ?? ''),
+        checklist_json: String(row.checklist_json ?? '[]'),
+        created_at: String(row.created_at ?? ''),
+        updated_at: String(row.updated_at ?? ''),
+        run_name: String(row.run_name ?? ''),
+        run_status: String(row.run_status ?? ''),
+        lifecycle_id: row.lifecycle_id != null ? Number(row.lifecycle_id) : null,
+        days_overdue: daysOverdue,
+      };
+    });
   }
 
   private generateTasks(runId: number, templateId: number, startDate: string): void {
