@@ -38,3 +38,8 @@ export function canViewMetaIntelligence(user: StoredStaffUser | null): boolean {
   if (!user || !metaIntelligenceEnabled()) return false;
   return hasCap(user, 'crm_facebook_ads', 'view') || hasCap(user, 'crm_agency', 'view');
 }
+
+export function canEditMetaCreativeRegistry(user: StoredStaffUser | null): boolean {
+  if (!user) return false;
+  return hasCap(user, 'crm_facebook_ads', 'edit') || hasCap(user, 'crm_service_lifecycle', 'write');
+}

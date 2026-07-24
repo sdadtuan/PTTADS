@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { MetaCreativeLinkPanel } from '@/components/meta/MetaCreativeLinkPanel';
 import { OpsNav } from '@/components/OpsNav';
 import {
   fetchCrmCreatives,
@@ -21,6 +22,7 @@ import {
   updateStoredUser,
   type StoredStaffUser,
 } from '@/lib/auth';
+import { canEditMetaCreativeRegistry } from '@/lib/meta/caps';
 
 type StatusTab = 'all' | 'pending_client' | 'approved' | 'rejected';
 
@@ -187,6 +189,8 @@ export function CrmCreativesContent() {
   }
 
   const canEdit = hasCap(user, 'crm_board', 'edit');
+  const canLinkMetaAd = canEditMetaCreativeRegistry(user);
+  const hubToken = getAccessToken();
 
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '1.5rem' }}>
@@ -325,6 +329,16 @@ export function CrmCreativesContent() {
                     <Link href={`/crm/service-delivery/${row.lifecycle_id}?tab=launch_qa`} className="nav-link">
                       Lifecycle
                     </Link>
+                  ) : null}
+                  {row.status === 'approved' ? (
+                    <MetaCreativeLinkPanel
+                      token={hubToken}
+                      clientId={row.client_id}
+                      creativeSubmissionId={row.id}
+                      creativeTitle={row.title}
+                      externalCampaignId={row.external_campaign_id}
+                      canEdit={canLinkMetaAd}
+                    />
                   ) : null}
                   {row.status === 'rejected' && canEdit ? (
                     <>
