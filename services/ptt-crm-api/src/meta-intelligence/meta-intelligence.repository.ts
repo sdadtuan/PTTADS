@@ -346,4 +346,81 @@ export class MetaIntelligenceRepository implements OnModuleDestroy {
 
     return { rows: result.rows, hasLevelCol };
   }
+
+  async pgDailyPerformanceBreakdownReady(): Promise<boolean> {
+    try {
+      const result = await this.db.query(
+        `SELECT 1 FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = 'daily_performance_breakdown'
+         LIMIT 1`,
+      );
+      return (result.rowCount ?? 0) > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  async listInsightsBreakdown(params: {
+    clientId?: string;
+    externalCampaignId?: string;
+    breakdownType: string;
+    dateFrom: string;
+    dateTo: string;
+    limit?: number;
+  }) {
+    const clauses = [
+      `dpb.channel = 'meta'`,
+      `dpb.breakdown_type = $1`,
+      `dpb.performance_date BETWEEN $2::date AND $3::date`,
+    ];
+    const values: unknown[] = [params.breakdownType, params.dateFrom, params.dateTo];
+    let idx = 4;
+    if (params.clientId) {
+      clauses.push(`dpb.client_id = $${idx++}::uuid`);
+      values.push(params.clientId);
+    }
+    if (params.externalCampaignId) {
+      clauses.push(`dpb.external_campaign_id = $${idx++}`);
+      values.push(params.externalCampaignId);
+    }
+    const limit = Math.min(Math.max(params.limit ?? 500, 1), 2000);
+    values.push(limit);
+
+    const result = await this.db.query(
+      `SELECT dpb.client_id::text, dpb.external_campaign_id, dpb.performance_date::date,
+              dpb.breakdown_type, dpb.breakdown_value,
+              dpb.spend, dpb.impressions, dpb.clicks, dpb.leads_platform
+       FROM daily_performance_breakdown dpb
+       WHERE ${clauses.join(' AND ')}
+       ORDER BY dpb.performance_date DESC, dpb.spend DESC
+       LIMIT $${idx}`,
+      values,
+    );
+    return result.rows;
+  }
+
+  async sumCampaignSpend(params: {
+    clientId?: string;
+    externalCampaignId: string;
+    dateFrom: string;
+    dateTo: string;
+  }): Promise<number> {
+    const clauses = [
+      `dp.channel = 'meta'`,
+      `dp.external_campaign_id = $1`,
+      `dp.performance_date BETWEEN $2::date AND $3::date`,
+    ];
+    const values: unknown[] = [params.externalCampaignId, params.dateFrom, params.dateTo];
+    if (params.clientId) {
+      clauses.push(`dp.client_id = $4::uuid`);
+      values.push(params.clientId);
+    }
+    const result = await this.db.query(
+      `SELECT COALESCE(SUM(dp.spend), 0) AS total_spend
+       FROM daily_performance dp
+       WHERE ${clauses.join(' AND ')}`,
+      values,
+    );
+    return toNumber(result.rows[0]?.total_spend);
+  }
 }

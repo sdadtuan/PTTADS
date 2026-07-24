@@ -8,6 +8,8 @@ import {
   MetaBudgetRecommendationsResponse,
   MetaDailyInsightRow,
   MetaDailyInsightsResponse,
+  MetaInsightsBreakdownResponse,
+  MetaInsightsBreakdownRow,
   MetaRoasResponse,
 } from './meta-intelligence.types';
 import {
@@ -36,6 +38,12 @@ export class MetaIntelligenceService {
 
   isRecommendEnabled(): boolean {
     return this.isAnomalyEnabled() || this.isRoasEnabled();
+  }
+
+  isBreakdownEnabled(): boolean {
+    return ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_META_INSIGHTS_BREAKDOWN ?? '0').trim().toLowerCase(),
+    );
   }
 
   insightsLevelEnabled(): string {
@@ -396,6 +404,118 @@ export class MetaIntelligenceService {
       date_to: dateTo,
       rows: mapped,
       count: mapped.length,
+      attribution,
+    };
+  }
+
+  async getInsightsBreakdown(query: {
+    client_id?: string;
+    campaign_id?: string;
+    date?: string;
+    type?: string;
+    from?: string;
+    to?: string;
+    days?: string;
+  }): Promise<MetaInsightsBreakdownResponse> {
+    await this.ensurePerformanceReady();
+    const breakdownType = (query.type ?? 'publisher_platform').trim().toLowerCase();
+    const allowed = ['publisher_platform', 'platform_position', 'age', 'gender', 'device_platform', 'country'];
+    if (!allowed.includes(breakdownType)) {
+      throw new BadRequestException({ ok: false, error: 'invalid_breakdown_type', type: breakdownType });
+    }
+
+    let start: Date;
+    let end: Date;
+    if (query.date?.trim()) {
+      const day = this.repo.parseOptionalDate(query.date.trim(), new Date());
+      start = day;
+      end = day;
+    } else {
+      const window = this.repo.resolveWindow(query, 7);
+      start = window.start;
+      end = window.end;
+    }
+    const { dateFrom, dateTo } = this.repo.formatWindow(start, end);
+    const clientId = query.client_id?.trim() || undefined;
+    const campaignId = query.campaign_id?.trim() || undefined;
+    const attribution = await this.buildAttribution({ clientId, dateFrom, dateTo });
+
+    if (!this.isBreakdownEnabled()) {
+      return {
+        ok: true,
+        disabled: true,
+        breakdown_type: breakdownType,
+        date_from: dateFrom,
+        date_to: dateTo,
+        rows: [],
+        count: 0,
+        total_spend: 0,
+        breakdown_spend: 0,
+        spend_delta_pct: null,
+        attribution,
+      };
+    }
+
+    if (!(await this.repo.pgDailyPerformanceBreakdownReady())) {
+      return {
+        ok: true,
+        disabled: true,
+        reason: 'daily_performance_breakdown_not_ready',
+        hint: './scripts/apply_pg_ddl_v8_meta_insights_breakdown.sh',
+        breakdown_type: breakdownType,
+        date_from: dateFrom,
+        date_to: dateTo,
+        rows: [],
+        count: 0,
+        total_spend: 0,
+        breakdown_spend: 0,
+        spend_delta_pct: null,
+        attribution,
+      };
+    }
+
+    const rawRows = await this.repo.listInsightsBreakdown({
+      clientId,
+      externalCampaignId: campaignId,
+      breakdownType,
+      dateFrom,
+      dateTo,
+    });
+    const rows: MetaInsightsBreakdownRow[] = rawRows.map((row) => ({
+      client_id: String(row.client_id),
+      external_campaign_id: String(row.external_campaign_id),
+      performance_date: String(row.performance_date).slice(0, 10),
+      breakdown_type: String(row.breakdown_type),
+      breakdown_value: String(row.breakdown_value),
+      spend: Math.round(toNumber(row.spend) * 100) / 100,
+      impressions: Math.round(toNumber(row.impressions)),
+      clicks: Math.round(toNumber(row.clicks)),
+      leads_platform: Math.round(toNumber(row.leads_platform)),
+    }));
+
+    const breakdownSpend = rows.reduce((acc, row) => acc + row.spend, 0);
+    let totalSpend = 0;
+    if (campaignId) {
+      totalSpend = await this.repo.sumCampaignSpend({
+        clientId,
+        externalCampaignId: campaignId,
+        dateFrom,
+        dateTo,
+      });
+    }
+    const spendDeltaPct =
+      totalSpend > 0 ? Math.round(((breakdownSpend - totalSpend) / totalSpend) * 1000) / 10 : null;
+
+    return {
+      ok: true,
+      breakdown_type: breakdownType,
+      date_from: dateFrom,
+      date_to: dateTo,
+      rows,
+      count: rows.length,
+      total_spend: Math.round(totalSpend * 100) / 100,
+      breakdown_spend: Math.round(breakdownSpend * 100) / 100,
+      spend_delta_pct: spendDeltaPct,
       attribution,
     };
   }

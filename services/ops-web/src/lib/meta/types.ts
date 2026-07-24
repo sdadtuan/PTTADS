@@ -421,3 +421,31 @@ export interface MetaDailyInsightsResponse {
   count: number;
   attribution: HubAttributionMeta;
 }
+
+export interface MetaInsightsBreakdownRow {
+  client_id: string;
+  external_campaign_id: string;
+  performance_date: string;
+  breakdown_type: string;
+  breakdown_value: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  leads_platform: number;
+}
+
+export interface MetaInsightsBreakdownResponse {
+  ok: boolean;
+  disabled?: boolean;
+  reason?: string;
+  hint?: string;
+  breakdown_type: string;
+  date_from: string;
+  date_to: string;
+  rows: MetaInsightsBreakdownRow[];
+  count: number;
+  total_spend: number;
+  breakdown_spend: number;
+  spend_delta_pct: number | null;
+  attribution: HubAttributionMeta;
+}

@@ -133,6 +133,85 @@ def fetch_campaign_insights(
     return rows, None
 
 
+def normalize_breakdown_insight_row(row: dict[str, Any], breakdown_type: str) -> dict[str, Any]:
+    base = normalize_insight_row(row)
+    breakdown_value = str(row.get(breakdown_type) or row.get("breakdown_value") or "unknown")
+    base["breakdown_type"] = breakdown_type
+    base["breakdown_value"] = breakdown_value
+    return base
+
+
+def fetch_campaign_insights_breakdown(
+    *,
+    ad_account_id: str,
+    access_token: str,
+    since: str,
+    until: str,
+    breakdown_type: str = "publisher_platform",
+) -> tuple[list[dict[str, Any]], str | None]:
+    """Fetch campaign-level daily insights with a Graph breakdown dimension."""
+    account = ad_account_id if ad_account_id.startswith("act_") else f"act_{ad_account_id}"
+    params = {
+        "fields": _INSIGHTS_FIELDS,
+        "level": "campaign",
+        "breakdowns": breakdown_type,
+        "time_range": json.dumps({"since": since, "until": until}),
+        "time_increment": "1",
+        "limit": "500",
+    }
+    rows: list[dict[str, Any]] = []
+    path = f"{account}/insights"
+    while path:
+        if path.startswith("http"):
+            data = _graph_get_url(path)
+        else:
+            data = _graph_get(path, access_token=access_token, params=params)
+            params = {}
+
+        err = graph_error(data)
+        if err:
+            return rows, err
+
+        batch = data.get("data") or []
+        if isinstance(batch, list):
+            for item in batch:
+                if isinstance(item, dict) and item.get("campaign_id"):
+                    rows.append(normalize_breakdown_insight_row(item, breakdown_type))
+
+        next_url = (data.get("paging") or {}).get("next")
+        path = next_url if next_url else ""
+    return rows, None
+
+
+def stub_campaign_breakdown_insights(
+    *,
+    since: str,
+    until: str,
+    ad_account_id: str,
+    breakdown_type: str = "publisher_platform",
+) -> list[dict[str, Any]]:
+    day = since if since == until else since
+    platforms = [
+        ("facebook", "100000"),
+        ("instagram", "50000"),
+    ]
+    out: list[dict[str, Any]] = []
+    for platform, spend in platforms:
+        row = {
+            "campaign_id": "stub_campaign_1",
+            "campaign_name": f"Stub Campaign ({ad_account_id})",
+            "date_start": day,
+            "date_stop": day,
+            "spend": spend,
+            "impressions": "6000" if platform == "facebook" else "3000",
+            "clicks": "120" if platform == "facebook" else "60",
+            breakdown_type: platform,
+            "actions": [{"action_type": "lead", "value": "2" if platform == "facebook" else "1"}],
+        }
+        out.append(normalize_breakdown_insight_row(row, breakdown_type))
+    return out
+
+
 def _graph_get_url(url: str) -> dict[str, Any]:
     try:
         with urllib.request.urlopen(url, timeout=30) as resp:
