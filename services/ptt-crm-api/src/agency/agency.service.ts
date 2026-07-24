@@ -10,7 +10,14 @@ import {
   AgencyStatsResponse,
   FacebookHubResponse,
   FacebookHubAlert,
+  FacebookHubCampaignsResponse,
+  FacebookHubCampaignRow,
   GoogleHubResponse,
+  MetaHubMapSuggestBody,
+  MetaHubMapSuggestResponse,
+  MetaSyncStatusResponse,
+  ChannelAlertConfigBody,
+  ChannelAlertConfigResponse,
   HubCampaignMapsResponse,
   HubCampaignGlobalRow,
   HubCampaignMapRow,
@@ -39,6 +46,11 @@ import {
   googleAdsHubExportFilename,
   normalizeHubClientUuid,
 } from './facebook-hub.util';
+import {
+  buildMetaAttributionMeta,
+  computeCplDelta,
+  computeUnmappedSpendPct,
+} from '../meta-attribution.util';
 import { googleAdsPilotStatus, checkGoogleAdsPilot } from './google-ads-pilot.util';
 import {
   exchangeGoogleAuthorizationCode,
@@ -295,6 +307,23 @@ export class AgencyService {
         q,
       });
 
+    const attrStats = await this.repo.fetchHubAttributionStats({
+      dateFrom: df,
+      dateTo: dt,
+      clientId: clientId ?? undefined,
+    });
+    const unmappedSpendPct = computeUnmappedSpendPct(attrStats.unmappedSpend, attrStats.totalSpend);
+    summary.unmapped_spend_pct = unmappedSpendPct;
+    summary.accounts_sync_ok = attrStats.accountsSyncOk;
+    summary.accounts_sync_error = attrStats.accountsSyncError;
+    summary.open_alerts = attrStats.openAlerts;
+
+    const attribution = buildMetaAttributionMeta({
+      dateTo: dt,
+      syncedAt: attrStats.syncedAt,
+      unmappedSpendPct,
+    });
+
     const alerts = this.buildFacebookHubAlerts(summary);
 
     return {
@@ -306,12 +335,156 @@ export class AgencyService {
       summary,
       clients,
       alerts,
+      attribution,
       filters: {
         client_id: clientId,
         status: status ?? null,
         q: q ?? null,
       },
     };
+  }
+
+  async facebookHubCampaigns(query: {
+    days?: string;
+    to?: string;
+    date_to?: string;
+    from?: string;
+    date_from?: string;
+    status?: string;
+    client_id?: string;
+    q?: string;
+  }): Promise<FacebookHubCampaignsResponse> {
+    await this.ensurePg();
+    const windowDays = Math.min(Math.max(Number(query.days ?? 7) || 7, 1), 90);
+    const dateTo = (query.to ?? query.date_to ?? '').trim() || undefined;
+    const dateFrom = (query.from ?? query.date_from ?? '').trim() || undefined;
+    const clientId = normalizeHubClientUuid(query.client_id);
+    const q = query.q?.trim() || undefined;
+    const status = query.status?.trim() || undefined;
+
+    const hub = await this.facebookHub({
+      days: String(windowDays),
+      to: dateTo,
+      date_from: dateFrom,
+      from: dateFrom,
+      date_to: dateTo,
+      status,
+      client_id: clientId ?? undefined,
+      q,
+    });
+
+    const rows = await this.repo.facebookHubCampaignExport({
+      dateFrom: hub.date_from,
+      dateTo: hub.date_to,
+      clientId: hub.filters?.client_id ?? undefined,
+      status: hub.filters?.status ?? undefined,
+      q: hub.filters?.q ?? undefined,
+    });
+
+    const campaigns: FacebookHubCampaignRow[] = rows.map((row) => {
+      const delta = computeCplDelta(row.cpl, row.target_cpl_vnd);
+      return {
+        ...row,
+        cpl_delta_vnd: delta.deltaVnd,
+        cpl_delta_pct: delta.deltaPct,
+        over_target: delta.overTarget,
+      };
+    });
+
+    return {
+      ok: true,
+      date_from: hub.date_from,
+      date_to: hub.date_to,
+      window_days: hub.window_days,
+      campaigns,
+      count: campaigns.length,
+      attribution: hub.attribution,
+      filters: hub.filters,
+    };
+  }
+
+  async metaSyncStatus(clientId?: string): Promise<MetaSyncStatusResponse> {
+    await this.ensurePg();
+    const normalized = normalizeHubClientUuid(clientId);
+    const out = await this.repo.fetchMetaSyncStatus(normalized ?? undefined);
+    return {
+      ok: true,
+      global: out.global,
+      clients: out.clients,
+      count: out.clients.length,
+    };
+  }
+
+  async metaHubMapSuggest(body: MetaHubMapSuggestBody): Promise<MetaHubMapSuggestResponse> {
+    await this.ensurePg();
+    const clientId = normalizeHubClientUuid(body.client_id);
+    const hub = await this.facebookHub({
+      days: '7',
+      date_from: body.date_from,
+      date_to: body.date_to,
+      from: body.date_from,
+      to: body.date_to,
+      client_id: clientId ?? undefined,
+    });
+    const dryRun = body.dry_run === true;
+    const out = await this.repo.suggestHubCampaignMaps({
+      clientId: clientId ?? undefined,
+      dateFrom: hub.date_from,
+      dateTo: hub.date_to,
+      dryRun,
+    });
+    return {
+      ok: true,
+      date_from: hub.date_from,
+      date_to: hub.date_to,
+      suggestions: out.suggestions as unknown as MetaHubMapSuggestResponse['suggestions'],
+      inserted: out.inserted as unknown as MetaHubMapSuggestResponse['inserted'],
+      inserted_count: out.inserted.length,
+      dry_run: dryRun,
+    };
+  }
+
+  async patchChannelAccountAlertConfig(
+    clientId: string,
+    accountId: string,
+    body: ChannelAlertConfigBody,
+  ): Promise<ChannelAlertConfigResponse> {
+    await this.ensurePg();
+    await this.assertClientWritable(clientId);
+    const client = await this.repo.fetchClient(clientId);
+    if (!client) {
+      throw new NotFoundException({ error: 'Not found' });
+    }
+
+    if (body.target_cpl_vnd === undefined) {
+      throw new BadRequestException({ error: 'target_cpl_vnd_required' });
+    }
+
+    let targetCpl: number | null = null;
+    if (body.target_cpl_vnd != null) {
+      if (!Number.isFinite(Number(body.target_cpl_vnd))) {
+        throw new BadRequestException({ error: 'invalid_target_cpl_vnd' });
+      }
+      const n = Number(body.target_cpl_vnd);
+      if (n <= 0) {
+        throw new BadRequestException({ error: 'invalid_target_cpl_vnd' });
+      }
+      targetCpl = Math.round(n * 100) / 100;
+    }
+
+    try {
+      const account = await this.repo.patchChannelAccountAlertConfig(clientId, accountId, targetCpl);
+      if (!account) {
+        throw new NotFoundException({ error: 'account_not_found' });
+      }
+      return { ok: true, account };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg === 'alert_config_meta_only') {
+        throw new BadRequestException({ error: msg });
+      }
+      throw err;
+    }
   }
 
   async facebookHubExportCsv(query: {

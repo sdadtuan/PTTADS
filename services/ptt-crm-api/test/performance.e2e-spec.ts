@@ -58,7 +58,31 @@ describe('Performance API (portal JWT)', () => {
     expect(res.body.rows.length).toBeGreaterThan(0);
     expect(res.body.summary.total_spend).toBeGreaterThan(0);
     expect(res.body.summary.total_leads_crm).toBeGreaterThan(0);
+    expect(res.body.attribution_model).toBe('last_touch_crm');
+    expect(res.body.spend_source).toBe('meta_api');
+    expect(typeof res.body.unmapped_spend_pct).toBe('number');
+    expect(res.body.data_freshness.through_date).toBeTruthy();
     expect(res.body.rows[0].external_campaign_id).toBe('camp_e2e');
+  });
+
+  it('GET /api/v1/performance returns CPL delta on mapped rows', async () => {
+    if (!app || !token) return;
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/performance')
+      .query({ channel: 'meta', group_by: 'campaign' })
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(res.body.ok).toBe(true);
+    const row = res.body.rows.find(
+      (r: { external_campaign_id: string | null }) => r.external_campaign_id === 'camp_e2e',
+    );
+    expect(row).toBeTruthy();
+    expect(row.hub_mapped).toBe(true);
+    expect(row.target_cpl_vnd).toBe(40000);
+    expect(row.cpl).toBe(50000);
+    expect(row.cpl_delta_vnd).toBe(10000);
+    expect(row.cpl_delta_pct).toBe(25);
   });
 
   it('GET /api/v1/performance rejects client_id mismatch', async () => {

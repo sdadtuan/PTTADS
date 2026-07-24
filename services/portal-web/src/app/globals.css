@@ -160,6 +160,17 @@ input {
   letter-spacing: 0.04em;
 }
 
+.channel-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -209,8 +220,33 @@ input {
   white-space: nowrap;
 }
 
-.perf-table td.over-target {
+.perf-table td.over-target,
+.summary-card strong.over-target,
+.over-target {
   color: var(--danger);
+}
+
+.map-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.map-badge--ok {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+}
+
+.map-badge--warn {
+  background: rgba(234, 179, 8, 0.15);
+  color: #fde047;
+}
+
+.portal-attribution-footer strong {
+  color: var(--text);
 }
 
 .perf-table tbody tr:hover {

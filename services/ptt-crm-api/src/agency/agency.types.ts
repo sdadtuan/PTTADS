@@ -1,3 +1,7 @@
+import type { MetaAttributionMeta } from '../meta-attribution.util';
+
+export type { MetaAttributionMeta };
+
 export interface AgencyClientRow {
   id: string;
   code: string;
@@ -48,6 +52,7 @@ export interface AgencyChannelAccount {
   credential_ref?: string | null;
   pixel_id?: string | null;
   facebook_page_id?: string | null;
+  target_cpl_vnd?: number | null;
 }
 
 export interface AgencyStatsResponse {
@@ -164,6 +169,15 @@ export interface UpdateChannelAccountBody {
   external_account_id?: string;
   status?: string;
   facebook_page_id?: string;
+}
+
+export interface ChannelAlertConfigBody {
+  target_cpl_vnd?: number | null;
+}
+
+export interface ChannelAlertConfigResponse {
+  ok: boolean;
+  account: AgencyChannelAccount;
 }
 
 export interface SetChannelTokenBody {
@@ -284,6 +298,95 @@ export interface FacebookHubAlert {
   link_label: string;
 }
 
+export interface FacebookHubCampaignRow {
+  client_id: string;
+  client_code: string | null;
+  client_name: string | null;
+  external_campaign_id: string | null;
+  external_campaign_name: string | null;
+  spend: number;
+  leads_crm: number;
+  cpl: number | null;
+  target_cpl_vnd: number | null;
+  hub_mapped: boolean;
+  cpl_delta_vnd: number | null;
+  cpl_delta_pct: number | null;
+  over_target: boolean;
+}
+
+export interface FacebookHubCampaignsResponse {
+  ok: boolean;
+  date_from: string;
+  date_to: string;
+  window_days: number;
+  campaigns: FacebookHubCampaignRow[];
+  count: number;
+  attribution: MetaAttributionMeta;
+  filters?: {
+    client_id?: string | null;
+    status?: string | null;
+    q?: string | null;
+  };
+}
+
+export interface MetaSyncStatusGlobal {
+  last_sync_at: string | null;
+  last_success_at: string | null;
+  last_error: string | null;
+  accounts_total: number;
+  accounts_failed: number;
+  status: 'ok' | 'warn' | 'error';
+}
+
+export interface MetaSyncStatusClientRow {
+  client_id: string;
+  client_code: string | null;
+  client_name: string | null;
+  last_job_id: string | null;
+  last_job_status: string | null;
+  last_job_finished_at: string | null;
+  last_job_error: string | null;
+  token_status: string | null;
+  sync_status: 'ok' | 'warn' | 'error';
+}
+
+export interface MetaSyncStatusResponse {
+  ok: boolean;
+  global: MetaSyncStatusGlobal;
+  clients: MetaSyncStatusClientRow[];
+  count: number;
+}
+
+export interface MetaHubMapSuggestBody {
+  client_id?: string;
+  date_from?: string;
+  date_to?: string;
+  dry_run?: boolean;
+}
+
+export interface MetaHubMapSuggestItem {
+  client_id: string;
+  external_campaign_id: string;
+  external_campaign_name: string | null;
+  hub_campaign_id: number;
+  hub_campaign_code: string;
+  hub_campaign_name: string;
+  utm_campaign: string;
+  match_score: number;
+  spend_vnd: number;
+  map_id?: string;
+}
+
+export interface MetaHubMapSuggestResponse {
+  ok: boolean;
+  date_from: string;
+  date_to: string;
+  suggestions: MetaHubMapSuggestItem[];
+  inserted: MetaHubMapSuggestItem[];
+  inserted_count: number;
+  dry_run: boolean;
+}
+
 export interface FacebookHubResponse {
   ok: boolean;
   pg_ready: boolean;
@@ -293,6 +396,7 @@ export interface FacebookHubResponse {
   summary: Record<string, unknown>;
   clients: FacebookHubClientRow[];
   alerts: FacebookHubAlert[];
+  attribution: MetaAttributionMeta;
   filters?: {
     client_id?: string | null;
     status?: string | null;

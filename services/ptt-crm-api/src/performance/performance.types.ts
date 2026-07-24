@@ -1,3 +1,7 @@
+import type { MetaAttributionMeta } from '../meta-attribution.util';
+
+export type { MetaAttributionMeta };
+
 export type PerformanceGroupBy = 'day' | 'campaign';
 export type PerformanceChannel = 'meta' | 'google';
 
@@ -59,5 +63,9 @@ export interface PerformanceListResponse {
   channel?: PerformanceChannel | null;
   rows: PerformanceRow[];
   summary: PerformanceSummary;
+  attribution_model: MetaAttributionMeta['attribution_model'];
+  unmapped_spend_pct: number;
+  spend_source: MetaAttributionMeta['spend_source'];
+  data_freshness: MetaAttributionMeta['data_freshness'];
   error?: string;
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { PortalAttributionFooter } from '@/components/PortalAttributionFooter';
 import { PerformanceTable } from '@/components/PerformanceTable';
 import {
   fetchPerformance,
@@ -8,7 +9,7 @@ import {
   type PerformanceChannel,
   type PerformanceListResponse,
 } from '@/lib/api';
-import { dateRangeEndingYesterday, fmtDate, fmtNumber, fmtVnd } from '@/lib/format';
+import { dateRangeEndingYesterday, fmtDate, fmtNumber, fmtPct, fmtVnd } from '@/lib/format';
 
 type WindowDays = 7 | 30;
 type GroupBy = 'day' | 'campaign';
@@ -191,6 +192,12 @@ export function PerformancePanel({
             <span className="muted">Chiến dịch tracked</span>
             <strong>{fmtNumber(summary.campaigns_tracked)}</strong>
           </div>
+          {performance.unmapped_spend_pct != null ? (
+            <div className="summary-card">
+              <span className="muted">Unmapped spend</span>
+              <strong>{fmtPct(performance.unmapped_spend_pct)}</strong>
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -205,11 +212,14 @@ export function PerformancePanel({
           </p>
         </div>
       ) : performance ? (
-        <PerformanceTable
-          rows={performance.rows}
-          groupBy={performance.group_by}
-          hideChannel={hideChannelColumn}
-        />
+        <>
+          <PerformanceTable
+            rows={performance.rows}
+            groupBy={performance.group_by}
+            hideChannel={hideChannelColumn}
+          />
+          <PortalAttributionFooter performance={performance} />
+        </>
       ) : null}
     </section>
   );
