@@ -79,6 +79,11 @@ def meta_warehouse_export_enabled() -> bool:
     return _truthy("PTT_META_WAREHOUSE_EXPORT", "0")
 
 
+def meta_ads_ops_enabled() -> bool:
+    """B15 — governed Ads Ops launch/edit wizard."""
+    return _truthy("PTT_META_ADS_OPS_ENABLED", "0")
+
+
 def meta_token_refresh_enabled() -> bool:
     """Phase 2 M1-03 — Meta long-lived token refresh + expiry alerts."""
     return _truthy("PTT_META_TOKEN_REFRESH", "0")

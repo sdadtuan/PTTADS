@@ -550,3 +550,74 @@ export interface MetaCreativeLinkMutationResponse {
   replaced?: boolean;
   link?: MetaAdCreativeLinkRow;
 }
+
+export interface MetaAdsOpsTemplate {
+  id: string;
+  label: string;
+  objective: string;
+  optimization_goal: string;
+  billing_event: string;
+  default_daily_budget_vnd: number;
+  description: string;
+}
+
+export interface MetaAdsOpsPreflightItem {
+  key: string;
+  label: string;
+  passed: boolean;
+  note: string;
+}
+
+export interface MetaAdsOpsPreflightResponse {
+  ok: boolean;
+  disabled?: boolean;
+  client_id: string;
+  ready: boolean;
+  items: MetaAdsOpsPreflightItem[];
+  pilot: { allowed: boolean; reason?: string | null };
+}
+
+export interface MetaAdsOpsLaunchBody {
+  client_id: string;
+  external_account_id: string;
+  template_id?: string;
+  campaign_name: string;
+  adset_name: string;
+  ad_name: string;
+  daily_budget_vnd: number;
+  creative_submission_id: string;
+  external_creative_id?: string;
+  submitted_by?: string;
+  preflight_ack?: boolean;
+}
+
+export interface MetaAdsOpsEditSnapshot {
+  ok: boolean;
+  client_id: string;
+  external_ad_id: string;
+  effective_status: string;
+  headline: string;
+  primary_text: string;
+  description: string;
+  call_to_action: string;
+  creative_submission_id: string | null;
+  external_creative_id: string | null;
+  stub?: boolean;
+}
+
+export interface MetaAdsOpsSubmitResponse {
+  ok: boolean;
+  request_id?: string;
+  workflow_id?: string | null;
+  change_type?: string;
+  pilot?: Record<string, unknown>;
+  diff?: Record<string, unknown>;
+}
+
+export type MetaAdsOpsMode = 'launch' | 'edit';
+
+export interface MetaWizardStep {
+  id: string;
+  label: string;
+}
+

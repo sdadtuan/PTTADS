@@ -6,7 +6,15 @@ export type CampaignWriteStatus =
   | 'execution_failed'
   | 'withdrawn';
 
-export type CampaignChangeType = 'daily_budget' | 'status' | 'name';
+export type CampaignChangeType =
+  | 'daily_budget'
+  | 'status'
+  | 'name'
+  | 'create_campaign'
+  | 'create_adset'
+  | 'create_ad'
+  | 'update_ad_creative'
+  | 'update_ad_copy';
 
 export interface SubmitCampaignWriteBody {
   client_id: string;

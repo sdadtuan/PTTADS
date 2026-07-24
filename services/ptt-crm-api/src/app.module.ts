@@ -14,6 +14,7 @@ import { MetaAlertsModule } from './meta-alerts/meta-alerts.module';
 import { MetaIntelligenceModule } from './meta-intelligence/meta-intelligence.module';
 import { MetaCreativeRegistryModule } from './meta-creative-registry/meta-creative-registry.module';
 import { MetaComplianceModule } from './meta-compliance/meta-compliance.module';
+import { MetaAdsOpsModule } from './meta-ads-ops/meta-ads-ops.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { MarketingPlansModule } from './marketing-plans/marketing-plans.module';
 import { ServiceLifecycleModule } from './service-lifecycle/service-lifecycle.module';
@@ -89,6 +90,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     MetaIntelligenceModule,
     MetaCreativeRegistryModule,
     MetaComplianceModule,
+    MetaAdsOpsModule,
     MetricsModule,
     CreativesModule,
     CampaignWritesModule,

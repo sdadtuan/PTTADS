@@ -6,6 +6,7 @@ import {
   deactivateMetaCreativeLink,
   fetchMetaCreativeLinks,
 } from '@/lib/meta/api';
+import { MetaEditAdLink } from '@/components/meta/MetaEditAdLink';
 import { metaCreativeRegistryEnabled } from '@/lib/meta/flags';
 import type { MetaAdCreativeLinkRow } from '@/lib/meta/types';
 
@@ -122,6 +123,12 @@ export function MetaCreativeLinkPanel({
                 <li key={link.id}>
                   Ad <code>{link.external_ad_id}</code>
                   {link.external_campaign_id ? ` · campaign ${link.external_campaign_id}` : ''}
+                  {' · '}
+                  <MetaEditAdLink
+                    clientId={clientId}
+                    externalAdId={link.external_ad_id}
+                    className="nav-link"
+                  />
                   {canEdit ? (
                     <>
                       {' · '}
