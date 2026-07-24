@@ -16,6 +16,8 @@ function alertTypeLabel(type: string): string {
     cpl_high: 'CPL cao',
     unmapped_spend_high: 'Chi tiêu chưa map',
     sync_failed: 'Sync lỗi',
+    meta_account_disabled: 'Tài khoản Meta bị vô hiệu',
+    ad_disapproved: 'Ad bị từ chối',
   };
   return map[type] ?? type;
 }

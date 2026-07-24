@@ -1484,6 +1484,7 @@ export class AgencyRepository implements OnModuleDestroy {
     accountsSyncOk: number;
     accountsSyncError: number;
     openAlerts: number;
+    opsAccountDisabledCount: number;
   }> {
     const spendClauses = [`dp.channel = 'meta'`, `dp.performance_date BETWEEN $1::date AND $2::date`];
     const spendParams: unknown[] = [params.dateFrom, params.dateTo];
@@ -1526,6 +1527,7 @@ export class AgencyRepository implements OnModuleDestroy {
     const acctRow = acctResult.rows[0] ?? {};
 
     let openAlerts = 0;
+    let opsAccountDisabledCount = 0;
     try {
       const alertClauses = [`ma.channel = 'meta'`, `ma.acknowledged_at IS NULL`];
       const alertParams: unknown[] = [];
@@ -1535,14 +1537,17 @@ export class AgencyRepository implements OnModuleDestroy {
         alertParams.push(params.clientId);
       }
       const alertResult = await this.db.query(
-        `SELECT COUNT(*)::int AS c
+        `SELECT COUNT(*)::int AS c,
+                COUNT(*) FILTER (WHERE ma.alert_type = 'meta_account_disabled')::int AS disabled_c
          FROM meta_alerts ma
          WHERE ${alertClauses.join(' AND ')}`,
         alertParams,
       );
       openAlerts = Number(alertResult.rows[0]?.c ?? 0);
+      opsAccountDisabledCount = Number(alertResult.rows[0]?.disabled_c ?? 0);
     } catch {
       openAlerts = 0;
+      opsAccountDisabledCount = 0;
     }
 
     return {
@@ -1552,6 +1557,7 @@ export class AgencyRepository implements OnModuleDestroy {
       accountsSyncOk: Number(acctRow.sync_ok ?? 0),
       accountsSyncError: Number(acctRow.sync_error ?? 0),
       openAlerts,
+      opsAccountDisabledCount,
     };
   }
 

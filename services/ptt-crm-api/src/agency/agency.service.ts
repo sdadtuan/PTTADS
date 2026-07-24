@@ -317,6 +317,7 @@ export class AgencyService {
     summary.accounts_sync_ok = attrStats.accountsSyncOk;
     summary.accounts_sync_error = attrStats.accountsSyncError;
     summary.open_alerts = attrStats.openAlerts;
+    summary.ops_account_disabled_count = attrStats.opsAccountDisabledCount;
 
     const attribution = buildMetaAttributionMeta({
       dateTo: dt,
@@ -877,8 +878,17 @@ export class AgencyService {
 
   private buildFacebookHubAlerts(summary: Record<string, unknown>): FacebookHubAlert[] {
     const alerts: FacebookHubAlert[] = [];
+    const disabledAccounts = Number(summary.ops_account_disabled_count ?? 0);
     const unmapped = Number(summary.unmapped_campaigns ?? 0);
     const overTarget = Number(summary.over_target_rows ?? 0);
+    if (disabledAccounts > 0) {
+      alerts.push({
+        severity: 'danger',
+        message: `${disabledAccounts} tài khoản Meta bị vô hiệu hóa`,
+        link: '/meta/facebook-ads',
+        link_label: 'Xem alerts',
+      });
+    }
     if (unmapped > 0) {
       alerts.push({
         severity: 'warn',

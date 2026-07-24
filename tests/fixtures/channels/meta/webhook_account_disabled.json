@@ -1,0 +1,19 @@
+{
+  "object": "ad_account",
+  "entry": [
+    {
+      "id": "1234567890",
+      "time": 1720000000,
+      "changes": [
+        {
+          "field": "account_update",
+          "value": {
+            "account_id": "act_1234567890",
+            "account_status": 2,
+            "disable_reason": "policy_violation"
+          }
+        }
+      ]
+    }
+  ]
+}

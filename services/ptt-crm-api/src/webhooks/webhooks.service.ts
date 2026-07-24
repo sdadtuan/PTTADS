@@ -10,6 +10,7 @@ import {
 } from './meta-webhook.parser';
 import { extractMetaLeadgenContext } from './meta-webhook-context';
 import { MetaWebhookRepository } from './meta-webhook.repository';
+import { MetaOpsWebhookService } from './meta-ops-webhook.service';
 import { parseEmailWebhook } from './email-webhook.parser';
 import { parseGoogleWebhook } from './google-webhook.parser';
 import { parseZaloWebhook } from './zalo-webhook.parser';
@@ -29,6 +30,7 @@ export class WebhooksService {
     private readonly config: AppConfigService,
     private readonly jobQueue: JobQueueRepository,
     private readonly metaWebhookRepo: MetaWebhookRepository,
+    private readonly metaOpsWebhookService: MetaOpsWebhookService,
   ) {}
 
   listChannels(): Record<string, unknown> {
@@ -140,6 +142,9 @@ export class WebhooksService {
       page_ids: parsed.page_ids ?? ctx.pageIds,
       form_ids: parsed.form_ids ?? ctx.formIds,
     };
+
+    const opsResult = await this.metaOpsWebhookService.processPayload(payload);
+    response.ops_webhook = opsResult;
 
     if (!parsed.leads.length) {
       return { kind: 'json', status: 200, body: response };
