@@ -29,12 +29,16 @@ def _truthy(name: str, default: str = "0") -> bool:
 def _check_b10_modules() -> dict[str, Any]:
     files = [
         ROOT / "deploy/env.meta-enterprise-b10.example",
+        ROOT / "docs/specs/2026-07-24-postgresql-ddl-v6-meta-insights-level.sql",
+        ROOT / "scripts/apply_pg_ddl_v6_meta_insights_level.sh",
         ROOT / "ptt_meta/anomaly.py",
         ROOT / "ptt_meta/roas.py",
         ROOT / "ptt_meta/budget_recommend.py",
+        ROOT / "ptt_meta/insights_daily.py",
         ROOT / "tests/test_meta_anomaly.py",
         ROOT / "tests/test_meta_roas.py",
         ROOT / "tests/test_meta_budget_recommend.py",
+        ROOT / "tests/test_insights_daily.py",
         ROOT / "tests/test_b10_intelligence_qa.py",
         ROOT / "services/ptt-crm-api/src/meta-intelligence/meta-intelligence.module.ts",
         ROOT / "services/ptt-crm-api/src/meta-intelligence/meta-intelligence.controller.ts",
@@ -44,11 +48,15 @@ def _check_b10_modules() -> dict[str, Any]:
         ROOT / "services/ops-web/src/app/meta/intelligence/page.tsx",
         ROOT / "services/ops-web/src/app/meta/intelligence/MetaIntelligenceContent.tsx",
         ROOT / "services/ops-web/src/components/meta/MetaIntelligenceRoasKpi.tsx",
+        ROOT / "services/ops-web/src/components/meta/MetaIntelligenceRoasChart.tsx",
+        ROOT / "services/ops-web/src/components/meta/MetaAdsetInsightsTable.tsx",
         ROOT / "services/ops-web/src/components/meta/MetaAnomaliesTable.tsx",
         ROOT / "services/ops-web/src/components/meta/MetaBudgetRecommendTable.tsx",
         ROOT / "services/ops-web/src/hooks/meta/useMetaIntelligence.ts",
+        ROOT / "services/ops-web/e2e/meta-intelligence.spec.ts",
         ROOT / "scripts/wave_b10_gate.sh",
         ROOT / "scripts/wave_b10_smoke.sh",
+        ROOT / "scripts/playwright_ops_meta_intelligence_e2e.sh",
     ]
     missing = [str(p.relative_to(ROOT)) for p in files if not p.is_file()]
     return {"id": "B10-G01", "ok": not missing, "label": "Wave B10 module files", "missing": missing}
@@ -76,6 +84,7 @@ def _run_b10_python_tests() -> dict[str, Any]:
             "tests.test_meta_anomaly",
             "tests.test_meta_roas",
             "tests.test_meta_budget_recommend",
+            "tests.test_insights_daily",
             "-v",
         ],
         cwd=str(ROOT),
@@ -86,7 +95,7 @@ def _run_b10_python_tests() -> dict[str, Any]:
     return {
         "id": "B10-G03",
         "ok": proc.returncode == 0,
-        "label": "unittest anomaly + roas + budget_recommend",
+        "label": "unittest anomaly + roas + budget_recommend + insights_daily",
         "returncode": proc.returncode,
         "tail": (proc.stdout or proc.stderr)[-800:],
     }
@@ -182,6 +191,7 @@ def _run_wave_b9_gate() -> dict[str, Any]:
             "WAVE_B9_SKIP_B8_GATE": "1",
             "WAVE_B9_SKIP_HORIZON1": "1",
             "WAVE_B9_SKIP_SOAK": "1",
+            "WAVE_B9_SKIP_PG": "1",
         },
         capture_output=True,
         text=True,
@@ -195,6 +205,43 @@ def _run_wave_b9_gate() -> dict[str, Any]:
     }
 
 
+def _check_pg_insights_level_ddl() -> dict[str, Any]:
+    if _truthy("WAVE_B10_SKIP_PG", "1"):
+        return {"id": "B10-G09", "ok": True, "label": "PG insight_level DDL (skipped)", "skipped": True}
+    try:
+        from ptt_crm.pg_schema import pg_daily_performance_insight_level_ready
+
+        ok = pg_daily_performance_insight_level_ready()
+    except Exception as exc:
+        ok = False
+        err = str(exc)
+    else:
+        err = None
+    return {
+        "id": "B10-G09",
+        "ok": ok,
+        "label": "PG daily_performance.insight_level ready",
+        "error": err,
+        "hint": "./scripts/apply_pg_ddl_v6_meta_insights_level.sh",
+    }
+
+
+def _run_playwright_meta_intelligence() -> dict[str, Any]:
+    if _truthy("WAVE_B10_SKIP_E2E", "1"):
+        return {"id": "B10-G10", "ok": True, "label": "Playwright E2E meta intelligence (skipped)", "skipped": True}
+    script = ROOT / "scripts/playwright_ops_meta_intelligence_e2e.sh"
+    proc = subprocess.run(["bash", str(script)], cwd=str(ROOT), capture_output=True, text=True)
+    ok = proc.returncode == 0
+    return {
+        "id": "B10-G10",
+        "ok": ok,
+        "label": "Playwright ops /meta/intelligence E2E",
+        "returncode": proc.returncode,
+        "tail": (proc.stdout or proc.stderr)[-800:],
+        "hint": "Start Nest + ops-web with B10 flags=1; set WAVE_B10_SKIP_E2E=0",
+    }
+
+
 def run_wave_b10_gates() -> dict[str, Any]:
     checks = [
         _check_b10_modules(),
@@ -205,6 +252,8 @@ def run_wave_b10_gates() -> dict[str, Any]:
         _run_nest_jest_b10(),
         _run_ops_web_build(),
         _run_wave_b9_gate(),
+        _check_pg_insights_level_ddl(),
+        _run_playwright_meta_intelligence(),
     ]
     ok = all(c.get("ok") for c in checks)
     report = {"wave": "b10", "ok": ok, "generated_at": _now_iso(), "checks": checks}

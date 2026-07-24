@@ -28,7 +28,7 @@ if [[ -n "$STAFF_TOKEN" ]]; then
     qs="?client_id=${CLIENT_ID}"
   fi
 
-  for path in meta/anomalies meta/roas meta/budget-recommendations; do
+  for path in meta/anomalies meta/roas meta/budget-recommendations meta/insights/daily; do
     body="$(curl -sf "$BASE/api/v1/${path}${qs}" -H "Authorization: Bearer $STAFF_TOKEN" 2>/dev/null || echo '{}')"
     parsed="$(python3 -c "
 import sys,json

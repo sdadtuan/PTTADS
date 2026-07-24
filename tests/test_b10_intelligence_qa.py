@@ -17,6 +17,8 @@ class TestB10IntelligenceQa(unittest.TestCase):
         content = _read("services/ops-web/src/app/meta/intelligence/MetaIntelligenceContent.tsx")
         self.assertIn("MetaIntelligenceContent", page)
         self.assertIn("MetaIntelligenceRoasKpi", content)
+        self.assertIn("MetaIntelligenceRoasChart", content)
+        self.assertIn("MetaAdsetInsightsTable", content)
         self.assertIn("MetaAnomaliesTable", content)
         self.assertIn("MetaBudgetRecommendTable", content)
         self.assertIn("Tạo write request", _read("services/ops-web/src/components/meta/MetaBudgetRecommendTable.tsx"))
@@ -27,11 +29,13 @@ class TestB10IntelligenceQa(unittest.TestCase):
             "/api/v1/meta/anomalies",
             "/api/v1/meta/roas",
             "/api/v1/meta/budget-recommendations",
+            "/api/v1/meta/insights/daily",
         ):
             self.assertIn(path, text, msg=f"missing {path}")
         self.assertIn("fetchMetaAnomalies", text)
         self.assertIn("fetchMetaRoas", text)
         self.assertIn("fetchMetaBudgetRecommendations", text)
+        self.assertIn("fetchMetaDailyInsights", text)
 
     def test_meta_flags_and_caps(self) -> None:
         flags = _read("services/ops-web/src/lib/meta/flags.ts")
@@ -52,9 +56,22 @@ class TestB10IntelligenceQa(unittest.TestCase):
         self.assertIn("@Get('anomalies')", text)
         self.assertIn("@Get('roas')", text)
         self.assertIn("@Get('budget-recommendations')", text)
+        self.assertIn("@Get('insights/daily')", text)
+
+    def test_playwright_intelligence_e2e_exists(self) -> None:
+        path = ROOT / "services/ops-web/e2e/meta-intelligence.spec.ts"
+        self.assertTrue(path.is_file())
+        text = path.read_text(encoding="utf-8")
+        self.assertIn("/meta/intelligence", text)
+        self.assertIn("meta-intelligence-roas-chart", text)
 
     def test_python_b10_modules_exist(self) -> None:
-        for rel in ("ptt_meta/anomaly.py", "ptt_meta/roas.py", "ptt_meta/budget_recommend.py"):
+        for rel in (
+            "ptt_meta/anomaly.py",
+            "ptt_meta/roas.py",
+            "ptt_meta/budget_recommend.py",
+            "ptt_meta/insights_daily.py",
+        ):
             self.assertTrue((ROOT / rel).is_file(), rel)
 
     def test_alerts_eval_calls_anomaly(self) -> None:

@@ -246,4 +246,26 @@ export async function fetchMetaBudgetRecommendations(
   return metaFetch(token, `/api/v1/meta/budget-recommendations${suffix}`);
 }
 
+export async function fetchMetaDailyInsights(
+  token: string,
+  params: {
+    client_id?: string;
+    level?: 'campaign' | 'adset' | 'ad';
+    from?: string;
+    to?: string;
+    days?: number;
+    limit?: number;
+  } = {},
+): Promise<import('./types').MetaDailyInsightsResponse> {
+  const qs = new URLSearchParams();
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.level) qs.set('level', params.level);
+  if (params.from) qs.set('from', params.from);
+  if (params.to) qs.set('to', params.to);
+  if (params.days != null) qs.set('days', String(params.days));
+  if (params.limit != null) qs.set('limit', String(params.limit));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return metaFetch(token, `/api/v1/meta/insights/daily${suffix}`);
+}
+
 export { MetaApiError };

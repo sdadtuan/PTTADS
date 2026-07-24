@@ -117,16 +117,32 @@ def count_crm_leads(*, client_id: str, campaign_id: str, perf_date: date) -> int
 
 
 def upsert_daily_performance(record: dict[str, Any]) -> None:
+    from ptt_crm.pg_schema import pg_daily_performance_insight_level_ready
+
+    rec = dict(record)
+    if pg_daily_performance_insight_level_ready():
+        rec.setdefault("insight_level", "campaign")
+        rec.setdefault("external_adset_id", "")
+        rec.setdefault("external_adset_name", None)
+        conflict = "(client_id, channel, external_campaign_id, external_adset_id, insight_level, performance_date)"
+        extra_cols = ", insight_level, external_adset_id, external_adset_name"
+        extra_vals = ", %(insight_level)s, %(external_adset_id)s, %(external_adset_name)s"
+    else:
+        conflict = "(client_id, channel, external_campaign_id, performance_date)"
+        extra_cols = ""
+        extra_vals = ""
+
     with pg_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """
+                f"""
                 INSERT INTO daily_performance (
                     client_id, channel, external_account_id, external_campaign_id,
                     external_campaign_name, hub_campaign_map_id, performance_date,
                     currency, spend, impressions, clicks, reach, frequency,
                     cpc, cpm, ctr, leads_platform, leads_crm, conversions,
                     conversion_value, raw_insights, synced_at, sync_version
+                    {extra_cols}
                 ) VALUES (
                     %(client_id)s::uuid, %(channel)s, %(external_account_id)s,
                     %(external_campaign_id)s, %(external_campaign_name)s,
@@ -135,8 +151,9 @@ def upsert_daily_performance(record: dict[str, Any]) -> None:
                     %(reach)s, %(frequency)s, %(cpc)s, %(cpm)s, %(ctr)s,
                     %(leads_platform)s, %(leads_crm)s, %(conversions)s,
                     %(conversion_value)s, %(raw_insights)s::jsonb, NOW(), 1
+                    {extra_vals}
                 )
-                ON CONFLICT (client_id, channel, external_campaign_id, performance_date)
+                ON CONFLICT {conflict}
                 DO UPDATE SET
                     external_account_id = EXCLUDED.external_account_id,
                     external_campaign_name = EXCLUDED.external_campaign_name,
@@ -155,7 +172,7 @@ def upsert_daily_performance(record: dict[str, Any]) -> None:
                     synced_at = NOW(),
                     sync_version = daily_performance.sync_version + 1
                 """,
-                record,
+                rec,
             )
         conn.commit()
 

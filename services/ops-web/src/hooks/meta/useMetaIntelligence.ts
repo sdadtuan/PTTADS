@@ -4,11 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   fetchMetaAnomalies,
   fetchMetaBudgetRecommendations,
+  fetchMetaDailyInsights,
   fetchMetaRoas,
 } from '@/lib/meta/api';
 import type {
   MetaAnomaliesListResponse,
   MetaBudgetRecommendationsResponse,
+  MetaDailyInsightsResponse,
   MetaRoasResponse,
 } from '@/lib/meta/types';
 
@@ -22,6 +24,7 @@ export function useMetaIntelligence({ token, clientId, days = 7 }: UseMetaIntell
   const [anomalies, setAnomalies] = useState<MetaAnomaliesListResponse | null>(null);
   const [roas, setRoas] = useState<MetaRoasResponse | null>(null);
   const [recommendations, setRecommendations] = useState<MetaBudgetRecommendationsResponse | null>(null);
+  const [adsetInsights, setAdsetInsights] = useState<MetaDailyInsightsResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -31,14 +34,16 @@ export function useMetaIntelligence({ token, clientId, days = 7 }: UseMetaIntell
     setError('');
     try {
       const params = { client_id: clientId || undefined, days };
-      const [anomalyRes, roasRes, recRes] = await Promise.all([
+      const [anomalyRes, roasRes, recRes, insightsRes] = await Promise.all([
         fetchMetaAnomalies(token, params),
         fetchMetaRoas(token, params),
         fetchMetaBudgetRecommendations(token, params),
+        fetchMetaDailyInsights(token, { ...params, level: 'adset', limit: 100 }),
       ]);
       setAnomalies(anomalyRes);
       setRoas(roasRes);
       setRecommendations(recRes);
+      setAdsetInsights(insightsRes);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không tải được Meta Intelligence');
     } finally {
@@ -54,6 +59,7 @@ export function useMetaIntelligence({ token, clientId, days = 7 }: UseMetaIntell
     anomalies,
     roas,
     recommendations,
+    adsetInsights,
     loading,
     error,
     reload,

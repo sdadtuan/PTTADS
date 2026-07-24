@@ -77,4 +77,31 @@ describe('Meta intelligence B10 (anomalies + roas + budget-recommendations)', ()
     expect(res.body.read_only).toBe(true);
     expect(Array.isArray(res.body.recommendations)).toBe(true);
   });
+
+  it('GET /meta/insights/daily returns campaign rows', async () => {
+    if (!app || !staffToken) return;
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/meta/insights/daily?client_id=${E2E_CLIENT_ID}&level=campaign&days=7`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .expect(200);
+
+    expect(res.body.ok).toBe(true);
+    expect(res.body.level).toBe('campaign');
+    expect(Array.isArray(res.body.rows)).toBe(true);
+    expect(res.body.attribution.attribution_model).toBe('last_touch_crm');
+  });
+
+  it('GET /meta/insights/daily?level=adset respects enabled level', async () => {
+    if (!app || !staffToken) return;
+    process.env.PTT_META_INSIGHTS_LEVEL = 'adset';
+    const res = await request(app.getHttpServer())
+      .get(`/api/v1/meta/insights/daily?client_id=${E2E_CLIENT_ID}&level=adset&days=7`)
+      .set('Authorization', `Bearer ${staffToken}`)
+      .expect(200);
+
+    expect(res.body.ok).toBe(true);
+    expect(res.body.level).toBe('adset');
+    expect(Array.isArray(res.body.rows)).toBe(true);
+    delete process.env.PTT_META_INSIGHTS_LEVEL;
+  });
 });

@@ -5,6 +5,7 @@ import { MetaIntelligenceService } from './meta-intelligence.service';
 import {
   MetaAnomaliesListResponse,
   MetaBudgetRecommendationsResponse,
+  MetaDailyInsightsResponse,
   MetaRoasResponse,
 } from './meta-intelligence.types';
 
@@ -40,5 +41,25 @@ export class MetaIntelligenceController {
     @Query('days') days?: string,
   ): Promise<MetaBudgetRecommendationsResponse> {
     return this.intelligence.listBudgetRecommendations({ client_id: clientId, days });
+  }
+
+  @Get('insights/daily')
+  @UseGuards(StaffOrInternalKeyGuard, StaffMetaIntelligenceViewGuard)
+  listDailyInsights(
+    @Query('client_id') clientId?: string,
+    @Query('level') level?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('days') days?: string,
+    @Query('limit') limit?: string,
+  ): Promise<MetaDailyInsightsResponse> {
+    return this.intelligence.getDailyInsights({
+      client_id: clientId,
+      level,
+      from,
+      to,
+      days,
+      limit,
+    });
   }
 }

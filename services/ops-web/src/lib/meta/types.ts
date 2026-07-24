@@ -390,3 +390,34 @@ export interface MetaBudgetRecommendationsResponse {
   count: number;
   attribution: HubAttributionMeta;
 }
+
+export interface MetaDailyInsightRow {
+  client_id: string;
+  client_code?: string | null;
+  client_name?: string | null;
+  external_campaign_id: string | null;
+  external_campaign_name?: string | null;
+  external_adset_id?: string | null;
+  external_adset_name?: string | null;
+  insight_level: string;
+  performance_date: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  leads_crm: number;
+  conversion_value: number;
+}
+
+export interface MetaDailyInsightsResponse {
+  ok: boolean;
+  disabled?: boolean;
+  reason?: string;
+  hint?: string;
+  enabled_level?: string;
+  level: string;
+  date_from: string;
+  date_to: string;
+  rows: MetaDailyInsightRow[];
+  count: number;
+  attribution: HubAttributionMeta;
+}

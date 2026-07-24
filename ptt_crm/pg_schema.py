@@ -21,6 +21,7 @@ DDL_V3_INGEST_CONFIG_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v3-leads-i
 DDL_V3_CLIENT_OFFBOARD_REL = Path("docs/specs/2026-07-23-postgresql-ddl-v3-client-offboard.sql")
 DDL_V4_META_ENTERPRISE_REL = Path("docs/specs/2026-07-24-postgresql-ddl-v4-meta-enterprise.sql")
 DDL_V5_META_CONVERSION_REL = Path("docs/specs/2026-07-24-postgresql-ddl-v5-meta-conversion.sql")
+DDL_V6_META_INSIGHTS_LEVEL_REL = Path("docs/specs/2026-07-24-postgresql-ddl-v6-meta-insights-level.sql")
 KPI_DICTIONARY_SEED_REL = Path("docs/specs/2026-07-17-kpi-dictionary-seed.sql")
 MIGRATION_VERSION = "2026-07-17-v2-leads"
 MIGRATION_V3_OLTP = "2026-07-17-v3-leads-oltp"
@@ -36,6 +37,7 @@ MIGRATION_V3_INGEST_CONFIG = "2026-07-17-v3-ingest"
 MIGRATION_V3_CLIENT_OFFBOARD = "2026-07-23-v3-client-offboard"
 MIGRATION_V4_META_ENTERPRISE = "2026-07-24-v4-meta-enterprise"
 MIGRATION_V5_META_CONVERSION = "2026-07-24-v5-meta-conversion"
+MIGRATION_V6_META_INSIGHTS_LEVEL = "2026-07-24-v6-meta-insights-level"
 
 CRM_LEADS_COLUMNS: tuple[str, ...] = (
     "sqlite_lead_id",
@@ -126,6 +128,11 @@ def ddl_v4_meta_enterprise_path() -> Path:
 def ddl_v5_meta_conversion_path() -> Path:
     base = Path(__file__).resolve().parents[1]
     return base / DDL_V5_META_CONVERSION_REL
+
+
+def ddl_v6_meta_insights_level_path() -> Path:
+    base = Path(__file__).resolve().parents[1]
+    return base / DDL_V6_META_INSIGHTS_LEVEL_REL
 
 
 def _apply_sql_file(path: Path) -> None:
@@ -731,4 +738,32 @@ def pg_meta_conversion_rules_ready() -> bool:
 
 def apply_ddl_v5_meta_conversion(*, ddl_path: Path | None = None) -> bool:
     _apply_sql_file(ddl_path or ddl_v5_meta_conversion_path())
+    return True
+
+
+def pg_daily_performance_insight_level_ready() -> bool:
+    try:
+        from ptt_jobs.db import pg_available, pg_connection
+
+        if not pg_available():
+            return False
+        with pg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'daily_performance'
+                      AND column_name = 'insight_level'
+                    LIMIT 1
+                    """
+                )
+                return cur.fetchone() is not None
+    except Exception as exc:
+        logger.debug("pg_daily_performance_insight_level_ready: %s", exc)
+        return False
+
+
+def apply_ddl_v6_meta_insights_level(*, ddl_path: Path | None = None) -> bool:
+    _apply_sql_file(ddl_path or ddl_v6_meta_insights_level_path())
     return True

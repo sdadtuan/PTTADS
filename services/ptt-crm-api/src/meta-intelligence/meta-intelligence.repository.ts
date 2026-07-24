@@ -276,4 +276,74 @@ export class MetaIntelligenceRepository implements OnModuleDestroy {
   parseOptionalDate(value: string | undefined, fallback: Date): Date {
     return parseDate(value, fallback);
   }
+
+  async pgInsightLevelColumnReady(): Promise<boolean> {
+    try {
+      const result = await this.db.query(
+        `SELECT 1 FROM information_schema.columns
+         WHERE table_schema = 'public'
+           AND table_name = 'daily_performance'
+           AND column_name = 'insight_level'
+         LIMIT 1`,
+      );
+      return (result.rowCount ?? 0) > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  async listDailyInsights(params: {
+    clientId?: string;
+    level: string;
+    dateFrom: string;
+    dateTo: string;
+    limit?: number;
+  }) {
+    const hasLevelCol = await this.pgInsightLevelColumnReady();
+    const clauses = [`dp.channel = 'meta'`, `dp.performance_date BETWEEN $1::date AND $2::date`];
+    const values: unknown[] = [params.dateFrom, params.dateTo];
+    let idx = 3;
+
+    if (hasLevelCol) {
+      clauses.push(`dp.insight_level = $${idx++}`);
+      values.push(params.level);
+    } else if (params.level !== 'campaign') {
+      return { rows: [], hasLevelCol: false };
+    }
+
+    if (params.clientId) {
+      clauses.push(`dp.client_id = $${idx++}::uuid`);
+      values.push(params.clientId);
+    }
+
+    const limit = Math.min(Math.max(params.limit ?? 500, 1), 2000);
+    values.push(limit);
+
+    const adsetSelect = hasLevelCol
+      ? `, dp.external_adset_id, dp.external_adset_name, dp.insight_level`
+      : `, '' AS external_adset_id, NULL::varchar AS external_adset_name, 'campaign' AS insight_level`;
+
+    const result = await this.db.query(
+      `SELECT dp.client_id::text,
+              c.code AS client_code,
+              c.name AS client_name,
+              dp.external_campaign_id,
+              dp.external_campaign_name,
+              dp.performance_date::date,
+              dp.spend,
+              dp.impressions,
+              dp.clicks,
+              dp.leads_crm,
+              dp.conversion_value
+              ${adsetSelect}
+       FROM daily_performance dp
+       JOIN clients c ON c.id = dp.client_id
+       WHERE ${clauses.join(' AND ')}
+       ORDER BY dp.performance_date DESC, dp.spend DESC
+       LIMIT $${idx}`,
+      values,
+    );
+
+    return { rows: result.rows, hasLevelCol };
+  }
 }

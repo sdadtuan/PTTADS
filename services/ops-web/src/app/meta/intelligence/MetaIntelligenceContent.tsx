@@ -3,9 +3,11 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { MetaAdsetInsightsTable } from '@/components/meta/MetaAdsetInsightsTable';
 import { MetaAnomaliesTable } from '@/components/meta/MetaAnomaliesTable';
 import { MetaAttributionFooter } from '@/components/meta/MetaAttributionFooter';
 import { MetaBudgetRecommendTable } from '@/components/meta/MetaBudgetRecommendTable';
+import { MetaIntelligenceRoasChart } from '@/components/meta/MetaIntelligenceRoasChart';
 import { MetaIntelligenceRoasKpi } from '@/components/meta/MetaIntelligenceRoasKpi';
 import { MetaPageShell } from '@/components/meta/MetaPageShell';
 import { useMetaIntelligence } from '@/hooks/meta/useMetaIntelligence';
@@ -77,7 +79,8 @@ export function MetaIntelligenceContent() {
       .catch(() => setClientOptions([]));
   }, [token]);
 
-  const { anomalies, roas, recommendations, loading, error, reload, attribution } = useMetaIntelligence({
+  const { anomalies, roas, recommendations, adsetInsights, loading, error, reload, attribution } =
+    useMetaIntelligence({
     token,
     clientId: clientId || undefined,
     days,
@@ -170,6 +173,8 @@ export function MetaIntelligenceContent() {
       {error ? <p className="error-text">{error}</p> : null}
 
       <MetaIntelligenceRoasKpi roas={roas} days={days} />
+      <MetaIntelligenceRoasChart series={roas?.series ?? []} disabled={roas?.disabled} />
+      <MetaAdsetInsightsTable data={adsetInsights} />
       <MetaAnomaliesTable data={anomalies} />
       <MetaBudgetRecommendTable data={recommendations} />
     </MetaPageShell>

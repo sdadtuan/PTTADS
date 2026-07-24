@@ -1,11 +1,13 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { buildMetaAttributionMeta } from '../meta-attribution.util';
-import { computeRoas } from '../performance/performance.util';
+import { computeRoas, toNumber } from '../performance/performance.util';
 import { MetaIntelligenceRepository } from './meta-intelligence.repository';
 import {
   MetaAnomaliesListResponse,
   MetaAnomalyRow,
   MetaBudgetRecommendationsResponse,
+  MetaDailyInsightRow,
+  MetaDailyInsightsResponse,
   MetaRoasResponse,
 } from './meta-intelligence.types';
 import {
@@ -34,6 +36,11 @@ export class MetaIntelligenceService {
 
   isRecommendEnabled(): boolean {
     return this.isAnomalyEnabled() || this.isRoasEnabled();
+  }
+
+  insightsLevelEnabled(): string {
+    const raw = (process.env.PTT_META_INSIGHTS_LEVEL ?? 'campaign').trim().toLowerCase();
+    return ['campaign', 'adset', 'ad'].includes(raw) ? raw : 'campaign';
   }
 
   private async ensurePerformanceReady(): Promise<void> {
@@ -298,6 +305,97 @@ export class MetaIntelligenceService {
       date_to: dateTo,
       recommendations,
       count: recommendations.length,
+      attribution,
+    };
+  }
+
+  async getDailyInsights(query: {
+    client_id?: string;
+    level?: string;
+    from?: string;
+    to?: string;
+    days?: string;
+    limit?: string;
+  }): Promise<MetaDailyInsightsResponse> {
+    await this.ensurePerformanceReady();
+    const level = (query.level ?? 'campaign').trim().toLowerCase();
+    if (!['campaign', 'adset', 'ad'].includes(level)) {
+      throw new BadRequestException({ ok: false, error: 'invalid_insight_level', level });
+    }
+
+    const enabledLevel = this.insightsLevelEnabled();
+    const { start, end } = this.repo.resolveWindow(query, 7);
+    const { dateFrom, dateTo } = this.repo.formatWindow(start, end);
+    const clientId = query.client_id?.trim() || undefined;
+    const attribution = await this.buildAttribution({ clientId, dateFrom, dateTo });
+    const limit = query.limit ? Number(query.limit) : 500;
+
+    if (level !== 'campaign' && enabledLevel !== level) {
+      return {
+        ok: true,
+        disabled: true,
+        level,
+        enabled_level: enabledLevel,
+        date_from: dateFrom,
+        date_to: dateTo,
+        rows: [],
+        count: 0,
+        attribution,
+      };
+    }
+
+    const { rows, hasLevelCol } = await this.repo.listDailyInsights({
+      clientId,
+      level,
+      dateFrom,
+      dateTo,
+      limit: Number.isFinite(limit) ? limit : 500,
+    });
+
+    if (!hasLevelCol && level !== 'campaign') {
+      return {
+        ok: true,
+        disabled: true,
+        level,
+        enabled_level: enabledLevel,
+        reason: 'insight_level_column_not_ready',
+        hint: './scripts/apply_pg_ddl_v6_meta_insights_level.sh',
+        date_from: dateFrom,
+        date_to: dateTo,
+        rows: [],
+        count: 0,
+        attribution,
+      };
+    }
+
+    const mapped: MetaDailyInsightRow[] = rows.map((row) => ({
+      client_id: String(row.client_id),
+      client_code: row.client_code != null ? String(row.client_code) : null,
+      client_name: row.client_name != null ? String(row.client_name) : null,
+      external_campaign_id: row.external_campaign_id ? String(row.external_campaign_id) : null,
+      external_campaign_name: row.external_campaign_name != null ? String(row.external_campaign_name) : null,
+      external_adset_id:
+        row.external_adset_id && String(row.external_adset_id) !== ''
+          ? String(row.external_adset_id)
+          : null,
+      external_adset_name: row.external_adset_name != null ? String(row.external_adset_name) : null,
+      insight_level: String(row.insight_level ?? level),
+      performance_date: String(row.performance_date).slice(0, 10),
+      spend: Math.round(toNumber(row.spend) * 100) / 100,
+      impressions: Math.round(toNumber(row.impressions)),
+      clicks: Math.round(toNumber(row.clicks)),
+      leads_crm: Math.round(toNumber(row.leads_crm)),
+      conversion_value: Math.round(toNumber(row.conversion_value) * 100) / 100,
+    }));
+
+    return {
+      ok: true,
+      level,
+      enabled_level: enabledLevel,
+      date_from: dateFrom,
+      date_to: dateTo,
+      rows: mapped,
+      count: mapped.length,
       attribution,
     };
   }
