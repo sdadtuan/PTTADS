@@ -7,8 +7,11 @@ import { MetaAdsetInsightsTable } from '@/components/meta/MetaAdsetInsightsTable
 import { MetaAnomaliesTable } from '@/components/meta/MetaAnomaliesTable';
 import { MetaAttributionFooter } from '@/components/meta/MetaAttributionFooter';
 import { MetaBudgetRecommendTable } from '@/components/meta/MetaBudgetRecommendTable';
+import { MetaForecastPanel } from '@/components/meta/MetaForecastPanel';
 import { MetaIntelligenceRoasChart } from '@/components/meta/MetaIntelligenceRoasChart';
 import { MetaIntelligenceRoasKpi } from '@/components/meta/MetaIntelligenceRoasKpi';
+import { MetaPixelsTable } from '@/components/meta/MetaPixelsTable';
+import { MetaStatAnomaliesTable } from '@/components/meta/MetaStatAnomaliesTable';
 import { MetaPageShell } from '@/components/meta/MetaPageShell';
 import { useMetaIntelligence } from '@/hooks/meta/useMetaIntelligence';
 import { fetchAgencyClients, staffMe, staffRefresh } from '@/lib/api';
@@ -79,7 +82,7 @@ export function MetaIntelligenceContent() {
       .catch(() => setClientOptions([]));
   }, [token]);
 
-  const { anomalies, roas, recommendations, adsetInsights, loading, error, reload, attribution } =
+  const { anomalies, statAnomalies, forecast, pixels, roas, recommendations, adsetInsights, loading, error, reload, attribution } =
     useMetaIntelligence({
     token,
     clientId: clientId || undefined,
@@ -121,8 +124,12 @@ export function MetaIntelligenceContent() {
       <MetaPageShell user={user} onLogout={() => { clearSession(); router.replace('/login'); }}>
         <h1 style={{ marginTop: 0 }}>Meta Intelligence</h1>
         <p className="meta-intelligence-disabled-banner">
-          B10 Intelligence đang tắt — bật <code>NEXT_PUBLIC_PTT_META_ANOMALY_ENABLED</code> hoặc{' '}
-          <code>NEXT_PUBLIC_PTT_META_ROAS_ENABLED</code>.
+          Meta Intelligence đang tắt — bật một trong các flag B10/B11 (
+          <code>NEXT_PUBLIC_PTT_META_ANOMALY_ENABLED</code>,{' '}
+          <code>NEXT_PUBLIC_PTT_META_ROAS_ENABLED</code>,{' '}
+          <code>NEXT_PUBLIC_PTT_META_ANOMALY_STAT_ENABLED</code>,{' '}
+          <code>NEXT_PUBLIC_PTT_META_FORECAST_ENABLED</code>,{' '}
+          <code>NEXT_PUBLIC_PTT_META_PIXELS_ENABLED</code>).
         </p>
       </MetaPageShell>
     );
@@ -139,7 +146,7 @@ export function MetaIntelligenceContent() {
     >
       <h1 style={{ marginTop: 0 }}>Meta Intelligence</h1>
       <p className="muted" style={{ marginTop: 0 }}>
-        ROAS, anomaly median spike, budget recommendations (read-only).
+        ROAS, anomaly median/z-score, forecast, multi-pixel, budget recommendations (read-only).
       </p>
 
       <div className="meta-intelligence-filters">
@@ -176,6 +183,9 @@ export function MetaIntelligenceContent() {
       <MetaIntelligenceRoasChart series={roas?.series ?? []} disabled={roas?.disabled} />
       <MetaAdsetInsightsTable data={adsetInsights} />
       <MetaAnomaliesTable data={anomalies} />
+      <MetaStatAnomaliesTable data={statAnomalies} />
+      <MetaForecastPanel data={forecast} metric="cpl" />
+      <MetaPixelsTable data={pixels} />
       <MetaBudgetRecommendTable data={recommendations} />
     </MetaPageShell>
   );

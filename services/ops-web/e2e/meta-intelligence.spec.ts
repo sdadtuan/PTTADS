@@ -24,6 +24,9 @@ test.describe('Ops Meta intelligence B10 E2E', () => {
     await expect(page.getByRole('heading', { name: /^Anomalies$/i })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Budget recommendations/i })).toBeVisible();
     await expect(page.getByRole('heading', { name: /Insights daily/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Stat anomalies/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Forecast/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Multi-pixel/i })).toBeVisible();
   });
 
   test('intelligence filters and refresh button', async ({ page }) => {

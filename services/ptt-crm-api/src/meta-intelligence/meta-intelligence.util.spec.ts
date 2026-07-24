@@ -1,5 +1,8 @@
 import {
+  buildForecastProjection,
+  computeZscore,
   detectCampaignAnomalies,
+  detectCampaignStatAnomalies,
   isMedianSpike,
   recommendBudgetChange,
 } from './meta-intelligence.util';
@@ -39,5 +42,35 @@ describe('meta-intelligence.util', () => {
     });
     expect(rec?.recommendation_type).toBe('decrease_budget');
     expect(rec?.suggested_daily_budget_vnd).toBe(850_000);
+  });
+
+  it('computeZscore detects spike', () => {
+    const z = computeZscore(250_000, [100_000, 110_000, 95_000, 105_000, 98_000, 102_000]);
+    expect(z).not.toBeNull();
+    expect(z!).toBeGreaterThan(2);
+  });
+
+  it('detectCampaignStatAnomalies returns spend_zscore', () => {
+    const items = detectCampaignStatAnomalies({
+      spendToday: 300_000,
+      leadsToday: 3,
+      spendHistory: [100_000, 110_000, 95_000, 105_000, 98_000],
+      cplHistory: [50_000, 55_000, 48_000],
+      zscoreThreshold: 2,
+    });
+    expect(items.some((i) => i.alert_type === 'spend_zscore')).toBe(true);
+  });
+
+  it('buildForecastProjection returns 7d projection', () => {
+    const out = buildForecastProjection({
+      historical: [
+        { performance_date: '2026-07-17', value: 100_000 },
+        { performance_date: '2026-07-18', value: 110_000 },
+        { performance_date: '2026-07-19', value: 120_000 },
+      ],
+      projectionDays: 7,
+    });
+    expect(out.projection).toHaveLength(7);
+    expect(out.slope).toBeGreaterThan(0);
   });
 });

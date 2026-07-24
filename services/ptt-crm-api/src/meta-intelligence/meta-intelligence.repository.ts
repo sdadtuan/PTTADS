@@ -2,7 +2,7 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 import { AppConfigService } from '../config/app-config.service';
 import { formatDateOnly, parseDate, resolveDateWindow, toNumber } from '../performance/performance.util';
-import { B10_ANOMALY_TYPES } from './meta-intelligence.util';
+import { B10_ANOMALY_TYPES, B11_STAT_ANOMALY_TYPES } from './meta-intelligence.util';
 
 export interface CampaignDayMetricRow {
   client_id: string;
@@ -345,6 +345,233 @@ export class MetaIntelligenceRepository implements OnModuleDestroy {
     );
 
     return { rows: result.rows, hasLevelCol };
+  }
+
+  async listStoredStatAnomalies(params: { clientId?: string; limit: number }) {
+    if (!(await this.pgMetaAlertsReady())) return [];
+    const clauses = [`ma.channel = 'meta'`, `ma.alert_type = ANY($1::text[])`];
+    const values: unknown[] = [B11_STAT_ANOMALY_TYPES];
+    let idx = 2;
+    if (params.clientId) {
+      clauses.push(`ma.client_id = $${idx++}::uuid`);
+      values.push(params.clientId);
+    }
+    values.push(Math.min(Math.max(params.limit, 1), 500));
+
+    const result = await this.db.query(
+      `SELECT ma.id, ma.client_id, ma.external_campaign_id, ma.alert_type, ma.severity,
+              ma.metric_value, ma.threshold_value, ma.message, ma.performance_date, ma.created_at,
+              c.code AS client_code, c.name AS client_name
+       FROM meta_alerts ma
+       JOIN clients c ON c.id = ma.client_id
+       WHERE ${clauses.join(' AND ')}
+       ORDER BY ma.created_at DESC
+       LIMIT $${idx}`,
+      values,
+    );
+    return result.rows;
+  }
+
+  async listDailyMetricSeries(params: {
+    clientId?: string;
+    dateFrom: string;
+    dateTo: string;
+    metric: 'cpl' | 'spend';
+  }) {
+    const clauses = [`dp.channel = 'meta'`, `dp.performance_date BETWEEN $1::date AND $2::date`];
+    const values: unknown[] = [params.dateFrom, params.dateTo];
+    if (params.clientId) {
+      clauses.push(`dp.client_id = $3::uuid`);
+      values.push(params.clientId);
+    }
+
+    const result = await this.db.query(
+      `SELECT dp.performance_date::date,
+              SUM(dp.spend) AS spend,
+              SUM(dp.leads_crm) AS leads_crm
+       FROM daily_performance dp
+       WHERE ${clauses.join(' AND ')}
+       GROUP BY dp.performance_date
+       ORDER BY dp.performance_date ASC`,
+      values,
+    );
+
+    return result.rows.map((row) => {
+      const spend = toNumber(row.spend);
+      const leads = Math.round(toNumber(row.leads_crm));
+      const value = params.metric === 'spend' ? spend : leads > 0 ? spend / leads : 0;
+      return {
+        performance_date: formatDateOnly(new Date(String(row.performance_date))),
+        value,
+      };
+    });
+  }
+
+  async pgMetaPixelsReady(): Promise<boolean> {
+    try {
+      const result = await this.db.query(
+        `SELECT 1 FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = 'meta_pixels'
+         LIMIT 1`,
+      );
+      return (result.rowCount ?? 0) > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  async pgMetaIntelligenceSnapshotsReady(): Promise<boolean> {
+    try {
+      const result = await this.db.query(
+        `SELECT 1 FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = 'meta_intelligence_snapshots'
+         LIMIT 1`,
+      );
+      return (result.rowCount ?? 0) > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  async listMetaPixels(params: { clientId?: string; channelAccountId?: string }) {
+    const clauses = ['1=1'];
+    const values: unknown[] = [];
+    let idx = 1;
+    if (params.channelAccountId) {
+      clauses.push(`mp.client_channel_account_id = $${idx++}::uuid`);
+      values.push(params.channelAccountId);
+    }
+    if (params.clientId) {
+      clauses.push(`cca.client_id = $${idx++}::uuid`);
+      values.push(params.clientId);
+    }
+
+    const result = await this.db.query(
+      `SELECT mp.id::text, mp.client_channel_account_id::text, cca.client_id::text,
+              mp.pixel_id, mp.label, mp.is_primary, mp.capi_enabled, mp.created_at
+       FROM meta_pixels mp
+       JOIN client_channel_accounts cca ON cca.id = mp.client_channel_account_id
+       WHERE ${clauses.join(' AND ')}
+       ORDER BY mp.is_primary DESC, mp.created_at ASC`,
+      values,
+    );
+    return result.rows;
+  }
+
+  async insertMetaPixel(params: {
+    clientChannelAccountId: string;
+    pixelId: string;
+    label: string;
+    isPrimary: boolean;
+    capiEnabled: boolean;
+  }) {
+    const client = await this.db.connect();
+    try {
+      await client.query('BEGIN');
+      if (params.isPrimary) {
+        await client.query(
+          `UPDATE meta_pixels SET is_primary = FALSE WHERE client_channel_account_id = $1::uuid`,
+          [params.clientChannelAccountId],
+        );
+      }
+      const result = await client.query(
+        `INSERT INTO meta_pixels (
+           client_channel_account_id, pixel_id, label, is_primary, capi_enabled
+         ) VALUES ($1::uuid, $2, $3, $4, $5)
+         RETURNING id::text, client_channel_account_id::text, pixel_id, label, is_primary, capi_enabled, created_at`,
+        [
+          params.clientChannelAccountId,
+          params.pixelId,
+          params.label,
+          params.isPrimary,
+          params.capiEnabled,
+        ],
+      );
+      await client.query('COMMIT');
+      return result.rows[0];
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async patchMetaPixel(
+    pixelId: string,
+    updates: { label?: string; isPrimary?: boolean; capiEnabled?: boolean },
+  ) {
+    const client = await this.db.connect();
+    try {
+      await client.query('BEGIN');
+      const existing = await client.query(
+        `SELECT client_channel_account_id::text FROM meta_pixels WHERE id = $1::uuid`,
+        [pixelId],
+      );
+      if (!existing.rows.length) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+      const accountId = String(existing.rows[0].client_channel_account_id);
+      if (updates.isPrimary) {
+        await client.query(
+          `UPDATE meta_pixels SET is_primary = FALSE WHERE client_channel_account_id = $1::uuid`,
+          [accountId],
+        );
+      }
+      const sets: string[] = [];
+      const values: unknown[] = [];
+      let idx = 1;
+      if (updates.label != null) {
+        sets.push(`label = $${idx++}`);
+        values.push(updates.label);
+      }
+      if (updates.isPrimary != null) {
+        sets.push(`is_primary = $${idx++}`);
+        values.push(updates.isPrimary);
+      }
+      if (updates.capiEnabled != null) {
+        sets.push(`capi_enabled = $${idx++}`);
+        values.push(updates.capiEnabled);
+      }
+      values.push(pixelId);
+      const result = await client.query(
+        `UPDATE meta_pixels SET ${sets.join(', ')}
+         WHERE id = $${idx}
+         RETURNING id::text, client_channel_account_id::text, pixel_id, label, is_primary, capi_enabled, created_at`,
+        values,
+      );
+      await client.query('COMMIT');
+      return result.rows[0];
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async insertIntelligenceSnapshot(params: {
+    clientId?: string;
+    periodStart: string;
+    periodEnd: string;
+    artifactPath: string;
+    byteSize: number;
+  }) {
+    const result = await this.db.query(
+      `INSERT INTO meta_intelligence_snapshots (
+         client_id, period_start, period_end, artifact_path, byte_size, gzip
+       ) VALUES ($1::uuid, $2::date, $3::date, $4, $5, TRUE)
+       RETURNING id::text, client_id::text, period_start, period_end, artifact_path, byte_size, gzip, created_at`,
+      [
+        params.clientId ?? null,
+        params.periodStart,
+        params.periodEnd,
+        params.artifactPath,
+        params.byteSize,
+      ],
+    );
+    return result.rows[0];
   }
 
   async pgDailyPerformanceBreakdownReady(): Promise<boolean> {
