@@ -1,0 +1,122 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_CLICKHOUSE",
+      "label": "ClickHouse",
+      "description": "grafana-clickhouse-datasource",
+      "type": "datasource",
+      "pluginId": "grafana-clickhouse-datasource",
+      "pluginName": "ClickHouse"
+    }
+  ],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "9.0.0" },
+    { "type": "datasource", "id": "grafana-clickhouse-datasource", "name": "ClickHouse", "version": "4.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Meta spend trend (VND)",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${DS_CLICKHOUSE}" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": 1,
+          "queryType": "sql",
+          "rawSql": "SELECT\n  performance_date AS time,\n  sum(spend) AS spend\nFROM ptt.meta_daily_facts\nWHERE channel = 'meta'\n  AND client_id = toUUID($client_id)\n  AND performance_date >= today() - toInt32($days)\nGROUP BY performance_date\nORDER BY performance_date"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "currencyVND", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 } },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Meta + Google spend",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${DS_CLICKHOUSE}" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": 1,
+          "queryType": "sql",
+          "rawSql": "SELECT\n  performance_date AS time,\n  channel,\n  sum(spend) AS spend\nFROM ptt.meta_daily_facts\nWHERE client_id = toUUID($client_id)\n  AND performance_date >= today() - toInt32($days)\nGROUP BY performance_date, channel\nORDER BY performance_date, channel"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "currencyVND", "custom": { "drawStyle": "line", "lineWidth": 2 } },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Leads CRM (7d)",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 9 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${DS_CLICKHOUSE}" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": 1,
+          "queryType": "sql",
+          "rawSql": "SELECT sum(leads_crm) AS value\nFROM ptt.meta_daily_facts\nWHERE channel = 'meta'\n  AND client_id = toUUID($client_id)\n  AND performance_date >= today() - toInt32($days)"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto" }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Unmapped rows (7d)",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 9 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${DS_CLICKHOUSE}" },
+      "targets": [
+        {
+          "refId": "A",
+          "format": 1,
+          "queryType": "sql",
+          "rawSql": "SELECT countIf(hub_mapped = 0) AS value\nFROM ptt.meta_daily_facts\nWHERE channel = 'meta'\n  AND client_id = toUUID($client_id)\n  AND performance_date >= today() - toInt32($days)"
+        }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "orientation": "auto", "textMode": "auto" }
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["ptt", "meta", "b14", "warehouse"],
+  "templating": {
+    "list": [
+      {
+        "name": "client_id",
+        "type": "textbox",
+        "label": "Client UUID",
+        "current": { "text": "550e8400-e29b-41d4-a716-446655440000", "value": "550e8400-e29b-41d4-a716-446655440000" }
+      },
+      {
+        "name": "days",
+        "type": "textbox",
+        "label": "Days",
+        "current": { "text": "7", "value": "7" }
+      }
+    ]
+  },
+  "time": { "from": "now-7d", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "PTT Meta Ops — Warehouse BI (B14)",
+  "uid": "ptt-meta-ops-b14",
+  "version": 1,
+  "weekStart": ""
+}

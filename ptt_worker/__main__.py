@@ -96,6 +96,10 @@ def run_worker(*, poll_interval: float = 1.0, once: bool = False) -> int:
                 from ptt_jobs.handlers.meta_ops_webhook import run_meta_ops_webhook_job
 
                 run_meta_ops_webhook_job(job)
+            elif job_type == "meta_clickhouse_export":
+                from ptt_jobs.handlers.meta_clickhouse_export import run_meta_clickhouse_export_job
+
+                run_meta_clickhouse_export_job(job)
             elif job_type == "meta_conversion_sync":
                 from ptt_jobs.handlers.meta_conversion_sync import run_meta_conversion_sync_job
 

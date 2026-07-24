@@ -69,6 +69,16 @@ def meta_insights_sync_enabled() -> bool:
     return _truthy("PTT_META_INSIGHTS_SYNC", "0")
 
 
+def meta_insights_hourly_enabled() -> bool:
+    """B14 ME52 — hourly insights sync for allowlisted high-spend clients."""
+    return _truthy("PTT_META_INSIGHTS_HOURLY", "0")
+
+
+def meta_warehouse_export_enabled() -> bool:
+    """B14 ME48 — daily_performance → ClickHouse facts."""
+    return _truthy("PTT_META_WAREHOUSE_EXPORT", "0")
+
+
 def meta_token_refresh_enabled() -> bool:
     """Phase 2 M1-03 — Meta long-lived token refresh + expiry alerts."""
     return _truthy("PTT_META_TOKEN_REFRESH", "0")

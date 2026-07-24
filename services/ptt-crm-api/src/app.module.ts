@@ -13,6 +13,8 @@ import { MetaTrackingModule } from './meta-tracking/meta-tracking.module';
 import { MetaAlertsModule } from './meta-alerts/meta-alerts.module';
 import { MetaIntelligenceModule } from './meta-intelligence/meta-intelligence.module';
 import { MetaCreativeRegistryModule } from './meta-creative-registry/meta-creative-registry.module';
+import { MetaComplianceModule } from './meta-compliance/meta-compliance.module';
+import { MetricsModule } from './metrics/metrics.module';
 import { MarketingPlansModule } from './marketing-plans/marketing-plans.module';
 import { ServiceLifecycleModule } from './service-lifecycle/service-lifecycle.module';
 import { SvcFinanceModule } from './svc-finance/svc-finance.module';
@@ -86,6 +88,8 @@ import { WorkflowsModule } from './workflows/workflows.module';
     MetaAlertsModule,
     MetaIntelligenceModule,
     MetaCreativeRegistryModule,
+    MetaComplianceModule,
+    MetricsModule,
     CreativesModule,
     CampaignWritesModule,
     TemporalModule,

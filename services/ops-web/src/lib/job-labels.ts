@@ -23,6 +23,7 @@ const JOB_TYPE_LABELS: Record<string, string> = {
   email_send_batch: 'Gửi batch email',
   email_engagement_ingest: 'Ingest tương tác email',
   email_clickhouse_export: 'Export email → ClickHouse',
+  meta_clickhouse_export: 'Export Meta/Google → ClickHouse',
   email_attribution_rollup: 'Tổng hợp attribution email',
   email_deliverability_scan: 'Quét deliverability email',
   email_bounce_process: 'Xử lý bounce email',

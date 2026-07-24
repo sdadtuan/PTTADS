@@ -27,6 +27,24 @@ def meta_insights_stub_mode() -> bool:
     return _truthy("PTT_META_INSIGHTS_STUB", "0")
 
 
+def meta_insights_hourly_enabled() -> bool:
+    return _truthy("PTT_META_INSIGHTS_HOURLY", "0")
+
+
+def _hourly_allowlist() -> set[str]:
+    raw = os.environ.get("PTT_META_INSIGHTS_HOURLY_CLIENTS", "")
+    return {item.strip() for item in raw.split(",") if item.strip()}
+
+
+def _filter_hourly_accounts(accounts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not meta_insights_hourly_enabled():
+        return accounts
+    allow = _hourly_allowlist()
+    if not allow:
+        return []
+    return [a for a in accounts if str(a.get("client_id")) in allow]
+
+
 def pg_meta_insights_ready() -> bool:
     try:
         from ptt_jobs.db import pg_available
@@ -342,6 +360,8 @@ def sync_meta_insights(
 
     perf_date = _target_date(target_date)
     accounts = _load_meta_accounts(client_id=client_id)
+    if meta_insights_hourly_enabled():
+        accounts = _filter_hourly_accounts(accounts)
     if not accounts:
         _update_sync_state(ok=True, accounts_total=0, accounts_failed=0, rows_upserted=0, last_error=None)
         return {"ok": True, "skipped": True, "reason": "no_meta_accounts", "performance_date": perf_date.isoformat()}
