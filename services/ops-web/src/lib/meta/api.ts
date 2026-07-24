@@ -1,4 +1,10 @@
 import type {
+  CapiEventsListResponse,
+  CapiFlushResponse,
+  CapiRetryResponse,
+  ConversionRuleRow,
+  ConversionRulesListResponse,
+  CreateConversionRuleBody,
   FacebookHubCampaignsResponse,
   FacebookHubQuery,
   MetaAlertAckResponse,
@@ -6,6 +12,9 @@ import type {
   MetaHubMapSuggestBody,
   MetaHubMapSuggestResponse,
   MetaSyncStatusResponse,
+  PatchConversionRuleBody,
+  TestPixelResponse,
+  TrackingHealthResponse,
 } from './types';
 
 const API_BASE = (process.env.NEXT_PUBLIC_PTT_API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
@@ -111,3 +120,94 @@ export async function postMetaHubMapSuggest(
     body: JSON.stringify(body),
   });
 }
+
+export async function fetchMetaTrackingHealth(
+  token: string,
+  params: { client_id?: string; window_days?: number } = {},
+): Promise<TrackingHealthResponse> {
+  const qs = new URLSearchParams();
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.window_days != null) qs.set('window_days', String(params.window_days));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return metaFetch(token, `/api/v1/meta/tracking/health${suffix}`);
+}
+
+export async function fetchMetaCapiEvents(
+  token: string,
+  params: {
+    client_id?: string;
+    status?: string;
+    event_name?: string;
+    limit?: number;
+    offset?: number;
+  } = {},
+): Promise<CapiEventsListResponse> {
+  const qs = new URLSearchParams();
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.status) qs.set('status', params.status);
+  if (params.event_name) qs.set('event_name', params.event_name);
+  if (params.limit != null) qs.set('limit', String(params.limit));
+  if (params.offset != null) qs.set('offset', String(params.offset));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return metaFetch(token, `/api/v1/meta/capi/events${suffix}`);
+}
+
+export async function postMetaCapiRetry(token: string, logId: string): Promise<CapiRetryResponse> {
+  return metaMutate(token, `/api/v1/meta/capi/events/${encodeURIComponent(logId)}/retry`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export async function postMetaCapiFlush(
+  token: string,
+  params: { client_id?: string; limit?: number } = {},
+): Promise<CapiFlushResponse> {
+  return metaMutate(token, '/api/v1/meta/capi/flush', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+export async function postMetaTestPixel(
+  token: string,
+  clientId: string,
+  accountId: string,
+): Promise<TestPixelResponse> {
+  return metaMutate(
+    token,
+    `/api/v1/clients/${encodeURIComponent(clientId)}/channel-accounts/${encodeURIComponent(accountId)}/test-pixel`,
+    { method: 'POST', body: '{}' },
+  );
+}
+
+export async function fetchMetaConversionRules(
+  token: string,
+  clientId?: string,
+): Promise<ConversionRulesListResponse> {
+  const qs = clientId ? `?client_id=${encodeURIComponent(clientId)}` : '';
+  return metaFetch(token, `/api/v1/meta/conversion-rules${qs}`);
+}
+
+export async function createMetaConversionRule(
+  token: string,
+  body: CreateConversionRuleBody,
+): Promise<{ ok: boolean; rule: ConversionRuleRow }> {
+  return metaMutate(token, '/api/v1/meta/conversion-rules', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchMetaConversionRule(
+  token: string,
+  ruleId: string,
+  body: PatchConversionRuleBody,
+): Promise<{ ok: boolean; rule: ConversionRuleRow }> {
+  return metaMutate(token, `/api/v1/meta/conversion-rules/${encodeURIComponent(ruleId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export { MetaApiError };

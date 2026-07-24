@@ -248,6 +248,12 @@ export function ServiceDeliveryWorkflowPanel({
             {(launchQaGate?.messages ?? [])[0] ??
               `Checklist ${launchQaGate?.progress_completed ?? 0}/${launchQaGate?.progress_total ?? 0} — hoàn thiện trước bàn giao`}
           </p>
+          <p className="muted" style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}>
+            Meta preflight (pixel · test · hub map · CAPI) auto-sync — xem{' '}
+            <a href="/meta/tracking" className="nav-link">
+              Meta Tracking
+            </a>
+          </p>
           {onOpenLaunchQaTab ? (
             <button type="button" className="btn btn-sm btn-secondary" style={{ marginBottom: '0.5rem' }} onClick={onOpenLaunchQaTab}>
               Mở tab Launch QA

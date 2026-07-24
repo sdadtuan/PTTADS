@@ -62,6 +62,7 @@ export class MetaPixelTestService {
     }
 
     if (this.isStubMode()) {
+      await this.repo.recordPixelTestResult(clientId.trim(), accountId.trim(), true);
       return {
         ok: true,
         stub: true,
@@ -123,6 +124,7 @@ export class MetaPixelTestService {
       };
     }
 
+    await this.repo.recordPixelTestResult(clientId.trim(), accountId.trim(), true);
     return {
       ok: true,
       pixel_id: account.pixel_id,

@@ -242,7 +242,8 @@ def load_pg_lead(lead_id: int) -> dict[str, Any] | None:
                 cur.execute(
                     """
                     SELECT sqlite_lead_id, full_name, phone, email, status, source,
-                           channel, external_lead_id, meta_json
+                           channel, external_lead_id, meta_json, agency_client_id::text,
+                           campaign_id, updated_at
                     FROM crm_leads
                     WHERE sqlite_lead_id = %s
                     LIMIT 1
@@ -262,7 +263,13 @@ def load_pg_lead(lead_id: int) -> dict[str, Any] | None:
             "source": row[5] or "",
             "channel": row[6] or "",
             "external_id": row[7] or "",
+            "external_lead_id": row[7] or "",
+            "agency_client_id": row[9] or "",
+            "client_id": row[9] or "",
+            "campaign_id": row[10] or "",
+            "updated_at": row[11],
             "landing_url": meta.get("landing_url") or meta.get("source_url") or "",
+            "meta_json": meta,
         }
     except Exception as exc:
         logger.debug("load_pg_lead %s: %s", lead_id, exc)

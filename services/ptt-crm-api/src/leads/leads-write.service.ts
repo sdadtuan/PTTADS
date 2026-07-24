@@ -6,6 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { DomainEventService } from '../events/domain-event.service';
+import { MetaConversionSideEffectsService } from '../meta-tracking/meta-conversion-side-effects.service';
 import { PgLeadsWriteRepository } from './pg-leads-write.repository';
 import { CreateLeadV1Body, LeadV1, PatchLeadV1Body } from './leads.types';
 
@@ -14,6 +15,7 @@ export class LeadsWriteService {
   constructor(
     private readonly writeRepo: PgLeadsWriteRepository,
     private readonly events: DomainEventService,
+    private readonly conversionFx: MetaConversionSideEffectsService,
   ) {}
 
   async createLead(body: CreateLeadV1Body): Promise<LeadV1> {
@@ -57,6 +59,14 @@ export class LeadsWriteService {
           lead_id: leadId,
           owner_id: body.owner_id,
           assigned_by: body.assigned_by?.trim() || actor || null,
+        });
+      }
+      if (result.status_changed && body.status !== undefined) {
+        await this.conversionFx.enqueueConversionEval({
+          leadId,
+          clientId: result.lead.client_id,
+          oldStatus: result.previous_status ?? null,
+          newStatus: body.status,
         });
       }
       return result.lead;

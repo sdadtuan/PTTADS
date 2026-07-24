@@ -136,6 +136,8 @@ export class PgLeadsWriteRepository implements OnModuleDestroy {
     const params: unknown[] = [];
     let assigned = false;
     let scored = false;
+    let statusChanged = false;
+    const previousStatus = existing.status?.trim() || null;
 
     const push = (clause: string, value: unknown) => {
       params.push(value);
@@ -143,7 +145,9 @@ export class PgLeadsWriteRepository implements OnModuleDestroy {
     };
 
     if (body.status !== undefined) {
-      push('status = ?', body.status.trim());
+      const nextStatus = body.status.trim();
+      statusChanged = previousStatus !== nextStatus;
+      push('status = ?', nextStatus);
     }
     if (body.owner_id !== undefined) {
       const prev = existing.owner_id;
@@ -173,7 +177,7 @@ export class PgLeadsWriteRepository implements OnModuleDestroy {
     if (!lead) {
       throw new BadRequestException({ error: 'Patch failed' });
     }
-    return { lead, assigned, scored };
+    return { lead, assigned, scored, status_changed: statusChanged, previous_status: previousStatus };
   }
 
   private async nextStagingLeadId(client: PoolClient): Promise<number> {

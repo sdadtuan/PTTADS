@@ -4,6 +4,7 @@ import { WebhooksModule } from '../webhooks/webhooks.module';
 import { MetaCapiEventsController } from './meta-capi-events.controller';
 import { MetaConversionRulesController } from './meta-conversion-rules.controller';
 import { MetaConversionRulesService } from './meta-conversion-rules.service';
+import { MetaConversionSideEffectsService } from './meta-conversion-side-effects.service';
 import { MetaPixelTestController } from './meta-pixel-test.controller';
 import { MetaPixelTestService } from './meta-pixel-test.service';
 import { MetaTrackingController } from './meta-tracking.controller';
@@ -31,15 +32,18 @@ import {
     MetaTrackingService,
     MetaCapiEventsService,
     MetaConversionRulesService,
+    MetaConversionSideEffectsService,
     MetaPixelTestService,
     StaffMetaTrackingViewGuard,
     StaffMetaTrackingConfigureGuard,
     StaffMetaTrackingEnabledGuard,
   ],
   exports: [
+    MetaTrackingRepository,
     MetaTrackingService,
     MetaCapiEventsService,
     MetaConversionRulesService,
+    MetaConversionSideEffectsService,
     MetaPixelTestService,
   ],
 })

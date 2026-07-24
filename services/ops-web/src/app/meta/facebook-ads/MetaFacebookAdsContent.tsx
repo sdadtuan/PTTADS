@@ -32,6 +32,7 @@ export function MetaFacebookAdsContent() {
     q,
     exportScope,
     hubQuery,
+    trackingByClient,
     setDays,
     setDateTo,
     setDateFrom,
@@ -126,7 +127,9 @@ export function MetaFacebookAdsContent() {
         alertsOpenCount={alertsEnabled ? alertsOpenCount : 0}
       />
 
-      {tab === 'clients' ? <MetaClientTable rows={clientRows} loading={loading} /> : null}
+      {tab === 'clients' ? (
+        <MetaClientTable rows={clientRows} loading={loading} trackingByClient={trackingByClient} />
+      ) : null}
 
       {tab === 'campaigns' ? (
         <>

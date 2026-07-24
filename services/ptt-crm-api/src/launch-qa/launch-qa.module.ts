@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { InternalKeyGuard } from '../auth/internal-key.guard';
 import { CampaignWritesRepository } from '../campaign-writes/campaign-writes.repository';
 import { CreativesRepository } from '../creatives/creatives.repository';
+import { MetaTrackingModule } from '../meta-tracking/meta-tracking.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { LaunchQaPgRepository } from '../service-lifecycle/launch-qa-pg.repository';
 import {
@@ -14,15 +15,17 @@ import { LaunchQaCreativeBridgeService } from './launch-qa-creative-bridge.servi
 import { LaunchQaHubService } from './launch-qa-hub.service';
 import { LaunchQaInternalController } from './launch-qa-internal.controller';
 import { LaunchQaLifecycleLookupService } from './launch-qa-lifecycle-lookup.service';
+import { LaunchQaMetaBridgeService } from './launch-qa-meta-bridge.service';
 
 @Module({
-  imports: [StaffAuthModule],
+  imports: [StaffAuthModule, MetaTrackingModule],
   controllers: [LaunchQaController, LaunchQaInternalController],
   providers: [
     LaunchQaHubService,
     LaunchQaLifecycleLookupService,
     LaunchQaCreativeBridgeService,
     LaunchQaCampaignWriteBridgeService,
+    LaunchQaMetaBridgeService,
     LaunchQaPgRepository,
     CreativesRepository,
     CampaignWritesRepository,
@@ -34,6 +37,7 @@ import { LaunchQaLifecycleLookupService } from './launch-qa-lifecycle-lookup.ser
     LaunchQaPgRepository,
     LaunchQaCreativeBridgeService,
     LaunchQaCampaignWriteBridgeService,
+    LaunchQaMetaBridgeService,
     LaunchQaLifecycleLookupService,
   ],
 })

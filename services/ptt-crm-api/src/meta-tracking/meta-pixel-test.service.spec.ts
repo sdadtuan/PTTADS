@@ -6,6 +6,7 @@ describe('MetaPixelTestService', () => {
   const repo = {
     pgCapiEventLogReady: jest.fn(),
     getMetaChannelAccount: jest.fn(),
+    recordPixelTestResult: jest.fn().mockResolvedValue(undefined),
   } as unknown as MetaTrackingRepository;
 
   beforeEach(() => {

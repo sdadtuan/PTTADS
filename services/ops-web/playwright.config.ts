@@ -23,6 +23,7 @@ export default defineConfig({
           ...process.env,
           NEXT_PUBLIC_PTT_API_URL: API_URL,
           NEXT_PUBLIC_PTT_META_ALERTS_ENABLED: '0',
+          NEXT_PUBLIC_PTT_META_TRACKING_ENABLED: process.env.NEXT_PUBLIC_PTT_META_TRACKING_ENABLED ?? '1',
         },
       },
 });

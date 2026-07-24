@@ -94,4 +94,6 @@ export interface PatchLeadResult {
   lead: LeadV1;
   assigned: boolean;
   scored: boolean;
+  status_changed?: boolean;
+  previous_status?: string | null;
 }

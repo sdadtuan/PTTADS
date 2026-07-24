@@ -92,6 +92,18 @@ def run_worker(*, poll_interval: float = 1.0, once: bool = False) -> int:
                 from ptt_jobs.handlers.meta_alerts_eval import run_meta_alerts_eval_job
 
                 run_meta_alerts_eval_job(job)
+            elif job_type == "meta_conversion_sync":
+                from ptt_jobs.handlers.meta_conversion_sync import run_meta_conversion_sync_job
+
+                run_meta_conversion_sync_job(job)
+            elif job_type == "meta_conversion_eval":
+                from ptt_jobs.handlers.meta_conversion_eval import run_meta_conversion_eval_job
+
+                run_meta_conversion_eval_job(job)
+            elif job_type == "meta_insights_archive":
+                from ptt_jobs.handlers.meta_insights_archive import run_meta_insights_archive_job
+
+                run_meta_insights_archive_job(job)
             elif job_type == "google_insights_sync":
                 from ptt_jobs.handlers.google_insights_sync import run_google_insights_sync_job
 

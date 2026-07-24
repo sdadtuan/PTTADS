@@ -388,6 +388,74 @@ export class MetaTrackingRepository implements OnModuleDestroy {
     return result.rows.map((row) => this.mapCapiEventRow(row));
   }
 
+  async getChannelAccountMetaJson(clientId: string): Promise<Record<string, unknown>> {
+    const result = await this.db.query(
+      `SELECT meta FROM client_channel_accounts
+       WHERE client_id = $1::uuid AND channel = 'meta'
+         AND COALESCE(status, 'active') = 'active'
+       ORDER BY created_at ASC
+       LIMIT 1`,
+      [clientId],
+    );
+    return this.parseMeta(result.rows[0]?.meta);
+  }
+
+  async computeUnmappedSpendPct(
+    clientId: string,
+    windowDays = 7,
+  ): Promise<{ total_spend: number; unmapped_spend: number; unmapped_spend_pct: number | null }> {
+    const days = Math.min(Math.max(windowDays, 1), 90);
+    const result = await this.db.query(
+      `SELECT
+         COALESCE(SUM(spend), 0)::float AS total_spend,
+         COALESCE(SUM(spend) FILTER (WHERE hub_campaign_map_id IS NULL), 0)::float AS unmapped_spend
+       FROM daily_performance
+       WHERE client_id = $1::uuid
+         AND performance_date >= CURRENT_DATE - ($2::text || ' days')::interval`,
+      [clientId, days],
+    );
+    const total = Number(result.rows[0]?.total_spend ?? 0);
+    const unmapped = Number(result.rows[0]?.unmapped_spend ?? 0);
+    const pct = total > 0 ? (unmapped / total) * 100 : null;
+    return {
+      total_spend: total,
+      unmapped_spend: unmapped,
+      unmapped_spend_pct: pct,
+    };
+  }
+
+  async getLastCapiSentAt(clientId: string): Promise<string | null> {
+    const result = await this.db.query(
+      `SELECT MAX(sent_at) AS last_sent_at
+       FROM capi_event_log
+       WHERE client_id = $1::uuid AND status = 'sent'`,
+      [clientId],
+    );
+    const raw = result.rows[0]?.last_sent_at;
+    return raw ? new Date(String(raw)).toISOString() : null;
+  }
+
+  async recordPixelTestResult(
+    clientId: string,
+    accountId: string,
+    ok: boolean,
+  ): Promise<void> {
+    await this.db.query(
+      `UPDATE client_channel_accounts
+       SET meta = COALESCE(meta, '{}'::jsonb) || $3::jsonb,
+           updated_at = NOW()
+       WHERE client_id = $1::uuid AND id = $2::uuid AND channel = 'meta'`,
+      [
+        clientId,
+        accountId,
+        JSON.stringify({
+          pixel_test_ok_at: new Date().toISOString(),
+          pixel_test_ok: ok,
+        }),
+      ],
+    );
+  }
+
   async getMetaChannelAccount(
     clientId: string,
     accountId: string,

@@ -82,6 +82,17 @@ interface Props {
   lifecycleId: number;
 }
 
+const META_LAUNCH_QA_KEYS = new Set([
+  'meta_pixel_configured',
+  'meta_capi_test_ok',
+  'meta_hub_map_coverage',
+  'meta_capi_recent_sent',
+]);
+
+function isMetaLaunchQaKey(key: string): boolean {
+  return META_LAUNCH_QA_KEYS.has(key);
+}
+
 const STATUS_LABEL: Record<string, string> = {
   pending_client: 'Chờ client duyệt',
   approved: 'Đã duyệt',
@@ -310,7 +321,9 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
             ) : null}
 
             <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: '0.4rem' }}>
-              {entries.map(([key, item]) => (
+              {entries.map(([key, item]) => {
+                const isMetaAuto = isMetaLaunchQaKey(key);
+                return (
                 <li
                   key={key}
                   style={{
@@ -320,24 +333,40 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
                     padding: '0.45rem',
                     border: '1px solid var(--border)',
                     borderRadius: 8,
+                    background: isMetaAuto ? 'rgba(57, 139, 67, 0.04)' : undefined,
                   }}
                 >
                   <input
                     type="checkbox"
                     checked={Boolean(item.completed)}
-                    disabled={!canEdit || saving || run.status !== 'in_progress'}
+                    disabled={!canEdit || saving || run.status !== 'in_progress' || isMetaAuto}
                     onChange={(e) => void toggleItem(key, e.target.checked)}
                   />
                   <div>
-                    <strong>{item.label ?? key}</strong>
+                    <strong>
+                      {item.label ?? key}
+                      {isMetaAuto ? (
+                        <span className="meta-launch-qa-auto-tag"> · auto</span>
+                      ) : null}
+                    </strong>
                     {item.note ? (
                       <p className="muted" style={{ margin: '0.2rem 0 0' }}>
                         {item.note}
                       </p>
                     ) : null}
+                    {isMetaAuto ? (
+                      <p className="muted" style={{ margin: '0.2rem 0 0', fontSize: '0.8rem' }}>
+                        <a href="/meta/tracking" className="nav-link">
+                          Mở Meta Tracking
+                        </a>
+                        {' · '}
+                        sync tự động từ preflight
+                      </p>
+                    ) : null}
                   </div>
                 </li>
-              ))}
+              );
+              })}
             </ul>
           </>
         )}

@@ -7,6 +7,7 @@ import { SopModule } from '../sop/sop.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { SvcFinanceModule } from '../svc-finance/svc-finance.module';
 import { TemporalModule } from '../temporal/temporal.module';
+import { LaunchQaModule } from '../launch-qa/launch-qa.module';
 import { WorkflowsModule } from '../workflows/workflows.module';
 import {
   StaffServiceLifecycleViewGuard,
@@ -33,6 +34,7 @@ import { ServiceLifecycleService } from './service-lifecycle.service';
     CampaignWritesModule,
     TemporalModule,
     WorkflowsModule,
+    LaunchQaModule,
   ],
   controllers: [ServiceLifecycleController],
   providers: [

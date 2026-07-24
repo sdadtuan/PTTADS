@@ -12,7 +12,9 @@ import { CreativesRepository } from '../creatives/creatives.repository';
 import { CreativesService } from '../creatives/creatives.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { LaunchQaAutoStartService } from './launch-qa-auto-start.service';
+import { LaunchQaMetaBridgeService } from '../launch-qa/launch-qa-meta-bridge.service';
 import { LaunchQaPgRepository } from './launch-qa-pg.repository';
+import { isMetaLaunchQaItemKey } from '../meta-tracking/launch-qa-meta.util';
 import { launchQaGateFromRun, launchQaProgress } from './lifecycle-launch-gate.util';
 import { launchQaHandoverGateFromRun } from './lifecycle-launch-handover-gate.util';
 import { ServiceLifecycleSqliteRepository } from './service-lifecycle-sqlite.repository';
@@ -29,6 +31,7 @@ export class LifecycleLaunchQaService {
     private readonly campaignWritesRepo: CampaignWritesRepository,
     private readonly workflows: WorkflowsService,
     private readonly config: AppConfigService,
+    private readonly metaBridge: LaunchQaMetaBridgeService,
   ) {}
 
   async launchQa(lifecycleId: number) {
@@ -46,7 +49,13 @@ export class LifecycleLaunchQaService {
       };
     }
 
-    const run = await this.repo.findLatestRun(ctx.clientId!, ctx.campaignCode!);
+    let run = await this.repo.findLatestRun(ctx.clientId!, ctx.campaignCode!);
+    if (run) {
+      const synced = await this.metaBridge.syncRun(run);
+      if (synced.run_id) {
+        run = (await this.repo.findById(synced.run_id)) ?? run;
+      }
+    }
     const progress = launchQaProgress(run?.checklist ?? null);
     return {
       lifecycle_id: lifecycleId,
@@ -113,6 +122,12 @@ export class LifecycleLaunchQaService {
     }
 
     const key = itemKey.trim();
+    if (isMetaLaunchQaItemKey(key)) {
+      throw new BadRequestException({
+        error: 'meta_checklist_auto_only',
+        hint: 'Meta checklist items are auto-evaluated — refresh Launch QA or run preflight on /meta/tracking',
+      });
+    }
     try {
       const updated = await this.repo.updateChecklistItem(run.id, key, {
         completed: Boolean(body.completed),

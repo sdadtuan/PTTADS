@@ -1,6 +1,10 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 import { AppConfigService } from '../config/app-config.service';
+import {
+  isMetaLaunchQaEnabled,
+  mergeMetaLaunchQaChecklist,
+} from '../meta-tracking/launch-qa-meta.util';
 import { launchQaProgress } from './lifecycle-launch-gate.util';
 
 export const DEFAULT_LAUNCH_QA_CHECKLIST: Record<
@@ -14,6 +18,14 @@ export const DEFAULT_LAUNCH_QA_CHECKLIST: Record<
   utm_tracking: { label: 'UTM tracking template', completed: false },
   qa_signoff: { label: 'PM / QA sign-off', completed: false },
 };
+
+export function buildDefaultLaunchQaChecklist(): Record<
+  string,
+  { label: string; completed: boolean; completed_by?: string; note?: string }
+> {
+  const base = JSON.parse(JSON.stringify(DEFAULT_LAUNCH_QA_CHECKLIST));
+  return isMetaLaunchQaEnabled() ? mergeMetaLaunchQaChecklist(base) : base;
+}
 
 export interface LaunchQaRunRow {
   id: string;
@@ -84,7 +96,7 @@ export class LaunchQaPgRepository implements OnModuleDestroy {
     temporalWorkflowId?: string | null;
     temporalRunId?: string | null;
   }): Promise<LaunchQaRunRow> {
-    const checklist = JSON.parse(JSON.stringify(DEFAULT_LAUNCH_QA_CHECKLIST));
+    const checklist = buildDefaultLaunchQaChecklist();
     const result = await this.db.query(
       `INSERT INTO launch_qa_runs (
          client_id, external_campaign_id, campaign_name, checklist, started_by,
@@ -157,6 +169,74 @@ export class LaunchQaPgRepository implements OnModuleDestroy {
                      started_by, started_at, completed_at`
         : `UPDATE launch_qa_runs
            SET checklist = $2::jsonb, updated_at = NOW()
+           WHERE id = $1::uuid AND status = 'in_progress'
+           RETURNING id::text, client_id::text, external_campaign_id, campaign_name,
+                     status, checklist, launch_ready, temporal_workflow_id, temporal_run_id,
+                     started_by, started_at, completed_at`,
+      [runId, JSON.stringify(checklist)],
+    );
+    if (!result.rows[0]) {
+      throw new Error('update_failed');
+    }
+    return this.mapRow(result.rows[0]);
+  }
+
+  async syncAutoChecklistItems(
+    runId: string,
+    updates: Record<string, { completed: boolean; note?: string; completedBy?: string }>,
+    mergedTemplate?: Record<string, { label?: string; completed?: boolean; note?: string }>,
+  ): Promise<LaunchQaRunRow> {
+    const existing = await this.findById(runId);
+    if (!existing) {
+      throw new Error('run_not_found');
+    }
+    if (existing.status !== 'in_progress') {
+      throw new Error('run_not_in_progress');
+    }
+
+    const checklist = { ...(existing.checklist ?? {}) };
+    if (mergedTemplate) {
+      for (const [key, template] of Object.entries(mergedTemplate)) {
+        if (!(key in checklist)) {
+          checklist[key] = {
+            label: template.label,
+            completed: Boolean(template.completed),
+            note: template.note,
+          };
+        }
+      }
+    }
+
+    for (const [itemKey, input] of Object.entries(updates)) {
+      const entry = { ...(checklist[itemKey] ?? {}) };
+      if (!entry.label && mergedTemplate?.[itemKey]?.label) {
+        entry.label = mergedTemplate[itemKey].label;
+      }
+      entry.completed = Boolean(input.completed);
+      if (input.completedBy) entry.completed_by = input.completedBy;
+      if (input.note) entry.note = input.note;
+      checklist[itemKey] = entry;
+    }
+
+    const progress = launchQaProgress(checklist);
+    const allDone = progress.total > 0 && progress.completed === progress.total;
+
+    const result = await this.db.query(
+      allDone
+        ? `UPDATE launch_qa_runs
+           SET checklist = $2::jsonb,
+               status = 'passed',
+               launch_ready = TRUE,
+               completed_at = NOW(),
+               updated_at = NOW()
+           WHERE id = $1::uuid AND status = 'in_progress'
+           RETURNING id::text, client_id::text, external_campaign_id, campaign_name,
+                     status, checklist, launch_ready, temporal_workflow_id, temporal_run_id,
+                     started_by, started_at, completed_at`
+        : `UPDATE launch_qa_runs
+           SET checklist = $2::jsonb,
+               launch_ready = FALSE,
+               updated_at = NOW()
            WHERE id = $1::uuid AND status = 'in_progress'
            RETURNING id::text, client_id::text, external_campaign_id, campaign_name,
                      status, checklist, launch_ready, temporal_workflow_id, temporal_run_id,

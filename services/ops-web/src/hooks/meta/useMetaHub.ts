@@ -23,8 +23,10 @@ import {
   type StoredStaffUser,
 } from '@/lib/auth';
 import { canViewMetaHub } from '@/lib/meta/caps';
+import { fetchMetaTrackingHealth } from '@/lib/meta/api';
+import { metaTrackingEnabled } from '@/lib/meta/flags';
 import { yesterdayIso } from '@/lib/meta/format';
-import type { FacebookHubExportScope } from '@/lib/meta/types';
+import type { FacebookHubExportScope, TrackingHealthAccountRow } from '@/lib/meta/types';
 
 export function useMetaHub() {
   const router = useRouter();
@@ -37,6 +39,7 @@ export function useMetaHub() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [exportBusy, setExportBusy] = useState(false);
+  const [trackingAccounts, setTrackingAccounts] = useState<TrackingHealthAccountRow[]>([]);
 
   const [days, setDays] = useState(Number(searchParams.get('days') ?? 7) || 7);
   const [dateTo, setDateTo] = useState(searchParams.get('date_to') ?? yesterdayIso());
@@ -110,8 +113,14 @@ export function useMetaHub() {
       setLoading(true);
       setError('');
       try {
-        const data = await fetchFacebookHub(access, hubQuery);
+        const [data, tracking] = await Promise.all([
+          fetchFacebookHub(access, hubQuery),
+          metaTrackingEnabled()
+            ? fetchMetaTrackingHealth(access).catch(() => null)
+            : Promise.resolve(null),
+        ]);
         setHub(data);
+        setTrackingAccounts(tracking?.accounts ?? []);
         syncUrl();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Tải Meta hub thất bại');
@@ -121,6 +130,14 @@ export function useMetaHub() {
     },
     [hubQuery, syncUrl],
   );
+
+  const trackingByClient = useMemo(() => {
+    const map = new Map<string, TrackingHealthAccountRow>();
+    for (const row of trackingAccounts) {
+      if (!map.has(row.client_id)) map.set(row.client_id, row);
+    }
+    return map;
+  }, [trackingAccounts]);
 
   useEffect(() => {
     void (async () => {
@@ -192,6 +209,7 @@ export function useMetaHub() {
     q,
     exportScope,
     hubQuery,
+    trackingByClient,
     setDays,
     setDateTo,
     setDateFrom,
