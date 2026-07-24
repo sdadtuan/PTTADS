@@ -203,6 +203,15 @@ def resolve_capi_config(client_id: str) -> dict[str, Any] | None:
         account = dict(zip(cols, row))
         meta = _parse_meta_json(account.get("meta"))
         pixel_id = str(meta.get("pixel_id") or meta.get("meta_pixel_id") or global_pixel).strip()
+        try:
+            from ptt_meta.meta_pixels import meta_pixels_enabled, resolve_primary_pixel_id
+
+            if meta_pixels_enabled():
+                primary = resolve_primary_pixel_id(str(account.get("id") or ""))
+                if primary:
+                    pixel_id = primary
+        except Exception:
+            pass
         token = resolve_meta_access_token(account) or global_token
         if pixel_id and token:
             return {

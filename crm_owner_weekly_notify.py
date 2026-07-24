@@ -62,6 +62,21 @@ def build_weekly_digest(
         for step in (action.get("steps") or [])[:3]:
             lines.append(f"  - {step}")
         lines.append("")
+    try:
+        from ptt_meta.intelligence_snapshot import fetch_latest_snapshot_digest
+
+        snap = fetch_latest_snapshot_digest()
+        if snap:
+            lines.extend(
+                [
+                    "Meta Intelligence snapshot:",
+                    f"  Kỳ {snap.get('period_start')} → {snap.get('period_end')}",
+                    f"  Artifact {snap.get('byte_size', 0)} bytes (gzip)",
+                    "",
+                ]
+            )
+    except Exception:
+        pass
     if dashboard_url:
         lines.append(f"Dashboard: {dashboard_url}")
     lines.append("Export: /api/crm/owner-weekly/export")

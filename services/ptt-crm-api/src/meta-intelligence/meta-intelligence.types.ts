@@ -11,6 +11,7 @@ export interface MetaAnomalyRow {
   metric_value: number | null;
   threshold_value: number | null;
   spike_pct: number | null;
+  z_score?: number | null;
   message: string;
   performance_date: string | null;
   created_at: string;
@@ -19,6 +20,7 @@ export interface MetaAnomalyRow {
 export interface MetaAnomaliesListResponse {
   ok: boolean;
   disabled?: boolean;
+  mode?: 'median' | 'stat';
   anomalies: MetaAnomalyRow[];
   count: number;
   attribution: import('../meta-attribution.util').MetaAttributionMeta;
@@ -111,4 +113,76 @@ export interface MetaDailyInsightsResponse {
   rows: MetaDailyInsightRow[];
   count: number;
   attribution: import('../meta-attribution.util').MetaAttributionMeta;
+}
+
+export type MetaForecastMetric = 'cpl' | 'spend';
+
+export interface MetaForecastHistoricalPoint {
+  performance_date: string;
+  value: number;
+}
+
+export interface MetaForecastProjectionPoint {
+  performance_date: string;
+  projected_value: number;
+}
+
+export interface MetaForecastResponse {
+  ok: boolean;
+  disabled?: boolean;
+  metric: MetaForecastMetric;
+  date_from: string;
+  date_to: string;
+  slope: number;
+  intercept: number;
+  historical: MetaForecastHistoricalPoint[];
+  projection: MetaForecastProjectionPoint[];
+  attribution: import('../meta-attribution.util').MetaAttributionMeta;
+}
+
+export interface MetaPixelRow {
+  id: string;
+  client_channel_account_id: string;
+  client_id: string | null;
+  pixel_id: string;
+  label: string;
+  is_primary: boolean;
+  capi_enabled: boolean;
+  created_at: string;
+}
+
+export interface MetaPixelsListResponse {
+  ok: boolean;
+  disabled?: boolean;
+  reason?: string;
+  hint?: string;
+  pixels: MetaPixelRow[];
+  count: number;
+}
+
+export interface MetaPixelMutationResponse {
+  ok: boolean;
+  disabled?: boolean;
+  pixel?: MetaPixelRow;
+  error?: string;
+}
+
+export interface MetaIntelligenceSnapshotRow {
+  id: string;
+  client_id: string | null;
+  period_start: string;
+  period_end: string;
+  artifact_path: string;
+  byte_size: number;
+  gzip: boolean;
+  created_at: string;
+}
+
+export interface MetaIntelligenceSnapshotResponse {
+  ok: boolean;
+  disabled?: boolean;
+  skipped?: boolean;
+  reason?: string;
+  hint?: string;
+  snapshot?: MetaIntelligenceSnapshotRow;
 }

@@ -23,6 +23,30 @@ export function metaRoasEnabled(): boolean {
   );
 }
 
+export function metaAnomalyStatEnabled(): boolean {
+  return ['1', 'true', 'yes', 'on'].includes(
+    (process.env.NEXT_PUBLIC_PTT_META_ANOMALY_STAT_ENABLED ?? '0').trim().toLowerCase(),
+  );
+}
+
+export function metaForecastEnabled(): boolean {
+  return ['1', 'true', 'yes', 'on'].includes(
+    (process.env.NEXT_PUBLIC_PTT_META_FORECAST_ENABLED ?? '0').trim().toLowerCase(),
+  );
+}
+
+export function metaPixelsEnabled(): boolean {
+  return ['1', 'true', 'yes', 'on'].includes(
+    (process.env.NEXT_PUBLIC_PTT_META_PIXELS_ENABLED ?? '0').trim().toLowerCase(),
+  );
+}
+
 export function metaIntelligenceEnabled(): boolean {
-  return metaAnomalyEnabled() || metaRoasEnabled();
+  return (
+    metaAnomalyEnabled() ||
+    metaRoasEnabled() ||
+    metaAnomalyStatEnabled() ||
+    metaForecastEnabled() ||
+    metaPixelsEnabled()
+  );
 }

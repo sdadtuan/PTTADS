@@ -8,11 +8,19 @@ import {
   MetaBudgetRecommendationsResponse,
   MetaDailyInsightRow,
   MetaDailyInsightsResponse,
+  MetaForecastMetric,
+  MetaForecastResponse,
+  MetaIntelligenceSnapshotResponse,
+  MetaPixelMutationResponse,
+  MetaPixelRow,
+  MetaPixelsListResponse,
   MetaRoasResponse,
 } from './meta-intelligence.types';
 import {
+  buildForecastProjection,
   computeSpikePct,
   detectCampaignAnomalies,
+  detectCampaignStatAnomalies,
   envFloat,
   envInt,
   recommendBudgetChange,
@@ -36,6 +44,30 @@ export class MetaIntelligenceService {
 
   isRecommendEnabled(): boolean {
     return this.isAnomalyEnabled() || this.isRoasEnabled();
+  }
+
+  isAnomalyStatEnabled(): boolean {
+    return ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_META_ANOMALY_STAT_ENABLED ?? '0').trim().toLowerCase(),
+    );
+  }
+
+  isForecastEnabled(): boolean {
+    return ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_META_FORECAST_ENABLED ?? '0').trim().toLowerCase(),
+    );
+  }
+
+  isPixelsEnabled(): boolean {
+    return ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_META_PIXELS_ENABLED ?? '0').trim().toLowerCase(),
+    );
+  }
+
+  isSnapshotEnabled(): boolean {
+    return ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_META_INTEL_SNAPSHOT_ENABLED ?? '0').trim().toLowerCase(),
+    );
   }
 
   insightsLevelEnabled(): string {
@@ -62,7 +94,11 @@ export class MetaIntelligenceService {
     client_id?: string;
     limit?: string;
     days?: string;
+    mode?: string;
   }): Promise<MetaAnomaliesListResponse> {
+    if ((query.mode ?? '').trim().toLowerCase() === 'stat') {
+      return this.listStatAnomalies(query);
+    }
     await this.ensurePerformanceReady();
     if (!this.isAnomalyEnabled()) {
       const { start, end } = this.repo.resolveWindow(query, 7);
@@ -167,6 +203,307 @@ export class MetaIntelligenceService {
     anomalies.sort((a, b) => (b.performance_date ?? '').localeCompare(a.performance_date ?? ''));
     const capped = anomalies.slice(0, Number.isFinite(limit) ? limit : 100);
     return { ok: true, anomalies: capped, count: capped.length, attribution };
+  }
+
+  async listStatAnomalies(query: {
+    client_id?: string;
+    limit?: string;
+    days?: string;
+  }): Promise<MetaAnomaliesListResponse> {
+    await this.ensurePerformanceReady();
+    const windowDays = envInt('PTT_META_ANOMALY_STAT_WINDOW_DAYS', 14);
+    const { start, end } = this.repo.resolveWindow(query, windowDays);
+    const { dateFrom, dateTo } = this.repo.formatWindow(start, end);
+    const clientId = query.client_id?.trim() || undefined;
+    const attribution = await this.buildAttribution({ clientId, dateFrom, dateTo });
+
+    if (!this.isAnomalyStatEnabled()) {
+      return {
+        ok: true,
+        disabled: true,
+        mode: 'stat',
+        anomalies: [],
+        count: 0,
+        attribution,
+      };
+    }
+
+    const limit = query.limit ? Number(query.limit) : 100;
+    const stored = await this.repo.listStoredStatAnomalies({
+      clientId,
+      limit: Number.isFinite(limit) ? limit : 100,
+    });
+    if (stored.length) {
+      const anomalies: MetaAnomalyRow[] = stored.map((row) => ({
+        id: String(row.id),
+        client_id: String(row.client_id),
+        client_code: row.client_code != null ? String(row.client_code) : null,
+        client_name: row.client_name != null ? String(row.client_name) : null,
+        external_campaign_id: row.external_campaign_id ? String(row.external_campaign_id) : null,
+        alert_type: String(row.alert_type),
+        severity: String(row.severity),
+        metric_value: row.metric_value != null ? Number(row.metric_value) : null,
+        threshold_value: row.threshold_value != null ? Number(row.threshold_value) : null,
+        spike_pct: null,
+        z_score: null,
+        message: String(row.message ?? ''),
+        performance_date: row.performance_date ? String(row.performance_date).slice(0, 10) : null,
+        created_at: new Date(String(row.created_at)).toISOString(),
+      }));
+      return { ok: true, mode: 'stat', anomalies, count: anomalies.length, attribution };
+    }
+
+    const zThreshold = envFloat('PTT_META_ANOMALY_ZSCORE_THRESHOLD', 2);
+    const metrics = await this.repo.listCampaignDayMetrics({ clientId, dateFrom, dateTo });
+    const byCampaign = new Map<string, typeof metrics>();
+    for (const row of metrics) {
+      const key = `${row.client_id}:${row.external_campaign_id}`;
+      const list = byCampaign.get(key) ?? [];
+      list.push(row);
+      byCampaign.set(key, list);
+    }
+
+    const anomalies: MetaAnomalyRow[] = [];
+    for (const rows of byCampaign.values()) {
+      const latest = rows[0];
+      const history = rows.filter((r) => r.performance_date < latest.performance_date);
+      const spendHistory = history.map((r) => r.spend);
+      const cplHistory = history.filter((r) => r.leads_crm > 0).map((r) => r.spend / r.leads_crm);
+      const detected = detectCampaignStatAnomalies({
+        spendToday: latest.spend,
+        leadsToday: latest.leads_crm,
+        spendHistory,
+        cplHistory,
+        zscoreThreshold: zThreshold,
+      });
+      for (const item of detected) {
+        anomalies.push({
+          id: `${latest.client_id}:${latest.external_campaign_id}:${item.alert_type}:${latest.performance_date}`,
+          client_id: latest.client_id,
+          client_code: latest.client_code,
+          client_name: latest.client_name,
+          external_campaign_id: latest.external_campaign_id || null,
+          alert_type: item.alert_type,
+          severity: item.severity,
+          metric_value: item.metric_value,
+          threshold_value: item.threshold_value,
+          spike_pct: null,
+          z_score: item.z_score,
+          message: item.message,
+          performance_date: latest.performance_date,
+          created_at: new Date().toISOString(),
+        });
+      }
+    }
+
+    anomalies.sort((a, b) => (b.performance_date ?? '').localeCompare(a.performance_date ?? ''));
+    const capped = anomalies.slice(0, Number.isFinite(limit) ? limit : 100);
+    return { ok: true, mode: 'stat', anomalies: capped, count: capped.length, attribution };
+  }
+
+  async getForecast(query: {
+    client_id?: string;
+    metric?: string;
+    days?: string;
+  }): Promise<MetaForecastResponse> {
+    await this.ensurePerformanceReady();
+    const metricRaw = (query.metric ?? 'cpl').trim().toLowerCase();
+    const metric: MetaForecastMetric = metricRaw === 'spend' ? 'spend' : 'cpl';
+    const historyDays = envInt('PTT_META_FORECAST_HISTORY_DAYS', 14);
+    const { start, end } = this.repo.resolveWindow(query, historyDays);
+    const { dateFrom, dateTo } = this.repo.formatWindow(start, end);
+    const clientId = query.client_id?.trim() || undefined;
+    const attribution = await this.buildAttribution({ clientId, dateFrom, dateTo });
+
+    if (!this.isForecastEnabled()) {
+      return {
+        ok: true,
+        disabled: true,
+        metric,
+        date_from: dateFrom,
+        date_to: dateTo,
+        slope: 0,
+        intercept: 0,
+        historical: [],
+        projection: [],
+        attribution,
+      };
+    }
+
+    const historical = await this.repo.listDailyMetricSeries({
+      clientId,
+      dateFrom,
+      dateTo,
+      metric,
+    });
+    const projectionDays = envInt('PTT_META_FORECAST_PROJECTION_DAYS', 7);
+    const forecast = buildForecastProjection({ historical, projectionDays });
+
+    return {
+      ok: true,
+      metric,
+      date_from: dateFrom,
+      date_to: dateTo,
+      slope: forecast.slope,
+      intercept: forecast.intercept,
+      historical: forecast.historical,
+      projection: forecast.projection,
+      attribution,
+    };
+  }
+
+  private mapPixelRow(row: Record<string, unknown>, clientId?: string | null): MetaPixelRow {
+    return {
+      id: String(row.id),
+      client_channel_account_id: String(row.client_channel_account_id),
+      client_id: clientId ?? (row.client_id != null ? String(row.client_id) : null),
+      pixel_id: String(row.pixel_id),
+      label: String(row.label ?? ''),
+      is_primary: Boolean(row.is_primary),
+      capi_enabled: Boolean(row.capi_enabled),
+      created_at: new Date(String(row.created_at)).toISOString(),
+    };
+  }
+
+  async listPixels(query: {
+    client_id?: string;
+    client_channel_account_id?: string;
+  }): Promise<MetaPixelsListResponse> {
+    if (!this.isPixelsEnabled()) {
+      return { ok: true, disabled: true, pixels: [], count: 0 };
+    }
+    if (!(await this.repo.pgMetaPixelsReady())) {
+      return {
+        ok: true,
+        disabled: true,
+        reason: 'meta_pixels_not_ready',
+        hint: './scripts/apply_pg_ddl_v7_meta_advanced.sh',
+        pixels: [],
+        count: 0,
+      };
+    }
+
+    const rows = await this.repo.listMetaPixels({
+      clientId: query.client_id?.trim() || undefined,
+      channelAccountId: query.client_channel_account_id?.trim() || undefined,
+    });
+    const pixels = rows.map((row) =>
+      this.mapPixelRow(row as Record<string, unknown>, String(row.client_id ?? '')),
+    );
+    return { ok: true, pixels, count: pixels.length };
+  }
+
+  async createPixel(body: Record<string, unknown>): Promise<MetaPixelMutationResponse> {
+    if (!this.isPixelsEnabled()) {
+      return { ok: true, disabled: true };
+    }
+    if (!(await this.repo.pgMetaPixelsReady())) {
+      return { ok: false, error: 'meta_pixels_not_ready' };
+    }
+
+    const accountId = String(body.client_channel_account_id ?? '').trim();
+    const pixelId = String(body.pixel_id ?? '').trim();
+    if (!accountId || !pixelId) {
+      throw new BadRequestException({ ok: false, error: 'client_channel_account_id_and_pixel_id_required' });
+    }
+
+    const row = await this.repo.insertMetaPixel({
+      clientChannelAccountId: accountId,
+      pixelId,
+      label: String(body.label ?? '').trim(),
+      isPrimary: Boolean(body.is_primary),
+      capiEnabled: body.capi_enabled == null ? true : Boolean(body.capi_enabled),
+    });
+    return { ok: true, pixel: this.mapPixelRow(row as Record<string, unknown>) };
+  }
+
+  async patchPixel(pixelRowId: string, body: Record<string, unknown>): Promise<MetaPixelMutationResponse> {
+    if (!this.isPixelsEnabled()) {
+      return { ok: true, disabled: true };
+    }
+    if (!(await this.repo.pgMetaPixelsReady())) {
+      return { ok: false, error: 'meta_pixels_not_ready' };
+    }
+
+    const row = await this.repo.patchMetaPixel(pixelRowId, {
+      label: body.label != null ? String(body.label).trim() : undefined,
+      isPrimary: body.is_primary != null ? Boolean(body.is_primary) : undefined,
+      capiEnabled: body.capi_enabled != null ? Boolean(body.capi_enabled) : undefined,
+    });
+    if (!row) {
+      throw new BadRequestException({ ok: false, error: 'not_found' });
+    }
+    return { ok: true, pixel: this.mapPixelRow(row as Record<string, unknown>) };
+  }
+
+  async createSnapshot(body: Record<string, unknown>): Promise<MetaIntelligenceSnapshotResponse> {
+    if (!this.isSnapshotEnabled()) {
+      return { ok: true, disabled: true, skipped: true, reason: 'PTT_META_INTEL_SNAPSHOT_ENABLED=0' };
+    }
+    if (!(await this.repo.pgMetaIntelligenceSnapshotsReady())) {
+      return {
+        ok: false,
+        reason: 'meta_intelligence_snapshots_not_ready',
+        hint: './scripts/apply_pg_ddl_v7_meta_advanced.sh',
+      };
+    }
+
+    const clientId = body.client_id ? String(body.client_id).trim() : undefined;
+    const periodDays = body.days ? Number(body.days) : 7;
+    const end = new Date();
+    end.setUTCDate(end.getUTCDate() - 1);
+    const start = new Date(end);
+    start.setUTCDate(start.getUTCDate() - Math.max(1, periodDays) - 1);
+    const dateFrom = this.repo.formatWindow(start, end).dateFrom;
+    const dateTo = this.repo.formatWindow(start, end).dateTo;
+
+    const historical = await this.repo.listDailyMetricSeries({
+      clientId,
+      dateFrom,
+      dateTo,
+      metric: 'spend',
+    });
+    const payload = {
+      generated_at: new Date().toISOString(),
+      period_start: dateFrom,
+      period_end: dateTo,
+      client_id: clientId ?? null,
+      performance: historical,
+    };
+    const raw = Buffer.from(JSON.stringify(payload), 'utf8');
+    const { gzipSync } = await import('zlib');
+    const compressed = gzipSync(raw);
+    const artifactsDir = process.env.PTT_ARTIFACTS_DIR?.trim() || '.local-dev';
+    const { mkdirSync, writeFileSync } = await import('fs');
+    const { join } = await import('path');
+    const dir = join(process.cwd(), artifactsDir, 'meta-intel-snapshots');
+    mkdirSync(dir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+/, 'Z');
+    const filename = `meta-intel-${clientId ?? 'all'}-${stamp}.json.gz`;
+    const artifactPath = join(dir, filename);
+    writeFileSync(artifactPath, compressed);
+
+    const row = await this.repo.insertIntelligenceSnapshot({
+      clientId,
+      periodStart: dateFrom,
+      periodEnd: dateTo,
+      artifactPath,
+      byteSize: raw.length,
+    });
+
+    return {
+      ok: true,
+      snapshot: {
+        id: String(row.id),
+        client_id: row.client_id != null ? String(row.client_id) : null,
+        period_start: String(row.period_start).slice(0, 10),
+        period_end: String(row.period_end).slice(0, 10),
+        artifact_path: String(row.artifact_path),
+        byte_size: Number(row.byte_size ?? 0),
+        gzip: Boolean(row.gzip),
+        created_at: new Date(String(row.created_at)).toISOString(),
+      },
+    };
   }
 
   async getRoas(query: {

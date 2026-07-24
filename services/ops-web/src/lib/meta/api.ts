@@ -268,4 +268,65 @@ export async function fetchMetaDailyInsights(
   return metaFetch(token, `/api/v1/meta/insights/daily${suffix}`);
 }
 
+export async function fetchMetaStatAnomalies(
+  token: string,
+  params: { client_id?: string; limit?: number; days?: number } = {},
+): Promise<import('./types').MetaAnomaliesListResponse> {
+  const qs = new URLSearchParams({ mode: 'stat' });
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.limit != null) qs.set('limit', String(params.limit));
+  if (params.days != null) qs.set('days', String(params.days));
+  return metaFetch(token, `/api/v1/meta/anomalies?${qs.toString()}`);
+}
+
+export async function fetchMetaForecast(
+  token: string,
+  params: { client_id?: string; metric?: 'cpl' | 'spend'; days?: number } = {},
+): Promise<import('./types').MetaForecastResponse> {
+  const qs = new URLSearchParams();
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.metric) qs.set('metric', params.metric);
+  if (params.days != null) qs.set('days', String(params.days));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return metaFetch(token, `/api/v1/meta/forecast${suffix}`);
+}
+
+export async function fetchMetaPixels(
+  token: string,
+  params: { client_id?: string; client_channel_account_id?: string } = {},
+): Promise<import('./types').MetaPixelsListResponse> {
+  const qs = new URLSearchParams();
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.client_channel_account_id) qs.set('client_channel_account_id', params.client_channel_account_id);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return metaFetch(token, `/api/v1/meta/pixels${suffix}`);
+}
+
+export async function createMetaPixel(
+  token: string,
+  body: {
+    client_channel_account_id: string;
+    pixel_id: string;
+    label?: string;
+    is_primary?: boolean;
+    capi_enabled?: boolean;
+  },
+): Promise<import('./types').MetaPixelMutationResponse> {
+  return metaMutate(token, '/api/v1/meta/pixels', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchMetaPixel(
+  token: string,
+  pixelId: string,
+  body: { label?: string; is_primary?: boolean; capi_enabled?: boolean },
+): Promise<import('./types').MetaPixelMutationResponse> {
+  return metaMutate(token, `/api/v1/meta/pixels/${encodeURIComponent(pixelId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
 export { MetaApiError };
