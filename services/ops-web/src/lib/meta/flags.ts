@@ -10,3 +10,19 @@ export function metaTrackingEnabled(): boolean {
     (process.env.NEXT_PUBLIC_PTT_META_TRACKING_ENABLED ?? '0').trim().toLowerCase(),
   );
 }
+
+export function metaAnomalyEnabled(): boolean {
+  return ['1', 'true', 'yes', 'on'].includes(
+    (process.env.NEXT_PUBLIC_PTT_META_ANOMALY_ENABLED ?? '0').trim().toLowerCase(),
+  );
+}
+
+export function metaRoasEnabled(): boolean {
+  return ['1', 'true', 'yes', 'on'].includes(
+    (process.env.NEXT_PUBLIC_PTT_META_ROAS_ENABLED ?? '0').trim().toLowerCase(),
+  );
+}
+
+export function metaIntelligenceEnabled(): boolean {
+  return metaAnomalyEnabled() || metaRoasEnabled();
+}

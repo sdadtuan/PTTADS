@@ -1728,6 +1728,33 @@ body:has(.ops-sidebar) main {
   font-size: 0.85rem;
 }
 
+.meta-intelligence-section {
+  margin: 1.25rem 0 1.75rem;
+}
+
+.meta-intelligence-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: end;
+  margin: 0 0 1rem;
+}
+
+.meta-intelligence-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.meta-intelligence-disabled-banner {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  font-size: 0.85rem;
+}
+
 .meta-tracking-section {
   margin-bottom: 1rem;
   padding: 1rem;

@@ -11,6 +11,7 @@ import { CustomersModule } from './customers/customers.module';
 import { IntakeModule } from './intake/intake.module';
 import { MetaTrackingModule } from './meta-tracking/meta-tracking.module';
 import { MetaAlertsModule } from './meta-alerts/meta-alerts.module';
+import { MetaIntelligenceModule } from './meta-intelligence/meta-intelligence.module';
 import { MarketingPlansModule } from './marketing-plans/marketing-plans.module';
 import { ServiceLifecycleModule } from './service-lifecycle/service-lifecycle.module';
 import { SvcFinanceModule } from './svc-finance/svc-finance.module';
@@ -82,6 +83,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     PerformanceModule,
     MetaTrackingModule,
     MetaAlertsModule,
+    MetaIntelligenceModule,
     CreativesModule,
     CampaignWritesModule,
     TemporalModule,

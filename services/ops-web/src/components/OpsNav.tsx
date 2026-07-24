@@ -7,8 +7,8 @@ import type { StoredStaffUser } from '@/lib/auth';
 import { getAccessToken, hasCap } from '@/lib/auth';
 import { fetchReviewQueueCount } from '@/lib/api';
 import { emailJourneysEnabled, emailModuleEnabled } from '@/lib/email-flags';
-import { canViewMetaTracking } from '@/lib/meta/caps';
-import { metaTrackingEnabled } from '@/lib/meta/flags';
+import { canViewMetaIntelligence, canViewMetaTracking } from '@/lib/meta/caps';
+import { metaIntelligenceEnabled, metaTrackingEnabled } from '@/lib/meta/flags';
 
 interface OpsNavProps {
   user: StoredStaffUser | null;
@@ -50,6 +50,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/agency/kpi-definitions': 'Định nghĩa KPI',
   '/meta/facebook-ads': 'Meta Ads',
   '/meta/tracking': 'Meta Tracking',
+  '/meta/intelligence': 'Meta Intelligence',
   '/google/google-ads': 'Google Ads',
   '/meta/ads-combined': 'Ads CPL',
   '/meta/migration': 'Meta Migration',
@@ -198,6 +199,9 @@ function buildSections(
     agency.push({ href: '/meta/facebook-ads', label: 'Meta Ads' });
     if (metaTrackingEnabled() && canViewMetaTracking(user)) {
       agency.push({ href: '/meta/tracking', label: 'Meta Tracking' });
+    }
+    if (metaIntelligenceEnabled() && canViewMetaIntelligence(user)) {
+      agency.push({ href: '/meta/intelligence', label: 'Meta Intelligence' });
     }
     agency.push({ href: '/meta/migration', label: 'Meta Migration' });
   }

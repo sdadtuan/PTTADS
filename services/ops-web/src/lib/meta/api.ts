@@ -210,4 +210,40 @@ export async function patchMetaConversionRule(
   });
 }
 
+export async function fetchMetaAnomalies(
+  token: string,
+  params: { client_id?: string; limit?: number; days?: number } = {},
+): Promise<import('./types').MetaAnomaliesListResponse> {
+  const qs = new URLSearchParams();
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.limit != null) qs.set('limit', String(params.limit));
+  if (params.days != null) qs.set('days', String(params.days));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return metaFetch(token, `/api/v1/meta/anomalies${suffix}`);
+}
+
+export async function fetchMetaRoas(
+  token: string,
+  params: { client_id?: string; from?: string; to?: string; days?: number } = {},
+): Promise<import('./types').MetaRoasResponse> {
+  const qs = new URLSearchParams();
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.from) qs.set('from', params.from);
+  if (params.to) qs.set('to', params.to);
+  if (params.days != null) qs.set('days', String(params.days));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return metaFetch(token, `/api/v1/meta/roas${suffix}`);
+}
+
+export async function fetchMetaBudgetRecommendations(
+  token: string,
+  params: { client_id?: string; days?: number } = {},
+): Promise<import('./types').MetaBudgetRecommendationsResponse> {
+  const qs = new URLSearchParams();
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.days != null) qs.set('days', String(params.days));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return metaFetch(token, `/api/v1/meta/budget-recommendations${suffix}`);
+}
+
 export { MetaApiError };

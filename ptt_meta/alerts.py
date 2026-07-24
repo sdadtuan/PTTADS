@@ -249,9 +249,21 @@ def evaluate_meta_alerts(
                 ):
                     created += 1
 
+    anomaly_out: dict[str, Any] = {"ok": True, "skipped": True}
+    try:
+        from ptt_meta.anomaly import evaluate_anomaly_alerts
+
+        anomaly_out = evaluate_anomaly_alerts(client_id=client_id, performance_date=perf_date)
+        if anomaly_out.get("ok") and not anomaly_out.get("skipped"):
+            created += int(anomaly_out.get("alerts_created") or 0)
+    except Exception as exc:
+        logger.warning("B10 anomaly eval failed: %s", exc)
+        anomaly_out = {"ok": False, "error": str(exc)}
+
     return {
         "ok": True,
         "performance_date": perf_date.isoformat(),
         "client_id": client_id,
         "alerts_created": created,
+        "anomaly_eval": anomaly_out,
     }
