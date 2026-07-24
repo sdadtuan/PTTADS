@@ -27,6 +27,10 @@ import {
   UpdateHubCampaignMapBody,
   CreateKpiDefinitionBody,
   UpdateKpiDefinitionBody,
+  MetaHubMapSuggestBody,
+  MetaHubMapSuggestResponse,
+  MetaSyncStatusResponse,
+  FacebookHubCampaignsResponse,
 } from './agency.types';
 import {
   StaffAgencyViewGuard,
@@ -193,6 +197,43 @@ export class AgencyOpsController {
     });
     res.setHeader('Content-Disposition', `attachment; filename="${out.filename}"`);
     return out.csv;
+  }
+
+  @Get('facebook-ads/hub/campaigns')
+  @UseGuards(StaffOrInternalKeyGuard, StaffFacebookAdsViewGuard)
+  async facebookHubCampaigns(
+    @Query('days') days?: string,
+    @Query('to') to?: string,
+    @Query('date_to') dateTo?: string,
+    @Query('from') from?: string,
+    @Query('date_from') dateFrom?: string,
+    @Query('status') status?: string,
+    @Query('client_id') clientId?: string,
+    @Query('q') q?: string,
+  ): Promise<FacebookHubCampaignsResponse> {
+    return this.agency.facebookHubCampaigns({
+      days,
+      to,
+      date_to: dateTo,
+      from,
+      date_from: dateFrom,
+      status,
+      client_id: clientId,
+      q,
+    });
+  }
+
+  @Get('meta/sync/status')
+  @UseGuards(StaffOrInternalKeyGuard, StaffFacebookAdsViewGuard)
+  async metaSyncStatus(@Query('client_id') clientId?: string): Promise<MetaSyncStatusResponse> {
+    return this.agency.metaSyncStatus(clientId);
+  }
+
+  @Post('meta/hub-campaign-map/suggest')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(StaffOrInternalKeyGuard, StaffAgencyWriteGuard)
+  async metaHubMapSuggest(@Body() body: MetaHubMapSuggestBody): Promise<MetaHubMapSuggestResponse> {
+    return this.agency.metaHubMapSuggest(body);
   }
 
   @Get('google-ads/pilot-status')

@@ -241,6 +241,11 @@ export class AgencyRepository implements OnModuleDestroy {
       meta && typeof meta === 'object'
         ? normMetaPageId(String(meta.facebook_page_id ?? meta.page_id ?? ''))
         : null;
+    const targetCplRaw = meta && typeof meta === 'object' ? meta.target_cpl_vnd : null;
+    const targetCplVnd =
+      targetCplRaw != null && targetCplRaw !== '' && Number.isFinite(Number(targetCplRaw))
+        ? Math.round(Number(targetCplRaw) * 100) / 100
+        : null;
     return {
       ...base,
       credential_ref: cred || null,
@@ -249,6 +254,7 @@ export class AgencyRepository implements OnModuleDestroy {
       token_expires_at: expires ? expires.toISOString() : null,
       pixel_id: pixelId,
       facebook_page_id: facebookPageId,
+      target_cpl_vnd: targetCplVnd,
     };
   }
 
@@ -1466,6 +1472,350 @@ export class AgencyRepository implements OnModuleDestroy {
       };
     });
   }
+
+  async fetchHubAttributionStats(params: {
+    dateFrom: string;
+    dateTo: string;
+    clientId?: string;
+  }): Promise<{
+    unmappedSpend: number;
+    totalSpend: number;
+    syncedAt: string | null;
+    accountsSyncOk: number;
+    accountsSyncError: number;
+    openAlerts: number;
+  }> {
+    const spendClauses = [`dp.channel = 'meta'`, `dp.performance_date BETWEEN $1::date AND $2::date`];
+    const spendParams: unknown[] = [params.dateFrom, params.dateTo];
+    let idx = 3;
+    if (params.clientId) {
+      spendClauses.push(`dp.client_id = $${idx++}::uuid`);
+      spendParams.push(params.clientId);
+    }
+
+    const spendResult = await this.db.query(
+      `SELECT COALESCE(SUM(dp.spend) FILTER (WHERE dp.hub_campaign_map_id IS NULL), 0) AS unmapped_spend,
+              COALESCE(SUM(dp.spend), 0) AS total_spend,
+              MAX(dp.synced_at) AS latest_synced_at
+       FROM daily_performance dp
+       WHERE ${spendClauses.join(' AND ')}`,
+      spendParams,
+    );
+    const spendRow = spendResult.rows[0] ?? {};
+
+    const acctClauses = [`cca.channel = 'meta'`, `cca.status = 'active'`];
+    const acctParams: unknown[] = [];
+    let acctIdx = 1;
+    if (params.clientId) {
+      acctClauses.push(`cca.client_id = $${acctIdx++}::uuid`);
+      acctParams.push(params.clientId);
+    }
+    const acctResult = await this.db.query(
+      `SELECT COUNT(*) FILTER (
+         WHERE cca.token_status IN ('valid', 'active', 'ok')
+           OR (cca.access_token_encrypted IS NOT NULL AND COALESCE(cca.token_status, '') NOT IN ('expired', 'revoked'))
+       )::int AS sync_ok,
+              COUNT(*) FILTER (
+         WHERE cca.token_status IN ('expired', 'revoked', 'error')
+           OR (cca.access_token_encrypted IS NULL AND COALESCE(cca.token_status, '') != 'revoked')
+       )::int AS sync_error
+       FROM client_channel_accounts cca
+       WHERE ${acctClauses.join(' AND ')}`,
+      acctParams,
+    );
+    const acctRow = acctResult.rows[0] ?? {};
+
+    let openAlerts = 0;
+    try {
+      const alertClauses = [`ma.channel = 'meta'`, `ma.acknowledged_at IS NULL`];
+      const alertParams: unknown[] = [];
+      let alertIdx = 1;
+      if (params.clientId) {
+        alertClauses.push(`ma.client_id = $${alertIdx++}::uuid`);
+        alertParams.push(params.clientId);
+      }
+      const alertResult = await this.db.query(
+        `SELECT COUNT(*)::int AS c
+         FROM meta_alerts ma
+         WHERE ${alertClauses.join(' AND ')}`,
+        alertParams,
+      );
+      openAlerts = Number(alertResult.rows[0]?.c ?? 0);
+    } catch {
+      openAlerts = 0;
+    }
+
+    return {
+      unmappedSpend: Number(spendRow.unmapped_spend ?? 0),
+      totalSpend: Number(spendRow.total_spend ?? 0),
+      syncedAt: iso(spendRow.latest_synced_at),
+      accountsSyncOk: Number(acctRow.sync_ok ?? 0),
+      accountsSyncError: Number(acctRow.sync_error ?? 0),
+      openAlerts,
+    };
+  }
+
+  async fetchMetaSyncStatus(clientId?: string): Promise<{
+    global: {
+      last_sync_at: string | null;
+      last_success_at: string | null;
+      last_error: string | null;
+      accounts_total: number;
+      accounts_failed: number;
+      status: 'ok' | 'warn' | 'error';
+    };
+    clients: Array<{
+      client_id: string;
+      client_code: string | null;
+      client_name: string | null;
+      last_job_id: string | null;
+      last_job_status: string | null;
+      last_job_finished_at: string | null;
+      last_job_error: string | null;
+      token_status: string | null;
+      sync_status: 'ok' | 'warn' | 'error';
+    }>;
+  }> {
+    let globalRow: Record<string, unknown> = {};
+    try {
+      const globalResult = await this.db.query(
+        `SELECT last_sync_at, last_success_at, last_error, accounts_total, accounts_failed
+         FROM meta_insights_sync_state
+         WHERE id = 1`,
+      );
+      globalRow = globalResult.rows[0] ?? {};
+    } catch {
+      globalRow = {};
+    }
+
+    const accountsFailed = Number(globalRow.accounts_failed ?? 0);
+    const lastError = globalRow.last_error ? String(globalRow.last_error) : null;
+    let globalStatus: 'ok' | 'warn' | 'error' = 'ok';
+    if (lastError || accountsFailed > 0) {
+      globalStatus = accountsFailed > 0 ? 'error' : 'warn';
+    }
+
+    const clientClauses = [`cca.channel = 'meta'`, `cca.status = 'active'`];
+    const clientParams: unknown[] = [];
+    let clientIdx = 1;
+    if (clientId) {
+      clientClauses.push(`cca.client_id = $${clientIdx++}::uuid`);
+      clientParams.push(clientId);
+    }
+
+    const clientResult = await this.db.query(
+      `SELECT c.id::text AS client_id,
+              c.code AS client_code,
+              c.name AS client_name,
+              cca.token_status,
+              lj.id::text AS last_job_id,
+              lj.status AS last_job_status,
+              lj.finished_at AS last_job_finished_at,
+              lj.last_error AS last_job_error
+       FROM client_channel_accounts cca
+       JOIN clients c ON c.id = cca.client_id
+       LEFT JOIN LATERAL (
+         SELECT j.id, j.status, j.finished_at, j.last_error
+         FROM job_queue j
+         WHERE j.client_id = cca.client_id
+           AND j.job_type = 'meta_insights_sync'
+         ORDER BY j.created_at DESC
+         LIMIT 1
+       ) lj ON TRUE
+       WHERE ${clientClauses.join(' AND ')}
+       ORDER BY c.code ASC
+       LIMIT 200`,
+      clientParams,
+    );
+
+    const clients = clientResult.rows.map((row) => {
+      const tokenStatus = row.token_status ? String(row.token_status) : null;
+      const jobStatus = row.last_job_status ? String(row.last_job_status) : null;
+      const jobError = row.last_job_error ? String(row.last_job_error) : null;
+      let syncStatus: 'ok' | 'warn' | 'error' = 'ok';
+      if (
+        tokenStatus === 'expired' ||
+        tokenStatus === 'revoked' ||
+        tokenStatus === 'error' ||
+        jobStatus === 'failed' ||
+        jobStatus === 'dead'
+      ) {
+        syncStatus = 'error';
+      } else if (jobStatus === 'pending' || jobStatus === 'running' || jobError) {
+        syncStatus = 'warn';
+      }
+      return {
+        client_id: String(row.client_id),
+        client_code: row.client_code ?? null,
+        client_name: row.client_name ?? null,
+        last_job_id: row.last_job_id ? String(row.last_job_id) : null,
+        last_job_status: jobStatus,
+        last_job_finished_at: iso(row.last_job_finished_at),
+        last_job_error: jobError,
+        token_status: tokenStatus,
+        sync_status: syncStatus,
+      };
+    });
+
+    return {
+      global: {
+        last_sync_at: iso(globalRow.last_sync_at),
+        last_success_at: iso(globalRow.last_success_at),
+        last_error: lastError,
+        accounts_total: Number(globalRow.accounts_total ?? 0),
+        accounts_failed: accountsFailed,
+        status: globalStatus,
+      },
+      clients,
+    };
+  }
+
+  async patchChannelAccountAlertConfig(
+    clientId: string,
+    accountId: string,
+    targetCplVnd: number | null,
+  ): Promise<AgencyChannelAccount | null> {
+    const existing = await this.fetchChannelAccount(clientId, accountId);
+    if (!existing) return null;
+    if (existing.channel.trim().toLowerCase() !== 'meta') {
+      throw new Error('alert_config_meta_only');
+    }
+
+    const metaPatch =
+      targetCplVnd == null
+        ? { target_cpl_vnd: null }
+        : { target_cpl_vnd: Math.round(targetCplVnd * 100) / 100 };
+
+    await this.db.query(
+      `UPDATE client_channel_accounts
+       SET meta = COALESCE(meta, '{}'::jsonb) || $3::jsonb,
+           updated_at = NOW()
+       WHERE client_id = $1::uuid AND id = $2::uuid`,
+      [clientId, accountId, JSON.stringify(metaPatch)],
+    );
+    return this.fetchChannelAccount(clientId, accountId);
+  }
+
+  async suggestHubCampaignMaps(params: {
+    clientId?: string;
+    dateFrom: string;
+    dateTo: string;
+    dryRun?: boolean;
+  }): Promise<{
+    suggestions: Array<Record<string, unknown>>;
+    inserted: Array<Record<string, unknown>>;
+  }> {
+    const clientFilter = params.clientId ? 'AND dp.client_id = $3::uuid' : '';
+    const queryParams: unknown[] = [params.dateFrom, params.dateTo];
+    if (params.clientId) {
+      queryParams.push(params.clientId);
+    }
+
+    const unmappedResult = await this.db.query(
+      `SELECT dp.client_id::text,
+              dp.external_campaign_id,
+              MAX(dp.external_campaign_name) AS external_campaign_name,
+              SUM(dp.spend) AS spend
+       FROM daily_performance dp
+       LEFT JOIN hub_campaign_map hcm
+         ON hcm.client_id = dp.client_id
+        AND hcm.channel = 'meta'
+        AND hcm.external_campaign_id = dp.external_campaign_id
+        AND hcm.active IS TRUE
+       WHERE dp.channel = 'meta'
+         AND dp.performance_date BETWEEN $1::date AND $2::date
+         AND hcm.id IS NULL
+         ${clientFilter}
+       GROUP BY dp.client_id, dp.external_campaign_id
+       HAVING SUM(dp.spend) > 0
+       ORDER BY SUM(dp.spend) DESC
+       LIMIT 200`,
+      queryParams,
+    );
+
+    const hubResult = await this.db.query(
+      `SELECT hc.id, hc.code, hc.name, hc.utm_campaign
+       FROM hub_campaigns hc
+       WHERE hc.active IS TRUE
+         AND hc.channel IN ('meta', 'other')
+       ORDER BY hc.id ASC
+       LIMIT 500`,
+    );
+    const hubCampaigns = hubResult.rows.map((row) => ({
+      id: Math.trunc(Number(row.id)),
+      code: String(row.code ?? ''),
+      name: String(row.name ?? ''),
+      utm: String(row.utm_campaign ?? ''),
+    }));
+
+    const suggestions: Array<Record<string, unknown>> = [];
+    const inserted: Array<Record<string, unknown>> = [];
+
+    for (const row of unmappedResult.rows) {
+      const cid = String(row.client_id);
+      const extId = String(row.external_campaign_id ?? '');
+      const extName = String(row.external_campaign_name ?? '');
+      const spend = Number(row.spend ?? 0);
+      const normName = normalizeSuggestName(extName);
+
+      let best: (typeof hubCampaigns)[number] | null = null;
+      let bestScore = 0;
+      for (const hc of hubCampaigns) {
+        let score = 0;
+        if (hc.utm && extName.toLowerCase().includes(hc.utm.toLowerCase())) {
+          score = 100;
+        } else if (hc.code && extName.toLowerCase().includes(hc.code.toLowerCase())) {
+          score = 80;
+        } else {
+          const hcNorm = normalizeSuggestName(hc.name);
+          if (normName && hcNorm && (normName.includes(hcNorm) || hcNorm.includes(normName))) {
+            score = 60;
+          }
+        }
+        if (score > bestScore) {
+          bestScore = score;
+          best = hc;
+        }
+      }
+
+      if (!best || bestScore < 60) continue;
+
+      const item: Record<string, unknown> = {
+        client_id: cid,
+        external_campaign_id: extId,
+        external_campaign_name: extName || null,
+        hub_campaign_id: best.id,
+        hub_campaign_code: best.code,
+        hub_campaign_name: best.name,
+        utm_campaign: best.utm,
+        match_score: bestScore,
+        spend_vnd: Math.round(spend * 100) / 100,
+      };
+      suggestions.push(item);
+
+      if (params.dryRun) continue;
+
+      const insertResult = await this.db.query(
+        `INSERT INTO hub_campaign_map (
+           client_id, hub_campaign_id, channel,
+           external_campaign_id, external_campaign_name, active, meta
+         ) VALUES (
+           $1::uuid, $2, 'meta',
+           $3, $4, TRUE, '{"source":"b8_suggest"}'::jsonb
+         )
+         ON CONFLICT (client_id, channel, external_campaign_id) DO NOTHING
+         RETURNING id::text`,
+        [cid, best.id, extId, extName || null],
+      );
+      const mapRow = insertResult.rows[0];
+      if (mapRow) {
+        item.map_id = String(mapRow.id);
+        inserted.push({ ...item });
+      }
+    }
+
+    return { suggestions, inserted };
+  }
 }
 
 function normMetaPageId(raw: string): string | null {
@@ -1480,4 +1830,13 @@ function metaPagePatch(channel: string, facebookPageId?: string): Record<string,
   const pageId = normMetaPageId(facebookPageId ?? '');
   if (!pageId) return null;
   return { facebook_page_id: pageId, page_id: pageId };
+}
+
+function normalizeSuggestName(value: string): string {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }

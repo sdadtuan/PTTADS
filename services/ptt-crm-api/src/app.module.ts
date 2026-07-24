@@ -9,6 +9,7 @@ import { KpiModule } from './kpi/kpi.module';
 import { SalesModule } from './sales/sales.module';
 import { CustomersModule } from './customers/customers.module';
 import { IntakeModule } from './intake/intake.module';
+import { MetaAlertsModule } from './meta-alerts/meta-alerts.module';
 import { MarketingPlansModule } from './marketing-plans/marketing-plans.module';
 import { ServiceLifecycleModule } from './service-lifecycle/service-lifecycle.module';
 import { SvcFinanceModule } from './svc-finance/svc-finance.module';
@@ -78,6 +79,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     SeoAdminModule,
     EmailMarketingModule,
     PerformanceModule,
+    MetaAlertsModule,
     CreativesModule,
     CampaignWritesModule,
     TemporalModule,

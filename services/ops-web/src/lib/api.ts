@@ -2411,51 +2411,30 @@ export interface PerformanceResponse {
   summary: Record<string, unknown>;
 }
 
-export interface FacebookHubClient {
-  id: string;
-  code: string | null;
-  name: string | null;
-  status: string | null;
-  spend: number;
-  leads_crm: number;
-  cpl: number | null;
-  campaigns: number;
-  unmapped_campaigns: number;
-  over_target_rows: number;
-  meta_has_token?: boolean;
-  token_status?: string;
-}
+import type {
+  FacebookHubAlert,
+  FacebookHubQuery,
+  FacebookHubResponse,
+} from '@/lib/meta/types';
 
-export interface FacebookHubAlert {
-  severity: 'warn' | 'danger';
-  message: string;
-  link: string;
-  link_label: string;
-}
-
-export interface FacebookHubResponse {
-  ok: boolean;
-  summary: Record<string, unknown>;
-  clients: FacebookHubClient[];
-  alerts: FacebookHubAlert[];
-  date_from: string;
-  date_to: string;
-  window_days?: number;
-  filters?: {
-    client_id?: string | null;
-    status?: string | null;
-    q?: string | null;
-  };
-}
-
-export interface FacebookHubQuery {
-  days?: number;
-  date_to?: string;
-  date_from?: string;
-  status?: string;
-  client_id?: string;
-  q?: string;
-}
+export type {
+  FacebookHubAlert,
+  FacebookHubCampaignRow,
+  FacebookHubCampaignsResponse,
+  FacebookHubClient,
+  FacebookHubExportScope,
+  FacebookHubQuery,
+  FacebookHubResponse,
+  HubAttributionMeta,
+  MetaAlertRow,
+  MetaAlertsListResponse,
+  MetaBadgeVariant,
+  MetaHubFilterState,
+  MetaHubMapSuggestBody,
+  MetaHubMapSuggestResponse,
+  MetaHubTab,
+  MetaSyncStatusResponse,
+} from '@/lib/meta/types';
 
 export interface FacebookAdsMigrationStatus {
   ok: boolean;
@@ -2652,6 +2631,16 @@ export async function fetchFacebookHub(
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   return agencyFetch(token, `/api/v1/facebook-ads/hub${suffix}`);
 }
+
+export {
+  fetchFacebookHubCampaigns,
+  fetchMetaAlerts,
+  fetchMetaSyncStatus,
+  patchMetaAlertAck,
+  postMetaHubMapSuggest,
+} from '@/lib/meta/api';
+
+export { metaAlertsEnabled } from '@/lib/meta/flags';
 
 export async function downloadFacebookHubExport(
   token: string,

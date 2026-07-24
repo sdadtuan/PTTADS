@@ -17,6 +17,10 @@ import {
   toIso,
   toNumber,
 } from './performance.util';
+import {
+  buildMetaAttributionMeta,
+  computeUnmappedSpendPct,
+} from '../meta-attribution.util';
 
 @Injectable()
 export class PerformanceService {
@@ -41,6 +45,16 @@ export class PerformanceService {
     const dbRows = await this.repo.fetchRows(clientId, dateFrom, dateTo, groupBy, channels);
     const rows = dbRows.map((row) => this.mapRow(row));
     const meta = await this.repo.fetchMeta(clientId, channels);
+    const summary = this.buildSummary(rows, meta);
+
+    const totalSpend = summary.total_spend;
+    const unmappedSpend = rows.filter((r) => !r.hub_mapped).reduce((sum, r) => sum + r.spend, 0);
+    const unmappedSpendPct = computeUnmappedSpendPct(unmappedSpend, totalSpend);
+    const attribution = buildMetaAttributionMeta({
+      dateTo,
+      syncedAt: summary.latest_synced_at,
+      unmappedSpendPct,
+    });
 
     return {
       ok: true,
@@ -50,7 +64,11 @@ export class PerformanceService {
       group_by: groupBy,
       channel,
       rows,
-      summary: this.buildSummary(rows, meta),
+      summary,
+      attribution_model: attribution.attribution_model,
+      unmapped_spend_pct: attribution.unmapped_spend_pct,
+      spend_source: attribution.spend_source,
+      data_freshness: attribution.data_freshness,
     };
   }
 

@@ -27,6 +27,40 @@ export function fmtDate(value: string | null | undefined): string {
   return new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeZone: 'UTC' }).format(d);
 }
 
+export function fmtPct(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) {
+    return '—';
+  }
+  return `${value.toLocaleString('vi-VN', { maximumFractionDigits: 1 })}%`;
+}
+
+export function fmtDeltaVnd(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) {
+    return '—';
+  }
+  const sign = value > 0 ? '+' : '';
+  return sign + fmtVnd(value);
+}
+
+export function fmtDeltaPct(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) {
+    return '—';
+  }
+  const sign = value > 0 ? '+' : '';
+  return sign + fmtPct(value);
+}
+
+export function fmtDateTime(value: string | null | undefined): string {
+  if (!value) return '—';
+  try {
+    return new Intl.DateTimeFormat('vi-VN', { dateStyle: 'medium', timeStyle: 'short' }).format(
+      new Date(value),
+    );
+  } catch {
+    return value;
+  }
+}
+
 export function dateRangeEndingYesterday(days: number): { from: string; to: string } {
   const end = new Date();
   end.setUTCDate(end.getUTCDate() - 1);

@@ -47,6 +47,11 @@ export interface PerformanceSummary {
 
 export type PerformanceChannel = 'meta' | 'google';
 
+export interface PerformanceDataFreshness {
+  through_date: string;
+  synced_at: string | null;
+}
+
 export interface PerformanceListResponse {
   ok: boolean;
   client_id: string;
@@ -56,6 +61,10 @@ export interface PerformanceListResponse {
   channel?: PerformanceChannel | null;
   rows: PerformanceRow[];
   summary: PerformanceSummary;
+  attribution_model?: 'last_touch_crm';
+  unmapped_spend_pct?: number;
+  spend_source?: 'meta_api';
+  data_freshness?: PerformanceDataFreshness;
   error?: string;
 }
 

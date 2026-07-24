@@ -32,6 +32,8 @@ import {
   SetChannelTokenBody,
   CreateHubCampaignMapBody,
   UpdateHubCampaignMapBody,
+  ChannelAlertConfigBody,
+  ChannelAlertConfigResponse,
 } from './agency.types';
 import { OffboardClientBody, OffboardAuditListResponse, OffboardClientResponse } from './client-offboard.types';
 import { StaffAgencyConfigureGuard } from './guards/staff-agency-configure.guard';
@@ -231,6 +233,16 @@ export class ClientsController {
     @Body() body: SetChannelTokenBody,
   ) {
     return this.agency.setChannelAccountToken(id, accountId, body);
+  }
+
+  @Patch(':id/channel-accounts/:accountId/alert-config')
+  @UseGuards(StaffAgencyConfigureGuard)
+  async patchChannelAccountAlertConfig(
+    @Param('id') id: string,
+    @Param('accountId') accountId: string,
+    @Body() body: ChannelAlertConfigBody,
+  ): Promise<ChannelAlertConfigResponse> {
+    return this.agency.patchChannelAccountAlertConfig(id, accountId, body);
   }
 
   @Post(':id/sync/insights')

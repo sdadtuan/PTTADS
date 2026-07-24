@@ -108,13 +108,32 @@ export async function seedE2eDailyPerformance(): Promise<void> {
     const yesterday = new Date();
     yesterday.setUTCDate(yesterday.getUTCDate() - 1);
     const perfDate = yesterday.toISOString().slice(0, 10);
+
+    const mapResult = await pool.query(
+      `INSERT INTO hub_campaign_map (
+         client_id, hub_campaign_id, channel, external_campaign_id,
+         external_campaign_name, target_cpl_vnd, active
+       ) VALUES (
+         $1::uuid, 9000000001, 'meta', 'camp_e2e', 'E2E Campaign', 40000, TRUE
+       )
+       ON CONFLICT (client_id, channel, external_campaign_id) DO UPDATE SET
+         external_campaign_name = EXCLUDED.external_campaign_name,
+         target_cpl_vnd = EXCLUDED.target_cpl_vnd,
+         active = EXCLUDED.active
+       RETURNING id::text`,
+      [E2E_CLIENT_ID],
+    );
+    const mapId = String(mapResult.rows[0]?.id ?? '');
+
     await pool.query(
       `INSERT INTO daily_performance (
          client_id, channel, external_campaign_id, external_campaign_name,
-         performance_date, spend, leads_crm, leads_platform, impressions, clicks
+         performance_date, spend, leads_crm, leads_platform, impressions, clicks,
+         hub_campaign_map_id
        ) VALUES (
          $1::uuid, 'meta', 'camp_e2e', 'E2E Campaign',
-         $2::date, 150000, 3, 2, 1000, 50
+         $2::date, 150000, 3, 2, 1000, 50,
+         NULLIF($3, '')::uuid
        )
        ON CONFLICT (client_id, channel, external_campaign_id, performance_date) DO UPDATE SET
          external_campaign_name = EXCLUDED.external_campaign_name,
@@ -123,9 +142,26 @@ export async function seedE2eDailyPerformance(): Promise<void> {
          leads_platform = EXCLUDED.leads_platform,
          impressions = EXCLUDED.impressions,
          clicks = EXCLUDED.clicks,
+         hub_campaign_map_id = EXCLUDED.hub_campaign_map_id,
          synced_at = NOW()`,
-      [E2E_CLIENT_ID, perfDate],
+      [E2E_CLIENT_ID, perfDate, mapId],
     );
+  } finally {
+    await pool.end();
+  }
+}
+
+export async function pgFacebookHubReady(): Promise<boolean> {
+  const pool = new Pool({ connectionString: DATABASE_URL });
+  try {
+    const result = await pool.query(
+      `SELECT COUNT(*)::int AS c FROM information_schema.tables
+       WHERE table_schema = 'public'
+         AND table_name IN ('clients', 'daily_performance', 'hub_campaign_map')`,
+    );
+    return Number(result.rows[0]?.c ?? 0) >= 3;
+  } catch {
+    return false;
   } finally {
     await pool.end();
   }
