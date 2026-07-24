@@ -18,12 +18,13 @@ Use this document when opening the PR on GitHub.
 - **Granular RBAC (B8.1)** — Buyer can submit campaign writes but not approve; Tracking can configure rules (`crm_agency.configure`) but not approve writes; AM/Admin retains approve. Tracking configure guard no longer falls back to `crm_facebook_ads.view`.
 - **Gates** — `wave_b81_gates.py`, `./scripts/wave_b8_1_gate.sh`, seed script `seed_staff_meta_rbac_b81.py`.
 
-**Scope:** 31 files, +1,514 / −42 lines (2 commits ahead of `main`).
+**Scope:** 31 files, +1,514 / −42 lines (3 commits ahead of `main`).
 
 ### Commits included
 
 - `fa26f43` — feat(meta-b8-1): publisher_platform breakdown and granular Meta RBAC
 - `af42a53` — docs(pr): add B8.1 breakdown + RBAC merge checklist for main
+- `ded02f3` — docs(pr): fix B8.1 merge checklist commit hash
 
 ---
 
