@@ -56,3 +56,9 @@ export function metaBreakdownEnabled(): boolean {
     (process.env.NEXT_PUBLIC_PTT_META_INSIGHTS_BREAKDOWN ?? '0').trim().toLowerCase(),
   );
 }
+
+export function metaCreativeRegistryEnabled(): boolean {
+  return ['1', 'true', 'yes', 'on'].includes(
+    (process.env.NEXT_PUBLIC_PTT_META_CREATIVE_REGISTRY_ENABLED ?? '0').trim().toLowerCase(),
+  );
+}

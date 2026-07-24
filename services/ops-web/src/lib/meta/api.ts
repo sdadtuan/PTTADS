@@ -353,4 +353,64 @@ export async function patchMetaPixel(
   });
 }
 
+export async function fetchMetaCreativeLinks(
+  token: string,
+  params: {
+    client_id?: string;
+    external_ad_id?: string;
+    external_campaign_id?: string;
+    creative_submission_id?: string;
+    active_only?: boolean;
+    limit?: number;
+  } = {},
+): Promise<import('./types').MetaCreativeLinksListResponse> {
+  const qs = new URLSearchParams();
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.external_ad_id) qs.set('external_ad_id', params.external_ad_id);
+  if (params.external_campaign_id) qs.set('external_campaign_id', params.external_campaign_id);
+  if (params.creative_submission_id) qs.set('creative_submission_id', params.creative_submission_id);
+  if (params.active_only === false) qs.set('active_only', '0');
+  if (params.limit != null) qs.set('limit', String(params.limit));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return metaFetch(token, `/api/v1/meta/creative-links${suffix}`);
+}
+
+export async function resolveMetaCreativeLink(
+  token: string,
+  params: { client_id: string; external_ad_id: string },
+): Promise<import('./types').MetaCreativeLinkResolveResponse> {
+  const qs = new URLSearchParams({
+    client_id: params.client_id,
+    external_ad_id: params.external_ad_id,
+  });
+  return metaFetch(token, `/api/v1/meta/creative-links/resolve?${qs.toString()}`);
+}
+
+export async function createMetaCreativeLink(
+  token: string,
+  body: {
+    client_id: string;
+    creative_submission_id: string;
+    external_ad_id: string;
+    external_adset_id?: string;
+    external_campaign_id?: string;
+    external_creative_id?: string;
+    note?: string;
+  },
+): Promise<import('./types').MetaCreativeLinkMutationResponse> {
+  return metaMutate(token, '/api/v1/meta/creative-links', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deactivateMetaCreativeLink(
+  token: string,
+  linkId: string,
+): Promise<import('./types').MetaCreativeLinkMutationResponse> {
+  return metaMutate(token, `/api/v1/meta/creative-links/${encodeURIComponent(linkId)}`, {
+    method: 'DELETE',
+  });
+}
+
 export { MetaApiError };

@@ -24,6 +24,7 @@ DDL_V5_META_CONVERSION_REL = Path("docs/specs/2026-07-24-postgresql-ddl-v5-meta-
 DDL_V6_META_INSIGHTS_LEVEL_REL = Path("docs/specs/2026-07-24-postgresql-ddl-v6-meta-insights-level.sql")
 DDL_V7_META_ADVANCED_REL = Path("docs/specs/2026-07-24-postgresql-ddl-v7-meta-advanced.sql")
 DDL_V8_META_INSIGHTS_BREAKDOWN_REL = Path("docs/specs/2026-07-24-postgresql-ddl-v8-meta-insights-breakdown.sql")
+DDL_V9_META_CREATIVE_REGISTRY_REL = Path("docs/specs/2026-07-25-postgresql-ddl-v9-meta-creative-registry.sql")
 KPI_DICTIONARY_SEED_REL = Path("docs/specs/2026-07-17-kpi-dictionary-seed.sql")
 MIGRATION_VERSION = "2026-07-17-v2-leads"
 MIGRATION_V3_OLTP = "2026-07-17-v3-leads-oltp"
@@ -42,6 +43,7 @@ MIGRATION_V5_META_CONVERSION = "2026-07-24-v5-meta-conversion"
 MIGRATION_V6_META_INSIGHTS_LEVEL = "2026-07-24-v6-meta-insights-level"
 MIGRATION_V7_META_ADVANCED = "2026-07-24-v7-meta-advanced"
 MIGRATION_V8_META_INSIGHTS_BREAKDOWN = "2026-07-24-v8-meta-insights-breakdown"
+MIGRATION_V9_META_CREATIVE_REGISTRY = "2026-07-25-v9-meta-creative-registry"
 
 CRM_LEADS_COLUMNS: tuple[str, ...] = (
     "sqlite_lead_id",
@@ -147,6 +149,11 @@ def ddl_v7_meta_advanced_path() -> Path:
 def ddl_v8_meta_insights_breakdown_path() -> Path:
     base = Path(__file__).resolve().parents[1]
     return base / DDL_V8_META_INSIGHTS_BREAKDOWN_REL
+
+
+def ddl_v9_meta_creative_registry_path() -> Path:
+    base = Path(__file__).resolve().parents[1]
+    return base / DDL_V9_META_CREATIVE_REGISTRY_REL
 
 
 def _apply_sql_file(path: Path) -> None:
@@ -854,4 +861,31 @@ def pg_daily_performance_breakdown_ready() -> bool:
 
 def apply_ddl_v8_meta_insights_breakdown(*, ddl_path: Path | None = None) -> bool:
     _apply_sql_file(ddl_path or ddl_v8_meta_insights_breakdown_path())
+    return True
+
+
+def pg_meta_ad_creative_links_ready() -> bool:
+    try:
+        from ptt_jobs.db import pg_available, pg_connection
+
+        if not pg_available():
+            return False
+        with pg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                      AND table_name = 'meta_ad_creative_links'
+                    LIMIT 1
+                    """
+                )
+                return cur.fetchone() is not None
+    except Exception as exc:
+        logger.debug("pg_meta_ad_creative_links_ready: %s", exc)
+        return False
+
+
+def apply_ddl_v9_meta_creative_registry(*, ddl_path: Path | None = None) -> bool:
+    _apply_sql_file(ddl_path or ddl_v9_meta_creative_registry_path())
     return True
