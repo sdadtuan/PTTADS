@@ -62,3 +62,9 @@ export function metaCreativeRegistryEnabled(): boolean {
     (process.env.NEXT_PUBLIC_PTT_META_CREATIVE_REGISTRY_ENABLED ?? '0').trim().toLowerCase(),
   );
 }
+
+export function metaAdsOpsEnabled(): boolean {
+  return ['1', 'true', 'yes', 'on'].includes(
+    (process.env.NEXT_PUBLIC_PTT_META_ADS_OPS_ENABLED ?? '0').trim().toLowerCase(),
+  );
+}

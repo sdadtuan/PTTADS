@@ -7,8 +7,8 @@ import type { StoredStaffUser } from '@/lib/auth';
 import { getAccessToken, hasCap } from '@/lib/auth';
 import { fetchReviewQueueCount } from '@/lib/api';
 import { emailJourneysEnabled, emailModuleEnabled } from '@/lib/email-flags';
-import { canViewMetaIntelligence, canViewMetaTracking } from '@/lib/meta/caps';
-import { metaIntelligenceEnabled, metaTrackingEnabled } from '@/lib/meta/flags';
+import { canViewMetaAdsOps, canViewMetaIntelligence, canViewMetaTracking } from '@/lib/meta/caps';
+import { metaAdsOpsEnabled, metaIntelligenceEnabled, metaTrackingEnabled } from '@/lib/meta/flags';
 
 interface OpsNavProps {
   user: StoredStaffUser | null;
@@ -49,6 +49,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/agency/notifications': 'Thông báo Agency',
   '/agency/kpi-definitions': 'Định nghĩa KPI',
   '/meta/facebook-ads': 'Meta Ads',
+  '/meta/ads-ops': 'Meta Ads Ops',
   '/meta/tracking': 'Meta Tracking',
   '/meta/intelligence': 'Meta Intelligence',
   '/google/google-ads': 'Google Ads',
@@ -197,6 +198,9 @@ function buildSections(
   }
   if (hasCap(user, 'crm_facebook_ads', 'view') || hasCap(user, 'crm_agency', 'view')) {
     agency.push({ href: '/meta/facebook-ads', label: 'Meta Ads' });
+    if (metaAdsOpsEnabled() && canViewMetaAdsOps(user)) {
+      agency.push({ href: '/meta/ads-ops', label: 'Meta Ads Ops' });
+    }
     if (metaTrackingEnabled() && canViewMetaTracking(user)) {
       agency.push({ href: '/meta/tracking', label: 'Meta Tracking' });
     }

@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { MetaEditAdLink } from '@/components/meta/MetaEditAdLink';
+import { parseDisapprovedAdId } from '@/lib/meta/ads-ops-url';
 import { fmtDateTime } from '@/lib/meta/format';
 import type { MetaAlertRow } from '@/lib/meta/types';
 
@@ -45,11 +47,14 @@ export function MetaAlertsTable({ alerts, loading, ackBusyId, onAck }: MetaAlert
               <th>Severity</th>
               <th>Ngày</th>
               <th>Message</th>
+              <th>Action</th>
               <th>Ack</th>
             </tr>
           </thead>
           <tbody>
-            {alerts.map((alert) => (
+            {alerts.map((alert) => {
+              const disapprovedAdId = parseDisapprovedAdId(alert);
+              return (
               <tr key={alert.id}>
                 <td>{alertTypeLabel(alert.alert_type)}</td>
                 <td>
@@ -62,6 +67,17 @@ export function MetaAlertsTable({ alerts, loading, ackBusyId, onAck }: MetaAlert
                 <td>{alert.performance_date ?? fmtDateTime(alert.created_at).slice(0, 10)}</td>
                 <td>{alert.message}</td>
                 <td>
+                  {disapprovedAdId ? (
+                    <MetaEditAdLink
+                      clientId={alert.client_id}
+                      externalAdId={disapprovedAdId}
+                      disapproved
+                    />
+                  ) : (
+                    <span className="muted">—</span>
+                  )}
+                </td>
+                <td>
                   <button
                     type="button"
                     className="btn btn-sm btn-secondary"
@@ -72,10 +88,11 @@ export function MetaAlertsTable({ alerts, loading, ackBusyId, onAck }: MetaAlert
                   </button>
                 </td>
               </tr>
-            ))}
+            );
+            })}
             {!loading && alerts.length === 0 ? (
               <tr>
-                <td colSpan={7} className="muted">
+                <td colSpan={8} className="muted">
                   Không có alert mở · bật <code>PTT_META_ALERTS_ENABLED=1</code> trên backend để eval
                 </td>
               </tr>

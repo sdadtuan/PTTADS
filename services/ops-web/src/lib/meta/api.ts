@@ -413,4 +413,73 @@ export async function deactivateMetaCreativeLink(
   });
 }
 
+export async function fetchMetaAdsOpsTemplates(token: string) {
+  return metaFetch<{ ok: boolean; disabled?: boolean; templates: import('./types').MetaAdsOpsTemplate[] }>(
+    token,
+    '/api/v1/meta/ads-ops/templates',
+  );
+}
+
+export async function fetchMetaAdsOpsPreflight(token: string, clientId: string) {
+  return metaFetch<import('./types').MetaAdsOpsPreflightResponse>(
+    token,
+    `/api/v1/meta/ads-ops/preflight?client_id=${encodeURIComponent(clientId)}`,
+  );
+}
+
+export async function postMetaAdsOpsCreativeUpload(
+  token: string,
+  body: { client_id: string; creative_submission_id: string; external_account_id?: string },
+) {
+  return metaMutate(token, '/api/v1/meta/ads-ops/creative/upload', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function postMetaAdsOpsLaunch(token: string, body: import('./types').MetaAdsOpsLaunchBody) {
+  return metaMutate<import('./types').MetaAdsOpsSubmitResponse>(token, '/api/v1/meta/ads-ops/launch', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchMetaAdsOpsEditSnapshot(token: string, clientId: string, adId: string) {
+  return metaFetch<import('./types').MetaAdsOpsEditSnapshot>(
+    token,
+    `/api/v1/meta/ads-ops/edit/snapshot?client_id=${encodeURIComponent(clientId)}&external_ad_id=${encodeURIComponent(adId)}`,
+  );
+}
+
+export async function postMetaAdsOpsEditSubmit(
+  token: string,
+  body: {
+    client_id: string;
+    external_ad_id: string;
+    external_campaign_id?: string;
+    action: 'update_ad_creative' | 'update_ad_copy';
+    old_value: Record<string, unknown>;
+    new_value: Record<string, unknown>;
+    disapproved_ack?: boolean;
+  },
+) {
+  return metaMutate<import('./types').MetaAdsOpsSubmitResponse>(token, '/api/v1/meta/ads-ops/edit/submit', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchMetaAdsOpsDeepLink(
+  token: string,
+  params: { client_id: string; external_campaign_id?: string; external_ad_id?: string },
+) {
+  const qs = new URLSearchParams({ client_id: params.client_id });
+  if (params.external_campaign_id) qs.set('external_campaign_id', params.external_campaign_id);
+  if (params.external_ad_id) qs.set('external_ad_id', params.external_ad_id);
+  return metaFetch<{ ok: boolean; url: string; external_account_id: string }>(
+    token,
+    `/api/v1/meta/ads-ops/deep-link?${qs.toString()}`,
+  );
+}
+
 export { MetaApiError };
