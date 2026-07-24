@@ -15,16 +15,14 @@ Use this document when opening the PR on GitHub.
 ## Summary
 
 - **B11 Advanced** — z-score stat anomalies, CPL/spend forecast, multi-pixel CRUD + CAPI primary routing, intelligence snapshot gzip export, DDL v7, ops-web panels, wave B11 gates.
-- **Stack note:** Branch includes **B10 Intelligence** commits (not yet on `main`). Review as combined stack or merge B10 first then retarget.
+- **Base:** `main` already includes **B10 Intelligence** (`966e60d`). This PR is **B11-only**.
 
-**Scope:** 4 commits ahead of `main` (3× B10 + 1× B11).
+**Scope:** 2 commits ahead of `main`.
 
 ### Commits included
 
-- `f3bc893` — feat(meta-b10): add Intelligence layer with ROAS, anomalies, and budget recommendations
-- `9e7ec84` — feat(meta-b10): add adset insights API, ROAS chart, and Playwright E2E
-- `966e60d` — docs(pr): add B10 Intelligence merge checklist for main
 - `57536d1` — feat(meta-b11): add Advanced intelligence with z-score, forecast, and multi-pixel
+- `70e8cce` — docs(pr): add B11 Advanced merge checklist for main
 
 ---
 
@@ -72,7 +70,7 @@ Use this document when opening the PR on GitHub.
 ```markdown
 ## Summary
 - B11 Advanced: z-score anomalies, forecast API, multi-pixel + CAPI routing, intelligence snapshot, DDL v7, ops-web UI, wave_b11 gates.
-- Branch stacks on B10 Intelligence (3 commits) — review combined or merge B10 first.
+- Base `main` already has B10 Intelligence merged — this PR is B11-only (2 commits).
 
 ## Test plan
 - [ ] `./scripts/wave_b11_gate.sh`
