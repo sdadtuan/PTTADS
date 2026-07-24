@@ -12,6 +12,7 @@ import { useMetaAlerts } from '@/hooks/meta/useMetaAlerts';
 import { useMetaHub } from '@/hooks/meta/useMetaHub';
 import { useMetaHubCampaigns } from '@/hooks/meta/useMetaHubCampaigns';
 import { useMetaHubTab } from '@/hooks/meta/useMetaHubTab';
+import { getAccessToken } from '@/lib/auth';
 
 export function MetaFacebookAdsContent() {
   const hub = useMetaHub();
@@ -84,6 +85,7 @@ export function MetaFacebookAdsContent() {
         campaigns={campaigns.campaigns}
         campaignsLoading={campaigns.loading}
         campaignsError={campaigns.error}
+        hubToken={getAccessToken()}
         hubDateFrom={hub.hub?.date_from}
         hubDateTo={hub.hub?.date_to}
         onMapSuggestDone={() => {

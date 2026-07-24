@@ -17,6 +17,7 @@ interface MetaHubTabPanelsProps {
   campaigns: FacebookHubCampaignRow[];
   campaignsLoading: boolean;
   campaignsError: string;
+  hubToken?: string | null;
   hubDateFrom?: string;
   hubDateTo?: string;
   onMapSuggestDone: () => void;
@@ -36,6 +37,7 @@ export function MetaHubTabPanels({
   campaigns,
   campaignsLoading,
   campaignsError,
+  hubToken,
   hubDateFrom,
   hubDateTo,
   onMapSuggestDone,
@@ -59,6 +61,7 @@ export function MetaHubTabPanels({
         <MetaCampaignTable
           rows={campaigns}
           loading={campaignsLoading || loading}
+          token={hubToken}
           dateFrom={hubDateFrom}
           dateTo={hubDateTo}
           onMapSuggestDone={onMapSuggestDone}

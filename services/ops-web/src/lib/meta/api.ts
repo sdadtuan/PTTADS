@@ -268,4 +268,28 @@ export async function fetchMetaDailyInsights(
   return metaFetch(token, `/api/v1/meta/insights/daily${suffix}`);
 }
 
+export async function fetchMetaInsightsBreakdown(
+  token: string,
+  params: {
+    client_id?: string;
+    campaign_id?: string;
+    date?: string;
+    type?: string;
+    from?: string;
+    to?: string;
+    days?: number;
+  } = {},
+): Promise<import('./types').MetaInsightsBreakdownResponse> {
+  const qs = new URLSearchParams();
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.campaign_id) qs.set('campaign_id', params.campaign_id);
+  if (params.date) qs.set('date', params.date);
+  if (params.type) qs.set('type', params.type);
+  if (params.from) qs.set('from', params.from);
+  if (params.to) qs.set('to', params.to);
+  if (params.days != null) qs.set('days', String(params.days));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return metaFetch(token, `/api/v1/meta/insights/breakdown${suffix}`);
+}
+
 export { MetaApiError };

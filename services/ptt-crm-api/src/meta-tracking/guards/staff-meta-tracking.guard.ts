@@ -57,10 +57,8 @@ export class StaffMetaTrackingConfigureGuard implements CanActivate {
     if (req.staffAuthVia === 'internal') return true;
     if (!req.staffUser) throw new UnauthorizedException({ error: 'Unauthorized' });
     const me = await this.staffAuth.me(req.staffUser);
-    const agency = this.staffAuth.hasCap(me.caps, 'crm_agency', 'configure');
-    const meta = this.staffAuth.hasCap(me.caps, 'crm_facebook_ads', 'view');
-    if (!agency && !meta) {
-      throw new ForbiddenException({ error: 'missing_cap', section: 'crm_agency' });
+    if (!this.staffAuth.hasCap(me.caps, 'crm_agency', 'configure')) {
+      throw new ForbiddenException({ error: 'missing_cap', section: 'crm_agency', action: 'configure' });
     }
     return true;
   }

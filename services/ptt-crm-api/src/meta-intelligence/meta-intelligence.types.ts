@@ -112,3 +112,39 @@ export interface MetaDailyInsightsResponse {
   count: number;
   attribution: import('../meta-attribution.util').MetaAttributionMeta;
 }
+
+export type MetaBreakdownType =
+  | 'publisher_platform'
+  | 'platform_position'
+  | 'age'
+  | 'gender'
+  | 'device_platform'
+  | 'country';
+
+export interface MetaInsightsBreakdownRow {
+  client_id: string;
+  external_campaign_id: string;
+  performance_date: string;
+  breakdown_type: MetaBreakdownType | string;
+  breakdown_value: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  leads_platform: number;
+}
+
+export interface MetaInsightsBreakdownResponse {
+  ok: boolean;
+  disabled?: boolean;
+  reason?: string;
+  hint?: string;
+  breakdown_type: MetaBreakdownType | string;
+  date_from: string;
+  date_to: string;
+  rows: MetaInsightsBreakdownRow[];
+  count: number;
+  total_spend: number;
+  breakdown_spend: number;
+  spend_delta_pct: number | null;
+  attribution: import('../meta-attribution.util').MetaAttributionMeta;
+}

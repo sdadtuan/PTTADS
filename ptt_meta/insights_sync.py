@@ -317,7 +317,16 @@ def sync_account_insights(
         upsert_daily_performance(record)
         upserted += 1
 
-    return {"ok": True, "upserted": upserted, "account_id": ad_account_id}
+    breakdown_out: dict[str, Any] = {"ok": True, "skipped": True}
+    try:
+        from ptt_meta.insights_breakdown import sync_account_breakdown_insights
+
+        breakdown_out = sync_account_breakdown_insights(account, target_date=target_date, stub=stub)
+    except Exception as exc:
+        logger.warning("meta breakdown sync skipped/failed: %s", exc)
+        breakdown_out = {"ok": False, "error": str(exc)}
+
+    return {"ok": True, "upserted": upserted, "account_id": ad_account_id, "breakdown": breakdown_out}
 
 
 def sync_meta_insights(

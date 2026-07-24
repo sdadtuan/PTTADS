@@ -26,3 +26,9 @@ export function metaRoasEnabled(): boolean {
 export function metaIntelligenceEnabled(): boolean {
   return metaAnomalyEnabled() || metaRoasEnabled();
 }
+
+export function metaBreakdownEnabled(): boolean {
+  return ['1', 'true', 'yes', 'on'].includes(
+    (process.env.NEXT_PUBLIC_PTT_META_INSIGHTS_BREAKDOWN ?? '0').trim().toLowerCase(),
+  );
+}
