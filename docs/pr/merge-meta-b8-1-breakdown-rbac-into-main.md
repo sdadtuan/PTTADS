@@ -23,7 +23,7 @@ Use this document when opening the PR on GitHub.
 ### Commits included
 
 - `fa26f43` — feat(meta-b8-1): publisher_platform breakdown and granular Meta RBAC
-- `919eef3` — docs(pr): add B8.1 breakdown + RBAC merge checklist for main
+- `af42a53` — docs(pr): add B8.1 breakdown + RBAC merge checklist for main
 
 ---
 
