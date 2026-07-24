@@ -1669,35 +1669,6 @@ body:has(.ops-sidebar) main {
   font-size: 0.8rem;
 }
 
-.meta-badge {
-  display: inline-block;
-  font-size: 0.75rem;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.meta-badge--ok {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.meta-badge--warn {
-  background: #fef9c3;
-  color: #854d0e;
-}
-
-.meta-badge--error {
-  background: #fee2e2;
-  color: #991b1b;
-}
-
-.meta-badge--muted {
-  background: #f3f4f6;
-  color: #4b5563;
-}
-
 .meta-tracking-header {
   display: flex;
   justify-content: space-between;

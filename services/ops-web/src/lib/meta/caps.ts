@@ -11,6 +11,9 @@ export function canConfigureMetaAgency(user: StoredStaffUser | null): boolean {
   return hasCap(user, 'crm_agency', 'configure');
 }
 
+/** Spec alias — agency configure cap for Meta hub writes. */
+export const canConfigureMeta = canConfigureMetaAgency;
+
 export function canViewMetaTracking(user: StoredStaffUser | null): boolean {
   if (!user || !metaTrackingEnabled()) return false;
   return hasCap(user, 'crm_facebook_ads', 'view') || hasCap(user, 'crm_agency', 'view');

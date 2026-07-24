@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { AgencyClient } from '@/lib/api';
+import { metaTrackingEnabled } from '@/lib/meta/flags';
 import type { FacebookHubExportScope } from '@/lib/meta/types';
 
 interface MetaHubFiltersProps {
@@ -68,6 +69,11 @@ export function MetaHubFilters({
         <Link href="/crm/hub" className="btn btn-sm btn-secondary">
           Hub campaign map
         </Link>
+        {metaTrackingEnabled() ? (
+          <Link href="/meta/tracking" className="btn btn-sm btn-secondary">
+            Meta Tracking
+          </Link>
+        ) : null}
         <Link href="/agency/clients" className="btn btn-sm btn-secondary">
           Agency clients
         </Link>

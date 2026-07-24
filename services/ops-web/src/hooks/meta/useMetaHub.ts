@@ -7,32 +7,22 @@ import {
   fetchAgencyClients,
   fetchFacebookAdsMigrationStatus,
   fetchFacebookHub,
-  staffMe,
-  staffRefresh,
   type AgencyClient,
   type FacebookAdsMigrationStatus,
   type FacebookHubResponse,
 } from '@/lib/api';
-import {
-  clearSession,
-  getAccessToken,
-  getRefreshToken,
-  getStoredUser,
-  updateAccessToken,
-  updateStoredUser,
-  type StoredStaffUser,
-} from '@/lib/auth';
-import { canViewMetaHub } from '@/lib/meta/caps';
+import { getAccessToken } from '@/lib/auth';
 import { fetchMetaTrackingHealth } from '@/lib/meta/api';
 import { metaTrackingEnabled } from '@/lib/meta/flags';
 import { yesterdayIso } from '@/lib/meta/format';
 import type { FacebookHubExportScope, TrackingHealthAccountRow } from '@/lib/meta/types';
+import { useMetaHubAuth } from '@/hooks/meta/useMetaHubAuth';
 
 export function useMetaHub() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, authError, setAuthError, ensureAuth, logout } = useMetaHubAuth();
 
-  const [user, setUser] = useState<StoredStaffUser | null>(null);
   const [hub, setHub] = useState<FacebookHubResponse | null>(null);
   const [migration, setMigration] = useState<FacebookAdsMigrationStatus | null>(null);
   const [clientOptions, setClientOptions] = useState<AgencyClient[]>([]);
@@ -60,37 +50,6 @@ export function useMetaHub() {
     }),
     [clientId, dateFrom, dateTo, days, q, status],
   );
-
-  const ensureAuth = useCallback(async (): Promise<string | null> => {
-    let access = getAccessToken();
-    if (!access) {
-      router.replace('/login');
-      return null;
-    }
-    const cached = getStoredUser();
-    if (cached) setUser(cached);
-    try {
-      const me = await staffMe(access);
-      setUser(me);
-      updateStoredUser(me);
-      if (!canViewMetaHub(me)) {
-        setError('Không có quyền Meta hub');
-        return null;
-      }
-      return access;
-    } catch {
-      const refresh = getRefreshToken();
-      if (!refresh) {
-        clearSession();
-        router.replace('/login');
-        return null;
-      }
-      const out = await staffRefresh(refresh);
-      updateAccessToken(out.access_token);
-      access = out.access_token;
-      return access;
-    }
-  }, [router]);
 
   const syncUrl = useCallback(() => {
     const qs = new URLSearchParams();
@@ -188,17 +147,14 @@ export function useMetaHub() {
     }
   }, [exportScope, hubQuery]);
 
-  const logout = useCallback(() => {
-    clearSession();
-    router.push('/login');
-  }, [router]);
+  const displayError = error || authError;
 
   return {
     user,
     hub,
     migration,
     clientOptions,
-    error,
+    error: displayError,
     loading,
     exportBusy,
     days,

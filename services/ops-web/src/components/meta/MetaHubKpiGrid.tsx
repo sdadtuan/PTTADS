@@ -12,7 +12,8 @@ export function MetaHubKpiGrid({ summary, clientCount, attribution }: MetaHubKpi
     attribution?.unmapped_spend_pct ?? (summary.unmapped_spend_pct as number | undefined);
 
   return (
-    <div className="card summary-grid" style={{ marginBottom: '1rem' }}>
+    <div className="card" style={{ marginBottom: '1rem' }}>
+      <div className="summary-grid">
       <div className="summary-card">
         <p className="muted" style={{ margin: 0 }}>
           Spend
@@ -63,6 +64,7 @@ export function MetaHubKpiGrid({ summary, clientCount, attribution }: MetaHubKpi
           <strong>{String(summary.open_alerts)}</strong>
         </div>
       ) : null}
+      </div>
     </div>
   );
 }
