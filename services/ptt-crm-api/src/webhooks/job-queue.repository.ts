@@ -178,6 +178,25 @@ export class JobQueueRepository implements OnModuleDestroy {
     });
   }
 
+  /** B9 CAPI replay/retry — only requires PTT_JOBS_ENABLED. */
+  async enqueueCapiDispatch(input: {
+    payload: Record<string, unknown>;
+    idempotencyKey: string;
+    clientId: string;
+    correlationId?: string;
+  }): Promise<EnqueuedJob | null> {
+    if (!this.config.jobsEnabled) {
+      return null;
+    }
+    return this.enqueueJobRecord({
+      jobType: 'capi_dispatch',
+      payload: input.payload,
+      idempotencyKey: input.idempotencyKey,
+      correlationId: input.correlationId,
+      clientId: this.normalizeClientUuid(input.clientId),
+    });
+  }
+
   async cancelPendingJobsForClient(clientId: string): Promise<number> {
     if (!this.config.jobsEnabled) {
       return 0;

@@ -106,6 +106,22 @@ def hash_phone(raw: str | None) -> str | None:
     return _sha256_normalized(digits)
 
 
+def lead_event_id(*, lead_id: int, client_id: str, external_id: str = "") -> str:
+    """B9 event_id — leadgen_* when Meta external id present, else legacy ptt-lead-*."""
+    ext = str(external_id or "").strip()
+    if ext and ext != str(lead_id):
+        return f"leadgen_{ext}"
+    return f"ptt-lead-{client_id}-{lead_id}"
+
+
+def legacy_lead_event_ids(*, lead_id: int, client_id: str, external_id: str = "") -> list[str]:
+    """Backward-compat dedupe keys for migrated Lead event_id format."""
+    primary = lead_event_id(lead_id=lead_id, client_id=client_id, external_id=external_id)
+    if primary.startswith("leadgen_"):
+        return [f"ptt-lead-{client_id}-{lead_id}"]
+    return []
+
+
 def build_lead_event(
     *,
     lead_id: int,
@@ -116,6 +132,7 @@ def build_lead_event(
     external_id: str = "",
     event_source_url: str = "",
     custom_data: dict[str, Any] | None = None,
+    event_id_override: str | None = None,
 ) -> dict[str, Any]:
     user_data: dict[str, Any] = {}
     em = hash_email(email)
@@ -128,10 +145,16 @@ def build_lead_event(
     if ext:
         user_data["external_id"] = _sha256_normalized(ext)
 
+    event_id = event_id_override or lead_event_id(
+        lead_id=lead_id,
+        client_id=client_id,
+        external_id=str(external_id or ""),
+    )
+
     evt: dict[str, Any] = {
         "event_name": _CAPI_EVENT_LEAD,
         "event_time": event_time or int(datetime.now(timezone.utc).timestamp()),
-        "event_id": f"ptt-lead-{client_id}-{lead_id}",
+        "event_id": event_id,
         "action_source": _ACTION_SOURCE,
         "user_data": user_data,
     }
@@ -280,6 +303,24 @@ def find_capi_log(client_id: str, event_id: str, event_name: str) -> dict[str, A
             return out
 
 
+def find_capi_log_dedup(
+    client_id: str,
+    event_name: str,
+    event_id: str,
+    *,
+    legacy_event_ids: list[str] | None = None,
+) -> dict[str, Any] | None:
+    """Resolve dedupe log row including legacy Lead event_id keys."""
+    existing = find_capi_log(client_id, event_id, event_name)
+    if existing:
+        return existing
+    for legacy_id in legacy_event_ids or []:
+        existing = find_capi_log(client_id, legacy_id, event_name)
+        if existing:
+            return existing
+    return None
+
+
 def insert_capi_log(
     *,
     client_id: str,
@@ -356,12 +397,13 @@ def update_capi_log(
 
 
 def capi_stats(*, client_id: str | None = None, hours: int = 24) -> dict[str, Any]:
-    """Observability summary for pilot (US-M5-04)."""
+    """Observability summary — default 24h; pass hours=168 for 7d tracking health."""
     if not pg_capi_ready():
         return {"ok": False, "error": "capi_log_not_ready"}
 
+    window_hours = max(1, min(int(hours), 24 * 90))
     clauses = ["created_at >= NOW() - (%s || ' hours')::interval"]
-    params: list[Any] = [str(max(1, hours))]
+    params: list[Any] = [str(window_hours)]
     if client_id:
         clauses.append("client_id = %s::uuid")
         params.append(client_id)
@@ -378,35 +420,58 @@ def capi_stats(*, client_id: str | None = None, hours: int = 24) -> dict[str, An
                 params,
             )
             by_status = {str(row[0]): int(row[1]) for row in cur.fetchall()}
+            cur.execute(
+                f"""
+                SELECT AVG(EXTRACT(EPOCH FROM (sent_at - created_at)) * 1000)::float AS avg_ms
+                FROM capi_event_log
+                WHERE status = 'sent'
+                  AND sent_at IS NOT NULL
+                  AND {' AND '.join(clauses)}
+                """,
+                params,
+            )
+            avg_row = cur.fetchone()
+            avg_latency_ms = avg_row[0] if avg_row else None
 
     total = sum(by_status.values())
     sent = by_status.get("sent", 0)
     failed = by_status.get("failed", 0)
     skipped = by_status.get("skipped", 0)
-    attempted = total - skipped
+    pending = by_status.get("pending", 0)
+    attempted = sent + failed
     error_rate = round(failed / attempted * 100, 2) if attempted else 0.0
+    window_days = round(window_hours / 24, 2) if window_hours >= 24 else None
 
     return {
         "ok": True,
-        "hours": hours,
+        "hours": window_hours,
+        "window_days": window_days,
         "total": total,
         "by_status": by_status,
+        "sent": sent,
+        "failed": failed,
+        "skipped": skipped,
+        "pending": pending,
         "attempted": attempted,
         "error_rate_pct": error_rate,
+        "fail_rate_pct": error_rate,
         "match_rate_pct": round(sent / attempted * 100, 2) if attempted else None,
+        "match_hint_pct": round(sent / attempted * 100, 2) if attempted else None,
+        "avg_latency_ms": round(float(avg_latency_ms), 2)
+        if avg_latency_ms is not None and float(avg_latency_ms) >= 0
+        else None,
     }
 
 
-def dispatch_lead_capi(
+def _dispatch_capi_event(
     *,
-    lead_id: int,
     client_id: str,
-    external_lead_id: str | None = None,
+    event: dict[str, Any],
+    lead_id: int | None = None,
     correlation_id: str | None = None,
+    legacy_event_ids: list[str] | None = None,
 ) -> dict[str, Any]:
-    """
-    Send Lead event to Meta CAPI. Non-blocking caller; logs to capi_event_log.
-    """
+    """Shared CAPI send path for Lead + conversion events."""
     if not capi_dispatch_enabled() and not capi_stub_mode():
         return {"ok": True, "skipped": True, "reason": "PTT_CAPI_ENABLED disabled"}
 
@@ -420,33 +485,35 @@ def dispatch_lead_capi(
     if not config:
         return {"ok": True, "skipped": True, "reason": "missing_pixel_or_token"}
 
-    lead = load_lead_for_capi(lead_id)
-    if not lead:
-        return {"ok": False, "error": "lead_not_found", "lead_id": lead_id}
+    event_name = str(event.get("event_name") or "").strip()
+    if not event_name:
+        return {"ok": False, "error": "event_name required"}
 
-    event = build_lead_event(
-        lead_id=lead_id,
-        client_id=client_id,
-        email=str(lead.get("email") or ""),
-        phone=str(lead.get("phone") or ""),
-        external_id=str(external_lead_id or lead.get("external_id") or lead_id),
-        event_source_url=str(lead.get("landing_url") or lead.get("source_url") or ""),
-        custom_data={
-            "lead_id": lead_id,
-            "client_id": client_id,
-            "correlation_id": correlation_id,
-        },
+    event_id = str(event.get("event_id") or "").strip()
+    if not event_id:
+        return {"ok": False, "error": "event_id required"}
+
+    payload = dict(event)
+    if correlation_id and isinstance(payload.get("custom_data"), dict):
+        payload["custom_data"] = {**payload["custom_data"], "correlation_id": correlation_id}
+    elif correlation_id:
+        payload["custom_data"] = {"correlation_id": correlation_id}
+
+    payload_hash = _payload_hash(payload)
+
+    existing = find_capi_log_dedup(
+        client_id,
+        event_name,
+        event_id,
+        legacy_event_ids=legacy_event_ids,
     )
-    event_id = str(event["event_id"])
-    payload_hash = _payload_hash(event)
-
-    existing = find_capi_log(client_id, event_id, _CAPI_EVENT_LEAD)
     if existing and existing.get("status") == "sent":
         return {
             "ok": True,
             "skipped": True,
             "reason": "dedup",
             "event_id": event_id,
+            "event_name": event_name,
             "log_status": existing.get("status"),
         }
 
@@ -456,7 +523,7 @@ def dispatch_lead_capi(
     else:
         log_id = insert_capi_log(
             client_id=client_id,
-            event_name=_CAPI_EVENT_LEAD,
+            event_name=event_name,
             event_id=event_id,
             lead_id=lead_id,
             pixel_id=str(config["pixel_id"]),
@@ -464,13 +531,19 @@ def dispatch_lead_capi(
             status="pending",
         )
         if not log_id:
-            existing = find_capi_log(client_id, event_id, _CAPI_EVENT_LEAD)
+            existing = find_capi_log_dedup(
+                client_id,
+                event_name,
+                event_id,
+                legacy_event_ids=legacy_event_ids,
+            )
             if existing and existing.get("status") == "sent":
                 return {
                     "ok": True,
                     "skipped": True,
                     "reason": "dedup_race",
                     "event_id": event_id,
+                    "event_name": event_name,
                     "log_status": existing.get("status"),
                 }
             log_id = str((existing or {}).get("id") or "")
@@ -479,12 +552,18 @@ def dispatch_lead_capi(
         return {"ok": False, "error": "capi_log_unavailable", "event_id": event_id}
 
     if capi_stub_mode():
-        stub_resp = {"events_received": 1, "stub": True, "pixel_id": config["pixel_id"]}
+        stub_resp = {
+            "events_received": 1,
+            "stub": True,
+            "pixel_id": config["pixel_id"],
+            "event_name": event_name,
+        }
         update_capi_log(log_id, status="sent", meta_response=stub_resp)
         return {
             "ok": True,
             "stub": True,
             "event_id": event_id,
+            "event_name": event_name,
             "log_id": log_id,
             "events_received": 1,
         }
@@ -492,7 +571,7 @@ def dispatch_lead_capi(
     outcome = send_pixel_events(
         pixel_id=str(config["pixel_id"]),
         access_token=str(config["access_token"]),
-        events=[event],
+        events=[payload],
         test_event_code=capi_test_event_code(),
     )
     err = outcome.get("_graph_error")
@@ -504,9 +583,9 @@ def dispatch_lead_capi(
             error_message=str(err),
         )
         logger.warning(
-            "capi dispatch failed lead_id=%s client_id=%s event_id=%s err=%s",
-            lead_id,
+            "capi dispatch failed client_id=%s event_name=%s event_id=%s err=%s",
             client_id,
+            event_name,
             event_id,
             err,
         )
@@ -514,25 +593,103 @@ def dispatch_lead_capi(
             "ok": False,
             "error": str(err),
             "event_id": event_id,
+            "event_name": event_name,
             "log_id": log_id,
         }
 
     update_capi_log(log_id, status="sent", meta_response=outcome)
     events_received = outcome.get("events_received")
     logger.info(
-        "capi dispatch sent lead_id=%s client_id=%s event_id=%s received=%s",
-        lead_id,
+        "capi dispatch sent client_id=%s event_name=%s event_id=%s received=%s",
         client_id,
+        event_name,
         event_id,
         events_received,
     )
     return {
         "ok": True,
         "event_id": event_id,
+        "event_name": event_name,
         "log_id": log_id,
         "events_received": events_received,
         "fbtrace_id": outcome.get("fbtrace_id"),
     }
+
+
+def dispatch_conversion_capi(
+    *,
+    client_id: str,
+    event: dict[str, Any],
+    lead_id: int | None = None,
+    correlation_id: str | None = None,
+) -> dict[str, Any]:
+    """Send arbitrary Meta CAPI event (B9 conversion rules pipeline)."""
+    return _dispatch_capi_event(
+        client_id=client_id,
+        event=event,
+        lead_id=lead_id,
+        correlation_id=correlation_id,
+    )
+
+
+def dispatch_conversion_intent(intent: dict[str, Any]) -> dict[str, Any]:
+    """Bridge from ptt_meta.conversion_rules evaluate output."""
+    if intent.get("skipped"):
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": intent.get("reason") or "intent_skipped",
+            "event_name": intent.get("event_name"),
+        }
+    event = intent.get("event")
+    if not isinstance(event, dict):
+        return {"ok": False, "error": "intent_missing_event"}
+    return dispatch_conversion_capi(
+        client_id=str(intent.get("client_id") or ""),
+        event=event,
+        lead_id=int(intent["lead_id"]) if intent.get("lead_id") is not None else None,
+    )
+
+
+def dispatch_lead_capi(
+    *,
+    lead_id: int,
+    client_id: str,
+    external_lead_id: str | None = None,
+    correlation_id: str | None = None,
+) -> dict[str, Any]:
+    """
+    Send Lead event to Meta CAPI. Non-blocking caller; logs to capi_event_log.
+    """
+    lead = load_lead_for_capi(lead_id)
+    if not lead:
+        return {"ok": False, "error": "lead_not_found", "lead_id": lead_id}
+
+    external = str(external_lead_id or lead.get("external_id") or lead.get("external_lead_id") or "")
+    event = build_lead_event(
+        lead_id=lead_id,
+        client_id=client_id,
+        email=str(lead.get("email") or ""),
+        phone=str(lead.get("phone") or ""),
+        external_id=external or str(lead_id),
+        event_source_url=str(lead.get("landing_url") or lead.get("source_url") or ""),
+        custom_data={
+            "lead_id": lead_id,
+            "client_id": client_id,
+            "correlation_id": correlation_id,
+        },
+    )
+    return _dispatch_capi_event(
+        client_id=client_id,
+        event=event,
+        lead_id=lead_id,
+        correlation_id=correlation_id,
+        legacy_event_ids=legacy_lead_event_ids(
+            lead_id=lead_id,
+            client_id=client_id,
+            external_id=external,
+        ),
+    )
 
 
 def build_purchase_event(
@@ -596,6 +753,183 @@ def dispatch_purchase_capi_stub(
     return {"ok": True, "stub": True, "event_id": event_id, "log_id": log_id}
 
 
+def get_capi_log_row(log_id: str) -> dict[str, Any] | None:
+    """Load a single capi_event_log row for replay/retry."""
+    if not pg_capi_ready():
+        return None
+    text = str(log_id or "").strip()
+    if not text:
+        return None
+    with pg_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id::text, client_id::text, event_name, event_id,
+                       lead_id, status, error_message
+                FROM capi_event_log
+                WHERE id = $1::uuid
+                """,
+                [text],
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            cols = [d[0] for d in cur.description]
+            return dict(zip(cols, row))
+
+
+def list_flushable_capi_logs(
+    *,
+    client_id: str | None = None,
+    limit: int = 50,
+) -> list[dict[str, Any]]:
+    """Rows eligible for manual flush/retry (pending or failed)."""
+    if not pg_capi_ready():
+        return []
+    max_rows = max(1, min(int(limit), 200))
+    values: list[Any] = [max_rows]
+    client_clause = ""
+    if client_id:
+        client_clause = " AND client_id = $2::uuid"
+        values.append(client_id)
+    with pg_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"""
+                SELECT id::text, client_id::text, event_name, event_id,
+                       lead_id, status, error_message
+                FROM capi_event_log
+                WHERE status IN ('pending', 'failed')
+                {client_clause}
+                ORDER BY created_at ASC
+                LIMIT $1
+                """,
+                values,
+            )
+            cols = [d[0] for d in cur.description]
+            return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+
+def replay_capi_event_from_log(row: dict[str, Any]) -> dict[str, Any] | None:
+    """Rebuild CAPI payload for retry using stored log row metadata."""
+    event_name = str(row.get("event_name") or "").strip()
+    event_id = str(row.get("event_id") or "").strip()
+    client_id = str(row.get("client_id") or "").strip()
+    lead_raw = row.get("lead_id")
+    lead_id = int(lead_raw) if lead_raw is not None else None
+    if not event_name or not event_id or not client_id:
+        return None
+
+    if event_name == _CAPI_EVENT_LEAD:
+        if not lead_id:
+            return None
+        lead = load_lead_for_capi(lead_id)
+        if not lead:
+            return None
+        external = str(lead.get("external_id") or lead.get("external_lead_id") or "")
+        event = build_lead_event(
+            lead_id=lead_id,
+            client_id=client_id,
+            email=str(lead.get("email") or ""),
+            phone=str(lead.get("phone") or ""),
+            external_id=external or str(lead_id),
+            event_source_url=str(lead.get("landing_url") or lead.get("source_url") or ""),
+            custom_data={"lead_id": lead_id, "client_id": client_id, "replay": True},
+            event_id_override=event_id,
+        )
+        return event
+
+    if not lead_id:
+        return None
+    lead = load_lead_for_capi(lead_id)
+    if not lead:
+        return None
+    try:
+        from ptt_meta.conversion_rules import build_conversion_event, normalize_lead
+
+        norm = normalize_lead({**lead, "agency_client_id": client_id})
+        rule = {
+            "id": "replay",
+            "client_id": None,
+            "lead_status": norm.get("status") or "",
+            "event_name": event_name,
+            "enabled": True,
+            "require_meta_attribution": False,
+            "value_vnd": 0,
+            "notes": "replay",
+        }
+        event = build_conversion_event(norm, rule)
+        event["event_id"] = event_id
+        return event
+    except Exception as exc:
+        logger.debug("replay_capi_event_from_log failed id=%s: %s", row.get("id"), exc)
+        return None
+
+
+def flush_pending_capi(
+    *,
+    client_id: str | None = None,
+    limit: int = 50,
+) -> dict[str, Any]:
+    """Retry pending/failed capi_event_log rows (B9 manual flush / cron drain)."""
+    if not capi_dispatch_enabled() and not capi_stub_mode():
+        return {"ok": True, "skipped": True, "reason": "PTT_CAPI_ENABLED disabled", "processed": 0}
+
+    rows = list_flushable_capi_logs(client_id=client_id, limit=limit)
+    results: list[dict[str, Any]] = []
+    sent = 0
+    skipped = 0
+    failed = 0
+
+    for row in rows:
+        event = replay_capi_event_from_log(row)
+        if not event:
+            skipped += 1
+            results.append(
+                {
+                    "log_id": row.get("id"),
+                    "ok": True,
+                    "skipped": True,
+                    "reason": "replay_unavailable",
+                }
+            )
+            continue
+        legacy = None
+        if str(event.get("event_name")) == _CAPI_EVENT_LEAD and row.get("lead_id"):
+            external = ""
+            lead = load_lead_for_capi(int(row["lead_id"]))
+            if lead:
+                external = str(lead.get("external_id") or lead.get("external_lead_id") or "")
+            legacy = legacy_lead_event_ids(
+                lead_id=int(row["lead_id"]),
+                client_id=str(row.get("client_id") or ""),
+                external_id=external,
+            )
+        out = _dispatch_capi_event(
+            client_id=str(row.get("client_id") or ""),
+            event=event,
+            lead_id=int(row["lead_id"]) if row.get("lead_id") is not None else None,
+            legacy_event_ids=legacy,
+        )
+        out["log_id"] = row.get("id")
+        results.append(out)
+        if out.get("ok") and not out.get("skipped"):
+            sent += 1
+        elif out.get("skipped"):
+            skipped += 1
+        else:
+            failed += 1
+
+    return {
+        "ok": True,
+        "processed": len(results),
+        "sent": sent,
+        "skipped": skipped,
+        "failed": failed,
+        "results": results,
+    }
+
+
 def enqueue_capi_lead_dispatch(
     *,
     lead_id: int,
@@ -630,13 +964,62 @@ def enqueue_capi_lead_dispatch(
 
 
 def process_capi_dispatch_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    lead_id = int(payload.get("lead_id") or 0)
     client_id = str(payload.get("client_id") or "").strip()
+    correlation_id = str(payload.get("correlation_id") or "") or None
+
+    capi_log_id = str(payload.get("capi_log_id") or "").strip()
+    if capi_log_id:
+        row = get_capi_log_row(capi_log_id)
+        if not row:
+            return {"ok": False, "error": "capi_log_not_found", "capi_log_id": capi_log_id}
+        event = replay_capi_event_from_log(row)
+        if not event:
+            return {
+                "ok": True,
+                "skipped": True,
+                "reason": "replay_unavailable",
+                "capi_log_id": capi_log_id,
+            }
+        legacy = None
+        if str(event.get("event_name")) == _CAPI_EVENT_LEAD and row.get("lead_id"):
+            external = ""
+            lead = load_lead_for_capi(int(row["lead_id"]))
+            if lead:
+                external = str(lead.get("external_id") or lead.get("external_lead_id") or "")
+            legacy = legacy_lead_event_ids(
+                lead_id=int(row["lead_id"]),
+                client_id=str(row.get("client_id") or ""),
+                external_id=external,
+            )
+        return _dispatch_capi_event(
+            client_id=str(row.get("client_id") or client_id),
+            event=event,
+            lead_id=int(row["lead_id"]) if row.get("lead_id") is not None else None,
+            correlation_id=correlation_id,
+            legacy_event_ids=legacy,
+        )
+
+    event = payload.get("event")
+    if isinstance(event, dict) and client_id:
+        lead_id_raw = payload.get("lead_id")
+        lead_id = int(lead_id_raw) if lead_id_raw is not None else None
+        return dispatch_conversion_capi(
+            client_id=client_id,
+            event=event,
+            lead_id=lead_id,
+            correlation_id=correlation_id,
+        )
+
+    intent = payload.get("conversion_intent")
+    if isinstance(intent, dict):
+        return dispatch_conversion_intent(intent)
+
+    lead_id = int(payload.get("lead_id") or 0)
     if not lead_id or not client_id:
         return {"ok": False, "error": "lead_id and client_id required"}
     return dispatch_lead_capi(
         lead_id=lead_id,
         client_id=client_id,
         external_lead_id=str(payload.get("external_lead_id") or "") or None,
-        correlation_id=str(payload.get("correlation_id") or "") or None,
+        correlation_id=correlation_id,
     )
