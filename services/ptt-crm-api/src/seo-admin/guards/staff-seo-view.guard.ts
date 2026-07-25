@@ -50,6 +50,16 @@ export function staffHasSeoWrite(caps: StaffSectionCap[]): boolean {
   return staffHasSeoSettings(caps);
 }
 
+export function staffHasSeoApprove(caps: StaffSectionCap[]): boolean {
+  if (caps.some((c) => c.section === 'crm_seo_aeo_approve' && c.action === 'approve')) {
+    return true;
+  }
+  if (caps.some((c) => c.section === 'crm_seo_aeo' && c.action === 'approve')) {
+    return true;
+  }
+  return caps.some((c) => c.section === 'crm_board' && c.action === 'edit');
+}
+
 @Injectable()
 export class StaffSeoViewGuard implements CanActivate {
   constructor(private readonly staffAuth: StaffAuthService) {}
@@ -81,6 +91,42 @@ export class StaffSeoSettingsGuard implements CanActivate {
     const me = await this.staffAuth.me(req.staffUser);
     if (!staffHasSeoSettings(me.caps)) {
       throw new ForbiddenException({ error: 'missing_cap', section: 'crm_seo_aeo_settings' });
+    }
+    return true;
+  }
+}
+
+@Injectable()
+export class StaffSeoWriteGuard implements CanActivate {
+  constructor(private readonly staffAuth: StaffAuthService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest<
+      Request & { staffUser?: StaffJwtPayload; staffAuthVia?: 'internal' | 'jwt' }
+    >();
+    if (req.staffAuthVia === 'internal') return true;
+    if (!req.staffUser) throw new UnauthorizedException({ error: 'Unauthorized' });
+    const me = await this.staffAuth.me(req.staffUser);
+    if (!staffHasSeoWrite(me.caps)) {
+      throw new ForbiddenException({ error: 'missing_cap', section: 'crm_seo_aeo_write' });
+    }
+    return true;
+  }
+}
+
+@Injectable()
+export class StaffSeoApproveGuard implements CanActivate {
+  constructor(private readonly staffAuth: StaffAuthService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest<
+      Request & { staffUser?: StaffJwtPayload; staffAuthVia?: 'internal' | 'jwt' }
+    >();
+    if (req.staffAuthVia === 'internal') return true;
+    if (!req.staffUser) throw new UnauthorizedException({ error: 'Unauthorized' });
+    const me = await this.staffAuth.me(req.staffUser);
+    if (!staffHasSeoApprove(me.caps)) {
+      throw new ForbiddenException({ error: 'missing_cap', section: 'crm_seo_aeo_approve' });
     }
     return true;
   }

@@ -3414,6 +3414,294 @@ export async function fetchSeoGa4OAuthUrl(
   return agencyFetch(token, `/api/v1/seo/clients/${customerId}/ga4/oauth/url${qs}`);
 }
 
+export interface SeoKeywordRow {
+  id: number;
+  customer_id: number;
+  phrase: string;
+  volume: number | null;
+  difficulty: number | null;
+  intent: string;
+  business_value: string;
+  cluster_id: number | null;
+  opportunity_score: number | null;
+  status: string;
+  created_at: string | null;
+  cluster_name?: string | null;
+}
+
+export interface SeoQuestionRow {
+  id: number;
+  customer_id: number;
+  question_text: string;
+  intent: string;
+  funnel_stage: string;
+  source: string;
+  answer_score: number | null;
+  status: string;
+  brand_name: string;
+  lifecycle_id: number | null;
+  notes: string;
+  created_at: string | null;
+}
+
+export interface SeoEntityGroupRow {
+  entity_key: string;
+  label: string;
+  intent: string;
+  keyword_count: number;
+  avg_opportunity_score: number;
+  top_opportunity_score: number;
+  sample_keywords: Array<{ phrase: string; opportunity_score: number | null }>;
+}
+
+export interface SeoClusterRow {
+  id: number;
+  customer_id: number;
+  name: string;
+  intent: string;
+  notes: string;
+  status: string;
+  keyword_count: number;
+}
+
+export interface SeoContentRow {
+  id: number;
+  customer_id: number;
+  project_id: number | null;
+  lifecycle_id: number | null;
+  title: string;
+  slug: string;
+  content_type: string;
+  workflow_status: string;
+  target_keyword_id: number | null;
+  target_question_id: number | null;
+  intent: string;
+  funnel_stage: string;
+  owner_staff_id: number | null;
+  due_date: string | null;
+  publish_date: string | null;
+  brief: Record<string, unknown>;
+  outline: Record<string, unknown>;
+  body_html: string;
+  seo_score: number | null;
+  aeo_score: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  target_keyword?: SeoKeywordRow | null;
+  target_question?: SeoQuestionRow | null;
+  approvals?: Array<{
+    stage: string;
+    status: string;
+    notes: string;
+    actor_id: string;
+    created_at: string | null;
+  }>;
+}
+
+export interface SeoPipelineBoard {
+  columns: Array<{ key: string; label: string; items: SeoContentRow[] }>;
+}
+
+export interface SeoBriefPreviewResponse {
+  ok: boolean;
+  title: string;
+  brief: Record<string, unknown>;
+  source: string;
+  keyword_id?: number | null;
+  question_id?: number | null;
+  ai_available: boolean;
+}
+
+export interface SeoResearchConsoleResponse {
+  ok: boolean;
+  customer_id: number;
+  keywords: SeoKeywordRow[];
+  questions: SeoQuestionRow[];
+  entities: SeoEntityGroupRow[];
+  opportunities: SeoKeywordRow[];
+  clusters: SeoClusterRow[];
+}
+
+export interface SeoAeoChecklistResponse {
+  content_id: number;
+  items: Array<{ label: string; done: boolean }>;
+  done_count: number;
+  total: number;
+  score_pct: number;
+}
+
+export async function fetchSeoResearchConsole(
+  token: string,
+  customerId: number,
+  tab?: string,
+): Promise<SeoResearchConsoleResponse> {
+  const qs = tab ? `?tab=${encodeURIComponent(tab)}` : '';
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/research${qs}`);
+}
+
+export async function fetchSeoKeywords(
+  token: string,
+  customerId: number,
+  params?: { q?: string; intent?: string; cluster_id?: number },
+): Promise<{ ok: boolean; keywords: SeoKeywordRow[] }> {
+  const qs = new URLSearchParams();
+  if (params?.q) qs.set('q', params.q);
+  if (params?.intent) qs.set('intent', params.intent);
+  if (params?.cluster_id != null) qs.set('cluster_id', String(params.cluster_id));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/keywords${suffix}`);
+}
+
+export async function createSeoKeyword(
+  token: string,
+  customerId: number,
+  body: Record<string, unknown>,
+): Promise<{ ok: boolean; keyword: SeoKeywordRow }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/keywords`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function importSeoKeywordsCsv(
+  token: string,
+  customerId: number,
+  csv: string,
+): Promise<{ ok: boolean; imported: number }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/keywords/import`, {
+    method: 'POST',
+    body: JSON.stringify({ csv }),
+  });
+}
+
+export async function createSeoQuestion(
+  token: string,
+  customerId: number,
+  body: Record<string, unknown>,
+): Promise<{ ok: boolean; question: SeoQuestionRow }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/questions`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function createSeoCluster(
+  token: string,
+  customerId: number,
+  body: Record<string, unknown>,
+): Promise<{ ok: boolean; cluster: SeoClusterRow }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/clusters`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function previewSeoBrief(
+  token: string,
+  body: { customer_id: number; keyword_id?: number; question_id?: number },
+): Promise<SeoBriefPreviewResponse> {
+  return agencyMutate(token, '/api/v1/seo/research/brief-preview', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function createSeoContentFromResearch(
+  token: string,
+  body: {
+    customer_id: number;
+    keyword_id?: number;
+    question_id?: number;
+    lifecycle_id?: number;
+    project_id?: number;
+    title?: string;
+    brief?: Record<string, unknown>;
+    owner_staff_id?: number;
+    due_date?: string;
+  },
+): Promise<{ ok: boolean; content: SeoContentRow }> {
+  return agencyMutate(token, '/api/v1/seo/research/to-content', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchSeoContentPipeline(
+  token: string,
+  params?: { customer_id?: number; lifecycle_id?: number },
+): Promise<{ ok: boolean; board: SeoPipelineBoard }> {
+  const qs = new URLSearchParams();
+  if (params?.customer_id != null) qs.set('customer_id', String(params.customer_id));
+  if (params?.lifecycle_id != null) qs.set('lifecycle_id', String(params.lifecycle_id));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return agencyFetch(token, `/api/v1/seo/content/pipeline${suffix}`);
+}
+
+export async function fetchSeoContentDetail(
+  token: string,
+  contentId: number,
+): Promise<{ ok: boolean; content: SeoContentRow }> {
+  return agencyFetch(token, `/api/v1/seo/content/${contentId}`);
+}
+
+export async function updateSeoContentStatus(
+  token: string,
+  contentId: number,
+  body: { workflow_status: string; notes?: string },
+): Promise<{ ok: boolean; content: SeoContentRow }> {
+  return agencyMutate(token, `/api/v1/seo/content/${contentId}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function approveSeoContent(
+  token: string,
+  contentId: number,
+  body: { stage: string; approved: boolean; notes?: string },
+): Promise<{ ok: boolean; content: SeoContentRow }> {
+  return agencyMutate(token, `/api/v1/seo/content/${contentId}/approve`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchSeoContentVersions(
+  token: string,
+  contentId: number,
+): Promise<{ ok: boolean; versions: Array<{ id: number; version_number: number; changes_summary: string; created_by: string; created_at: string | null; body_length?: number }> }> {
+  return agencyFetch(token, `/api/v1/seo/content/${contentId}/versions`);
+}
+
+export async function saveSeoContentVersion(
+  token: string,
+  contentId: number,
+  body: { body_html: string; changes_summary?: string },
+): Promise<{ ok: boolean; version: { id: number; version_number: number } }> {
+  return agencyMutate(token, `/api/v1/seo/content/${contentId}/versions`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchSeoAeoChecklist(
+  token: string,
+  contentId: number,
+): Promise<{ ok: boolean; checklist: SeoAeoChecklistResponse }> {
+  return agencyFetch(token, `/api/v1/seo/content/${contentId}/aeo-checklist`);
+}
+
+export async function patchSeoContent(
+  token: string,
+  contentId: number,
+  body: Record<string, unknown>,
+): Promise<{ ok: boolean; content: SeoContentRow }> {
+  return agencyMutate(token, `/api/v1/seo/content/${contentId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
 export interface EmailHubSummary {
   workspaces: number;
   contacts: number;

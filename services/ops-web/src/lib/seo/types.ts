@@ -1,7 +1,16 @@
 export type {
+  SeoAeoChecklistResponse,
+  SeoBriefPreviewResponse,
+  SeoClusterRow,
+  SeoContentRow,
+  SeoEntityGroupRow,
   SeoHubAlert,
   SeoHubClientRow,
   SeoHubResponse,
+  SeoKeywordRow,
+  SeoPipelineBoard,
+  SeoQuestionRow,
+  SeoResearchConsoleResponse,
 } from '@/lib/api';
 
 export interface SeoClientSettings {
@@ -100,3 +109,12 @@ export interface SeoSyncTriggerResponse {
 }
 
 export type SeoClientTab = 'overview' | 'tasks' | 'settings';
+
+export type SeoResearchTab =
+  | 'keywords'
+  | 'questions'
+  | 'entities'
+  | 'clusters'
+  | 'serp'
+  | 'pages'
+  | 'opportunities';

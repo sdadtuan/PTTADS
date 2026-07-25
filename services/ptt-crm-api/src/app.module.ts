@@ -42,6 +42,7 @@ import { ProposalsModule } from './proposals/proposals.module';
 import { ReProjectsModule } from './re-projects/re-projects.module';
 import { EmailMarketingModule } from './email-marketing/email-marketing.module';
 import { SeoAdminModule } from './seo-admin/seo-admin.module';
+import { SeoContentModule } from './seo-content/seo-content.module';
 import { StaffAuthModule } from './staff-auth/staff-auth.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { TemporalModule } from './temporal/temporal.module';
@@ -83,6 +84,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     PortalSeoModule,
     PortalEmailModule,
     SeoAdminModule,
+    SeoContentModule,
     EmailMarketingModule,
     PerformanceModule,
     MetaTrackingModule,

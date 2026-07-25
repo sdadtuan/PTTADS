@@ -8,8 +8,8 @@ import { getAccessToken, hasCap } from '@/lib/auth';
 import { fetchReviewQueueCount } from '@/lib/api';
 import { emailJourneysEnabled, emailModuleEnabled } from '@/lib/email-flags';
 import { canViewMetaAdsOps, canViewMetaIntelligence, canViewMetaTracking } from '@/lib/meta/caps';
-import { canViewSeoHub } from '@/lib/seo/caps';
-import { seoHubEnabled } from '@/lib/seo/flags';
+import { canViewSeoContent, canViewSeoHub, canViewSeoResearch } from '@/lib/seo/caps';
+import { seoContentEnabled, seoHubEnabled, seoResearchEnabled } from '@/lib/seo/flags';
 import { metaAdsOpsEnabled, metaIntelligenceEnabled, metaTrackingEnabled } from '@/lib/meta/flags';
 
 interface OpsNavProps {
@@ -60,6 +60,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/crm/hub': 'Hub · Hợp đồng',
   '/seo/hub': 'SEO/AEO Hub',
   '/seo/clients': 'SEO Clients',
+  '/seo/research': 'SEO Research',
+  '/seo/content': 'SEO Content Pipeline',
   '/email/hub': 'Email Hub',
   '/email/clients': 'Email Clients',
   '/email/contacts': 'Contacts',
@@ -91,6 +93,7 @@ function pageTitleFor(pathname: string): string {
   if (pathname.startsWith('/email/campaigns/') && pathname !== '/email/campaigns') return 'Campaign detail';
   if (pathname.startsWith('/email/journeys/') && pathname !== '/email/journeys') return 'Journey canvas';
   if (pathname.startsWith('/email/clients/') && pathname !== '/email/clients') return 'Client workspace';
+  if (pathname.startsWith('/seo/content/') && pathname !== '/seo/content') return 'Content detail';
   return PAGE_TITLES[pathname] ?? 'PTT CRM';
 }
 
@@ -218,6 +221,12 @@ function buildSections(
   if (seoHubEnabled() && canViewSeoHub(user)) {
     agency.push({ href: '/seo/hub', label: 'SEO/AEO Hub' });
     agency.push({ href: '/seo/clients', label: 'SEO Clients' });
+    if (seoResearchEnabled() && canViewSeoResearch(user)) {
+      agency.push({ href: '/seo/research', label: 'SEO Research' });
+    }
+    if (seoContentEnabled() && canViewSeoContent(user)) {
+      agency.push({ href: '/seo/content', label: 'SEO Content' });
+    }
   }
   if (agency.length) sections.push({ label: 'Agency & Hub', links: agency });
 
