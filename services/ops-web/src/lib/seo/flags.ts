@@ -37,3 +37,33 @@ export function seoStrategyEnabled(): boolean {
   const raw = process.env.NEXT_PUBLIC_PTT_SEO_STRATEGY_ENABLED ?? '1';
   return raw.trim().toLowerCase() !== '0';
 }
+
+export function seoAeoEnabled(): boolean {
+  const raw = process.env.NEXT_PUBLIC_PTT_SEO_AEO_ENABLED ?? '1';
+  return raw.trim().toLowerCase() !== '0';
+}
+
+export function seoAuthorityEnabled(): boolean {
+  const raw = process.env.NEXT_PUBLIC_PTT_SEO_AUTHORITY_ENABLED ?? '1';
+  return raw.trim().toLowerCase() !== '0';
+}
+
+export function seoRanksEnabled(): boolean {
+  const raw = process.env.NEXT_PUBLIC_PTT_SEO_RANKS_ENABLED ?? '1';
+  return raw.trim().toLowerCase() !== '0';
+}
+
+export function seoAutomationsEnabled(): boolean {
+  const raw = process.env.NEXT_PUBLIC_PTT_SEO_AUTOMATIONS_ENABLED ?? '1';
+  return raw.trim().toLowerCase() !== '0';
+}
+
+export function seoFreshnessEnabled(): boolean {
+  const raw = process.env.NEXT_PUBLIC_PTT_SEO_FRESHNESS_ENABLED ?? '1';
+  return raw.trim().toLowerCase() !== '0';
+}
+
+export function seoExperimentsEnabled(): boolean {
+  const raw = process.env.NEXT_PUBLIC_PTT_SEO_EXPERIMENTS_ENABLED ?? '0';
+  return raw.trim().toLowerCase() !== '0' && raw.trim().toLowerCase() !== 'false';
+}

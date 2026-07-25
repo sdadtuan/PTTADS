@@ -232,6 +232,22 @@ export class JobQueueRepository implements OnModuleDestroy {
     });
   }
 
+  /** AEO batch scan — customer_id + optional query_ids in payload. */
+  async enqueueSeoAeoScanJob(input: {
+    payload: Record<string, unknown>;
+    idempotencyKey: string;
+  }): Promise<EnqueuedJob | null> {
+    if (!this.config.jobsEnabled) {
+      return null;
+    }
+    return this.enqueueJobRecord({
+      jobType: 'seo_aeo_scan',
+      payload: input.payload,
+      idempotencyKey: input.idempotencyKey,
+      clientId: null,
+    });
+  }
+
   async cancelPendingJobsForClient(clientId: string): Promise<number> {
     if (!this.config.jobsEnabled) {
       return 0;

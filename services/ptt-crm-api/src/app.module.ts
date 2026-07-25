@@ -42,8 +42,14 @@ import { ProposalsModule } from './proposals/proposals.module';
 import { ReProjectsModule } from './re-projects/re-projects.module';
 import { EmailMarketingModule } from './email-marketing/email-marketing.module';
 import { SeoAdminModule } from './seo-admin/seo-admin.module';
+import { SeoAeoModule } from './seo-aeo/seo-aeo.module';
+import { SeoAuthorityModule } from './seo-authority/seo-authority.module';
+import { SeoAutomationsModule } from './seo-automations/seo-automations.module';
 import { SeoContentModule } from './seo-content/seo-content.module';
+import { SeoExperimentsModule } from './seo-experiments/seo-experiments.module';
+import { SeoFreshnessModule } from './seo-freshness/seo-freshness.module';
 import { SeoGovernanceModule } from './seo-governance/seo-governance.module';
+import { SeoRanksModule } from './seo-ranks/seo-ranks.module';
 import { SeoReportsModule } from './seo-reports/seo-reports.module';
 import { SeoStrategyModule } from './seo-strategy/seo-strategy.module';
 import { SeoTechnicalModule } from './seo-technical/seo-technical.module';
@@ -93,6 +99,12 @@ import { WorkflowsModule } from './workflows/workflows.module';
     SeoReportsModule,
     SeoGovernanceModule,
     SeoStrategyModule,
+    SeoAeoModule,
+    SeoAuthorityModule,
+    SeoRanksModule,
+    SeoAutomationsModule,
+    SeoFreshnessModule,
+    SeoExperimentsModule,
     EmailMarketingModule,
     PerformanceModule,
     MetaTrackingModule,

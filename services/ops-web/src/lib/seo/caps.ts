@@ -1,5 +1,20 @@
 import { hasCap, type StoredStaffUser } from '@/lib/auth';
-import { seoClientWorkspaceEnabled, seoContentEnabled, seoGovernanceEnabled, seoHubEnabled, seoReportsEnabled, seoResearchEnabled, seoStrategyEnabled, seoTechnicalEnabled } from './flags';
+import {
+  seoAeoEnabled,
+  seoAuthorityEnabled,
+  seoAutomationsEnabled,
+  seoClientWorkspaceEnabled,
+  seoContentEnabled,
+  seoExperimentsEnabled,
+  seoFreshnessEnabled,
+  seoGovernanceEnabled,
+  seoHubEnabled,
+  seoRanksEnabled,
+  seoReportsEnabled,
+  seoResearchEnabled,
+  seoStrategyEnabled,
+  seoTechnicalEnabled,
+} from './flags';
 
 const SEO_VIEW_SECTIONS = [
   'crm_seo_aeo',
@@ -90,5 +105,35 @@ export function canViewSeoGovernance(user: StoredStaffUser | null): boolean {
 
 export function canViewSeoStrategy(user: StoredStaffUser | null): boolean {
   if (!user || !seoStrategyEnabled()) return false;
+  return canViewSeoHub(user);
+}
+
+export function canViewSeoAeo(user: StoredStaffUser | null): boolean {
+  if (!user || !seoAeoEnabled()) return false;
+  return canViewSeoHub(user);
+}
+
+export function canViewSeoAuthority(user: StoredStaffUser | null): boolean {
+  if (!user || !seoAuthorityEnabled()) return false;
+  return canViewSeoHub(user);
+}
+
+export function canViewSeoRanks(user: StoredStaffUser | null): boolean {
+  if (!user || !seoRanksEnabled()) return false;
+  return canViewSeoHub(user);
+}
+
+export function canViewSeoAutomations(user: StoredStaffUser | null): boolean {
+  if (!user || !seoAutomationsEnabled()) return false;
+  return canConfigureSeoSettings(user) || canViewSeoReports(user);
+}
+
+export function canViewSeoFreshness(user: StoredStaffUser | null): boolean {
+  if (!user || !seoFreshnessEnabled()) return false;
+  return canViewSeoHub(user);
+}
+
+export function canViewSeoExperiments(user: StoredStaffUser | null): boolean {
+  if (!user || !seoExperimentsEnabled()) return false;
   return canViewSeoHub(user);
 }

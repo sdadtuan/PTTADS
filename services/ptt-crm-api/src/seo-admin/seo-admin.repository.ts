@@ -301,8 +301,13 @@ export class SeoAdminRepository implements OnModuleDestroy {
   private async aeoTotals(customerId: number): Promise<{ total: number; visible: number }> {
     const result = await this.db.query<{ total: string; visible: string }>(
       `SELECT COUNT(*) AS total,
-              COALESCE(SUM(CASE WHEN brand_visible THEN 1 ELSE 0 END), 0) AS visible
-       FROM ${SCHEMA}.seo_questions WHERE customer_id = $1`,
+              COALESCE(SUM(CASE WHEN COALESCE(m.brand_visible, false) THEN 1 ELSE 0 END), 0) AS visible
+       FROM ${SCHEMA}.seo_questions q
+       LEFT JOIN LATERAL (
+         SELECT brand_visible FROM ${SCHEMA}.seo_ai_mentions
+         WHERE question_id = q.id ORDER BY id DESC LIMIT 1
+       ) m ON true
+       WHERE q.customer_id = $1 AND q.status = 'active'`,
       [customerId],
     );
     return {

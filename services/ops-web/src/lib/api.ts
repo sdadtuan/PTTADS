@@ -3829,6 +3829,178 @@ export async function refreshSeoStrategyKpis(
   });
 }
 
+export interface SeoAeoQueryRow {
+  id: number;
+  customer_id: number;
+  query_text: string;
+  brand_name: string;
+  brand_visible: boolean;
+  citation_status: string;
+  last_scan_date: string | null;
+}
+
+export async function fetchSeoAeoConsole(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; queries: SeoAeoQueryRow[]; coverage: Record<string, unknown> }> {
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/aeo/queries`);
+}
+
+export async function createSeoAeoQuery(
+  token: string,
+  customerId: number,
+  body: { query_text: string; brand_name: string; notes?: string },
+): Promise<{ ok: boolean; query: SeoAeoQueryRow }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/aeo/queries`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function enqueueSeoAeoScan(
+  token: string,
+  customerId: number,
+  queryIds?: number[],
+): Promise<{ ok: boolean; mode: string; job?: unknown; outcome?: unknown }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/aeo/scan`, {
+    method: 'POST',
+    body: JSON.stringify({ query_ids: queryIds ?? [] }),
+  });
+}
+
+export async function syncSeoAeoScan(
+  token: string,
+  customerId: number,
+  queryIds?: number[],
+): Promise<{ ok: boolean; outcome: Record<string, unknown> }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/aeo/scan/sync`, {
+    method: 'POST',
+    body: JSON.stringify({ query_ids: queryIds ?? [] }),
+  });
+}
+
+export async function fetchSeoAuthoritySignals(
+  token: string,
+  customerId: number,
+  params?: { signal_type?: string },
+): Promise<{ ok: boolean; signals: Array<Record<string, unknown>>; summary: Record<string, unknown> }> {
+  const qs = new URLSearchParams();
+  if (params?.signal_type) qs.set('signal_type', params.signal_type);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/authority/signals${suffix}`);
+}
+
+export async function importSeoAuthorityCsv(
+  token: string,
+  customerId: number,
+  csvText: string,
+  signalType = 'backlink',
+): Promise<{ ok: boolean; imported: number; skipped: number }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/authority/import`, {
+    method: 'POST',
+    body: JSON.stringify({ csv_text: csvText, signal_type: signalType }),
+  });
+}
+
+export async function fetchSeoRankKeywords(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; keywords: Array<Record<string, unknown>>; sov: Record<string, unknown> }> {
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/ranks/keywords`);
+}
+
+export async function addSeoRankKeyword(
+  token: string,
+  customerId: number,
+  body: { phrase: string; target_url?: string },
+): Promise<{ ok: boolean; keyword: Record<string, unknown> }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/ranks/keywords`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function captureSeoRanks(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; result: Record<string, unknown> }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/ranks/capture`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function importSeoRankCsv(
+  token: string,
+  customerId: number,
+  csvText: string,
+): Promise<{ ok: boolean; tracked_added: number; snapshots: number }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/ranks/import`, {
+    method: 'POST',
+    body: JSON.stringify({ csv_text: csvText }),
+  });
+}
+
+export async function fetchSeoAutomationsStatus(
+  token: string,
+  customerId?: number,
+): Promise<{ ok: boolean; summary: Record<string, unknown>; sync_runs: Array<Record<string, unknown>>; recent_jobs: Array<Record<string, unknown>>; open_alerts: Array<Record<string, unknown>> }> {
+  const qs = customerId != null ? `?customer_id=${customerId}` : '';
+  return agencyFetch(token, `/api/v1/seo/automations/status${qs}`);
+}
+
+export async function runSeoAutomationsAlertChecks(
+  token: string,
+): Promise<{ ok: boolean; created: Array<{ id: number; type: string }> }> {
+  return agencyMutate(token, '/api/v1/seo/automations/run-alert-checks', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function fetchSeoFreshnessQueue(
+  token: string,
+  customerId: number,
+  minPriority?: string,
+): Promise<{ ok: boolean; items: Array<Record<string, unknown>> }> {
+  const qs = minPriority ? `?min_priority=${encodeURIComponent(minPriority)}` : '';
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/freshness/queue${qs}`);
+}
+
+export async function rescoreSeoFreshness(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; scored: number }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/freshness/rescore`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function fetchSeoExperimentsStatus(
+  token: string,
+): Promise<{ ok: boolean; enabled: boolean }> {
+  return agencyFetch(token, '/api/v1/seo/experiments/status');
+}
+
+export async function fetchSeoExperiments(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; experiments: Array<Record<string, unknown>> }> {
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/experiments`);
+}
+
+export async function createSeoExperiment(
+  token: string,
+  customerId: number,
+  body: { title: string; hypothesis?: string; experiment_type?: string; target_url?: string },
+): Promise<{ ok: boolean; experiment: Record<string, unknown> }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/experiments`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
 export async function fetchSeoAlerts(
   token: string,
   status = 'open',

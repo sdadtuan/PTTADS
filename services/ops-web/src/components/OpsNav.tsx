@@ -9,18 +9,30 @@ import { fetchReviewQueueCount } from '@/lib/api';
 import { emailJourneysEnabled, emailModuleEnabled } from '@/lib/email-flags';
 import { canViewMetaAdsOps, canViewMetaIntelligence, canViewMetaTracking } from '@/lib/meta/caps';
 import {
+  canViewSeoAeo,
+  canViewSeoAuthority,
+  canViewSeoAutomations,
   canViewSeoContent,
+  canViewSeoExperiments,
+  canViewSeoFreshness,
   canViewSeoGovernance,
   canViewSeoHub,
+  canViewSeoRanks,
   canViewSeoReports,
   canViewSeoResearch,
   canViewSeoStrategy,
   canViewSeoTechnical,
 } from '@/lib/seo/caps';
 import {
+  seoAeoEnabled,
+  seoAuthorityEnabled,
+  seoAutomationsEnabled,
   seoContentEnabled,
+  seoExperimentsEnabled,
+  seoFreshnessEnabled,
   seoGovernanceEnabled,
   seoHubEnabled,
+  seoRanksEnabled,
   seoReportsEnabled,
   seoResearchEnabled,
   seoStrategyEnabled,
@@ -82,6 +94,12 @@ const PAGE_TITLES: Record<string, string> = {
   '/seo/reports': 'SEO Reports',
   '/seo/governance': 'SEO Governance',
   '/seo/strategy': 'SEO Strategy',
+  '/seo/aeo': 'AEO Console',
+  '/seo/authority': 'Authority Console',
+  '/seo/ranks': 'Rank Tracker',
+  '/seo/automations': 'SEO Automations',
+  '/seo/freshness': 'Freshness Queue',
+  '/seo/experiments': 'SEO Experiments',
   '/email/hub': 'Email Hub',
   '/email/clients': 'Email Clients',
   '/email/contacts': 'Contacts',
@@ -258,6 +276,24 @@ function buildSections(
     }
     if (seoGovernanceEnabled() && canViewSeoGovernance(user)) {
       agency.push({ href: '/seo/governance', label: 'SEO Governance' });
+    }
+    if (seoAeoEnabled() && canViewSeoAeo(user)) {
+      agency.push({ href: '/seo/aeo', label: 'AEO Console' });
+    }
+    if (seoAuthorityEnabled() && canViewSeoAuthority(user)) {
+      agency.push({ href: '/seo/authority', label: 'Authority' });
+    }
+    if (seoRanksEnabled() && canViewSeoRanks(user)) {
+      agency.push({ href: '/seo/ranks', label: 'Rank Tracker' });
+    }
+    if (seoAutomationsEnabled() && canViewSeoAutomations(user)) {
+      agency.push({ href: '/seo/automations', label: 'Automations' });
+    }
+    if (seoFreshnessEnabled() && canViewSeoFreshness(user)) {
+      agency.push({ href: '/seo/freshness', label: 'Freshness' });
+    }
+    if (seoExperimentsEnabled() && canViewSeoExperiments(user)) {
+      agency.push({ href: '/seo/experiments', label: 'Experiments' });
     }
   }
   if (agency.length) sections.push({ label: 'Agency & Hub', links: agency });
