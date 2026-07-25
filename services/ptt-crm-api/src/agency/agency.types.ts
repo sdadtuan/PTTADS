@@ -187,6 +187,7 @@ export interface ChannelAlertConfigResponse {
 
 export interface SetChannelTokenBody {
   access_token?: string;
+  refresh_token?: string;
   credential_ref?: string;
   token_expires_at?: string;
   revoke?: boolean;

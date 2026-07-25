@@ -15,6 +15,7 @@ function pilotSet(name: string): Set<string> {
 export interface ZaloAdsPilotStatus {
   stub_mode: boolean;
   pilot_mode: boolean;
+  production_mode: boolean;
   insights_sync_enabled: boolean;
   oauth_configured: boolean;
   pilot_clients: string[];
@@ -25,6 +26,7 @@ export function checkZaloAdsPilot(clientId?: string): {
   allowed: boolean;
   stub_mode: boolean;
   pilot_mode: boolean;
+  production_mode: boolean;
   warning?: string | null;
 } {
   const stubMode = truthy('PTT_ZALO_ADS_STUB', '0');
@@ -33,18 +35,22 @@ export function checkZaloAdsPilot(clientId?: string): {
       allowed: true,
       stub_mode: true,
       pilot_mode: false,
+      production_mode: false,
       warning: 'Stub mode — Zalo Ads API không gọi thật',
     };
   }
+
   const pilotMode = truthy('PTT_ZALO_ADS_PILOT', '0');
   if (!pilotMode) {
     return {
-      allowed: false,
+      allowed: true,
       stub_mode: false,
       pilot_mode: false,
-      warning: 'Pilot mode tắt — sync Zalo có thể fail trên prod',
+      production_mode: true,
+      warning: null,
     };
   }
+
   const clients = pilotSet('PTT_ZALO_ADS_PILOT_CLIENTS');
   const cid = String(clientId ?? '').trim();
   if (clients.size && cid && !clients.has(cid)) {
@@ -52,10 +58,17 @@ export function checkZaloAdsPilot(clientId?: string): {
       allowed: false,
       stub_mode: false,
       pilot_mode: true,
+      production_mode: false,
       warning: 'Client ngoài pilot allowlist — sync Zalo có thể fail',
     };
   }
-  return { allowed: true, stub_mode: false, pilot_mode: true, warning: null };
+  return {
+    allowed: true,
+    stub_mode: false,
+    pilot_mode: true,
+    production_mode: false,
+    warning: null,
+  };
 }
 
 export function zaloAdsPilotStatus(clientId?: string): ZaloAdsPilotStatus {
@@ -68,6 +81,7 @@ export function zaloAdsPilotStatus(clientId?: string): ZaloAdsPilotStatus {
   return {
     stub_mode: check.stub_mode,
     pilot_mode: check.pilot_mode,
+    production_mode: check.production_mode,
     insights_sync_enabled: truthy('PTT_ZALO_INSIGHTS_SYNC', '0'),
     oauth_configured: oauthConfigured,
     pilot_clients: [...pilotSet('PTT_ZALO_ADS_PILOT_CLIENTS')],

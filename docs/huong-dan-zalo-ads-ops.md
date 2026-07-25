@@ -50,13 +50,21 @@ Reuse flow **Campaign Write / budget brief** trên Launch QA lifecycle:
 - Client creative approve: portal `/creatives` (shared, không cần route Zalo riêng)
 - Milestone notify: `notification_inbox` category `campaign_milestone` / `creative`
 
-## Env staging
+## Env staging / prod
+
+**Staging pilot:** `deploy/env.staging-zalo-pilot.example`  
+**Production cutover (Prod-S3):** `deploy/env.zalo-prod.example`
 
 ```bash
 PTT_ZALO_INSIGHTS_SYNC=1
 PTT_ZALO_FORM_POLL=1
+PTT_ZALO_FORM_POLL_SLA=1
+PTT_ZALO_TOKEN_REFRESH=1
 PTT_ZALO_ALERTS_ENABLED=1
+PTT_ZALO_ADS_STUB=0          # prod
+PTT_ZALO_ADS_PILOT=0          # prod — all clients
 PTT_ZALO_SLACK_WEBHOOK=   # optional
 ```
 
-Gate: `./scripts/staging_zalo_wave_z2_gate.sh` (+ Z3 DDL `./scripts/apply_pg_ddl_zalo_z3.sh`).
+Gate staging: `./scripts/staging_zalo_wave_z2_gate.sh`  
+Gate prod: `./scripts/zalo_prod_cutover_gate.sh` — runbook [`runbooks/zalo-prod-cutover.md`](runbooks/zalo-prod-cutover.md)

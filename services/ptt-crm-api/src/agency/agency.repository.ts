@@ -304,6 +304,7 @@ export class AgencyRepository implements OnModuleDestroy {
     accountId: string,
     params: {
       access_token?: string;
+      refresh_token?: string;
       credential_ref?: string;
       token_expires_at?: string;
       revoke?: boolean;
@@ -353,6 +354,15 @@ export class AgencyRepository implements OnModuleDestroy {
       tokenExpiresAt: expiresAt ? new Date(expiresAt) : null,
     });
 
+    const refreshToken = params.refresh_token?.trim() ?? '';
+    let metaSql = '';
+    const sqlParams: unknown[] = [clientId, accountId, encBlob, cred || null, expiresAt, status];
+    if (refreshToken) {
+      const refreshEnc = encryptAccessToken(refreshToken);
+      metaSql = `, meta = COALESCE(meta, '{}'::jsonb) || $7::jsonb`;
+      sqlParams.push(JSON.stringify({ refresh_token_encrypted: refreshEnc.toString('base64') }));
+    }
+
     await this.db.query(
       `UPDATE client_channel_accounts
        SET access_token_encrypted = COALESCE($3, access_token_encrypted),
@@ -360,9 +370,9 @@ export class AgencyRepository implements OnModuleDestroy {
            token_expires_at = COALESCE($5::timestamptz, token_expires_at),
            token_status = $6,
            last_token_refresh_at = NOW(),
-           updated_at = NOW()
+           updated_at = NOW()${metaSql}
        WHERE client_id = $1::uuid AND id = $2::uuid`,
-      [clientId, accountId, encBlob, cred || null, expiresAt, status],
+      sqlParams,
     );
     const out = await this.fetchChannelAccount(clientId, accountId);
     if (!out) throw new Error('account_not_found');
@@ -1545,13 +1555,15 @@ export class AgencyRepository implements OnModuleDestroy {
        zalo_acct AS (
          SELECT cca.client_id,
                 COUNT(*) FILTER (WHERE cca.channel = 'zalo') AS zalo_account_count,
-                BOOL_OR(cca.channel = 'zalo' AND cca.access_token_encrypted IS NOT NULL) AS zalo_has_token
+                BOOL_OR(cca.channel = 'zalo' AND cca.access_token_encrypted IS NOT NULL) AS zalo_has_token,
+                MAX(CASE WHEN cca.channel = 'zalo' THEN cca.token_status END) AS zalo_token_status
          FROM client_channel_accounts cca
          GROUP BY cca.client_id
        )
        SELECT c.id::text, c.code, c.name, c.status, c.owner_am_id,
               COALESCE(za.zalo_account_count, 0) AS zalo_account_count,
               COALESCE(za.zalo_has_token, FALSE) AS zalo_has_token,
+              za.zalo_token_status,
               COALESCE(p.spend, 0) AS spend,
               COALESCE(p.leads_crm, 0) AS leads_crm,
               COALESCE(p.conversions_won, 0) AS conversions_won,
@@ -1610,7 +1622,11 @@ export class AgencyRepository implements OnModuleDestroy {
         unmapped_campaigns: Math.trunc(Number(row.unmapped_campaigns ?? 0)),
         over_target_rows: Math.trunc(Number(row.over_target_rows ?? 0)),
         zalo_has_token: Boolean(row.zalo_has_token),
-        token_status: Boolean(row.zalo_has_token) ? 'ok' : 'missing',
+        token_status: row.zalo_token_status
+          ? String(row.zalo_token_status)
+          : Boolean(row.zalo_has_token)
+            ? 'valid'
+            : 'missing',
       });
     }
 

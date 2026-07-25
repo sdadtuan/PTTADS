@@ -30,7 +30,7 @@
 |------------|--------|------|--------|
 | Use case action tables | ~105/122 ✅ | — | Phase A–C done |
 | Meta hub + launch + CAPI | META-001–008 | ✅ | — |
-| Zalo Z1–Z3 hub/poll/alerts/PDF | ZALO-001–021 | ✅ (pilot/stub flags) | Prod cutover |
+| Zalo Z1–Z3 hub/poll/alerts/PDF | ZALO-001–021 | ✅ Prod-S3 cutover | — |
 | CRM leads + lifecycle + finance panel | CRM/SVC | ✅ partial | GAP-P1-01 strict |
 | SEO/Email report **schedule** | SEO-013, EM-013 | ✅ worker | — |
 | Meta/Zalo report **schedule** | SYS-005, META-013, ZALO-016 | ✅ Prod-S2 | — |
@@ -55,7 +55,7 @@
 |-------------|----------|----------|--------|
 | Portal client notifications | GAP-P1-02, ZALO-020, PORTAL-006/008, SYS-004 | P0 | **PROD-P0-NOTIFY** |
 | Scheduled reports Meta/Zalo | SYS-005, META-013, ZALO-016 | P0 | **PROD-P0-RPT** |
-| Zalo production cutover | ZALO-001, 003, 012, 017 | P0 | **PROD-P0-ZALO** |
+| Zalo production cutover | ZALO-001, 003, 012, 017 | ✅ Prod-S3 | — |
 | CSKH SLA board | CRM-UC-008, CRM-UC-001 | P0 | **PROD-P0-CSKH** |
 | Onboard wizard UX | SYS-001, SVC-002, ZALO-021 | P1 | **PROD-P1-WIZ** |
 | Finance gate strict | SVC-004, GAP-P1-01 | P1 | **PROD-P1-FIN** |

@@ -1,7 +1,7 @@
 # Phân tích Gap — Use Case vs Hành động người dùng thực tế
 
 > **Phiên bản:** 1.4 · **Ngày:** 2026-07-26  
-> **Cập nhật:** **Prod-S1** — Portal notification center (GAP-P1-02 code) · Phase C doc complete  
+> **Cập nhật:** **Prod-S3** — Zalo production cutover (PROD-P0-ZALO) · Prod-S2 report schedules · Prod-S1 portal notify  
 > **Mục đích:** Đối chiếu ~122 UC với ops-web / portal-web thực tế; xác định bước nghiệp vụ khách hàng chưa được hệ thống dẫn đủ.
 
 ---
@@ -54,7 +54,7 @@
 |------------------------------|--------------|-------------------|
 | Ký HĐ xong → client chạy ads trong 2 tuần | SYS-001, SVC-001/002, META-001, **ZALO-001/021** | ⚠️ Orchestrator ✅; AM vẫn deep-link nhiều URL — **doc Phase A** đã map đủ bước |
 | Lead Meta vào CRM < 1 phút, CSKH gọi ngay | META-004, **CRM-001**, PLAT-004 | ✅ **Phase B** — CRM-001 9 bước + nhánh Meta/Zalo |
-| **Lead Zalo vào CRM (webhook + poll)** | **ZALO-011/012/013/014, CRM-001** | ✅ Shipped + **CRM-001 nhánh Z** |
+| **Lead Zalo vào CRM (webhook + poll)** | **ZALO-011/012/013/014, CRM-001** | ✅ Shipped + **Prod-S3** prod cutover (no stub) |
 | Biết CPL/ROAS đúng theo client | SYS-002, META-002/003, **ZALO-004/015** | ✅ Hub + map; Zalo CPA refresh Z2-B7 |
 | **So sánh Meta/Google/Zalo một màn** | **SYS-002, ZALO-018** | ✅ `/meta/ads-combined` Z3-7 |
 | Launch ads chỉ khi QA + client duyệt | SYS-003, **SVC-005/006/007**, PORTAL-006, ZALO-008/019 | ✅ **SVC-005** Zalo auto-checklist + creative channel tag |

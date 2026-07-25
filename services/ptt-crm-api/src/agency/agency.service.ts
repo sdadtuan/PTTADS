@@ -664,6 +664,7 @@ export class AgencyService {
       });
 
     const openAlerts = await this.repo.countOpenZaloAlerts(clientId ?? undefined);
+    const tokenAlerts = this.countZaloTokenAlerts(clients);
 
     return {
       ok: true,
@@ -671,9 +672,9 @@ export class AgencyService {
       date_from: df,
       date_to: dt,
       window_days: wd,
-      summary: { ...summary, open_zalo_alerts: openAlerts },
+      summary: { ...summary, open_zalo_alerts: openAlerts, token_expiring: tokenAlerts.expiring, token_expired: tokenAlerts.expired },
       clients,
-      alerts: this.buildZaloHubAlerts(summary, openAlerts),
+      alerts: this.buildZaloHubAlerts(summary, openAlerts, tokenAlerts),
       pilot: zaloAdsPilotStatus(clientId ?? undefined) as unknown as Record<string, unknown>,
       filters: {
         client_id: clientId,
@@ -853,6 +854,10 @@ export class AgencyService {
     }
     await this.setChannelAccountToken(agencyClientId, targetAccountId, {
       access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      token_expires_at: tokens.expires_in
+        ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
+        : undefined,
     });
     const opsWeb = (process.env.PTT_OPS_WEB_URL ?? 'https://ops.pttads.vn').replace(/\/$/, '');
     return {
@@ -1131,10 +1136,42 @@ export class AgencyService {
     return alerts;
   }
 
-  private buildZaloHubAlerts(summary: Record<string, unknown>, openAlerts = 0): FacebookHubAlert[] {
+  private countZaloTokenAlerts(
+    clients: Array<{ token_status?: string | null }>,
+  ): { expiring: number; expired: number } {
+    let expiring = 0;
+    let expired = 0;
+    for (const c of clients) {
+      const st = String(c.token_status ?? '').toLowerCase();
+      if (st === 'expiring') expiring += 1;
+      if (st === 'expired' || st === 'revoked') expired += 1;
+    }
+    return { expiring, expired };
+  }
+
+  private buildZaloHubAlerts(
+    summary: Record<string, unknown>,
+    openAlerts = 0,
+    tokenAlerts: { expiring: number; expired: number } = { expiring: 0, expired: 0 },
+  ): FacebookHubAlert[] {
     const alerts: FacebookHubAlert[] = [];
     const unmapped = Number(summary.unmapped_campaigns ?? 0);
     const overTarget = Number(summary.over_target_rows ?? 0);
+    if (tokenAlerts.expired > 0) {
+      alerts.push({
+        severity: 'danger',
+        message: `${tokenAlerts.expired} client Zalo token hết hạn / revoked — cần OAuth lại`,
+        link: '/zalo/zalo-ads',
+        link_label: 'Xem Zalo hub',
+      });
+    } else if (tokenAlerts.expiring > 0) {
+      alerts.push({
+        severity: 'warn',
+        message: `${tokenAlerts.expiring} client Zalo token sắp hết hạn (≤7 ngày)`,
+        link: '/zalo/zalo-ads',
+        link_label: 'Xem Zalo hub',
+      });
+    }
     if (openAlerts > 0) {
       alerts.push({
         severity: 'warn',

@@ -128,6 +128,14 @@ def run_worker(*, poll_interval: float = 1.0, once: bool = False) -> int:
                 from ptt_jobs.handlers.zalo_alerts_eval import run_zalo_alerts_eval_job
 
                 run_zalo_alerts_eval_job(job)
+            elif job_type == "zalo_token_refresh":
+                from ptt_jobs.handlers.zalo_token_refresh import run_zalo_token_refresh_job
+
+                run_zalo_token_refresh_job(job)
+            elif job_type == "zalo_form_poll_sla":
+                from ptt_jobs.handlers.zalo_form_poll_sla import run_zalo_form_poll_sla_job
+
+                run_zalo_form_poll_sla_job(job)
             elif job_type == "meta_token_refresh":
                 from ptt_jobs.handlers.meta_token_refresh import run_meta_token_refresh_job
 

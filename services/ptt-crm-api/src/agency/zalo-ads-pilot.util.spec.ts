@@ -25,10 +25,12 @@ describe('zalo-ads-pilot.util', () => {
     expect(out.stub_mode).toBe(true);
   });
 
-  it('checkZaloAdsPilot blocks when pilot off and not stub', () => {
+  it('checkZaloAdsPilot allows all clients in production mode (pilot off, stub off)', () => {
     const out = checkZaloAdsPilot('client-1');
-    expect(out.allowed).toBe(false);
+    expect(out.allowed).toBe(true);
     expect(out.pilot_mode).toBe(false);
+    expect(out.production_mode).toBe(true);
+    expect(out.warning).toBeNull();
   });
 
   it('checkZaloAdsPilot respects pilot client allowlist', () => {

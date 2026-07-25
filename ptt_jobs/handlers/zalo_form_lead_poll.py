@@ -30,6 +30,13 @@ def run_zalo_form_lead_poll_job(job: dict[str, Any]) -> None:
 
     outcome = process_zalo_form_lead_poll_payload(payload)
     if outcome.get("ok") or outcome.get("skipped"):
+        try:
+            from ptt_zalo.form_poll_sla import evaluate_form_poll_sla
+
+            client_id = str(payload.get("client_id") or "").strip() or None
+            evaluate_form_poll_sla(client_id=client_id, dry_run=False)
+        except Exception as exc:
+            logger.debug("zalo form poll sla skipped: %s", exc)
         mark_job_done(job_id)
         logger.info("zalo_form_lead_poll done job_id=%s outcome=%s", job_id, outcome)
         return
