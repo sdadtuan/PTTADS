@@ -36,6 +36,14 @@ export PTT_TEMPORAL_TASK_QUEUE="${PTT_TEMPORAL_TASK_QUEUE:-ptt-agency}"
 export CRM_API_PORT="${CRM_API_PORT:-3000}"
 export PORT="$CRM_API_PORT"
 
+# Wave Z1 — Zalo Ads (staging stub defaults; override via deploy/env.staging-zalo-pilot.example)
+export PTT_ZALO_INSIGHTS_SYNC="${PTT_ZALO_INSIGHTS_SYNC:-1}"
+export PTT_ZALO_ADS_STUB="${PTT_ZALO_ADS_STUB:-1}"
+export PTT_ZALO_ADS_PILOT="${PTT_ZALO_ADS_PILOT:-1}"
+export PTT_ZALO_ADS_PILOT_CLIENTS="${PTT_ZALO_ADS_PILOT_CLIENTS:-550e8400-e29b-41d4-a716-446655440000}"
+export PTT_WEBHOOKS_NEST_ZALO="${PTT_WEBHOOKS_NEST_ZALO:-1}"
+export CRM_ZALO_WEBHOOK_SECRET="${CRM_ZALO_WEBHOOK_SECRET:-dev-zalo-webhook-secret}"
+
 cd "$API_DIR"
 if [[ ! -d node_modules ]]; then
   echo "==> npm install (ptt-crm-api)"

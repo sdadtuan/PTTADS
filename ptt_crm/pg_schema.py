@@ -15,6 +15,7 @@ DDL_V3_SPRINT0_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v3-sprint0-w5-pr
 DDL_V3_CREATIVES_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v3-creatives.sql")
 DDL_V3_LAUNCH_QA_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v3-launch-qa.sql")
 DDL_V3_GOOGLE_SYNC_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v3-google-sync.sql")
+DDL_ZALO_INSIGHTS_SYNC_REL = Path("docs/specs/2026-07-25-postgresql-ddl-zalo-insights-sync-state.sql")
 DDL_V4_HUB_SOP_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v4-hub-sop.sql")
 DDL_V5_CAMPAIGN_WRITES_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v5-campaign-writes.sql")
 DDL_V3_INGEST_CONFIG_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v3-leads-ingest-config.sql")
@@ -34,6 +35,7 @@ MIGRATION_V3_SPRINT0 = "2026-07-17-v3-sprint0"
 MIGRATION_V3_CREATIVES = "2026-07-17-v3-creatives"
 MIGRATION_V3_LAUNCH_QA = "2026-07-17-v3-launch-qa"
 MIGRATION_V3_GOOGLE_SYNC = "2026-07-17-v3-google-sync"
+MIGRATION_ZALO_INSIGHTS_SYNC = "2026-07-25-zalo-insights-sync"
 MIGRATION_V4_HUB_SOP = "2026-07-17-v4-hub-sop"
 MIGRATION_V5_CAMPAIGN_WRITES = "2026-07-17-v5-campaign-writes"
 MIGRATION_V3_INGEST_CONFIG = "2026-07-17-v3-ingest"
@@ -104,6 +106,11 @@ def ddl_v3_launch_qa_path() -> Path:
 def ddl_v3_google_sync_path() -> Path:
     base = Path(__file__).resolve().parents[1]
     return base / DDL_V3_GOOGLE_SYNC_REL
+
+
+def ddl_zalo_insights_sync_path() -> Path:
+    base = Path(__file__).resolve().parents[1]
+    return base / DDL_ZALO_INSIGHTS_SYNC_REL
 
 
 def ddl_v4_hub_sop_path() -> Path:
@@ -560,6 +567,32 @@ def pg_google_sync_ready() -> bool:
 
 def apply_ddl_v3_google_sync(*, ddl_path: Path | None = None) -> bool:
     _apply_sql_file(ddl_path or ddl_v3_google_sync_path())
+    return True
+
+
+def pg_zalo_sync_ready() -> bool:
+    try:
+        from ptt_jobs.db import pg_available, pg_connection
+
+        if not pg_available():
+            return False
+        with pg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'zalo_insights_sync_state'
+                    LIMIT 1
+                    """
+                )
+                return cur.fetchone() is not None
+    except Exception as exc:
+        logger.debug("pg_zalo_sync_ready: %s", exc)
+        return False
+
+
+def apply_ddl_zalo_insights_sync(*, ddl_path: Path | None = None) -> bool:
+    _apply_sql_file(ddl_path or ddl_zalo_insights_sync_path())
     return True
 
 
