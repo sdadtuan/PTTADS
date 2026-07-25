@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { DomainEventService } from '../events/domain-event.service';
 import { MetaConversionSideEffectsService } from '../meta-tracking/meta-conversion-side-effects.service';
+import { PerformanceService } from '../performance/performance.service';
 import { PgLeadsWriteRepository } from './pg-leads-write.repository';
 import { CreateLeadV1Body, LeadV1, PatchLeadV1Body } from './leads.types';
 
@@ -16,6 +17,7 @@ export class LeadsWriteService {
     private readonly writeRepo: PgLeadsWriteRepository,
     private readonly events: DomainEventService,
     private readonly conversionFx: MetaConversionSideEffectsService,
+    private readonly performance: PerformanceService,
   ) {}
 
   async createLead(body: CreateLeadV1Body): Promise<LeadV1> {
@@ -67,6 +69,14 @@ export class LeadsWriteService {
           clientId: result.lead.client_id,
           oldStatus: result.previous_status ?? null,
           newStatus: body.status,
+        });
+        await this.performance.refreshZaloHubCpaOnLeadStatusChange({
+          channel: result.lead.channel,
+          clientId: result.lead.client_id,
+          oldStatus: result.previous_status ?? null,
+          newStatus: body.status,
+          receivedAt: result.lead.received_at,
+          createdAt: result.lead.created_at,
         });
       }
       return result.lead;

@@ -159,11 +159,12 @@ Bước 2 fail → hub 🔴 → Tracking re-OAuth bước 4 UC-001.
 | Channel zalo CRUD | ✅ Shipped | Z0 |
 | Hub map zalo | ✅ Shipped | Z0 |
 | Webhook lead | ✅ Shipped | Z0 |
-| Hub `/zalo/zalo-ads` | ❌ | Z1 |
-| Sync job | ❌ | Z1 |
-| Portal `/zalo` | ❌ | Z1 |
-| Form poll | ❌ | Z2 |
-| Orchestrator zalo steps | ❌ | Z2 |
+| Hub `/zalo/zalo-ads` | ✅ Shipped | Z1 |
+| Sync job | ✅ Shipped | Z1 |
+| Portal `/zalo` | ✅ Shipped | Z1 |
+| Form poll | ✅ Shipped | Z2 |
+| Orchestrator zalo steps | ✅ Shipped | Z2 |
+| CRM Won → hub CPA | ✅ Shipped | Z2 |
 | Campaign write API | ❌ | Z4 |
 
 Cập nhật gap: [`ACTION-GAP-ANALYSIS.md`](../ACTION-GAP-ANALYSIS.md) khi bắt đầu Wave Z1.

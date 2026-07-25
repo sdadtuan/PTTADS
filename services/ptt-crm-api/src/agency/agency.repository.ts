@@ -36,6 +36,11 @@ function computeCpl(spend: number, leads: number): number | null {
   return Math.round((spend / leads) * 100) / 100;
 }
 
+function computeCpa(spend: number, conversions: number): number | null {
+  if (spend <= 0 || conversions <= 0) return null;
+  return Math.round((spend / conversions) * 100) / 100;
+}
+
 @Injectable()
 export class AgencyRepository implements OnModuleDestroy {
   private pool: Pool | null = null;
@@ -1517,10 +1522,12 @@ export class AgencyRepository implements OnModuleDestroy {
     }
 
     const result = await this.db.query(
-      `WITH perf AS (
+      `       WITH perf AS (
          SELECT dp.client_id,
                 SUM(dp.spend) AS spend,
                 SUM(dp.leads_crm) AS leads_crm,
+                SUM(dp.conversions) AS conversions_won,
+                SUM(dp.conversion_value) AS conversion_value,
                 COUNT(DISTINCT dp.external_campaign_id) AS campaigns,
                 COUNT(DISTINCT dp.external_campaign_id)
                   FILTER (WHERE dp.hub_campaign_map_id IS NULL) AS unmapped_campaigns,
@@ -1547,6 +1554,8 @@ export class AgencyRepository implements OnModuleDestroy {
               COALESCE(za.zalo_has_token, FALSE) AS zalo_has_token,
               COALESCE(p.spend, 0) AS spend,
               COALESCE(p.leads_crm, 0) AS leads_crm,
+              COALESCE(p.conversions_won, 0) AS conversions_won,
+              COALESCE(p.conversion_value, 0) AS conversion_value,
               COALESCE(p.campaigns, 0) AS campaigns,
               COALESCE(p.unmapped_campaigns, 0) AS unmapped_campaigns,
               COALESCE(p.over_target_rows, 0) AS over_target_rows
@@ -1568,14 +1577,20 @@ export class AgencyRepository implements OnModuleDestroy {
     const clients: ZaloHubClientRow[] = [];
     let totalSpend = 0;
     let totalLeads = 0;
+    let totalConversions = 0;
+    let totalConversionValue = 0;
     let overTarget = 0;
     let unmapped = 0;
 
     for (const row of result.rows) {
       const spend = Number(row.spend ?? 0);
       const leads = Math.trunc(Number(row.leads_crm ?? 0));
+      const conversionsWon = Math.trunc(Number(row.conversions_won ?? 0));
+      const conversionValue = Number(row.conversion_value ?? 0);
       totalSpend += spend;
       totalLeads += leads;
+      totalConversions += conversionsWon;
+      totalConversionValue += conversionValue;
       overTarget += Math.trunc(Number(row.over_target_rows ?? 0));
       unmapped += Math.trunc(Number(row.unmapped_campaigns ?? 0));
       clients.push({
@@ -1588,6 +1603,9 @@ export class AgencyRepository implements OnModuleDestroy {
         spend: Math.round(spend * 100) / 100,
         leads_crm: leads,
         cpl: computeCpl(spend, leads),
+        conversions_won: conversionsWon,
+        conversion_value: Math.round(conversionValue * 100) / 100,
+        cpa: computeCpa(spend, conversionsWon),
         campaigns: Math.trunc(Number(row.campaigns ?? 0)),
         unmapped_campaigns: Math.trunc(Number(row.unmapped_campaigns ?? 0)),
         over_target_rows: Math.trunc(Number(row.over_target_rows ?? 0)),
@@ -1601,6 +1619,9 @@ export class AgencyRepository implements OnModuleDestroy {
       total_spend: Math.round(totalSpend * 100) / 100,
       total_leads: totalLeads,
       avg_cpl: computeCpl(totalSpend, totalLeads),
+      total_conversions: totalConversions,
+      total_conversion_value: Math.round(totalConversionValue * 100) / 100,
+      avg_cpa: computeCpa(totalSpend, totalConversions),
       over_target_rows: overTarget,
       unmapped_campaigns: unmapped,
     };

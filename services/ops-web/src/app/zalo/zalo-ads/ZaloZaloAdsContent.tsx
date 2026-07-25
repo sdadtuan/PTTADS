@@ -361,6 +361,18 @@ export function ZaloZaloAdsContent() {
         </div>
         <div>
           <p className="muted" style={{ margin: 0 }}>
+            Won (CRM)
+          </p>
+          <strong>{String(summary.total_conversions ?? 0)}</strong>
+        </div>
+        <div>
+          <p className="muted" style={{ margin: 0 }}>
+            CPA TB
+          </p>
+          <strong>{fmtVnd(summary.avg_cpa as number | null)}</strong>
+        </div>
+        <div>
+          <p className="muted" style={{ margin: 0 }}>
             Clients
           </p>
           <strong>{String(summary.zalo_clients ?? rows.length)}</strong>
@@ -406,6 +418,8 @@ export function ZaloZaloAdsContent() {
                 <th>Spend</th>
                 <th>Leads</th>
                 <th>CPL</th>
+                <th>Won</th>
+                <th>CPA</th>
                 <th>Campaigns</th>
                 <th>Chưa map</th>
                 <th>Vượt target</th>
@@ -424,6 +438,8 @@ export function ZaloZaloAdsContent() {
                   <td>{fmtVnd(c.spend)}</td>
                   <td>{c.leads_crm}</td>
                   <td>{fmtVnd(c.cpl)}</td>
+                  <td>{c.conversions_won ?? 0}</td>
+                  <td>{fmtVnd(c.cpa ?? null)}</td>
                   <td>{c.campaigns}</td>
                   <td>{c.unmapped_campaigns ?? 0}</td>
                   <td>{c.over_target_rows}</td>
@@ -432,7 +448,7 @@ export function ZaloZaloAdsContent() {
               ))}
               {!loading && rows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="muted">
+                  <td colSpan={11} className="muted">
                     Không có dữ liệu Zalo cho bộ lọc đã chọn
                   </td>
                 </tr>

@@ -2774,6 +2774,9 @@ export interface ZaloHubClient {
   spend: number;
   leads_crm: number;
   cpl: number | null;
+  conversions_won?: number;
+  conversion_value?: number;
+  cpa?: number | null;
   campaigns: number;
   unmapped_campaigns: number;
   over_target_rows: number;

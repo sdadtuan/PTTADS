@@ -165,4 +165,62 @@ export class PerformanceRepository implements OnModuleDestroy {
       campaignCount: Number(row?.campaigns_tracked ?? 0),
     };
   }
+
+  /** Z2-B7 — recount won Zalo CRM leads into daily_performance.conversions / conversion_value. */
+  async refreshZaloConversionsForClientDate(
+    clientId: string,
+    perfDate: string,
+  ): Promise<number> {
+    const result = await this.db.query(
+      `WITH won_by_campaign AS (
+         SELECT campaign_id,
+                COUNT(*)::int AS conversions,
+                COALESCE(SUM(
+                  NULLIF(
+                    regexp_replace(
+                      COALESCE(
+                        meta_json->>'deal_value_vnd',
+                        meta_json->>'deal_value',
+                        meta_json->>'value_vnd',
+                        '0'
+                      ),
+                      '[^0-9.-]',
+                      '',
+                      'g'
+                    ),
+                    ''
+                  )::numeric,
+                  0
+                ) AS conversion_value
+         FROM crm_leads
+         WHERE agency_client_id = $1::uuid
+           AND lower(trim(COALESCE(channel, ''))) = 'zalo'
+           AND DATE(COALESCE(received_at, created_at) AT TIME ZONE 'UTC') = $2::date
+           AND is_duplicate IS NOT TRUE
+           AND lower(trim(COALESCE(status, ''))) IN ('won', 'closed_won', 'closed won', 'closed-won')
+           AND campaign_id IS NOT NULL
+           AND trim(campaign_id) <> ''
+         GROUP BY campaign_id
+       ),
+       targets AS (
+         SELECT dp.id,
+                COALESCE(w.conversions, 0) AS conversions,
+                COALESCE(w.conversion_value, 0) AS conversion_value
+         FROM daily_performance dp
+         LEFT JOIN won_by_campaign w ON w.campaign_id = dp.external_campaign_id
+         WHERE dp.client_id = $1::uuid
+           AND dp.channel = 'zalo'
+           AND dp.performance_date = $2::date
+       )
+       UPDATE daily_performance dp
+       SET conversions = t.conversions,
+           conversion_value = t.conversion_value,
+           synced_at = NOW()
+       FROM targets t
+       WHERE dp.id = t.id
+       RETURNING dp.id`,
+      [clientId, perfDate],
+    );
+    return result.rowCount ?? 0;
+  }
 }

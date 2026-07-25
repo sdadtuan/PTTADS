@@ -31,6 +31,18 @@
 #### Nhánh E1 — Chưa có Meta trong HĐ
 Bước 7–9: AM tick checklist item **"Meta deferred"** + ghi note; bỏ qua Meta.
 
+#### Nhánh Z1 — Zalo Ads trong HĐ (song song Meta bước 7–9)
+
+| # | Actor | Màn hình | Thao tác | Input | Phản hồi | Gate |
+|---|-------|----------|----------|-------|----------|------|
+| Z1 | Tracking | `/agency/clients/[id]?tab=channels` | **+ Channel Zalo** + OA ID | external_account_id, oa_id | Row channel `zalo` | ✓ |
+| Z2 | Tracking | Same | **Connect Zalo** OAuth | redirect Zalo | Token vault | ✓ token valid |
+| Z3 | Tracking | `/zalo/leads` tab **Form sync** | Cấu hình **form IDs** + poll smoke | form_id list | Cursor + job queued | ✓ form configured |
+| Z4 | Buyer | `/zalo/zalo-ads` | **Sync Zalo insights** + verify CPL | T-7 | Hub KPI green | ✓ daily_performance |
+| Z5 | CSKH | `/crm/leads/[id]` | Qualify → **Won** + deal value | status, deal_value_vnd | Hub CPA refresh | ✓ ZALO-UC-015 |
+
+**Orchestrator steps (auto-detect trên tab Onboard):** `zalo_account`, `zalo_token`, `zalo_form`, `zalo_sync`, `zalo_first_lead` — chi tiết [`08-ZALO-ACTIONS.md`](08-ZALO-ACTIONS.md#zalo-uc-021--onboard-zalo-orchestrator).
+
 #### Nhánh E2 — Khách không dùng portal
 Bước 13: Skip; AM cấu hình báo cáo PDF email manual ([SYS-UC-005](#sys-uc-005--báo-cáo-định-kỳ-cho-khách-hàng)).
 

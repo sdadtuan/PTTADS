@@ -7,6 +7,7 @@ import {
   PerformanceRow,
   PerformanceSummary,
 } from './performance.types';
+import { isWonLeadStatus } from './performance-conversion.util';
 import {
   computeCpl,
   computeRoas,
@@ -25,6 +26,40 @@ import {
 @Injectable()
 export class PerformanceService {
   constructor(private readonly repo: PerformanceRepository) {}
+
+  /** Z2-B7 / ZALO-UC-015 — CRM Won/Lost → refresh hub CPA slice on daily_performance. */
+  async refreshZaloHubCpaOnLeadStatusChange(input: {
+    channel: string | null | undefined;
+    clientId: string | null | undefined;
+    oldStatus: string | null | undefined;
+    newStatus: string | null | undefined;
+    receivedAt: string | null | undefined;
+    createdAt: string | null | undefined;
+  }): Promise<{ refreshed: number; perf_date: string } | null> {
+    const channel = String(input.channel ?? '')
+      .trim()
+      .toLowerCase();
+    if (channel !== 'zalo') {
+      return null;
+    }
+    const clientId = input.clientId?.trim();
+    if (!clientId) {
+      return null;
+    }
+    const oldWon = isWonLeadStatus(input.oldStatus);
+    const newWon = isWonLeadStatus(input.newStatus);
+    if (!oldWon && !newWon) {
+      return null;
+    }
+    if (!(await this.repo.pgPerformanceReady())) {
+      return null;
+    }
+
+    const ts = input.receivedAt?.trim() || input.createdAt?.trim();
+    const perfDate = ts ? formatDateOnly(new Date(ts)) : formatDateOnly(new Date());
+    const refreshed = await this.repo.refreshZaloConversionsForClientDate(clientId, perfDate);
+    return { refreshed, perf_date: perfDate };
+  }
 
   async listForClient(clientId: string, query: PerformanceQuery): Promise<PerformanceListResponse> {
     if (!(await this.repo.pgPerformanceReady())) {
