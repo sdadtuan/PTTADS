@@ -3,11 +3,16 @@
 import { PerformancePanel } from '@/components/PerformancePanel';
 import { PortalPageShell } from '@/components/PortalPageShell';
 
-export default function DashboardPage() {
+export default function ZaloPerformancePage() {
   return (
     <PortalPageShell>
       {({ token }) => (
-        <PerformancePanel token={token} title="Performance Meta + Google + Zalo" subtitle="Tất cả kênh" />
+        <PerformancePanel
+          token={token}
+          channel="zalo"
+          title="Zalo Ads Performance"
+          hideChannelColumn
+        />
       )}
     </PortalPageShell>
   );

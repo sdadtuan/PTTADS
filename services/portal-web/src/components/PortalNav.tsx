@@ -18,6 +18,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Performance',
   '/meta': 'Meta Performance',
   '/google': 'Google Performance',
+  '/zalo': 'Zalo Performance',
   '/creatives': 'Creative inbox',
   '/settings': 'Cài đặt',
   '/seo': 'SEO/AEO',
@@ -40,6 +41,7 @@ export function PortalNav({
     { href: '/dashboard', label: 'Performance' },
     { href: '/meta', label: 'Meta (Facebook)' },
     { href: '/google', label: 'Google Ads' },
+    { href: '/zalo', label: 'Zalo Ads' },
     {
       href: '/creatives',
       label: pendingCount > 0 ? `Creative inbox (${pendingCount})` : 'Creative inbox',

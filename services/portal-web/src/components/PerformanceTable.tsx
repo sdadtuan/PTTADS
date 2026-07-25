@@ -11,6 +11,12 @@ function isOverTarget(row: PerformanceRow): boolean {
   return row.cpl != null && row.target_cpl_vnd != null && row.cpl > row.target_cpl_vnd;
 }
 
+function channelLabel(channel: string | null | undefined): string {
+  if (channel === 'google') return 'Google';
+  if (channel === 'zalo') return 'Zalo';
+  return 'Meta';
+}
+
 export function PerformanceTable({ rows, groupBy, hideChannel = false }: PerformanceTableProps) {
   if (rows.length === 0) {
     return <p className="muted">Không có dữ liệu performance trong khoảng thời gian đã chọn.</p>;
@@ -43,7 +49,7 @@ export function PerformanceTable({ rows, groupBy, hideChannel = false }: Perform
                 {groupBy === 'day' && <td>{fmtDate(row.performance_date)}</td>}
                 {!hideChannel && (
                   <td>
-                    <span className="channel-badge">{row.channel === 'google' ? 'Google' : 'Meta'}</span>
+                    <span className="channel-badge">{channelLabel(row.channel)}</span>
                   </td>
                 )}
                 <td>

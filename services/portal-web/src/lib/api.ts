@@ -45,7 +45,7 @@ export interface PerformanceSummary {
   over_target_rows: number;
 }
 
-export type PerformanceChannel = 'meta' | 'google';
+export type PerformanceChannel = 'meta' | 'google' | 'zalo';
 
 export interface PerformanceDataFreshness {
   through_date: string;

@@ -16,7 +16,7 @@ async function loginAsApprover(page: import('@playwright/test').Page) {
 test.describe('Client portal E2E', () => {
   test('login → dashboard performance', async ({ page }) => {
     await loginAsApprover(page);
-    await expect(page.getByText(/Performance Meta \+ Google/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Performance Meta \+ Google \+ Zalo/i)).toBeVisible({ timeout: 15_000 });
   });
 
   test('navigate to creative inbox', async ({ page }) => {
@@ -35,6 +35,13 @@ test.describe('Client portal E2E', () => {
     });
     await expect(page.getByRole('columnheader', { name: /CPL Δ/i })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: /^Duyệt$/i })).toHaveCount(0);
+  });
+
+  test('navigate to Zalo performance tab', async ({ page }) => {
+    await loginAsApprover(page);
+    await page.getByRole('link', { name: /zalo ads/i }).click();
+    await expect(page).toHaveURL(/\/zalo/);
+    await expect(page.getByText(/Zalo Ads Performance/i)).toBeVisible({ timeout: 15_000 });
   });
 
   test('approver duyệt creative pending (Temporal seed)', async ({ page, request }) => {

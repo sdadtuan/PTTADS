@@ -2765,6 +2765,102 @@ export async function syncGoogleClientInsights(
   });
 }
 
+export interface ZaloHubClient {
+  id: string;
+  code: string | null;
+  name: string | null;
+  status: string | null;
+  spend: number;
+  leads_crm: number;
+  cpl: number | null;
+  campaigns: number;
+  unmapped_campaigns: number;
+  over_target_rows: number;
+  zalo_account_count?: number;
+  zalo_has_token?: boolean;
+  token_status?: string;
+}
+
+export interface ZaloHubResponse {
+  ok: boolean;
+  summary: Record<string, unknown>;
+  clients: ZaloHubClient[];
+  alerts: FacebookHubAlert[];
+  date_from: string;
+  date_to: string;
+  window_days?: number;
+  pilot?: Record<string, unknown>;
+  filters?: {
+    client_id?: string | null;
+    status?: string | null;
+    q?: string | null;
+  };
+}
+
+export type ZaloHubQuery = FacebookHubQuery;
+
+export async function fetchZaloHub(
+  token: string,
+  params: ZaloHubQuery = {},
+): Promise<ZaloHubResponse> {
+  const qs = new URLSearchParams();
+  if (params.days != null) qs.set('days', String(params.days));
+  if (params.date_to) qs.set('date_to', params.date_to);
+  if (params.date_from) qs.set('date_from', params.date_from);
+  if (params.status) qs.set('status', params.status);
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.q) qs.set('q', params.q);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return agencyFetch(token, `/api/v1/zalo-ads/hub${suffix}`);
+}
+
+export async function downloadZaloHubExport(
+  token: string,
+  params: ZaloHubQuery & { scope?: 'clients' | 'campaigns' } = {},
+): Promise<{ blob: Blob; filename: string }> {
+  const qs = new URLSearchParams();
+  if (params.days != null) qs.set('days', String(params.days));
+  if (params.date_to) qs.set('date_to', params.date_to);
+  if (params.date_from) qs.set('date_from', params.date_from);
+  if (params.status) qs.set('status', params.status);
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.q) qs.set('q', params.q);
+  if (params.scope) qs.set('scope', params.scope);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const res = await fetch(`${API_BASE}/api/v1/zalo-ads/hub/export${suffix}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Export failed (${res.status})`);
+  }
+  const cd = res.headers.get('content-disposition') ?? '';
+  const match = /filename="([^"]+)"/.exec(cd);
+  const filename = match?.[1] ?? 'zalo-hub-export.csv';
+  const blob = await res.blob();
+  return { blob, filename };
+}
+
+export async function fetchZaloOAuthStartUrl(
+  token: string,
+  clientId: string,
+  accountId?: string,
+): Promise<{ ok: boolean; authorization_url: string; pilot?: Record<string, unknown> }> {
+  const qs = new URLSearchParams({ client_id: clientId });
+  if (accountId) qs.set('account_id', accountId);
+  return agencyFetch(token, `/api/v1/zalo-ads/oauth/start?${qs.toString()}`);
+}
+
+export async function syncZaloClientInsights(
+  token: string,
+  clientId: string,
+): Promise<{ ok: boolean; jobs_enqueued?: Array<{ id: string; job_type: string }>; pilot?: Record<string, unknown> }> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/sync/zalo-insights`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
 export async function fetchHubCampaignMaps(
   token: string,
   params?: { client_id?: string; campaign_id?: string },

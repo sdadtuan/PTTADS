@@ -33,6 +33,8 @@ import {
   syncClientInsights,
   fetchGoogleOAuthStartUrl,
   syncGoogleClientInsights,
+  fetchZaloOAuthStartUrl,
+  syncZaloClientInsights,
 } from '@/lib/api';
 import { jobTypeLabel } from '@/lib/job-labels';
 import type {
@@ -571,6 +573,23 @@ export function AgencyClientDetailContent() {
     }
   }
 
+  async function handleSyncZaloInsights() {
+    const access = getAccessToken();
+    if (!access || !canMutate) return;
+    setBusy(true);
+    setActionMsg('');
+    setError('');
+    try {
+      const out = await syncZaloClientInsights(access, clientId);
+      const warn = out.pilot?.warning ? ` · ${String(out.pilot.warning)}` : '';
+      setActionMsg(`Đã enqueue job: ${jobTypeLabel('zalo_insights_sync')}${warn}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sync Zalo insights thất bại');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleGoogleOAuthConnect(accountId: string) {
     const access = getAccessToken();
     if (!access || !canMutate) return;
@@ -588,9 +607,29 @@ export function AgencyClientDetailContent() {
     }
   }
 
+  async function handleZaloOAuthConnect(accountId: string) {
+    const access = getAccessToken();
+    if (!access || !canMutate) return;
+    setBusy(true);
+    setError('');
+    try {
+      const out = await fetchZaloOAuthStartUrl(access, clientId, accountId);
+      if (out.pilot?.warning) {
+        setActionMsg(String(out.pilot.warning));
+      }
+      window.location.href = out.authorization_url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không mở được Zalo OAuth');
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
     if (searchParams.get('google_oauth') === 'ok') {
       setActionMsg('Google OAuth connected — refresh token đã lưu vault');
+    }
+    if (searchParams.get('zalo_oauth') === 'ok') {
+      setActionMsg('Zalo OAuth connected — access token đã lưu vault');
     }
   }, [searchParams]);
 
@@ -835,7 +874,7 @@ export function AgencyClientDetailContent() {
                   </div>
                 ) : null}
 
-                <h3 style={{ fontSize: '1rem', marginTop: '1.5rem' }}>Performance (Meta + Google, 7 ngày)</h3>
+                <h3 style={{ fontSize: '1rem', marginTop: '1.5rem' }}>Performance (Meta + Google + Zalo, 7 ngày)</h3>
                 {canMutate ? (
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
                     <button
@@ -853,6 +892,14 @@ export function AgencyClientDetailContent() {
                       onClick={() => void handleSyncGoogleInsights()}
                     >
                       Sync Google now
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={busy}
+                      onClick={() => void handleSyncZaloInsights()}
+                    >
+                      Sync Zalo now
                     </button>
                   </div>
                 ) : null}
@@ -959,7 +1006,11 @@ export function AgencyClientDetailContent() {
                       <option value="email">Email</option>
                     </select>
                     <input
-                      placeholder="External account ID (act_… hoặc số Meta)"
+                      placeholder={
+                        channelForm.channel === 'zalo'
+                          ? 'Zalo OA ID'
+                          : 'External account ID (act_… hoặc số Meta)'
+                      }
                       value={channelForm.external_account_id}
                       onChange={(e) => setChannelForm((f) => ({ ...f, external_account_id: e.target.value }))}
                       required
@@ -978,6 +1029,11 @@ export function AgencyClientDetailContent() {
                         onChange={(e) => setChannelForm((f) => ({ ...f, facebook_page_id: e.target.value }))}
                         style={{ padding: '0.5rem' }}
                       />
+                    ) : null}
+                    {channelForm.channel === 'zalo' ? (
+                      <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
+                        Form IDs (lead forms) sẽ cấu hình ở Wave Z2 — hiện dùng OA ID + OAuth connect.
+                      </p>
                     ) : null}
                     <button type="submit" className="btn btn-sm" disabled={busy}>
                       Thêm channel
@@ -1068,6 +1124,16 @@ export function AgencyClientDetailContent() {
                                 className="btn btn-secondary btn-sm"
                                 disabled={busy}
                                 onClick={() => void handleGoogleOAuthConnect(acc.id)}
+                              >
+                                Connect OAuth
+                              </button>
+                            ) : null}{' '}
+                            {acc.channel === 'zalo' && canMutate ? (
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                disabled={busy}
+                                onClick={() => void handleZaloOAuthConnect(acc.id)}
                               >
                                 Connect OAuth
                               </button>

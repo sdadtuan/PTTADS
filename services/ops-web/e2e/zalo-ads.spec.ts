@@ -1,0 +1,22 @@
+import { test, expect } from '@playwright/test';
+
+const STAFF_EMAIL = process.env.OPS_E2E_STAFF_EMAIL ?? 'staff@demo.local';
+const STAFF_PASSWORD = process.env.OPS_E2E_STAFF_PASSWORD ?? 'demo123';
+
+async function loginAsStaff(page: import('@playwright/test').Page) {
+  await page.goto('/login');
+  await page.getByLabel(/email/i).fill(STAFF_EMAIL);
+  await page.getByLabel(/mật khẩu|password/i).fill(STAFF_PASSWORD);
+  await page.getByRole('button', { name: /đăng nhập|login/i }).click();
+  await expect(page).toHaveURL(/\//);
+}
+
+test.describe('Ops Zalo Ads hub Z1', () => {
+  test('zalo-ads hub loads KPI and clients table', async ({ page }) => {
+    await loginAsStaff(page);
+    await page.goto('/zalo/zalo-ads');
+    await expect(page.getByRole('heading', { name: /Zalo Ads Hub/i })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: /Clients overview/i })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: /Spend/i })).toBeVisible();
+  });
+});
