@@ -18,6 +18,7 @@
 | **EM** | Email Marketing Enterprise Ops | [`05-EMAIL-MARKETING.md`](05-EMAIL-MARKETING.md) |
 | **PORTAL** | Client Portal | [`06-CLIENT-PORTAL.md`](06-CLIENT-PORTAL.md) |
 | **PLAT** | Platform — Auth, Webhook, Admin | [`07-PLATFORM-AUTH-WEBHOOKS.md`](07-PLATFORM-AUTH-WEBHOOKS.md) |
+| **ZALO** | Zalo Ads Operating System | [`08-ZALO-ADS.md`](08-ZALO-ADS.md) |
 
 **Format mỗi UC:** ID · Tên · Actor · Priority (P0/P1/P2) · Trigger · Main flow · Extensions · Postconditions · Rules · Traceability (Screen/API)
 
@@ -33,21 +34,21 @@
 
 ## 2. Ma trận Actor × Module
 
-| Actor | CRM | SVC | Meta | SEO | EM | Portal | Plat |
-|-------|-----|-----|------|-----|-----|--------|------|
-| Super Admin | ● | ● | ● | ● | ● | ● | ● |
-| AM | ● | ● | ○ | ○ | ○ | ○ | ○ |
-| CSKH / Sales | ● | ○ | ○ | ○ | ○ | ○ | ○ |
-| Media Buyer | ○ | ○ | ● | ○ | ○ | ○ | ○ |
-| Creative Lead | ○ | ● | ● | ○ | ○ | ○ | ○ |
-| Tracking/Tech | ○ | ○ | ● | ● | ○ | ○ | ● |
-| SEO Strategist | ○ | ○ | ○ | ● | ○ | ○ | ○ |
-| Email Strategist | ○ | ○ | ○ | ○ | ● | ○ | ○ |
-| Compliance | ○ | ○ | ○ | ● | ● | ○ | ○ |
-| Client Viewer | ○ | ○ | ○ | ○ | ○ | ● | ○ |
-| Client Approver | ○ | ○ | ○ | ○ | ○ | ● | ○ |
-| End Subscriber | ○ | ○ | ○ | ○ | ● | ○ | ○ |
-| System (Webhook/Worker) | ● | ○ | ● | ● | ● | ○ | ● |
+| Actor | CRM | SVC | Meta | SEO | EM | Zalo | Portal | Plat |
+|-------|-----|-----|------|-----|-----|------|--------|------|
+| Super Admin | ● | ● | ● | ● | ● | ● | ● | ● |
+| AM | ● | ● | ○ | ○ | ○ | ○ | ○ | ○ |
+| CSKH / Sales | ● | ○ | ○ | ○ | ○ | ○ | ○ | ○ |
+| Media Buyer | ○ | ○ | ● | ○ | ○ | ● | ○ | ○ |
+| Creative Lead | ○ | ● | ● | ○ | ○ | ○ | ○ | ○ |
+| Tracking/Tech | ○ | ○ | ● | ● | ○ | ● | ○ | ● |
+| SEO Strategist | ○ | ○ | ○ | ● | ○ | ○ | ○ | ○ |
+| Email Strategist | ○ | ○ | ○ | ○ | ● | ○ | ○ | ○ |
+| Compliance | ○ | ○ | ○ | ● | ● | ○ | ○ | ○ |
+| Client Viewer | ○ | ○ | ○ | ○ | ○ | ○ | ● | ○ |
+| Client Approver | ○ | ○ | ○ | ○ | ○ | ○ | ● | ○ |
+| End Subscriber | ○ | ○ | ○ | ○ | ● | ○ | ○ | ○ |
+| System (Webhook/Worker) | ● | ○ | ● | ● | ● | ● | ○ | ● |
 
 ● = actor chính · ○ = actor phụ / có thể
 
@@ -196,7 +197,33 @@
 | PLAT-UC-009 | Seed staff permissions | P0 |
 | PLAT-UC-010 | Health check & soak evidence | P1 |
 
-**Tổng:** ~101 use cases documented
+### 3.9. Zalo Ads (ZALO) — 21 UC
+
+| ID | Tên | Priority |
+|----|-----|----------|
+| ZALO-UC-001 | Kết nối Zalo Ads / OA | P0 |
+| ZALO-UC-002 | Hub map campaign | P0 |
+| ZALO-UC-003 | Sync insights → daily_performance | P0 |
+| ZALO-UC-004 | Hub CPL staff | P0 |
+| ZALO-UC-005 | Portal performance | P0 |
+| ZALO-UC-006 | Brief chiến dịch | P1 |
+| ZALO-UC-007 | Tạo campaign draft | P1 |
+| ZALO-UC-008 | Duyệt nội dung | P1 |
+| ZALO-UC-009 | Triển khai lên Zalo (API) | P2 |
+| ZALO-UC-010 | Pause/update/stop campaign | P2 |
+| ZALO-UC-011 | Webhook lead → CRM | P0 |
+| ZALO-UC-012 | Poll form lead API | P0 |
+| ZALO-UC-013 | Dedup & chuẩn hóa lead | P0 |
+| ZALO-UC-014 | CRM pipeline | P0 |
+| ZALO-UC-015 | CRM status sync hub | P1 |
+| ZALO-UC-016 | Xuất báo cáo KH | P1 |
+| ZALO-UC-017 | Cảnh báo bất thường | P1 |
+| ZALO-UC-018 | Phân tích đa chiều | P2 |
+| ZALO-UC-019 | Client duyệt budget | P1 |
+| ZALO-UC-020 | Thông báo tiến độ | P1 |
+| ZALO-UC-021 | Onboard orchestrator Zalo | P1 |
+
+**Tổng:** ~122 use cases documented
 
 ---
 
@@ -241,6 +268,7 @@ flowchart TB
 | [`SPEC_META_ENTERPRISE_PTTADS.md`](../SPEC_META_ENTERPRISE_PTTADS.md) | 03 |
 | [`SPEC_SEO_AEO_OPERATING_SYSTEM.md`](../SPEC_SEO_AEO_OPERATING_SYSTEM.md) | 04 |
 | [`SPEC_EMAIL_MARKETING_OPERATING_SYSTEM.md`](../SPEC_EMAIL_MARKETING_OPERATING_SYSTEM.md) | 05 |
+| [`SPEC_ZALO_ADS_OPERATING_SYSTEM.md`](../SPEC_ZALO_ADS_OPERATING_SYSTEM.md) | 08 |
 | [`SPEC_UI_UX_*`](../SPEC_UI_UX_PTT.md) | Screen refs trong từng UC |
 | [`product-model-v1.md`](../product-model-v1.md) | CRM-UC-001…007 |
 

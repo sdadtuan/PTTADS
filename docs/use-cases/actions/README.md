@@ -62,6 +62,7 @@ Bổ sung cho mỗi Use Case **toàn bộ bước thao tác** mà người dùng
 | [05-EM-ACTIONS.md](05-EM-ACTIONS.md) | Email Marketing | EM-001…014 |
 | [06-PORTAL-ACTIONS.md](06-PORTAL-ACTIONS.md) | Client Portal | PORTAL-001…010 |
 | [07-PLAT-ACTIONS.md](07-PLAT-ACTIONS.md) | Platform | PLAT-001…010 |
+| [08-ZALO-ACTIONS.md](08-ZALO-ACTIONS.md) | Zalo Ads | ZALO-001…021 |
 
 ---
 
