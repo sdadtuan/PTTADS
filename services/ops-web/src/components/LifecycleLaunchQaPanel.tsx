@@ -89,8 +89,14 @@ const META_LAUNCH_QA_KEYS = new Set([
   'meta_capi_recent_sent',
 ]);
 
+const ZALO_LAUNCH_QA_KEYS = new Set(['zalo_oauth_token', 'zalo_form_ids_configured']);
+
 function isMetaLaunchQaKey(key: string): boolean {
   return META_LAUNCH_QA_KEYS.has(key);
+}
+
+function isZaloLaunchQaKey(key: string): boolean {
+  return ZALO_LAUNCH_QA_KEYS.has(key);
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -323,6 +329,8 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
             <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: '0.4rem' }}>
               {entries.map(([key, item]) => {
                 const isMetaAuto = isMetaLaunchQaKey(key);
+                const isZaloAuto = isZaloLaunchQaKey(key);
+                const isAuto = isMetaAuto || isZaloAuto;
                 return (
                 <li
                   key={key}
@@ -333,19 +341,19 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
                     padding: '0.45rem',
                     border: '1px solid var(--border)',
                     borderRadius: 8,
-                    background: isMetaAuto ? 'rgba(57, 139, 67, 0.04)' : undefined,
+                    background: isAuto ? 'rgba(57, 139, 67, 0.04)' : undefined,
                   }}
                 >
                   <input
                     type="checkbox"
                     checked={Boolean(item.completed)}
-                    disabled={!canEdit || saving || run.status !== 'in_progress' || isMetaAuto}
+                    disabled={!canEdit || saving || run.status !== 'in_progress' || isAuto}
                     onChange={(e) => void toggleItem(key, e.target.checked)}
                   />
                   <div>
                     <strong>
                       {item.label ?? key}
-                      {isMetaAuto ? (
+                      {isAuto ? (
                         <span className="meta-launch-qa-auto-tag"> · auto</span>
                       ) : null}
                     </strong>
@@ -361,6 +369,17 @@ export function LifecycleLaunchQaPanel({ token, user, lifecycleId }: Props) {
                         </a>
                         {' · '}
                         sync tự động từ preflight
+                      </p>
+                    ) : null}
+                    {isZaloAuto ? (
+                      <p className="muted" style={{ margin: '0.2rem 0 0', fontSize: '0.8rem' }}>
+                        <a href="/agency/clients" className="nav-link">
+                          Tab Channels
+                        </a>
+                        {' · '}
+                        <a href="/zalo/leads" className="nav-link">
+                          Form sync
+                        </a>
                       </p>
                     ) : null}
                   </div>

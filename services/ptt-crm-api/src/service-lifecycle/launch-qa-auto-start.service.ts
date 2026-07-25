@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AppConfigService } from '../config/app-config.service';
 import { LaunchQaMetaBridgeService } from '../launch-qa/launch-qa-meta-bridge.service';
+import { LaunchQaZaloBridgeService } from '../launch-qa/launch-qa-zalo-bridge.service';
 import { TemporalClientService } from '../temporal/temporal-client.service';
 import { shouldReuseLaunchQaRun } from './launch-qa-auto-start.util';
 import { LaunchQaPgRepository } from './launch-qa-pg.repository';
@@ -19,6 +20,7 @@ export class LaunchQaAutoStartService {
     private readonly config: AppConfigService,
     private readonly temporal: TemporalClientService,
     private readonly metaBridge: LaunchQaMetaBridgeService,
+    private readonly zaloBridge: LaunchQaZaloBridgeService,
   ) {}
 
   async maybeStartOnDeliverEnter(input: {
@@ -47,6 +49,7 @@ export class LaunchQaAutoStartService {
     const existing = await this.repo.findLatestRun(clientId, campaignId);
     if (shouldReuseLaunchQaRun(existing)) {
       await this.metaBridge.syncRun(existing!);
+      await this.zaloBridge.syncRun(existing!);
       return {
         started: true,
         run_id: existing!.id,
@@ -82,6 +85,7 @@ export class LaunchQaAutoStartService {
     }
 
     await this.metaBridge.syncRun(run);
+    await this.zaloBridge.syncRun(run);
 
     return { started: true, run_id: run.id };
   }

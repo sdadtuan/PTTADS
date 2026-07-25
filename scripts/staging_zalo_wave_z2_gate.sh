@@ -34,6 +34,26 @@ echo "   PTT_API_URL=$BASE"
 echo "   PTT_ZALO_FORM_POLL=${PTT_ZALO_FORM_POLL:-0}"
 
 echo ""
+echo "==> Apply Zalo Z3 DDL (creative channel)"
+if bash "$ROOT/scripts/apply_pg_ddl_zalo_z3.sh"; then
+  ok "Zalo Z3 DDL"
+else
+  warn "Zalo Z3 DDL skipped — apply v3 + Postgres first"
+fi
+
+echo ""
+echo "==> Verify pg_zalo_z3_ready"
+if python3 -c "
+from ptt_crm.pg_schema import pg_zalo_z3_ready
+assert pg_zalo_z3_ready(), 'creative_submissions.channel missing'
+print('OK  pg_zalo_z3_ready')
+"; then
+  :
+else
+  warn "pg_zalo_z3_ready false"
+fi
+
+echo ""
 echo "==> Wave Z1 gate (insights DDL + hub smoke)"
 if bash "$ROOT/scripts/staging_zalo_wave_z1_gate.sh"; then
   ok "Wave Z1 gate"

@@ -1,6 +1,7 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 import { AppConfigService } from '../config/app-config.service';
+import { normalizeCreativeChannel } from './creative-channel.util';
 import { CreativeRow, CreativeStatus } from './creatives.types';
 
 interface CreativeDbRow {
@@ -20,7 +21,27 @@ interface CreativeDbRow {
   reviewed_at: Date | string | null;
   review_note: string | null;
   temporal_workflow_id: string | null;
+  channel?: string | null;
 }
+
+const SELECT_COLS = `
+  id::text,
+  client_id::text,
+  title,
+  description,
+  external_campaign_id,
+  external_campaign_name,
+  version,
+  asset_url,
+  asset_type,
+  status,
+  submitted_by,
+  submitted_at,
+  reviewed_by,
+  reviewed_at,
+  review_note,
+  COALESCE(channel, 'meta') AS channel,
+  temporal_workflow_id`;
 
 @Injectable()
 export class CreativesRepository implements OnModuleDestroy {
@@ -65,32 +86,18 @@ export class CreativesRepository implements OnModuleDestroy {
     assetUrl: string | null;
     assetType: string;
     submittedBy: string;
+    channel?: string;
   }): Promise<CreativeRow> {
+    const channel = normalizeCreativeChannel(input.channel);
     const result = await this.db.query(
       `INSERT INTO creative_submissions (
          client_id, title, description, external_campaign_id, external_campaign_name,
-         version, asset_url, asset_type, status, submitted_by
+         version, asset_url, asset_type, status, submitted_by, channel
        ) VALUES (
          $1::uuid, $2, $3, $4, $5,
-         $6, $7, $8, 'pending_client', $9
+         $6, $7, $8, 'pending_client', $9, $10
        )
-       RETURNING
-          id::text,
-          client_id::text,
-          title,
-          description,
-          external_campaign_id,
-          external_campaign_name,
-          version,
-          asset_url,
-          asset_type,
-          status,
-          submitted_by,
-          submitted_at,
-          reviewed_by,
-          reviewed_at,
-          review_note,
-          temporal_workflow_id`,
+       RETURNING ${SELECT_COLS}`,
       [
         input.clientId,
         input.title,
@@ -101,6 +108,7 @@ export class CreativesRepository implements OnModuleDestroy {
         input.assetUrl,
         input.assetType,
         input.submittedBy,
+        channel,
       ],
     );
     return this.mapRow(result.rows[0] as CreativeDbRow);
@@ -117,23 +125,7 @@ export class CreativesRepository implements OnModuleDestroy {
            temporal_run_id = $3,
            updated_at = NOW()
        WHERE id = $1::uuid
-       RETURNING
-          id::text,
-          client_id::text,
-          title,
-          description,
-          external_campaign_id,
-          external_campaign_name,
-          version,
-          asset_url,
-          asset_type,
-          status,
-          submitted_by,
-          submitted_at,
-          reviewed_by,
-          reviewed_at,
-          review_note,
-          temporal_workflow_id`,
+       RETURNING ${SELECT_COLS}`,
       [id, workflowId, runId],
     );
     const row = result.rows[0] as CreativeDbRow | undefined;
@@ -146,23 +138,7 @@ export class CreativesRepository implements OnModuleDestroy {
     limit = 10,
   ): Promise<CreativeRow[]> {
     const result = await this.db.query(
-      `SELECT
-          id::text,
-          client_id::text,
-          title,
-          description,
-          external_campaign_id,
-          external_campaign_name,
-          version,
-          asset_url,
-          asset_type,
-          status,
-          submitted_by,
-          submitted_at,
-          reviewed_by,
-          reviewed_at,
-          review_note,
-          temporal_workflow_id
+      `SELECT ${SELECT_COLS}
         FROM creative_submissions
         WHERE client_id = $1::uuid
           AND external_campaign_id = $2
@@ -177,6 +153,7 @@ export class CreativesRepository implements OnModuleDestroy {
     status?: string;
     clientId?: string;
     externalCampaignId?: string;
+    channel?: string;
     limit?: number;
   }): Promise<CreativeRow[]> {
     const limit = Math.min(200, Math.max(1, input.limit ?? 100));
@@ -195,26 +172,14 @@ export class CreativesRepository implements OnModuleDestroy {
       clauses.push(`external_campaign_id = $${idx++}`);
       params.push(input.externalCampaignId.trim());
     }
+    if (input.channel?.trim() && input.channel !== 'all') {
+      clauses.push(`COALESCE(channel, 'meta') = $${idx++}`);
+      params.push(normalizeCreativeChannel(input.channel));
+    }
     params.push(limit);
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
     const result = await this.db.query(
-      `SELECT
-          id::text,
-          client_id::text,
-          title,
-          description,
-          external_campaign_id,
-          external_campaign_name,
-          version,
-          asset_url,
-          asset_type,
-          status,
-          submitted_by,
-          submitted_at,
-          reviewed_by,
-          reviewed_at,
-          review_note,
-          temporal_workflow_id
+      `SELECT ${SELECT_COLS}
         FROM creative_submissions
         ${where}
         ORDER BY submitted_at DESC
@@ -228,23 +193,7 @@ export class CreativesRepository implements OnModuleDestroy {
     const safeDays = Math.min(90, Math.max(1, days));
     const safeLimit = Math.min(200, Math.max(1, limit));
     const result = await this.db.query(
-      `SELECT
-          id::text,
-          client_id::text,
-          title,
-          description,
-          external_campaign_id,
-          external_campaign_name,
-          version,
-          asset_url,
-          asset_type,
-          status,
-          submitted_by,
-          submitted_at,
-          reviewed_by,
-          reviewed_at,
-          review_note,
-          temporal_workflow_id
+      `SELECT ${SELECT_COLS}
         FROM creative_submissions
         WHERE client_id = $1::uuid
           AND status IN ('approved', 'rejected')
@@ -298,23 +247,7 @@ export class CreativesRepository implements OnModuleDestroy {
 
   async listPending(clientId: string): Promise<CreativeRow[]> {
     const result = await this.db.query(
-      `SELECT
-          id::text,
-          client_id::text,
-          title,
-          description,
-          external_campaign_id,
-          external_campaign_name,
-          version,
-          asset_url,
-          asset_type,
-          status,
-          submitted_by,
-          submitted_at,
-          reviewed_by,
-          reviewed_at,
-          review_note,
-          temporal_workflow_id
+      `SELECT ${SELECT_COLS}
         FROM creative_submissions
         WHERE client_id = $1::uuid AND status = 'pending_client'
         ORDER BY submitted_at DESC`,
@@ -325,23 +258,7 @@ export class CreativesRepository implements OnModuleDestroy {
 
   async findById(id: string): Promise<CreativeRow | null> {
     const result = await this.db.query(
-      `SELECT
-          id::text,
-          client_id::text,
-          title,
-          description,
-          external_campaign_id,
-          external_campaign_name,
-          version,
-          asset_url,
-          asset_type,
-          status,
-          submitted_by,
-          submitted_at,
-          reviewed_by,
-          reviewed_at,
-          review_note,
-          temporal_workflow_id
+      `SELECT ${SELECT_COLS}
         FROM creative_submissions
         WHERE id = $1::uuid
         LIMIT 1`,
@@ -365,23 +282,7 @@ export class CreativesRepository implements OnModuleDestroy {
            review_note = $4,
            updated_at = NOW()
        WHERE id = $1::uuid AND status = 'pending_client'
-       RETURNING
-          id::text,
-          client_id::text,
-          title,
-          description,
-          external_campaign_id,
-          external_campaign_name,
-          version,
-          asset_url,
-          asset_type,
-          status,
-          submitted_by,
-          submitted_at,
-          reviewed_by,
-          reviewed_at,
-          review_note,
-          temporal_workflow_id`,
+       RETURNING ${SELECT_COLS}`,
       [id, status, reviewedBy, reviewNote],
     );
     const row = result.rows[0] as CreativeDbRow | undefined;
@@ -406,6 +307,7 @@ export class CreativesRepository implements OnModuleDestroy {
       reviewed_at: row.reviewed_at ? this.toIso(row.reviewed_at) : null,
       review_note: row.review_note,
       temporal_workflow_id: row.temporal_workflow_id,
+      channel: normalizeCreativeChannel(row.channel),
     };
   }
 

@@ -22,6 +22,7 @@ export class CrmCreativesController {
     @Query('status') status?: string,
     @Query('client_id') clientId?: string,
     @Query('external_campaign_id') externalCampaignId?: string,
+    @Query('channel') channel?: string,
     @Query('limit') limit?: string,
   ) {
     const lim = limit ? Number(limit) : 100;
@@ -29,6 +30,7 @@ export class CrmCreativesController {
       status,
       clientId,
       externalCampaignId,
+      channel,
       limit: Number.isFinite(lim) ? lim : 100,
     });
   }
@@ -50,6 +52,7 @@ export class CrmCreativesController {
       version: body.version != null ? Number(body.version) : undefined,
       resubmit: Boolean(body.resubmit),
       submitted_by: staff?.email,
+      channel: body.channel != null ? String(body.channel) : undefined,
     });
   }
 }

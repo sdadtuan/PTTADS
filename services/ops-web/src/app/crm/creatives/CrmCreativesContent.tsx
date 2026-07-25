@@ -25,6 +25,7 @@ import {
 import { canEditMetaCreativeRegistry } from '@/lib/meta/caps';
 
 type StatusTab = 'all' | 'pending_client' | 'approved' | 'rejected';
+type ChannelFilter = 'all' | 'meta' | 'google' | 'zalo';
 
 type CreativeRow = {
   id: string;
@@ -32,6 +33,7 @@ type CreativeRow = {
   title: string;
   status: string;
   version: number;
+  channel: string;
   external_campaign_id: string | null;
   external_campaign_name: string | null;
   submitted_at: string;
@@ -59,6 +61,7 @@ export function CrmCreativesContent() {
   const searchParams = useSearchParams();
   const [user, setUser] = useState<StoredStaffUser | null>(null);
   const [tab, setTab] = useState<StatusTab>('pending_client');
+  const [channelFilter, setChannelFilter] = useState<ChannelFilter>('all');
   const [rows, setRows] = useState<CreativeRow[]>([]);
   const [stats, setStats] = useState<Record<string, number>>({});
   const [error, setError] = useState('');
@@ -70,6 +73,7 @@ export function CrmCreativesContent() {
     client_id: '',
     external_campaign_id: '',
     external_campaign_name: '',
+    channel: 'meta',
     title: '',
     description: '',
     asset_url: '',
@@ -110,10 +114,10 @@ export function CrmCreativesContent() {
     }
   }, [router]);
 
-  const reload = useCallback(async (access: string, status: StatusTab) => {
+  const reload = useCallback(async (access: string, status: StatusTab, channel: ChannelFilter) => {
     const [statsOut, listOut] = await Promise.all([
       fetchCrmCreativesStats(access),
-      fetchCrmCreatives(access, status),
+      fetchCrmCreatives(access, status, 100, channel),
     ]);
     setStats(statsOut.stats ?? {});
     setRows(listOut.rows ?? []);
@@ -133,14 +137,14 @@ export function CrmCreativesContent() {
       setLoading(true);
       setError('');
       try {
-        await reload(access, tab);
+        await reload(access, tab, channelFilter);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Tải thất bại');
       } finally {
         setLoading(false);
       }
     })();
-  }, [ensureAuth, reload, tab]);
+  }, [ensureAuth, reload, tab, channelFilter]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -154,7 +158,7 @@ export function CrmCreativesContent() {
       await postCrmCreativeSubmit(access, form);
       setMessage(form.resubmit ? 'Đã gửi creative phiên bản mới' : 'Đã gửi creative — chờ client duyệt portal');
       setShowSubmit(false);
-      await reload(access, tab);
+      await reload(access, tab, channelFilter);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Gửi thất bại');
     } finally {
@@ -251,6 +255,15 @@ export function CrmCreativesContent() {
             required
             style={inputStyle}
           />
+          <select
+            value={form.channel}
+            onChange={(e) => setForm({ ...form, channel: e.target.value })}
+            style={inputStyle}
+          >
+            <option value="meta">Meta</option>
+            <option value="google">Google</option>
+            <option value="zalo">Zalo</option>
+          </select>
           <input
             placeholder="Tiêu đề"
             value={form.title}
@@ -290,11 +303,25 @@ export function CrmCreativesContent() {
         ))}
       </div>
 
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', margin: '0.75rem 0' }}>
+        {(['all', 'meta', 'google', 'zalo'] as ChannelFilter[]).map((ch) => (
+          <button
+            key={ch}
+            type="button"
+            className={channelFilter === ch ? 'btn btn-sm' : 'btn btn-sm btn-ghost'}
+            onClick={() => setChannelFilter(ch)}
+          >
+            {ch === 'all' ? 'Mọi kênh' : ch.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
       <div className="card" style={{ padding: '0.75rem', overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
           <thead>
             <tr className="muted">
               <th style={{ textAlign: 'left', padding: '0.35rem' }}>Creative</th>
+              <th style={{ textAlign: 'left', padding: '0.35rem' }}>Kênh</th>
               <th style={{ textAlign: 'left', padding: '0.35rem' }}>Campaign</th>
               <th style={{ textAlign: 'left', padding: '0.35rem' }}>v</th>
               <th style={{ textAlign: 'left', padding: '0.35rem' }}>Trạng thái</th>
@@ -305,7 +332,7 @@ export function CrmCreativesContent() {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="muted" style={{ padding: '0.75rem' }}>
+                <td colSpan={7} className="muted" style={{ padding: '0.75rem' }}>
                   Không có creative.
                 </td>
               </tr>
@@ -320,6 +347,7 @@ export function CrmCreativesContent() {
                     </div>
                   ) : null}
                 </td>
+                <td style={{ padding: '0.35rem' }}>{(row.channel ?? 'meta').toUpperCase()}</td>
                 <td style={{ padding: '0.35rem' }}>{row.external_campaign_id ?? '—'}</td>
                 <td style={{ padding: '0.35rem' }}>{row.version}</td>
                 <td style={{ padding: '0.35rem' }}>{STATUS_LABEL[row.status] ?? row.status}</td>
@@ -330,7 +358,7 @@ export function CrmCreativesContent() {
                       Lifecycle
                     </Link>
                   ) : null}
-                  {row.status === 'approved' ? (
+                  {row.status === 'approved' && (row.channel ?? 'meta') === 'meta' ? (
                     <MetaCreativeLinkPanel
                       token={hubToken}
                       clientId={row.client_id}

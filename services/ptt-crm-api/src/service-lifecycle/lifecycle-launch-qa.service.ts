@@ -13,8 +13,10 @@ import { CreativesService } from '../creatives/creatives.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { LaunchQaAutoStartService } from './launch-qa-auto-start.service';
 import { LaunchQaMetaBridgeService } from '../launch-qa/launch-qa-meta-bridge.service';
+import { LaunchQaZaloBridgeService } from '../launch-qa/launch-qa-zalo-bridge.service';
 import { LaunchQaPgRepository } from './launch-qa-pg.repository';
 import { isMetaLaunchQaItemKey } from '../meta-tracking/launch-qa-meta.util';
+import { isZaloLaunchQaItemKey } from '../zalo-tracking/launch-qa-zalo.util';
 import { launchQaGateFromRun, launchQaProgress } from './lifecycle-launch-gate.util';
 import { launchQaHandoverGateFromRun } from './lifecycle-launch-handover-gate.util';
 import { ServiceLifecycleSqliteRepository } from './service-lifecycle-sqlite.repository';
@@ -32,6 +34,7 @@ export class LifecycleLaunchQaService {
     private readonly workflows: WorkflowsService,
     private readonly config: AppConfigService,
     private readonly metaBridge: LaunchQaMetaBridgeService,
+    private readonly zaloBridge: LaunchQaZaloBridgeService,
   ) {}
 
   async launchQa(lifecycleId: number) {
@@ -54,6 +57,10 @@ export class LifecycleLaunchQaService {
       const synced = await this.metaBridge.syncRun(run);
       if (synced.run_id) {
         run = (await this.repo.findById(synced.run_id)) ?? run;
+      }
+      const zaloSynced = await this.zaloBridge.syncRun(run);
+      if (zaloSynced.run_id) {
+        run = (await this.repo.findById(zaloSynced.run_id)) ?? run;
       }
     }
     const progress = launchQaProgress(run?.checklist ?? null);
@@ -126,6 +133,12 @@ export class LifecycleLaunchQaService {
       throw new BadRequestException({
         error: 'meta_checklist_auto_only',
         hint: 'Meta checklist items are auto-evaluated — refresh Launch QA or run preflight on /meta/tracking',
+      });
+    }
+    if (isZaloLaunchQaItemKey(key)) {
+      throw new BadRequestException({
+        error: 'zalo_checklist_auto_only',
+        hint: 'Zalo checklist items are auto-evaluated — refresh Launch QA or cấu hình token/form trên Channels',
       });
     }
     try {

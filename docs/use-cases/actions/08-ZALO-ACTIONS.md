@@ -165,6 +165,11 @@ Bước 2 fail → hub 🔴 → Tracking re-OAuth bước 4 UC-001.
 | Form poll | ✅ Shipped | Z2 |
 | Orchestrator zalo steps | ✅ Shipped | Z2 |
 | CRM Won → hub CPA | ✅ Shipped | Z2 |
+| Combined ads `/meta/ads-combined` | ✅ Shipped | Z3 |
+| Creative tag `channel=zalo` | ✅ Shipped | Z3 |
+| Launch QA Zalo checklist | ✅ Shipped | Z3 |
+| Alerts CPL/zero leads/CTR | ✅ Shipped | Z3 |
+| Export PDF báo cáo | ✅ Shipped | Z3 |
 | Campaign write API | ❌ | Z4 |
 
 Cập nhật gap: [`ACTION-GAP-ANALYSIS.md`](../ACTION-GAP-ANALYSIS.md) khi bắt đầu Wave Z1.

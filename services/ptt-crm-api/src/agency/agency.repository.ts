@@ -1629,6 +1629,24 @@ export class AgencyRepository implements OnModuleDestroy {
     return { clients, summary, dateFrom, dateTo, windowDays };
   }
 
+  async countOpenZaloAlerts(clientId?: string): Promise<number> {
+    try {
+      const clauses = [`ma.channel = 'zalo'`, `ma.acknowledged_at IS NULL`];
+      const params: unknown[] = [];
+      if (clientId?.trim()) {
+        clauses.push(`ma.client_id = $1::uuid`);
+        params.push(clientId.trim());
+      }
+      const result = await this.db.query(
+        `SELECT COUNT(*)::int AS c FROM meta_alerts ma WHERE ${clauses.join(' AND ')}`,
+        params,
+      );
+      return Number(result.rows[0]?.c ?? 0);
+    } catch {
+      return 0;
+    }
+  }
+
   async zaloHubCampaignExport(params: {
     dateFrom: string;
     dateTo: string;

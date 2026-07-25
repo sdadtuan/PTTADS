@@ -34,15 +34,16 @@ export class PortalCreativeNotifyService {
         ? `Client đã duyệt: ${creative.title} (v${creative.version})`
         : `Client từ chối: ${creative.title} (v${creative.version})`;
     const body = note?.trim() || `Quyết định ${decision} trên portal bởi ${reviewedBy}`;
-    const link = `/crm/creatives/${creative.id}`;
+    const link = creative.channel === 'zalo' ? '/zalo/zalo-ads' : `/crm/creatives/${creative.id}`;
 
     const inbox = await this.insertInbox(recipient, title, body, link, {
       creative_id: creative.id,
       client_id: creative.client_id,
+      channel: creative.channel ?? 'meta',
       version: creative.version,
       decision,
       reviewed_by: reviewedBy,
-      kind: 'creative_portal_decision',
+      kind: creative.channel === 'zalo' ? 'zalo_creative_milestone' : 'creative_portal_decision',
     });
 
     const email = await this.sendEmailWebhook({

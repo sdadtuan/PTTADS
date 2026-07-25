@@ -59,6 +59,7 @@ export function ZaloZaloAdsContent() {
   const [status, setStatus] = useState(searchParams.get('status') ?? '');
   const [q, setQ] = useState(searchParams.get('q') ?? '');
   const [exportScope, setExportScope] = useState<'clients' | 'campaigns'>('clients');
+  const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
 
   const hubQuery = useMemo(
     () => ({
@@ -164,6 +165,7 @@ export function ZaloZaloAdsContent() {
       const { blob, filename } = await downloadZaloHubExport(access, {
         ...hubQuery,
         scope: exportScope,
+        format: exportFormat,
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -311,13 +313,23 @@ export function ZaloZaloAdsContent() {
             {loading ? 'Đang tải…' : 'Áp dụng / Làm mới'}
           </button>
           <select
+            value={exportFormat}
+            onChange={(e) => setExportFormat(e.target.value as 'csv' | 'pdf')}
+            style={{ padding: '0.35rem' }}
+            aria-label="Export format"
+          >
+            <option value="csv">CSV</option>
+            <option value="pdf">PDF báo cáo KH</option>
+          </select>
+          <select
             value={exportScope}
             onChange={(e) => setExportScope(e.target.value as 'clients' | 'campaigns')}
             style={{ padding: '0.35rem' }}
             aria-label="Export scope"
+            disabled={exportFormat === 'pdf'}
           >
-            <option value="clients">Export CSV — theo client</option>
-            <option value="campaigns">Export CSV — theo campaign</option>
+            <option value="clients">Theo client</option>
+            <option value="campaigns">Theo campaign</option>
           </select>
           <button
             type="button"
@@ -325,7 +337,7 @@ export function ZaloZaloAdsContent() {
             disabled={exportBusy || loading}
             onClick={() => void handleExport()}
           >
-            {exportBusy ? 'Đang export…' : 'Tải CSV'}
+            {exportBusy ? 'Đang export…' : exportFormat === 'pdf' ? 'Tải PDF' : 'Tải CSV'}
           </button>
         </div>
       </div>

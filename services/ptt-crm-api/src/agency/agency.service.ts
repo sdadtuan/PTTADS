@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AgencySideEffectsService } from './agency-side-effects.service';
@@ -662,15 +663,17 @@ export class AgencyService {
         q,
       });
 
+    const openAlerts = await this.repo.countOpenZaloAlerts(clientId ?? undefined);
+
     return {
       ok: true,
       pg_ready: true,
       date_from: df,
       date_to: dt,
       window_days: wd,
-      summary,
+      summary: { ...summary, open_zalo_alerts: openAlerts },
       clients,
-      alerts: this.buildZaloHubAlerts(summary),
+      alerts: this.buildZaloHubAlerts(summary, openAlerts),
       pilot: zaloAdsPilotStatus(clientId ?? undefined) as unknown as Record<string, unknown>,
       filters: {
         client_id: clientId,
@@ -678,6 +681,32 @@ export class AgencyService {
         q: q ?? null,
       },
     };
+  }
+
+  async zaloHubExport(query: {
+    days?: string;
+    to?: string;
+    date_to?: string;
+    from?: string;
+    date_from?: string;
+    status?: string;
+    client_id?: string;
+    q?: string;
+    scope?: string;
+    format?: string;
+  }): Promise<{ csv?: string; buffer?: Buffer; filename: string; contentType: string }> {
+    const format = (query.format ?? 'csv').trim().toLowerCase();
+    if (format === 'pdf') {
+      const hub = await this.zaloHub(query);
+      const buffer = await this.renderZaloHubPdf(hub);
+      return {
+        buffer,
+        filename: `zalo-hub-${hub.date_from}_${hub.date_to}.pdf`,
+        contentType: 'application/pdf',
+      };
+    }
+    const csvOut = await this.zaloHubExportCsv(query);
+    return { ...csvOut, contentType: 'text/csv; charset=utf-8' };
   }
 
   async zaloHubExportCsv(query: {
@@ -1102,10 +1131,18 @@ export class AgencyService {
     return alerts;
   }
 
-  private buildZaloHubAlerts(summary: Record<string, unknown>): FacebookHubAlert[] {
+  private buildZaloHubAlerts(summary: Record<string, unknown>, openAlerts = 0): FacebookHubAlert[] {
     const alerts: FacebookHubAlert[] = [];
     const unmapped = Number(summary.unmapped_campaigns ?? 0);
     const overTarget = Number(summary.over_target_rows ?? 0);
+    if (openAlerts > 0) {
+      alerts.push({
+        severity: 'warn',
+        message: `${openAlerts} alert Zalo chưa ack (CPL / zero leads / CTR)`,
+        link: '/zalo/zalo-ads',
+        link_label: 'Xem Zalo hub',
+      });
+    }
     if (unmapped > 0) {
       alerts.push({
         severity: 'warn',
@@ -1785,5 +1822,42 @@ export class AgencyService {
       this.logger.warn(`enqueue insights after hub map: ${String(err)}`);
       return undefined;
     }
+  }
+
+  private renderZaloHubPdf(hub: ZaloHubResponse): Promise<Buffer> {
+    const root = path.resolve(__dirname, '../../../../..');
+    const script = path.join(root, 'scripts/export_zalo_hub_pdf.py');
+    const payload = JSON.stringify({
+      summary: hub.summary,
+      clients: hub.clients,
+      date_from: hub.date_from,
+      date_to: hub.date_to,
+      alerts: hub.alerts,
+    });
+    return new Promise((resolve, reject) => {
+      const proc = spawn('python3', [script], {
+        cwd: root,
+        env: { ...process.env, PYTHONPATH: root },
+      });
+      const chunks: Buffer[] = [];
+      const errChunks: Buffer[] = [];
+      proc.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+      proc.stderr.on('data', (chunk: Buffer) => errChunks.push(chunk));
+      proc.on('error', reject);
+      proc.on('close', (code) => {
+        if (code === 0) {
+          resolve(Buffer.concat(chunks));
+          return;
+        }
+        reject(
+          new ServiceUnavailableException({
+            error: 'zalo_pdf_export_failed',
+            detail: Buffer.concat(errChunks).toString('utf8').slice(0, 500),
+          }),
+        );
+      });
+      proc.stdin.write(payload);
+      proc.stdin.end();
+    });
   }
 }

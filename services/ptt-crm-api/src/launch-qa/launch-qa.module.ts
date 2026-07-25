@@ -16,6 +16,8 @@ import { LaunchQaHubService } from './launch-qa-hub.service';
 import { LaunchQaInternalController } from './launch-qa-internal.controller';
 import { LaunchQaLifecycleLookupService } from './launch-qa-lifecycle-lookup.service';
 import { LaunchQaMetaBridgeService } from './launch-qa-meta-bridge.service';
+import { LaunchQaZaloBridgeService } from './launch-qa-zalo-bridge.service';
+import { ZaloLaunchQaRepository } from '../zalo-tracking/zalo-launch-qa.repository';
 
 @Module({
   imports: [StaffAuthModule, MetaTrackingModule],
@@ -26,6 +28,8 @@ import { LaunchQaMetaBridgeService } from './launch-qa-meta-bridge.service';
     LaunchQaCreativeBridgeService,
     LaunchQaCampaignWriteBridgeService,
     LaunchQaMetaBridgeService,
+    LaunchQaZaloBridgeService,
+    ZaloLaunchQaRepository,
     LaunchQaPgRepository,
     CreativesRepository,
     CampaignWritesRepository,
@@ -38,6 +42,7 @@ import { LaunchQaMetaBridgeService } from './launch-qa-meta-bridge.service';
     LaunchQaCreativeBridgeService,
     LaunchQaCampaignWriteBridgeService,
     LaunchQaMetaBridgeService,
+    LaunchQaZaloBridgeService,
     LaunchQaLifecycleLookupService,
   ],
 })

@@ -1144,8 +1144,9 @@ export async function fetchCrmCreativesStats(token: string) {
   return crmFetch<{ ok: boolean; stats: Record<string, number> }>(token, '/api/crm/creatives/stats');
 }
 
-export async function fetchCrmCreatives(token: string, status = 'all', limit = 100) {
+export async function fetchCrmCreatives(token: string, status = 'all', limit = 100, channel = 'all') {
   const qs = new URLSearchParams({ status, limit: String(limit) });
+  if (channel && channel !== 'all') qs.set('channel', channel);
   return crmFetch<{
     ok: boolean;
     count: number;
@@ -1155,6 +1156,7 @@ export async function fetchCrmCreatives(token: string, status = 'all', limit = 1
       title: string;
       status: string;
       version: number;
+      channel?: string;
       external_campaign_id: string | null;
       external_campaign_name: string | null;
       submitted_at: string;
@@ -1175,6 +1177,7 @@ export async function postCrmCreativeSubmit(
     description?: string;
     asset_url?: string;
     asset_type?: string;
+    channel?: string;
     resubmit?: boolean;
   },
 ) {
@@ -2892,7 +2895,7 @@ export async function pollZaloForm(
 
 export async function downloadZaloHubExport(
   token: string,
-  params: ZaloHubQuery & { scope?: 'clients' | 'campaigns' } = {},
+  params: ZaloHubQuery & { scope?: 'clients' | 'campaigns'; format?: 'csv' | 'pdf' } = {},
 ): Promise<{ blob: Blob; filename: string }> {
   const qs = new URLSearchParams();
   if (params.days != null) qs.set('days', String(params.days));
@@ -2902,6 +2905,7 @@ export async function downloadZaloHubExport(
   if (params.client_id) qs.set('client_id', params.client_id);
   if (params.q) qs.set('q', params.q);
   if (params.scope) qs.set('scope', params.scope);
+  if (params.format) qs.set('format', params.format);
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   const res = await fetch(`${API_BASE}/api/v1/zalo-ads/hub/export${suffix}`, {
     headers: { Authorization: `Bearer ${token}` },

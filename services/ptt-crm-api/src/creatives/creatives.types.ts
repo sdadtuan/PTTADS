@@ -1,5 +1,7 @@
 export type CreativeStatus = 'pending_client' | 'approved' | 'rejected' | 'withdrawn';
 
+export type CreativeChannel = 'meta' | 'google' | 'zalo';
+
 export interface CreativeRow {
   id: string;
   client_id: string;
@@ -17,6 +19,7 @@ export interface CreativeRow {
   reviewed_at: string | null;
   review_note: string | null;
   temporal_workflow_id: string | null;
+  channel: CreativeChannel;
 }
 
 export interface CreativePendingResponse {
@@ -61,6 +64,7 @@ export interface CreateCreativeBody {
   asset_url?: string;
   asset_type?: string;
   submitted_by?: string;
+  channel?: CreativeChannel | string;
 }
 
 export interface CreateCreativeResponse {

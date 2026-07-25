@@ -17,6 +17,7 @@ DDL_V3_LAUNCH_QA_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v3-launch-qa.s
 DDL_V3_GOOGLE_SYNC_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v3-google-sync.sql")
 DDL_ZALO_INSIGHTS_SYNC_REL = Path("docs/specs/2026-07-25-postgresql-ddl-zalo-insights-sync-state.sql")
 DDL_ZALO_LEADS_REL = Path("docs/specs/2026-07-25-postgresql-ddl-zalo-leads.sql")
+DDL_ZALO_Z3_REL = Path("docs/specs/2026-07-25-postgresql-ddl-zalo-z3.sql")
 DDL_V4_HUB_SOP_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v4-hub-sop.sql")
 DDL_V5_CAMPAIGN_WRITES_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v5-campaign-writes.sql")
 DDL_V3_INGEST_CONFIG_REL = Path("docs/specs/2026-07-17-postgresql-ddl-v3-leads-ingest-config.sql")
@@ -118,6 +119,11 @@ def ddl_zalo_insights_sync_path() -> Path:
 def ddl_zalo_leads_path() -> Path:
     base = Path(__file__).resolve().parents[1]
     return base / DDL_ZALO_LEADS_REL
+
+
+def ddl_zalo_z3_path() -> Path:
+    base = Path(__file__).resolve().parents[1]
+    return base / DDL_ZALO_Z3_REL
 
 
 def ddl_v4_hub_sop_path() -> Path:
@@ -626,6 +632,33 @@ def pg_zalo_leads_ready() -> bool:
 
 def apply_ddl_zalo_leads(*, ddl_path: Path | None = None) -> bool:
     _apply_sql_file(ddl_path or ddl_zalo_leads_path())
+    return True
+
+
+def pg_zalo_z3_ready() -> bool:
+    try:
+        from ptt_jobs.db import pg_available, pg_connection
+
+        if not pg_available():
+            return False
+        with pg_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT COUNT(*) FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'creative_submissions'
+                      AND column_name = 'channel'
+                    """
+                )
+                return int(cur.fetchone()[0] or 0) >= 1
+    except Exception as exc:
+        logger.debug("pg_zalo_z3_ready: %s", exc)
+        return False
+
+
+def apply_ddl_zalo_z3(*, ddl_path: Path | None = None) -> bool:
+    _apply_sql_file(ddl_path or ddl_zalo_z3_path())
     return True
 
 

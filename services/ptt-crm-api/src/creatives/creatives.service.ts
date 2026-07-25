@@ -76,6 +76,7 @@ export class CreativesService {
       assetUrl: body.asset_url?.trim() || null,
       assetType: body.asset_type?.trim() || 'image',
       submittedBy,
+      channel: body.channel,
     });
 
     const wf = await this.temporal.startCreativeWorkflow({

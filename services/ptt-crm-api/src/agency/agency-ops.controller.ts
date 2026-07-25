@@ -350,7 +350,6 @@ export class AgencyOpsController {
 
   @Get('zalo-ads/hub/export')
   @UseGuards(StaffOrInternalKeyGuard, StaffZaloAdsViewGuard)
-  @Header('Content-Type', 'text/csv; charset=utf-8')
   async zaloHubExport(
     @Res({ passthrough: true }) res: Response,
     @Query('days') days?: string,
@@ -362,8 +361,9 @@ export class AgencyOpsController {
     @Query('client_id') clientId?: string,
     @Query('q') q?: string,
     @Query('scope') scope?: string,
-  ): Promise<string> {
-    const out = await this.agency.zaloHubExportCsv({
+    @Query('format') format?: string,
+  ): Promise<string | Buffer> {
+    const out = await this.agency.zaloHubExport({
       days,
       to,
       date_to: dateTo,
@@ -373,9 +373,14 @@ export class AgencyOpsController {
       client_id: clientId,
       q,
       scope,
+      format,
     });
     res.setHeader('Content-Disposition', `attachment; filename="${out.filename}"`);
-    return out.csv;
+    res.setHeader('Content-Type', out.contentType);
+    if (out.buffer) {
+      return out.buffer;
+    }
+    return out.csv ?? '';
   }
 
   @Get('zalo-ads/oauth/start')

@@ -25,7 +25,13 @@ export class CrmCreativesService {
     };
   }
 
-  async list(input: { status?: string; clientId?: string; externalCampaignId?: string; limit?: number }) {
+  async list(input: {
+    status?: string;
+    clientId?: string;
+    externalCampaignId?: string;
+    channel?: string;
+    limit?: number;
+  }) {
     await this.ensureReady();
     const status = VALID_STATUS.has(String(input.status ?? 'all').trim())
       ? String(input.status ?? 'all').trim()
@@ -34,6 +40,7 @@ export class CrmCreativesService {
       status: status === 'all' ? undefined : status,
       clientId: input.clientId,
       externalCampaignId: input.externalCampaignId,
+      channel: input.channel,
       limit: input.limit,
     });
     const index = this.lifecycleLookup.buildLifecycleIndex();
@@ -63,6 +70,7 @@ export class CrmCreativesService {
     version?: number;
     resubmit?: boolean;
     submitted_by?: string;
+    channel?: string;
   }) {
     await this.ensureReady();
     const clientId = body.client_id?.trim();
@@ -88,6 +96,7 @@ export class CrmCreativesService {
       asset_url: body.asset_url,
       asset_type: body.asset_type,
       submitted_by: body.submitted_by,
+      channel: body.channel,
     });
   }
 
