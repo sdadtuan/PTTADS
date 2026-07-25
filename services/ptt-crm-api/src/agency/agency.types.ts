@@ -52,6 +52,8 @@ export interface AgencyChannelAccount {
   credential_ref?: string | null;
   pixel_id?: string | null;
   facebook_page_id?: string | null;
+  /** Zalo lead form IDs (meta.form_ids). */
+  form_ids?: string[] | null;
   target_cpl_vnd?: number | null;
 }
 
@@ -162,6 +164,8 @@ export interface AddChannelAccountBody {
   display_name?: string;
   /** Meta Page ID for webhook → client resolution (digits only stored). */
   facebook_page_id?: string;
+  /** Zalo lead form IDs — stored in account meta.form_ids (Wave Z2). */
+  form_ids?: string[] | string;
 }
 
 export interface UpdateChannelAccountBody {
@@ -169,6 +173,7 @@ export interface UpdateChannelAccountBody {
   external_account_id?: string;
   status?: string;
   facebook_page_id?: string;
+  form_ids?: string[] | string;
 }
 
 export interface ChannelAlertConfigBody {

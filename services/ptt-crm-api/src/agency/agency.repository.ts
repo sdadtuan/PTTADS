@@ -23,6 +23,7 @@ import {
   FacebookHubCampaignExportRow,
   resolveFacebookHubDateWindow,
 } from './facebook-hub.util';
+import { channelAccountMetaPatch, readFormIdsFromMeta } from './channel-meta.util';
 
 function iso(value: unknown): string | null {
   if (value == null) return null;
@@ -242,6 +243,7 @@ export class AgencyRepository implements OnModuleDestroy {
       meta && typeof meta === 'object'
         ? normMetaPageId(String(meta.facebook_page_id ?? meta.page_id ?? ''))
         : null;
+    const formIds = readFormIdsFromMeta(meta);
     const targetCplRaw = meta && typeof meta === 'object' ? meta.target_cpl_vnd : null;
     const targetCplVnd =
       targetCplRaw != null && targetCplRaw !== '' && Number.isFinite(Number(targetCplRaw))
@@ -255,6 +257,7 @@ export class AgencyRepository implements OnModuleDestroy {
       token_expires_at: expires ? expires.toISOString() : null,
       pixel_id: pixelId,
       facebook_page_id: facebookPageId,
+      form_ids: formIds,
       target_cpl_vnd: targetCplVnd,
     };
   }
@@ -819,6 +822,7 @@ export class AgencyRepository implements OnModuleDestroy {
       external_account_id: string;
       display_name?: string;
       facebook_page_id?: string;
+      form_ids?: string[];
     },
   ): Promise<AgencyChannelAccount> {
     const channel = params.channel.trim().toLowerCase();
@@ -826,7 +830,10 @@ export class AgencyRepository implements OnModuleDestroy {
     if (channel === 'meta') {
       ext = ext.replace(/\D/g, '') || ext;
     }
-    const metaPatch = metaPagePatch(channel, params.facebook_page_id);
+    const metaPatch = channelAccountMetaPatch(channel, {
+      facebook_page_id: params.facebook_page_id,
+      form_ids: params.form_ids,
+    });
     const vaultReady = await this.vaultColumnsReady();
     const result = await this.db.query(
       vaultReady
@@ -875,6 +882,7 @@ export class AgencyRepository implements OnModuleDestroy {
       external_account_id?: string;
       status?: string;
       facebook_page_id?: string;
+      form_ids?: string[];
     },
   ): Promise<AgencyChannelAccount | null> {
     const existing = await this.fetchChannelAccount(clientId, accountId);
@@ -901,7 +909,10 @@ export class AgencyRepository implements OnModuleDestroy {
       sets.push(`status = $${idx++}`);
       values.push(params.status.trim());
     }
-    const metaPatch = metaPagePatch(existing.channel, params.facebook_page_id);
+    const metaPatch = channelAccountMetaPatch(existing.channel, {
+      facebook_page_id: params.facebook_page_id,
+      form_ids: params.form_ids,
+    });
     if (metaPatch) {
       sets.push(`meta = COALESCE(meta, '{}'::jsonb) || $${idx++}::jsonb`);
       values.push(JSON.stringify(metaPatch));
@@ -2132,13 +2143,6 @@ function normMetaPageId(raw: string): string | null {
     .replace(/\D/g, '')
     .trim();
   return id || null;
-}
-
-function metaPagePatch(channel: string, facebookPageId?: string): Record<string, string> | null {
-  if (channel.trim().toLowerCase() !== 'meta') return null;
-  const pageId = normMetaPageId(facebookPageId ?? '');
-  if (!pageId) return null;
-  return { facebook_page_id: pageId, page_id: pageId };
 }
 
 function normalizeSuggestName(value: string): string {

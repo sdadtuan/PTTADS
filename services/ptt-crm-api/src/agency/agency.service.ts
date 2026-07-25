@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AgencySideEffectsService } from './agency-side-effects.service';
 import { AgencyRepository } from './agency.repository';
+import { parseFormIds } from './channel-meta.util';
 import {
   AgencyClientsListResponse,
   AgencyClientDetail,
@@ -1321,6 +1322,7 @@ export class AgencyService {
       external_account_id: ext,
       display_name: body.display_name,
       facebook_page_id: body.facebook_page_id,
+      form_ids: parseFormIds(body.form_ids),
     });
     return this.getClient(clientId);
   }
@@ -1345,6 +1347,7 @@ export class AgencyService {
         external_account_id: body.external_account_id,
         status: body.status?.trim(),
         facebook_page_id: body.facebook_page_id,
+        form_ids: parseFormIds(body.form_ids),
       });
       if (!updated) {
         throw new NotFoundException({ error: 'account_not_found' });

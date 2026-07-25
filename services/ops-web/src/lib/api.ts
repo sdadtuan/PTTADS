@@ -2377,6 +2377,7 @@ export interface AgencyClient {
     token_status?: string | null;
     token_expires_at?: string | null;
     facebook_page_id?: string | null;
+    form_ids?: string[] | null;
   }>;
   side_effects?: {
     domain_event_id?: string | null;
@@ -3201,7 +3202,7 @@ export async function resetClientPortalUserPassword(
 export async function addClientChannelAccount(
   token: string,
   clientId: string,
-  body: { channel: string; external_account_id: string; display_name?: string; facebook_page_id?: string },
+  body: { channel: string; external_account_id: string; display_name?: string; facebook_page_id?: string; form_ids?: string },
 ): Promise<AgencyClient> {
   return agencyMutate(token, `/api/v1/clients/${clientId}/channel-accounts`, {
     method: 'POST',
@@ -3213,7 +3214,7 @@ export async function patchClientChannelAccount(
   token: string,
   clientId: string,
   accountId: string,
-  body: { display_name?: string; external_account_id?: string; status?: string; facebook_page_id?: string },
+  body: { display_name?: string; external_account_id?: string; status?: string; facebook_page_id?: string; form_ids?: string },
 ): Promise<AgencyClient> {
   return agencyMutate(token, `/api/v1/clients/${clientId}/channel-accounts/${accountId}`, {
     method: 'PATCH',

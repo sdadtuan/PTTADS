@@ -61,10 +61,13 @@ export function MetaHubFilters({
       </p>
       <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <Link href="/meta/ads-combined" className="btn btn-sm btn-secondary">
-          Meta + Google
+          Meta + Google + Zalo
         </Link>
         <Link href="/google/google-ads" className="btn btn-sm btn-secondary">
           Google Ads hub
+        </Link>
+        <Link href="/zalo/zalo-ads" className="btn btn-sm btn-secondary">
+          Zalo Ads hub
         </Link>
         <Link href="/crm/hub" className="btn btn-sm btn-secondary">
           Hub campaign map

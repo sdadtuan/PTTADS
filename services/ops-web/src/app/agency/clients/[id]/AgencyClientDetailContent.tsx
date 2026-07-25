@@ -111,6 +111,7 @@ export function AgencyClientDetailContent() {
     external_account_id: '',
     display_name: '',
     facebook_page_id: '',
+    form_ids: '',
   });
   const [editForm, setEditForm] = useState<ClientEditForm>({
     name: '',
@@ -126,11 +127,13 @@ export function AgencyClientDetailContent() {
   const [tokenAccountId, setTokenAccountId] = useState('');
   const [tokenValue, setTokenValue] = useState('');
   const [editChannelId, setEditChannelId] = useState<string | null>(null);
+  const [editChannelKind, setEditChannelKind] = useState<string>('meta');
   const [editChannelForm, setEditChannelForm] = useState({
     external_account_id: '',
     display_name: '',
     status: 'active',
     facebook_page_id: '',
+    form_ids: '',
   });
   const [accessToken, setAccessToken] = useState('');
   const [offboardReason, setOffboardReason] = useState('contract_ended');
@@ -406,7 +409,7 @@ export function AgencyClientDetailContent() {
     try {
       const updated = await addClientChannelAccount(access, clientId, channelForm);
       setClient(updated);
-      setChannelForm({ channel: 'meta', external_account_id: '', display_name: '', facebook_page_id: '' });
+      setChannelForm({ channel: 'meta', external_account_id: '', display_name: '', facebook_page_id: '', form_ids: '' });
       setActionMsg('Đã thêm channel account');
       const metaAcc = (updated.channel_accounts ?? []).find((a) => a.channel === 'meta');
       if (metaAcc) setTokenAccountId(metaAcc.id);
@@ -419,11 +422,13 @@ export function AgencyClientDetailContent() {
 
   function startEditChannel(acc: NonNullable<AgencyClient['channel_accounts']>[number]) {
     setEditChannelId(acc.id);
+    setEditChannelKind(acc.channel);
     setEditChannelForm({
       external_account_id: acc.external_account_id ?? '',
       display_name: acc.display_name ?? '',
       status: acc.status ?? 'active',
       facebook_page_id: acc.facebook_page_id ?? '',
+      form_ids: (acc.form_ids ?? []).join(', '),
     });
     setActionMsg('');
     setError('');
@@ -1031,9 +1036,12 @@ export function AgencyClientDetailContent() {
                       />
                     ) : null}
                     {channelForm.channel === 'zalo' ? (
-                      <p className="muted" style={{ margin: 0, fontSize: '0.85rem' }}>
-                        Form IDs (lead forms) sẽ cấu hình ở Wave Z2 — hiện dùng OA ID + OAuth connect.
-                      </p>
+                      <input
+                        placeholder="Form IDs (lead forms) — phân cách bằng dấu phẩy"
+                        value={channelForm.form_ids}
+                        onChange={(e) => setChannelForm((f) => ({ ...f, form_ids: e.target.value }))}
+                        style={{ padding: '0.5rem' }}
+                      />
                     ) : null}
                     <button type="submit" className="btn btn-sm" disabled={busy}>
                       Thêm channel
@@ -1060,12 +1068,22 @@ export function AgencyClientDetailContent() {
                       onChange={(e) => setEditChannelForm((f) => ({ ...f, display_name: e.target.value }))}
                       style={{ padding: '0.5rem' }}
                     />
-                    <input
-                      placeholder="Facebook Page ID (webhook routing)"
-                      value={editChannelForm.facebook_page_id}
-                      onChange={(e) => setEditChannelForm((f) => ({ ...f, facebook_page_id: e.target.value }))}
-                      style={{ padding: '0.5rem' }}
-                    />
+                    {editChannelKind === 'meta' ? (
+                      <input
+                        placeholder="Facebook Page ID (webhook routing)"
+                        value={editChannelForm.facebook_page_id}
+                        onChange={(e) => setEditChannelForm((f) => ({ ...f, facebook_page_id: e.target.value }))}
+                        style={{ padding: '0.5rem' }}
+                      />
+                    ) : null}
+                    {editChannelKind === 'zalo' ? (
+                      <input
+                        placeholder="Form IDs (lead forms) — phân cách bằng dấu phẩy"
+                        value={editChannelForm.form_ids}
+                        onChange={(e) => setEditChannelForm((f) => ({ ...f, form_ids: e.target.value }))}
+                        style={{ padding: '0.5rem' }}
+                      />
+                    ) : null}
                     <select
                       value={editChannelForm.status}
                       onChange={(e) => setEditChannelForm((f) => ({ ...f, status: e.target.value }))}
@@ -1092,7 +1110,7 @@ export function AgencyClientDetailContent() {
                     <tr>
                       <th>Channel</th>
                       <th>External ID</th>
-                      <th>Page ID</th>
+                      <th>Page / Form IDs</th>
                       <th>Tên hiển thị</th>
                       <th>Token</th>
                       <th>Status</th>
@@ -1104,7 +1122,11 @@ export function AgencyClientDetailContent() {
                       <tr key={acc.id}>
                         <td>{acc.channel}</td>
                         <td>{acc.external_account_id ?? '—'}</td>
-                        <td>{acc.facebook_page_id ?? '—'}</td>
+                        <td>
+                          {acc.channel === 'zalo'
+                            ? (acc.form_ids?.length ? acc.form_ids.join(', ') : '—')
+                            : (acc.facebook_page_id ?? '—')}
+                        </td>
                         <td>{acc.display_name ?? '—'}</td>
                         <td>{acc.token_status ?? (acc.has_token ? 'ok' : '—')}</td>
                         <td>{acc.status ?? '—'}</td>
@@ -1152,7 +1174,7 @@ export function AgencyClientDetailContent() {
                     ))}
                     {(client.channel_accounts ?? []).length === 0 ? (
                       <tr>
-                        <td colSpan={canMutate ? 6 : 5} className="muted">
+                        <td colSpan={canMutate ? 7 : 6} className="muted">
                           Chưa có channel account — thêm Meta act_… ở form trên
                         </td>
                       </tr>
