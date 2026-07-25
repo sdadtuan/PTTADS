@@ -101,6 +101,27 @@ def _run_prior_wave_gates() -> dict[str, Any]:
     }
 
 
+def _run_handoff_gate() -> dict[str, Any]:
+    if os.environ.get("WAVE_SEO_B7_SKIP_HANDOFF", "0") == "1":
+        return {"id": "SEO-B7-G06", "ok": True, "label": "§12 handoff gate", "skipped": True}
+    env = {**os.environ, "SEO_HANDOFF_SKIP_E2E": os.environ.get("SEO_HANDOFF_SKIP_E2E", "1")}
+    proc = subprocess.run(
+        [sys.executable, "-m", "ptt_crm.seo_handoff_gates"],
+        cwd=ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    return {
+        "id": "SEO-B7-G06",
+        "ok": proc.returncode == 0,
+        "label": "§12 handoff gate",
+        "returncode": proc.returncode,
+        "stdout_tail": proc.stdout[-1500:],
+        "stderr_tail": proc.stderr[-1500:],
+    }
+
+
 def run_gates() -> dict[str, Any]:
     checks = [
         _check_module_files(),
@@ -108,6 +129,7 @@ def run_gates() -> dict[str, Any]:
         _check_ops_web_routes(),
         _check_nginx_redirect(),
         _run_prior_wave_gates(),
+        _run_handoff_gate(),
     ]
     ok = all(c["ok"] for c in checks)
     report = {"ok": ok, "phase": "7", "gate": "A", "generated_at": _now_iso(), "checks": checks}
