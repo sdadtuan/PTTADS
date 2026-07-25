@@ -94,6 +94,33 @@ export class SeoContentController {
     return { ok: true, cluster };
   }
 
+  @Post('clients/:id/research/serp')
+  @UseGuards(StaffSeoWriteGuard)
+  async captureSerp(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { phrase?: string; keyword_id?: number; domain_hint?: string },
+  ) {
+    const snapshot = await this.content.captureSerpSnapshot(id, body);
+    return { ok: true, snapshot };
+  }
+
+  @Post('clients/:id/research/pages/sync-gsc')
+  @UseGuards(StaffSeoWriteGuard)
+  async syncPagesFromGsc(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { days?: number },
+  ) {
+    const out = await this.content.syncPagesFromGsc(id, body.days);
+    return { ok: true, ...out };
+  }
+
+  @Post('clients/:id/entities/autolink')
+  @UseGuards(StaffSeoWriteGuard)
+  async autolinkEntities(@Param('id', ParseIntPipe) id: number) {
+    const out = await this.content.autolinkEntities(id);
+    return { ok: true, ...out };
+  }
+
   @Post('research/brief-preview')
   async briefPreview(
     @Body()

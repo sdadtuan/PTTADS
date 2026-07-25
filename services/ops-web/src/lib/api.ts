@@ -3623,6 +3623,38 @@ export async function createSeoCluster(
   });
 }
 
+export async function captureSeoSerpSnapshot(
+  token: string,
+  customerId: number,
+  body: { phrase: string; keyword_id?: number; domain_hint?: string },
+): Promise<{ ok: boolean; snapshot: Record<string, unknown> }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/research/serp`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function syncSeoPagesFromGsc(
+  token: string,
+  customerId: number,
+  days = 90,
+): Promise<{ ok: boolean; synced: number; source: string }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/research/pages/sync-gsc`, {
+    method: 'POST',
+    body: JSON.stringify({ days }),
+  });
+}
+
+export async function autolinkSeoEntities(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; entities_created: number; links_created: number }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/entities/autolink`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
 export async function previewSeoBrief(
   token: string,
   body: { customer_id: number; keyword_id?: number; question_id?: number },

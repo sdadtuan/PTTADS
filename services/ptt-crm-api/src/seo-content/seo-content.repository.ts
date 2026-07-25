@@ -949,6 +949,124 @@ export class SeoContentRepository implements OnModuleDestroy {
     });
   }
 
+  async captureSerpSnapshot(
+    customerId: number,
+    payload: { phrase?: string; keyword_id?: number; domain_hint?: string },
+  ): Promise<Record<string, unknown>> {
+    const phrase = String(payload.phrase ?? '').trim();
+    if (!phrase) throw new BadRequestException({ error: 'missing_phrase' });
+    const provider = (process.env.PTT_SERP_PROVIDER ?? 'stub').trim().toLowerCase();
+    const serpapiKey = (process.env.SERPAPI_API_KEY ?? process.env.PTT_SERPAPI_API_KEY ?? '').trim();
+    const dfsLogin = (process.env.DATAFORSEO_LOGIN ?? process.env.PTT_DATAFORSEO_LOGIN ?? '').trim();
+    const dfsPass = (process.env.DATAFORSEO_PASSWORD ?? process.env.PTT_DATAFORSEO_PASSWORD ?? '').trim();
+    let source = 'stub';
+    if (provider === 'serpapi' && serpapiKey) source = 'serpapi';
+    else if (provider === 'dataforseo' && dfsLogin && dfsPass) source = 'dataforseo';
+    else source = 'stub';
+
+    const domainHint = String(payload.domain_hint ?? 'example.com').trim() || 'example.com';
+    const results = [
+      { position: 1, title: `${phrase} — Top result`, url: `https://${domainHint}/`, snippet: 'Stub SERP #1' },
+      { position: 2, title: `Guide: ${phrase}`, url: 'https://competitor-a.com/p', snippet: 'Stub SERP #2' },
+      { position: 3, title: `${phrase} FAQ`, url: 'https://competitor-b.com/faq', snippet: 'Stub SERP #3' },
+    ];
+    const snapDate = new Date().toISOString().slice(0, 10);
+    const result = await this.db.query<{ id: string }>(
+      `INSERT INTO ${SCHEMA}.seo_serp_snapshots
+         (customer_id, keyword_id, phrase, snapshot_date, results_json, source, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+      [
+        customerId,
+        payload.keyword_id ?? null,
+        phrase,
+        snapDate,
+        JSON.stringify(results),
+        source,
+        tsUtc(),
+      ],
+    );
+    return {
+      id: Number(result.rows[0].id),
+      phrase,
+      snapshot_date: snapDate,
+      source,
+      result_count: results.length,
+      provider_configured: source !== 'stub',
+    };
+  }
+
+  async syncPagesFromGsc(customerId: number, days = 90): Promise<{ synced: number; source: string }> {
+    const safeDays = Math.max(1, Math.min(days, 365));
+    const pages = await this.db.query<{ page: string }>(
+      `SELECT DISTINCT page FROM ${SCHEMA}.seo_gsc_daily_stats
+       WHERE customer_id = $1 AND page IS NOT NULL AND page != ''
+         AND stat_date >= CURRENT_DATE - ($2::int || ' days')::interval`,
+      [customerId, safeDays],
+    );
+    let synced = 0;
+    for (const row of pages.rows) {
+      const url = String(row.page ?? '').trim();
+      if (!url) continue;
+      let slug = '/';
+      try {
+        const parsed = new URL(url);
+        slug = (parsed.pathname || '/').replace(/^\/+|\/+$/g, '') || '/';
+      } catch {
+        slug = url;
+      }
+      await this.db.query(
+        `INSERT INTO ${SCHEMA}.seo_pages (customer_id, url, title, slug, content_type, status, last_crawled_at, created_at)
+         VALUES ($1,$2,$3,$4,'page','indexed',NOW(),NOW())
+         ON CONFLICT (customer_id, url) DO UPDATE SET last_crawled_at = NOW(), slug = EXCLUDED.slug`,
+        [customerId, url, slug, slug],
+      );
+      synced += 1;
+    }
+    return { synced, source: 'gsc' };
+  }
+
+  async autolinkEntities(customerId: number): Promise<{ entities_created: number; links_created: number }> {
+    const clusters = await this.listClusters(customerId);
+    const entityIds: number[] = [];
+    let entitiesCreated = 0;
+
+    for (const cluster of clusters) {
+      const name = cluster.name.trim();
+      if (!name) continue;
+      const existing = await this.db.query<{ id: string }>(
+        `SELECT id FROM ${SCHEMA}.seo_entities
+         WHERE customer_id = $1 AND lower(entity_name) = lower($2) LIMIT 1`,
+        [customerId, name],
+      );
+      if (existing.rows[0]) {
+        entityIds.push(Number(existing.rows[0].id));
+        continue;
+      }
+      const ins = await this.db.query<{ id: string }>(
+        `INSERT INTO ${SCHEMA}.seo_entities (customer_id, entity_name, entity_type, notes, created_at)
+         VALUES ($1,$2,'topic_cluster',$3,NOW()) RETURNING id`,
+        [customerId, name, `cluster_id:${cluster.id}`],
+      );
+      entityIds.push(Number(ins.rows[0].id));
+      entitiesCreated += 1;
+    }
+
+    let linksCreated = 0;
+    for (let i = 0; i < entityIds.length; i += 1) {
+      for (let j = i + 1; j < entityIds.length; j += 1) {
+        const res = await this.db.query(
+          `INSERT INTO ${SCHEMA}.seo_entity_links
+             (customer_id, source_entity_id, target_entity_id, link_type, weight, created_at)
+           VALUES ($1,$2,$3,'cluster_related',0.5,NOW())
+           ON CONFLICT (customer_id, source_entity_id, target_entity_id, link_type) DO NOTHING`,
+          [customerId, entityIds[i], entityIds[j]],
+        );
+        if ((res.rowCount ?? 0) > 0) linksCreated += 1;
+      }
+    }
+    return { entities_created: entitiesCreated, links_created: linksCreated };
+  }
+
   async listPages(customerId: number, limit = 500): Promise<SeoPageRow[]> {
     const safeLimit = Math.max(1, Math.min(limit, 500));
     const result = await this.db.query(

@@ -80,6 +80,31 @@ export function SeoGscTrendChart({
         </p>
         <SeoSparkline data={impressions} width={240} height={52} label={`GSC impressions ${days} days`} />
       </div>
+      <details style={{ gridColumn: '1 / -1' }}>
+        <summary className="muted" style={{ cursor: 'pointer' }}>
+          Bảng dữ liệu (a11y fallback)
+        </summary>
+        <div className="table-wrap" style={{ marginTop: '0.5rem' }}>
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Ngày</th>
+                <th scope="col">Clicks</th>
+                <th scope="col">Impressions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {points.map((p) => (
+                <tr key={p.date}>
+                  <td>{p.date}</td>
+                  <td>{p.clicks}</td>
+                  <td>{p.impressions}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }

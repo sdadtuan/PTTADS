@@ -121,6 +121,18 @@ export class SeoContentService {
     return this.repo.pipelineBoard(customerId, lifecycleId);
   }
 
+  captureSerpSnapshot(customerId: number, payload: Record<string, unknown>) {
+    return this.repo.captureSerpSnapshot(customerId, payload);
+  }
+
+  syncPagesFromGsc(customerId: number, days?: number) {
+    return this.repo.syncPagesFromGsc(customerId, days ?? 90);
+  }
+
+  autolinkEntities(customerId: number) {
+    return this.repo.autolinkEntities(customerId);
+  }
+
   listContent(params: {
     customerId?: number;
     lifecycleId?: number;

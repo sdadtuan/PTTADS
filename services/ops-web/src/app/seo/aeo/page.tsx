@@ -193,7 +193,9 @@ function SeoAeoContent() {
         )}
 
         {error && <p className="error">{error}</p>}
-        {toast && <p className="muted">{toast}</p>}
+        <p className="muted" aria-live="polite" role="status">
+          {toast}
+        </p>
 
         {loading ? (
           <p className="muted">Đang tải…</p>

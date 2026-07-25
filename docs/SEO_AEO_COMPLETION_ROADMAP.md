@@ -28,6 +28,19 @@
 
 ## 1. Bối cảnh & trạng thái hiện tại
 
+**Cập nhật 2026-07-25 (post B7 + P0/P1/P2 hardening):**
+
+| Lớp | Trạng thái |
+|-----|------------|
+| Staff UI ops-web `/seo/*` | ~19 routes — S-01…S-17 + Gate A + BI/CMS |
+| Nest `ptt-crm-api` `/api/v1/seo/*` | Modules đầy đủ; không proxy Flask |
+| Python `ptt_seo/` | Domain/worker layer (64 modules) |
+| Flask `/crm/seo/*` | Retired — nginx redirect only |
+| **Feature code vs spec** | ~90–95% |
+| **Prod-ready** | ~60–70% — soak, Gate A sign-off, VPS infra |
+
+Canonical routes: `/seo/hub`, `/seo/clients/[id]`, … (không còn `/crm/seo/*` staff).
+
 | Lớp | % vs spec | Ghi chú |
 |-----|-----------|---------|
 | Domain Python `ptt_seo/` + PG `seo_aeo.*` | ~85–90% | 64 module, workers, cron, tests |
@@ -308,14 +321,16 @@ Migration batch **B4:** AEO, ranks, automations.
 
 ## Backlog sau Gate A (không chặn go-live)
 
-Theo spec §9.2–§9.3:
+Theo spec §9.2–§9.3 (P2 hardening đã ship một phần 2026-07-25):
 
-- GA4 revenue sync + S-12 attribution panel (E7)
-- OKR KPI form editor (E1)
+- ~~S-12 attribution panel (E7)~~ ✅ P1
+- ~~OKR KPI form editor (E1)~~ ✅ P1
+- ~~SERP/Pages research tabs~~ ✅ P1 + P2 POST capture/sync/autolink
 - Non-brand visibility KPI
-- Native crawl API (thay CSV/webhook-only)
-- a11y hoàn thiện §10.2 (E8)
+- Native crawl API prod (thay CSV/webhook-only) — Nest endpoints wired; VPS keys
+- a11y hoàn thiện §10.2 — score meters + chart fallback + aria-live (partial)
 - Email SMTP scheduled reports prod verify
+- Live keys prod: `PTT_CWV_STUB=0`, `PTT_SERP_PROVIDER=serpapi|dataforseo`
 
 ---
 

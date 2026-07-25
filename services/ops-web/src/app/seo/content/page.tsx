@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
 import {
@@ -38,12 +38,22 @@ export default function SeoContentPipelinePage() {
   );
 }
 
+const REVIEW_STATUSES = new Set([
+  'seo_review',
+  'aeo_review',
+  'technical_review',
+  'client_review',
+]);
+
+type PipelineView = 'all' | 'review' | 'refresh';
+
 function SeoContentPipelineContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState<StoredStaffUser | null>(null);
   const [clients, setClients] = useState<SeoHubClientRow[]>([]);
   const [customerId, setCustomerId] = useState('');
+  const [view, setView] = useState<PipelineView>('all');
   const [board, setBoard] = useState<SeoPipelineBoard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -103,7 +113,24 @@ function SeoContentPipelineContent() {
   useEffect(() => {
     const cid = searchParams.get('customer_id');
     if (cid) setCustomerId(cid);
+    const rawView = searchParams.get('view');
+    if (rawView === 'review' || rawView === 'refresh') setView(rawView);
   }, [searchParams]);
+
+  const filteredBoard = useMemo(() => {
+    if (!board || view === 'all') return board;
+    const reviewKeys = new Set(['seo_review', 'aeo_review', 'technical_review', 'client_review']);
+    const columns = board.columns
+      .map((col) => {
+        const items =
+          view === 'refresh'
+            ? col.items.filter((item) => item.workflow_status === 'refresh_required')
+            : col.items.filter((item) => REVIEW_STATUSES.has(item.workflow_status));
+        return { ...col, items };
+      })
+      .filter((col) => (view === 'refresh' ? col.key === 'refresh' : reviewKeys.has(col.key)));
+    return { ...board, columns };
+  }, [board, view]);
 
   useEffect(() => {
     void (async () => {
@@ -162,17 +189,47 @@ function SeoContentPipelineContent() {
         </div>
 
         <div className="card" style={{ marginBottom: '1rem' }}>
-          <label>
-            Client filter
-            <select value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-              <option value="">Tất cả clients</option>
-              {clients.map((c) => (
-                <option key={c.customer_id} value={c.customer_id}>
-                  {c.customer_name} (#{c.customer_id})
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="form-row" style={{ alignItems: 'end', gap: '1rem', flexWrap: 'wrap' }}>
+            <label>
+              Client filter
+              <select
+                value={customerId}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setCustomerId(next);
+                  const qs = new URLSearchParams();
+                  if (next) qs.set('customer_id', next);
+                  if (view !== 'all') qs.set('view', view);
+                  router.replace(`/seo/content${qs.toString() ? `?${qs.toString()}` : ''}`);
+                }}
+              >
+                <option value="">Tất cả clients</option>
+                {clients.map((c) => (
+                  <option key={c.customer_id} value={c.customer_id}>
+                    {c.customer_name} (#{c.customer_id})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              View
+              <select
+                value={view}
+                onChange={(e) => {
+                  const next = e.target.value as PipelineView;
+                  setView(next);
+                  const qs = new URLSearchParams();
+                  if (customerId) qs.set('customer_id', customerId);
+                  if (next !== 'all') qs.set('view', next);
+                  router.replace(`/seo/content${qs.toString() ? `?${qs.toString()}` : ''}`);
+                }}
+              >
+                <option value="all">Full pipeline</option>
+                <option value="review">Review only</option>
+                <option value="refresh">Cần refresh</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         {error && <p className="error">{error}</p>}
@@ -189,7 +246,7 @@ function SeoContentPipelineContent() {
               paddingBottom: '1rem',
             }}
           >
-            {(board?.columns ?? []).map((col) => (
+            {(filteredBoard?.columns ?? []).map((col) => (
               <div key={col.key} className="card" style={{ minHeight: 320 }}>
                 <h3 style={{ fontSize: '0.95rem', marginBottom: '0.5rem' }}>
                   {col.label} ({col.items.length})

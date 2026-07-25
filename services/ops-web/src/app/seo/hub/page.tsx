@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
+import { SeoScoreMeter } from '@/components/SeoScoreMeter';
 import { fetchSeoHub, staffMe, staffRefresh, type SeoHubResponse } from '@/lib/api';
 import {
   clearSession,
@@ -180,10 +181,18 @@ export default function SeoHubPage() {
         <div className="card" style={{ marginBottom: '1rem' }}>
           <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Content delivery</h2>
           <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
-            <span>In writing: {hub.executive.content_delivery.in_writing ?? 0}</span>
-            <span>In review: {hub.executive.content_delivery.in_review ?? 0}</span>
-            <span>Overdue: {hub.executive.content_delivery.overdue ?? 0}</span>
-            <span>Published: {hub.executive.content_delivery.published ?? 0}</span>
+            <Link href="/seo/content" className="nav-link">
+              In writing: {hub.executive.content_delivery.in_writing ?? 0}
+            </Link>
+            <Link href="/seo/content?view=review" className="nav-link">
+              In review: {hub.executive.content_delivery.in_review ?? 0}
+            </Link>
+            <Link href="/seo/content?view=refresh" className="nav-link">
+              Overdue: {hub.executive.content_delivery.overdue ?? 0}
+            </Link>
+            <Link href="/seo/content" className="nav-link">
+              Published: {hub.executive.content_delivery.published ?? 0}
+            </Link>
           </div>
         </div>
       ) : null}
@@ -214,7 +223,9 @@ export default function SeoHubPage() {
             <p className="muted" style={{ margin: 0 }}>
               Critical issues
             </p>
-            <strong>{summary.critical_issues}</strong>
+            <Link href="/seo/technical" className="nav-link">
+              <strong>{summary.critical_issues}</strong>
+            </Link>
           </div>
           <div>
             <p className="muted" style={{ margin: 0 }}>
@@ -303,13 +314,24 @@ export default function SeoHubPage() {
                     </Link>
                   </td>
                   <td>
-                    {c.aeo_coverage_pct}% ({c.aeo_visible}/{c.aeo_queries})
+                    <Link href={`/seo/aeo?customer_id=${c.customer_id}`} className="nav-link">
+                      {c.aeo_coverage_pct}% ({c.aeo_visible}/{c.aeo_queries})
+                    </Link>
                   </td>
-                  <td>{c.critical_issues}</td>
                   <td>
-                    <span className={tierClass(c.health_tier)}>
-                      {c.health_score} · {c.health_tier}
-                    </span>
+                    <Link href={`/seo/technical?customer_id=${c.customer_id}`} className="nav-link">
+                      {c.critical_issues}
+                    </Link>
+                  </td>
+                  <td>
+                    <Link
+                      href={`/seo/clients/${c.customer_id}`}
+                      className="nav-link"
+                      style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}
+                    >
+                      <SeoScoreMeter value={c.health_score} label={`Health ${c.customer_name}`} />
+                      <span className={tierClass(c.health_tier)}>{c.health_tier}</span>
+                    </Link>
                   </td>
                 </tr>
               ))}

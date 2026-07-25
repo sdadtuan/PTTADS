@@ -27,7 +27,7 @@
           ],
           "for": "0m",
           "annotations": {
-            "summary": "Có critical technical issues SEO mở — kiểm tra /crm/seo/technical"
+            "summary": "Có critical technical issues SEO mở — kiểm tra /seo/technical"
           },
           "labels": { "team": "seo", "severity": "critical" }
         },

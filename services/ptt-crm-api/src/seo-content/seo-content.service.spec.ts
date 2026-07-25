@@ -10,6 +10,9 @@ describe('SeoContentService', () => {
     listClusters: jest.fn(),
     listSerpSnapshots: jest.fn(),
     listPages: jest.fn(),
+    captureSerpSnapshot: jest.fn(),
+    syncPagesFromGsc: jest.fn(),
+    autolinkEntities: jest.fn(),
     previewBrief: jest.fn(),
     pipelineBoard: jest.fn(),
     getContentDetail: jest.fn(),
@@ -60,6 +63,12 @@ describe('SeoContentService', () => {
     const out = await service.researchConsole(5, 'pages');
     expect(out.pages).toHaveLength(1);
     expect(repo.listKeywords).not.toHaveBeenCalled();
+  });
+
+  it('captures serp snapshot', async () => {
+    (repo.captureSerpSnapshot as jest.Mock).mockResolvedValue({ id: 1, phrase: 'kw' });
+    const out = await service.captureSerpSnapshot(5, { phrase: 'kw' });
+    expect(out).toEqual({ id: 1, phrase: 'kw' });
   });
 
   it('returns pipeline board', async () => {

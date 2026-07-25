@@ -5,6 +5,8 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
 import {
+  autolinkSeoEntities,
+  captureSeoSerpSnapshot,
   createSeoCluster,
   createSeoContentFromResearch,
   createSeoKeyword,
@@ -13,6 +15,7 @@ import {
   fetchSeoResearchConsole,
   importSeoKeywordsCsv,
   previewSeoBrief,
+  syncSeoPagesFromGsc,
   staffMe,
   staffRefresh,
   type SeoBriefPreviewResponse,
@@ -310,6 +313,49 @@ function SeoResearchContent() {
     }
   }
 
+  async function handleSyncPages() {
+    if (!canWrite || !customerId) return;
+    const access = await ensureAuth();
+    if (!access) return;
+    try {
+      const out = await syncSeoPagesFromGsc(access, Number.parseInt(customerId, 10), 90);
+      setToast(`Đã sync ${out.synced} pages từ GSC`);
+      await loadResearch(access, Number.parseInt(customerId, 10), tab);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sync pages thất bại');
+    }
+  }
+
+  async function handleCaptureSerp() {
+    if (!canWrite || !customerId) return;
+    const phrase = window.prompt('Keyword phrase để capture SERP');
+    if (!phrase?.trim()) return;
+    const access = await ensureAuth();
+    if (!access) return;
+    try {
+      const out = await captureSeoSerpSnapshot(access, Number.parseInt(customerId, 10), {
+        phrase: phrase.trim(),
+      });
+      setToast(`SERP captured (${String(out.snapshot.source ?? 'stub')})`);
+      await loadResearch(access, Number.parseInt(customerId, 10), tab);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Capture SERP thất bại');
+    }
+  }
+
+  async function handleAutolinkEntities() {
+    if (!canWrite || !customerId) return;
+    const access = await ensureAuth();
+    if (!access) return;
+    try {
+      const out = await autolinkSeoEntities(access, Number.parseInt(customerId, 10));
+      setToast(`Autolink: +${out.entities_created} entities, +${out.links_created} links`);
+      await loadResearch(access, Number.parseInt(customerId, 10), tab);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Autolink thất bại');
+    }
+  }
+
   return (
     <div className="page">
       <OpsNav user={user} onLogout={logout} />
@@ -376,6 +422,21 @@ function SeoResearchContent() {
                 {tab === 'clusters' && (
                   <button type="button" className="btn btn-sm" onClick={() => void handleAddCluster()}>
                     + Cluster
+                  </button>
+                )}
+                {tab === 'serp' && (
+                  <button type="button" className="btn btn-sm" onClick={() => void handleCaptureSerp()}>
+                    Capture SERP
+                  </button>
+                )}
+                {tab === 'pages' && (
+                  <button type="button" className="btn btn-sm" onClick={() => void handleSyncPages()}>
+                    Sync GSC pages
+                  </button>
+                )}
+                {tab === 'entities' && (
+                  <button type="button" className="btn btn-sm" onClick={() => void handleAutolinkEntities()}>
+                    Auto-link clusters
                   </button>
                 )}
               </>
