@@ -58,7 +58,7 @@
 | Biết CPL/ROAS đúng theo client | SYS-002, META-002/003, **ZALO-004/015** | ✅ Hub + map; Zalo CPA refresh Z2-B7 |
 | **So sánh Meta/Google/Zalo một màn** | **SYS-002, ZALO-018** | ✅ `/meta/ads-combined` Z3-7 |
 | Launch ads chỉ khi QA + client duyệt | SYS-003, **SVC-005/006/007**, PORTAL-006, ZALO-008/019 | ✅ **SVC-005** Zalo auto-checklist + creative channel tag |
-| Khách tự xem báo cáo T-1 | SYS-005, PORTAL-002/003, **PORTAL-UC-013** | ✅ Dashboard + export CSV/PDF; Zalo PDF Z3-6 |
+| Khách tự xem báo cáo T-1 | SYS-005, PORTAL-002/003, **PORTAL-UC-013** | ✅ Dashboard + export; Zalo PDF Z3-6; **Meta/Zalo schedule email Prod-S2** |
 | Khách duyệt email trước gửi | EM-007, PORTAL-008 | ✅ Portal approvals |
 | **Khách duyệt creative Zalo** | **ZALO-019, PORTAL-014** | ✅ Shared `/creatives` + channel=zalo tag |
 | SEO content duyệt trước publish | SEO-005/006, PORTAL-007 | ✅ Content pipeline + portal review |

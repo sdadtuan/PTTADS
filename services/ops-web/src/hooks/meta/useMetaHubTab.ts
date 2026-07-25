@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { metaAlertsEnabled } from '@/lib/meta/flags';
 import type { MetaHubTab } from '@/lib/meta/types';
 
-const VALID_TABS: MetaHubTab[] = ['clients', 'campaigns', 'alerts'];
+const VALID_TABS: MetaHubTab[] = ['clients', 'campaigns', 'alerts', 'settings'];
 
 export function useMetaHubTab() {
   const router = useRouter();
@@ -15,6 +15,7 @@ export function useMetaHubTab() {
   const tab = useMemo((): MetaHubTab => {
     const raw = searchParams.get('tab');
     if (raw === 'campaigns') return 'campaigns';
+    if (raw === 'settings') return 'settings';
     if (raw === 'alerts' && alertsEnabled) return 'alerts';
     return 'clients';
   }, [alertsEnabled, searchParams]);
@@ -44,6 +45,7 @@ export function useMetaHubTab() {
     if (alertsEnabled) {
       items.push({ id: 'alerts', label: 'Alerts' });
     }
+    items.push({ id: 'settings', label: 'Report schedules' });
     return items;
   }, [alertsEnabled]);
 

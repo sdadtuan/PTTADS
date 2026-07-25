@@ -5543,3 +5543,77 @@ export async function runEmailReportSchedule(
 ): Promise<{ ok: boolean; job_id: string | null }> {
   return emailPost(token, `/api/v1/email/reports/schedules/${scheduleId}/run`, {});
 }
+
+export interface ChannelReportScheduleRow {
+  id: string;
+  client_id: string;
+  client_name: string;
+  report_scope: 'clients' | 'campaigns';
+  export_format: 'csv' | 'pdf';
+  window_days: number;
+  cadence: string;
+  day_of_week: number;
+  day_of_month: number;
+  recipient_emails: string[];
+  cc_emails: string[];
+  bcc_emails: string[];
+  portal_link_enabled: boolean;
+  active: boolean;
+  next_run_at: string | null;
+  last_sent_at: string | null;
+}
+
+function channelReportBase(channel: 'meta' | 'zalo'): string {
+  return channel === 'meta' ? '/api/v1/facebook-ads/reports/schedules' : '/api/v1/zalo-ads/reports/schedules';
+}
+
+export async function fetchChannelReportSchedules(
+  token: string,
+  channel: 'meta' | 'zalo',
+  clientId: string,
+): Promise<{ ok: boolean; items: ChannelReportScheduleRow[]; total: number; table_ready?: boolean }> {
+  const qs = new URLSearchParams({ client_id: clientId });
+  return agencyFetch(token, `${channelReportBase(channel)}?${qs.toString()}`);
+}
+
+export async function createChannelReportSchedule(
+  token: string,
+  channel: 'meta' | 'zalo',
+  body: {
+    client_id: string;
+    report_scope?: 'clients' | 'campaigns';
+    export_format?: 'csv' | 'pdf';
+    window_days?: number;
+    cadence?: string;
+    day_of_week?: number;
+    recipient_emails?: string[];
+    portal_link_enabled?: boolean;
+  },
+): Promise<ChannelReportScheduleRow> {
+  return agencyMutate(token, channelReportBase(channel), {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function runChannelReportSchedule(
+  token: string,
+  channel: 'meta' | 'zalo',
+  scheduleId: string,
+): Promise<{ ok: boolean; job_id: string | null }> {
+  return agencyMutate(token, `${channelReportBase(channel)}/${scheduleId}/run`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
+export async function deleteChannelReportSchedule(
+  token: string,
+  channel: 'meta' | 'zalo',
+  scheduleId: string,
+): Promise<{ ok: boolean }> {
+  return agencyMutate(token, `${channelReportBase(channel)}/${scheduleId}/delete`, {
+    method: 'POST',
+    body: '{}',
+  });
+}

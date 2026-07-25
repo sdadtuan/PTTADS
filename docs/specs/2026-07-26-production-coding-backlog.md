@@ -33,7 +33,7 @@
 | Zalo Z1–Z3 hub/poll/alerts/PDF | ZALO-001–021 | ✅ (pilot/stub flags) | Prod cutover |
 | CRM leads + lifecycle + finance panel | CRM/SVC | ✅ partial | GAP-P1-01 strict |
 | SEO/Email report **schedule** | SEO-013, EM-013 | ✅ worker | — |
-| Meta/Zalo report **schedule** | SYS-005, META-013, ZALO-016 | ❌ | **PROD-P0-RPT** |
+| Meta/Zalo report **schedule** | SYS-005, META-013, ZALO-016 | ✅ Prod-S2 | — |
 | Portal approval inbox | PORTAL-006/008 | ✅ | — |
 | Portal **client notification** center | ZALO-020, SYS-004 | ✅ Prod-S1 | — |
 | Portal email notify (creative/reset) | PORTAL-001 | ✅ webhook wired | — |

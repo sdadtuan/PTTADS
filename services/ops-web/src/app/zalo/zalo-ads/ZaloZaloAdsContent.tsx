@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ZaloPilotBanner } from '@/components/ZaloPilotBanner';
+import { ChannelReportSchedulesPanel } from '@/components/ChannelReportSchedulesPanel';
 import { OpsNav } from '@/components/OpsNav';
 import {
   downloadZaloHubExport,
@@ -469,6 +470,10 @@ export function ZaloZaloAdsContent() {
           </table>
         </div>
       </div>
+
+      {user && clientId ? (
+        <ChannelReportSchedulesPanel channel="zalo" token={getAccessToken() ?? ''} clientId={clientId} />
+      ) : null}
     </main>
   );
 }

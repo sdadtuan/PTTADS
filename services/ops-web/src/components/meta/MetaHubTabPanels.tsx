@@ -1,3 +1,4 @@
+import { ChannelReportSchedulesPanel } from '@/components/ChannelReportSchedulesPanel';
 import { MetaAlertsTable } from '@/components/meta/MetaAlertsTable';
 import { MetaCampaignTable } from '@/components/meta/MetaCampaignTable';
 import { MetaClientTable } from '@/components/meta/MetaClientTable';
@@ -27,6 +28,8 @@ interface MetaHubTabPanelsProps {
   alertsError: string;
   ackBusyId: string | null;
   onAck: (id: string) => void;
+  settingsClientId?: string;
+  settingsToken?: string | null;
 }
 
 export function MetaHubTabPanels({
@@ -47,7 +50,17 @@ export function MetaHubTabPanels({
   alertsError,
   ackBusyId,
   onAck,
+  settingsClientId = '',
+  settingsToken = null,
 }: MetaHubTabPanelsProps) {
+  if (tab === 'settings') {
+    return settingsToken ? (
+      <ChannelReportSchedulesPanel channel="meta" token={settingsToken} clientId={settingsClientId} />
+    ) : (
+      <p className="muted">Đang tải session…</p>
+    );
+  }
+
   if (tab === 'clients') {
     return (
       <MetaClientTable rows={clientRows} loading={loading} trackingByClient={trackingByClient} />

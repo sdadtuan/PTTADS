@@ -2,7 +2,7 @@
 
 export type MetaBadgeVariant = 'ok' | 'warn' | 'error' | 'muted';
 
-export type MetaHubTab = 'clients' | 'campaigns' | 'alerts';
+export type MetaHubTab = 'clients' | 'campaigns' | 'alerts' | 'settings';
 
 export interface HubAttributionMeta {
   attribution_model: 'last_touch_crm';

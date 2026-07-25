@@ -98,6 +98,8 @@ export function MetaFacebookAdsContent() {
         alertsError={alerts.error}
         ackBusyId={alerts.ackBusyId}
         onAck={(id) => void alerts.acknowledge(id)}
+        settingsClientId={hub.clientId}
+        settingsToken={getAccessToken()}
       />
     </MetaPageShell>
   );

@@ -22,6 +22,7 @@ import { ServiceLifecycleModule } from './service-lifecycle/service-lifecycle.mo
 import { SvcFinanceModule } from './svc-finance/svc-finance.module';
 import { SopModule } from './sop/sop.module';
 import { CampaignWritesModule } from './campaign-writes/campaign-writes.module';
+import { ChannelReportSchedulesModule } from './channel-report-schedules/channel-report-schedules.module';
 import { ConfigModule } from './config/config.module';
 import { CreativesModule } from './creatives/creatives.module';
 import { FinanceModule } from './finance/finance.module';
@@ -128,6 +129,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     MetricsModule,
     CreativesModule,
     CampaignWritesModule,
+    ChannelReportSchedulesModule,
     TemporalModule,
     WorkflowsModule,
   ],

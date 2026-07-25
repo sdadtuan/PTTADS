@@ -34,6 +34,8 @@ const JOB_TYPE_LABELS: Record<string, string> = {
   email_dns_verify: 'Xác minh DNS email',
   email_warm_up_tick: 'Warm-up domain email',
   email_report_schedules: 'Lịch báo cáo email',
+  meta_report_schedules: 'Lịch báo cáo Meta',
+  zalo_report_schedules: 'Lịch báo cáo Zalo',
 };
 
 const JOB_STATUS_LABELS: Record<string, string> = {

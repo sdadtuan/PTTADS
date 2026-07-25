@@ -216,6 +216,14 @@ def run_worker(*, poll_interval: float = 1.0, once: bool = False) -> int:
                 from ptt_jobs.handlers.email_report_schedules import run_email_report_schedules_job
 
                 run_email_report_schedules_job(job)
+            elif job_type == "meta_report_schedules":
+                from ptt_jobs.handlers.meta_report_schedule import run_meta_report_schedules_job
+
+                run_meta_report_schedules_job(job)
+            elif job_type == "zalo_report_schedules":
+                from ptt_jobs.handlers.zalo_report_schedule import run_zalo_report_schedules_job
+
+                run_zalo_report_schedules_job(job)
             else:
                 from ptt_jobs.store import mark_job_failed
 
