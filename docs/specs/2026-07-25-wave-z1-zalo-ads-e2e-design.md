@@ -1,21 +1,50 @@
 # Wave Z1 — Zalo Ads CPL E2E (Track Z)
 
 **Date:** 2026-07-25  
-**Status:** PO draft — ready for approval  
+**Status:** PO approved  
+**Signed off:** 2026-07-25  
 **Depends on:** Z0 (channel account, hub map, webhook), Agency PG, worker infra  
-**Spec:** [`SPEC_ZALO_ADS_OPERATING_SYSTEM.md`](../SPEC_ZALO_ADS_OPERATING_SYSTEM.md)
+**Spec:** [`SPEC_ZALO_ADS_OPERATING_SYSTEM.md`](../SPEC_ZALO_ADS_OPERATING_SYSTEM.md)  
+**Backlog:** [`2026-07-25-zalo-ads-implementation-backlog.md`](2026-07-25-zalo-ads-implementation-backlog.md)
 
 ## PO decisions
 
 | Topic | Decision |
 |-------|----------|
 | Scope | **Z1_full** — Staff hub + Portal + OAuth pilot + manual sync |
-| Hub UX | **Separate page** — `/zalo/zalo-ads` (+ combined nav Z2) |
+| Hub UX | **Separate page** — `/zalo/zalo-ads` (+ combined nav deferred **Z2**) |
 | OAuth | **oauth_pilot** — Nest OAuth + pilot/stub banner (mirror Google B6-S6) |
 | Sync | **manual_button** — enqueue `zalo_insights_sync` job |
-| Lead | **webhook_primary** — form poll deferred to Z2 |
+| Lead | **webhook_primary** — form poll deferred to **Z2** |
 | Cap | **crm_zalo_ads** view + export |
-| Execute | **pending PO sign-off** |
+| Execute | **go** |
+
+## PO sign-off
+
+| Role | Decision | Date |
+|------|----------|------|
+| PO | **Approved** — triển khai Wave Z1 theo backlog Sprint S1–S2 | 2026-07-25 |
+| Engineering | Ready — pattern Google B6-S6; Z0 foundation verified | 2026-07-25 |
+
+**In scope for implementation (S1–S2):**
+
+- DDL `zalo_insights_sync_state` + worker `zalo_insights_sync`
+- Nest hub API + OAuth pilot + sync endpoints + cap `crm_zalo_ads`
+- ops-web `/zalo/zalo-ads` + agency Connect/Sync Zalo + OpsNav
+- portal-web `/zalo` + PerformanceChannel `zalo`
+- E2E `zalo-ads.spec.ts` + ops guide draft
+
+**Explicitly deferred:**
+
+- Form poll + `/zalo/leads` → **Wave Z2**
+- Combined nav `/meta/ads-combined` Zalo tab → **Wave Z3**
+- Campaign API write → **Wave Z4**
+
+**Pre-requisites before prod cutover:**
+
+- [ ] Zalo Developer App created; OAuth redirect URI registered
+- [ ] Env `PTT_ZALO_*` set on staging
+- [ ] Pilot client list `PTT_ZALO_ADS_PILOT_CLIENTS` agreed with AM
 
 ## Flow
 
