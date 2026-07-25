@@ -1,7 +1,7 @@
 # Phân tích Gap — Use Case vs Hành động người dùng thực tế
 
 > **Phiên bản:** 1.4 · **Ngày:** 2026-07-26  
-> **Cập nhật:** **Prod-S3** — Zalo production cutover (PROD-P0-ZALO) · Prod-S2 report schedules · Prod-S1 portal notify  
+> **Cập nhật:** **Prod-S4** — CSKH SLA board + PROD-H hardening · Prod-S3 Zalo cutover · Prod-S2 report schedules · Prod-S1 portal notify  
 > **Mục đích:** Đối chiếu ~122 UC với ops-web / portal-web thực tế; xác định bước nghiệp vụ khách hàng chưa được hệ thống dẫn đủ.
 
 ---
@@ -54,6 +54,7 @@
 |------------------------------|--------------|-------------------|
 | Ký HĐ xong → client chạy ads trong 2 tuần | SYS-001, SVC-001/002, META-001, **ZALO-001/021** | ⚠️ Orchestrator ✅; AM vẫn deep-link nhiều URL — **doc Phase A** đã map đủ bước |
 | Lead Meta vào CRM < 1 phút, CSKH gọi ngay | META-004, **CRM-001**, PLAT-004 | ✅ **Phase B** — CRM-001 9 bước + nhánh Meta/Zalo |
+| **CSKH SLA board — breach / bulk reassign** | **CRM-UC-008, CRM-001** | ✅ **Prod-S4** — `/crm/cskh-board` + API + 15m SLA |
 | **Lead Zalo vào CRM (webhook + poll)** | **ZALO-011/012/013/014, CRM-001** | ✅ Shipped + **Prod-S3** prod cutover (no stub) |
 | Biết CPL/ROAS đúng theo client | SYS-002, META-002/003, **ZALO-004/015** | ✅ Hub + map; Zalo CPA refresh Z2-B7 |
 | **So sánh Meta/Google/Zalo một màn** | **SYS-002, ZALO-018** | ✅ `/meta/ads-combined` Z3-7 |
@@ -72,7 +73,7 @@
 | Journey email tự động | EM-011 | ⚠️ **GAP-P1-02** — Flag `PTT_EMAIL_JOURNEYS=1` |
 | Báo cáo BI Grafana khách xem | EM-013, SEO-014 | ⚠️ **GAP-P1-03** — Staff embed OK; portal chưa embed |
 | Subscriber preference center | EM-014 | ✅ Public routes tokenized |
-| Multi-client isolation | SYS-011, PLAT-002/003 | ✅ JWT scope + e2e pen test |
+| Multi-client isolation | SYS-011, PLAT-002/003 | ✅ JWT scope + **Prod-S4** pen test matrix |
 | **Deploy campaign Zalo qua API** | **ZALO-009/010** | ❌ **GAP-Z4-01** — v1 manual go-live + map |
 
 ---

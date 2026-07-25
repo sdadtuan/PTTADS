@@ -37,13 +37,13 @@
 | Portal approval inbox | PORTAL-006/008 | ✅ | — |
 | Portal **client notification** center | ZALO-020, SYS-004 | ✅ Prod-S1 | — |
 | Portal email notify (creative/reset) | PORTAL-001 | ✅ webhook wired | — |
-| CSKH board `/crm/cskh-board` | CRM-UC-008 | ❌ route missing | **PROD-P0-CSKH** |
+| CSKH board `/crm/cskh-board` | CRM-UC-008 | ✅ Prod-S4 | — |
 | Onboard orchestrator deep-links | SYS-001, SVC-002 | ✅ | **PROD-P1-WIZ** UX |
 | Finance gate warn+confirm | SVC-004 | ✅ B5-S4 | **PROD-P1-FIN** strict mode |
 | Zalo campaign API write | ZALO-009/010 | ❌ manual | **GAP-Z4-01** |
 | Email journeys prod | EM-011 | ⚠ flag off | **PROD-P1-JRN** |
 | Grafana portal embed | EM-013, SEO-014 | ❌ | **GAP-P1-03** |
-| E2E prod smoke all modules | PLAT-010 | ⚠ partial | **PROD-H-E2E** |
+| E2E prod smoke all modules | PLAT-010 | ✅ Prod-S4 F1–F7 | — |
 
 **Ước lượng code prod-ready:** ~**75–80%** (doc ~86%, gap chủ yếu notify + schedule + polish).
 
@@ -355,4 +355,5 @@ PROD-Z4 (independent — Zalo API permission gate)
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-07-26 | 1.1 | **Prod-S4** — CSKH board + PROD-H gates/E2E/PEN/STUB/MON |
 | 2026-07-26 | 1.0 | Initial backlog from Phase A–C action analysis |

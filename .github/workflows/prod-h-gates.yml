@@ -1,0 +1,78 @@
+# Prod-H — production hardening gates (Prod-S4)
+name: prod-h-gates
+
+on:
+  push:
+    paths:
+      - 'ptt_crm/prod_h_gates.py'
+      - 'ptt_crm/webhook_health.py'
+      - 'ptt_crm/portal_notification_pen.py'
+      - 'ptt_jobs/handlers/webhook_health_check.py'
+      - 'scripts/prod_h_gate.sh'
+      - 'scripts/cskh_board_gate.sh'
+      - 'services/ptt-crm-api/src/cskh-board/**'
+      - 'services/ptt-crm-api/src/config/prod-h.stub-audit.service.ts'
+      - 'services/ops-web/e2e/prod-smoke-handover.spec.ts'
+      - 'services/ops-web/e2e/cskh-board.spec.ts'
+      - 'tests/test_prod_h_gates.py'
+      - 'tests/test_multi_tenant_pen.py'
+      - 'tests/test_webhook_health.py'
+      - '.github/workflows/prod-h-gates.yml'
+  pull_request:
+    paths:
+      - 'ptt_crm/**'
+      - 'ptt_jobs/handlers/webhook_health_check.py'
+      - 'scripts/prod_h_gate.sh'
+      - 'scripts/cskh_board_gate.sh'
+      - 'services/ptt-crm-api/src/cskh-board/**'
+      - 'services/ptt-crm-api/src/config/**'
+      - 'services/ops-web/e2e/**'
+      - 'tests/test_prod_h_gates.py'
+      - 'tests/test_multi_tenant_pen.py'
+      - 'tests/test_webhook_health.py'
+      - '.github/workflows/prod-h-gates.yml'
+
+jobs:
+  prod-h-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: PROD-H unit tests + stub audit
+        run: |
+          python -m unittest tests.test_prod_h_gates tests.test_multi_tenant_pen tests.test_webhook_health -q
+          python3 -m ptt_crm.prod_h_gates --skip-subgates
+
+  cskh-sla-jest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: CSKH SLA + prod stub audit unit tests
+        working-directory: services/ptt-crm-api
+        run: |
+          npm ci
+          npx jest src/cskh-board/cskh-board-sla.util.spec.ts src/config/prod-h.stub-audit.service.spec.ts --silent
+
+  cskh-board-gate:
+    runs-on: ubuntu-latest
+    needs: [cskh-sla-jest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Prod-S4 CSKH board gate script
+        run: |
+          chmod +x scripts/cskh_board_gate.sh scripts/prod_h_gate.sh
+          ./scripts/cskh_board_gate.sh

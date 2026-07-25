@@ -209,6 +209,56 @@ export class CrmLeadsSqliteRepository implements OnModuleDestroy {
     }));
   }
 
+  firstCallAtByLeadIds(leadIds: number[]): Map<number, string> {
+    const out = new Map<number, string>();
+    if (!leadIds.length) return out;
+    const placeholders = leadIds.map(() => '?').join(', ');
+    const rows = this.database
+      .prepare(
+        `SELECT lead_id, MIN(created_at) AS first_call_at
+         FROM crm_lead_activities
+         WHERE lead_id IN (${placeholders}) AND activity_type = 'call'
+         GROUP BY lead_id`,
+      )
+      .all(...leadIds) as Array<{ lead_id: number; first_call_at: string }>;
+    for (const row of rows) {
+      if (row.first_call_at) out.set(Number(row.lead_id), String(row.first_call_at));
+    }
+    return out;
+  }
+
+  nextFollowUpByLeadIds(leadIds: number[]): Map<number, string> {
+    const out = new Map<number, string>();
+    if (!leadIds.length) return out;
+    const placeholders = leadIds.map(() => '?').join(', ');
+    const rows = this.database
+      .prepare(
+        `SELECT lead_id, next_action_at, created_at
+         FROM crm_lead_activities
+         WHERE lead_id IN (${placeholders})
+           AND COALESCE(next_action_at, '') <> ''
+         ORDER BY created_at DESC`,
+      )
+      .all(...leadIds) as Array<{ lead_id: number; next_action_at: string }>;
+    for (const row of rows) {
+      const id = Number(row.lead_id);
+      if (!out.has(id) && row.next_action_at) out.set(id, String(row.next_action_at));
+    }
+    return out;
+  }
+
+  staffNamesByIds(staffIds: number[]): Map<number, string> {
+    const out = new Map<number, string>();
+    const uniq = [...new Set(staffIds.filter((id) => id > 0))];
+    if (!uniq.length) return out;
+    const placeholders = uniq.map(() => '?').join(', ');
+    const rows = this.database
+      .prepare(`SELECT id, name FROM crm_staff WHERE id IN (${placeholders})`)
+      .all(...uniq) as Array<{ id: number; name: string }>;
+    for (const row of rows) out.set(Number(row.id), String(row.name ?? ''));
+    return out;
+  }
+
   private mapActivity(d: Record<string, unknown>): LeadActivityRow {
     const at = String(d.activity_type ?? 'note');
     return {

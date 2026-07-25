@@ -60,6 +60,7 @@ type NavSection = { label: string; links: NavLink[] };
 const PAGE_TITLES: Record<string, string> = {
   '/': 'Bảng điều khiển',
   '/crm': 'Bảng CSKH',
+  '/crm/cskh-board': 'Bảng CSKH SLA',
   '/crm/leads': 'Quản lý Lead',
   '/crm/catalog': 'CRM Catalog',
   '/crm/customers': 'Khách hàng',
@@ -174,6 +175,7 @@ function buildSections(
   const care: NavLink[] = [];
   if (hasCap(user, 'crm_leads', 'view')) {
     care.push({ href: '/crm/leads', label: 'Quản lý Lead' });
+    care.push({ href: '/crm/cskh-board', label: 'Bảng CSKH SLA' });
     if (hasCap(user, 'crm_leads', 'assign')) {
       care.push({
         href: '/crm/leads/review-queue',

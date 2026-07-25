@@ -20,6 +20,13 @@ const BOARD_MODULES: Array<{
   altSection?: string;
 }> = [
   { id: 'leads', label: 'Leads', href: '/crm/leads', description: 'Pipeline lead', section: 'crm_leads' },
+  {
+    id: 'cskh_board',
+    label: 'CSKH SLA board',
+    href: '/crm/cskh-board',
+    description: 'SLA breach + bulk reassign',
+    section: 'crm_leads',
+  },
   { id: 'catalog', label: 'Catalog', href: '/crm/catalog', description: 'DV / ngành', section: 'crm_leads' },
   {
     id: 'customers',

@@ -8,6 +8,7 @@ const JOB_TYPE_LABELS: Record<string, string> = {
   zalo_form_poll_sla: 'SLA poll form Zalo',
   zalo_token_refresh: 'Làm mới token Zalo',
   meta_token_refresh: 'Làm mới token Meta',
+  webhook_health_check: 'Giám sát webhook / ingest',
   ingest_lead: 'Ingest lead (webhook/form)',
   form_ingest: 'Ingest form lead',
   sync_lead_replica: 'Đồng bộ lead replica',

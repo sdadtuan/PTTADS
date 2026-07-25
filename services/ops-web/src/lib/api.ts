@@ -124,6 +124,111 @@ export async function fetchLeads(
   return body;
 }
 
+export interface CskhBoardRow {
+  id: number;
+  full_name: string;
+  phone: string;
+  email: string;
+  status: string;
+  source: string;
+  channel: string;
+  owner_id: number | null;
+  owner_name: string | null;
+  received_at: string;
+  created_at: string;
+  first_call_at: string | null;
+  sla_state: 'ok' | 'warning' | 'breach' | 'na';
+  sla_minutes_elapsed: number | null;
+  sla_deadline_at: string | null;
+  next_follow_up_at: string | null;
+}
+
+export interface CskhBoardResponse {
+  ok: boolean;
+  items: CskhBoardRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  summary: { total: number; breach: number; warning: number; ok: number };
+}
+
+export async function fetchCskhBoard(
+  token: string,
+  params?: {
+    owner_id?: number;
+    status?: string;
+    source?: string;
+    channel?: string;
+    q?: string;
+    sla_filter?: 'all' | 'breach' | 'warning' | 'open';
+    limit?: number;
+    offset?: number;
+  },
+): Promise<CskhBoardResponse> {
+  const qs = new URLSearchParams();
+  if (params?.owner_id != null) qs.set('owner_id', String(params.owner_id));
+  if (params?.status) qs.set('status', params.status);
+  if (params?.source) qs.set('source', params.source);
+  if (params?.channel) qs.set('channel', params.channel);
+  if (params?.q) qs.set('q', params.q);
+  if (params?.sla_filter && params.sla_filter !== 'all') qs.set('sla_filter', params.sla_filter);
+  if (params?.limit != null) qs.set('limit', String(params.limit));
+  if (params?.offset != null) qs.set('offset', String(params.offset));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const res = await fetch(`${API_BASE}/api/crm/cskh-board${suffix}`, {
+    headers: authHeaders(token),
+    cache: 'no-store',
+  });
+  const body = await parseJson<CskhBoardResponse & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'CSKH board fetch failed', res.status);
+  }
+  return body;
+}
+
+export async function bulkAssignCskhLeads(
+  token: string,
+  body: { lead_ids: number[]; to_user_id: number; reason: string },
+): Promise<{ ok: boolean; assigned: number; total: number }> {
+  const res = await fetch(`${API_BASE}/api/crm/cskh-board/bulk-assign`, {
+    method: 'POST',
+    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const out = await parseJson<{ ok: boolean; assigned: number; total: number; error?: string }>(res);
+  if (!res.ok) throw new ApiError(out.error ?? 'Bulk assign failed', res.status);
+  return out;
+}
+
+export async function bulkRescheduleCskhLeads(
+  token: string,
+  body: { lead_ids: number[]; follow_up_at: string; note?: string },
+): Promise<{ ok: boolean; rescheduled: number }> {
+  const res = await fetch(`${API_BASE}/api/crm/cskh-board/bulk-reschedule`, {
+    method: 'POST',
+    headers: { ...authHeaders(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const out = await parseJson<{ ok: boolean; rescheduled: number; error?: string }>(res);
+  if (!res.ok) throw new ApiError(out.error ?? 'Bulk reschedule failed', res.status);
+  return out;
+}
+
+export function cskhBoardExportUrl(params?: {
+  owner_id?: number;
+  status?: string;
+  sla_filter?: string;
+  q?: string;
+}): string {
+  const qs = new URLSearchParams();
+  if (params?.owner_id != null) qs.set('owner_id', String(params.owner_id));
+  if (params?.status) qs.set('status', params.status);
+  if (params?.sla_filter) qs.set('sla_filter', params.sla_filter);
+  if (params?.q) qs.set('q', params.q);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return `${API_BASE}/api/crm/cskh-board/export${suffix}`;
+}
+
 export async function fetchLead(token: string, id: number): Promise<LeadRow> {
   const res = await fetch(`${API_BASE}/api/v1/leads/${id}`, {
     headers: authHeaders(token),

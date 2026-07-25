@@ -136,6 +136,10 @@ def run_worker(*, poll_interval: float = 1.0, once: bool = False) -> int:
                 from ptt_jobs.handlers.zalo_form_poll_sla import run_zalo_form_poll_sla_job
 
                 run_zalo_form_poll_sla_job(job)
+            elif job_type == "webhook_health_check":
+                from ptt_jobs.handlers.webhook_health_check import run_webhook_health_check_job
+
+                run_webhook_health_check_job(job)
             elif job_type == "meta_token_refresh":
                 from ptt_jobs.handlers.meta_token_refresh import run_meta_token_refresh_job
 
