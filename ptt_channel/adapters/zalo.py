@@ -24,10 +24,23 @@ class ZaloAdapter(ChannelAdapter):
 
     @property
     def capabilities(self) -> AdapterCapabilities:
+        import os
+
+        write_enabled = (os.environ.get("PTT_ZALO_CAMPAIGN_WRITE_STUB") or "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        } or (os.environ.get("PTT_ZALO_CAMPAIGN_WRITE_PILOT") or "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
         return AdapterCapabilities(
             supports_webhooks=True,
             supports_server_events=False,
-            supports_campaign_write=False,
+            supports_campaign_write=write_enabled,
             supports_lead_ingest=True,
             supports_daily_insights=True,
             supports_creative_upload=False,

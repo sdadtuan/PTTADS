@@ -207,13 +207,13 @@ Bước 4 reject → Creative sửa → resubmit bước 3.
 | # | Actor | Màn hình | Thao tác | Input | Phản hồi | Gate |
 |---|-------|----------|----------|-------|----------|------|
 | 1 | Buyer | `/crm/launch-qa` | Xác nhận Launch QA **passed** | run id | Gate open | ✓ |
-| 2 | Buyer | `/crm/campaign-writes` | Submit campaign write (future) | payload JSON | queued | ⚠ GAP-Z4-01 |
-| 3 | System | worker / Temporal | Execute Zalo create API | — | external_campaign_id | ⚠ GAP-Z4-01 |
-| 4 | System | — | Auto hub map campaign | campaign id | Row green | ⚠ GAP-Z4-01 |
+| 2 | Buyer | `/crm/campaign-writes` hoặc `/api/v1/zalo/ads-ops/launch` | Submit campaign write | payload JSON | queued | ✓ Prod-Z4 (stub/pilot) |
+| 3 | System | worker / Temporal | Execute Zalo create API | — | external_campaign_id | ✓ Prod-Z4 |
+| 4 | System | — | Auto hub map campaign | campaign id | Row green | ✓ Prod-Z4 |
 | 5 | Buyer | `/zalo/zalo-ads` | Verify spend > 0 ngày T+1 | filter | KPI update | ✓ |
 | 6 | System | — | Audit log + notify AM | — | notification_inbox | ✓ Z3-8 |
 
-#### Nhánh E1 — v1 manual (hiện tại)
+#### Nhánh E1 — v1 manual (fallback cho đến khi có Zalo Business API write permission)
 | # | Actor | Màn hình | Thao tác | Gate |
 |---|-------|----------|----------|------|
 | M1 | Buyer | Zalo Ads Manager UI | Tạo campaign thủ công theo brief | ✓ |
@@ -234,7 +234,7 @@ Bước 4 reject → Creative sửa → resubmit bước 3.
 |---|-------|----------|----------|-------|----------|------|
 | 1 | Buyer | `/zalo/zalo-ads` | Xác định campaign cần action | filter client | Row target | ✓ |
 | 2 | Buyer | Zalo Ads UI | **Pause** campaign | — | Status paused | ✓ v1 manual |
-| 3 | Buyer | `/crm/campaign-writes` | Submit pause write (future) | campaign id | queued | ⚠ GAP-Z4-01 |
+| 3 | Buyer | `/crm/campaign-writes` hoặc `/api/v1/zalo/ads-ops/status` | Submit pause write | campaign id | queued | ✓ Prod-Z4 (stub/pilot) |
 | 4 | Buyer | Zalo Ads UI | **Resume** hoặc **Stop** | — | Status update | ✓ |
 | 5 | Buyer | `/zalo/zalo-ads` | Verify spend dừng tăng | T+1 | Spend flat | ✓ |
 | 6 | AM | Email/Slack | Thông báo client nếu emergency pause | reason | Comms log | ○ |
@@ -549,7 +549,7 @@ AM bước 7 email manual thay bước 6.
 | Export PDF báo cáo | ✅ Shipped | Z3 | — |
 | Milestone notify staff | ✅ Shipped | Z3 | — |
 | Portal in-app notify client | ⚠ Partial | — | GAP-P1-02 |
-| Campaign write API Zalo | ❌ | Z4 | GAP-Z4-01 |
+| Campaign write API Zalo | ✓ Prod-Z4 | Z4 | stub/pilot — E1 manual fallback |
 | DWH/Grafana Zalo drill | ❌ | Z4 | GAP-P2-01 |
 
 Cập nhật gap tổng: [`ACTION-GAP-ANALYSIS.md`](../ACTION-GAP-ANALYSIS.md).

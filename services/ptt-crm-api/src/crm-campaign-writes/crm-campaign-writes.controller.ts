@@ -42,12 +42,18 @@ export class CrmCampaignWritesController {
     const staff = (req as Request & { staffUser?: { email?: string } }).staffUser;
     return this.service.submit({
       client_id: body.client_id != null ? String(body.client_id) : undefined,
+      channel: body.channel != null ? String(body.channel) : undefined,
       external_campaign_id:
         body.external_campaign_id != null ? String(body.external_campaign_id) : undefined,
       external_campaign_name:
         body.external_campaign_name != null ? String(body.external_campaign_name) : undefined,
       daily_budget_vnd: body.daily_budget_vnd != null ? Number(body.daily_budget_vnd) : undefined,
       change_type: body.change_type != null ? String(body.change_type) : undefined,
+      status: body.status != null ? String(body.status) : undefined,
+      new_value:
+        body.new_value != null && typeof body.new_value === 'object'
+          ? (body.new_value as Record<string, unknown>)
+          : undefined,
       submitted_by: staff?.email,
     });
   }

@@ -27,6 +27,7 @@ class CampaignWriteApprovalInput:
     change_type: str
     new_value: dict[str, Any]
     submitted_by: str
+    channel: str = "meta"
 
 
 @workflow.defn(name="CampaignWriteApprovalWorkflow")
@@ -48,6 +49,7 @@ class CampaignWriteApprovalWorkflow:
                 change_type=inp.change_type,
                 submitted_by=inp.submitted_by,
                 message="Chờ admin duyệt thay đổi campaign",
+                channel=inp.channel,
             ),
             start_to_close_timeout=timedelta(seconds=30),
             retry_policy=retry,
@@ -76,6 +78,7 @@ class CampaignWriteApprovalWorkflow:
                 external_campaign_id=inp.external_campaign_id,
                 change_type=inp.change_type,
                 new_value=inp.new_value,
+                channel=inp.channel,
             ),
             start_to_close_timeout=timedelta(seconds=60),
             retry_policy=retry,
@@ -84,7 +87,12 @@ class CampaignWriteApprovalWorkflow:
         err = None if ok else str(outcome.get("error") or "execution_failed")
         await workflow.execute_activity(
             mark_campaign_write_executed,
-            MarkCampaignWriteInput(request_id=inp.request_id, ok=ok, error=err),
+            MarkCampaignWriteInput(
+                request_id=inp.request_id,
+                ok=ok,
+                error=err,
+                execution_outcome=outcome if isinstance(outcome, dict) else {},
+            ),
             start_to_close_timeout=timedelta(seconds=30),
             retry_policy=retry,
         )

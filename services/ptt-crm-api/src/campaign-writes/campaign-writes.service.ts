@@ -57,6 +57,7 @@ export class CampaignWritesService {
       changeType,
       newValue: body.new_value,
       submittedBy,
+      channel,
     });
     const linked = await this.repo.updateTemporalMeta(row.id, wf.workflowId, wf.runId);
 

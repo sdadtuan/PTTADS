@@ -1760,6 +1760,44 @@ export class AgencyService {
     }
   }
 
+  async autoMapFromCampaignWrite(body: {
+    client_id: string;
+    channel?: string;
+    external_campaign_id: string;
+    external_campaign_name?: string;
+    external_account_id?: string | null;
+    target_cpl_vnd?: number;
+    request_id?: string;
+  }): Promise<{ ok: boolean; map?: HubCampaignMapRow; duplicate?: boolean; request_id?: string }> {
+    const clientId = body.client_id?.trim() ?? '';
+    const channel = (body.channel?.trim() || 'zalo').toLowerCase();
+    const externalId = normalizeExternalCampaignId(channel, body.external_campaign_id ?? '');
+    if (!clientId || !externalId) {
+      throw new BadRequestException({ error: 'client_id_and_external_campaign_id_required' });
+    }
+    try {
+      const out = await this.createHubCampaignMap({
+        client_id: clientId,
+        channel,
+        external_campaign_id: externalId,
+        external_campaign_name: body.external_campaign_name,
+        external_account_id: body.external_account_id ?? undefined,
+        target_cpl_vnd: body.target_cpl_vnd,
+      });
+      return {
+        ok: true,
+        map: out.map,
+        request_id: body.request_id,
+      };
+    } catch (err) {
+      const msg = String(err);
+      if (msg.includes('duplicate_map') || msg.includes('duplicate')) {
+        return { ok: true, duplicate: true, request_id: body.request_id };
+      }
+      throw err;
+    }
+  }
+
   async updateHubCampaignMapById(
     mapId: string,
     body: UpdateHubCampaignMapBody,
@@ -1844,21 +1882,32 @@ export class AgencyService {
     clientId: string,
     channel: string,
   ): Promise<AgencySideEffectsSummary['jobs_enqueued'] | undefined> {
-    if (channel !== 'meta') return undefined;
     const jobsEnabled = (process.env.PTT_JOBS_ENABLED ?? '').trim();
     if (jobsEnabled !== '1' && jobsEnabled.toLowerCase() !== 'true') return undefined;
+    const ch = (channel || 'meta').trim().toLowerCase();
     try {
-      const jobs = await this.sideEffects.enqueueMetaInsightsSync(clientId);
-      return jobs.map((j) => ({
-        id: j.id,
-        job_type: j.job_type,
-        status: j.status,
-        created: j.created,
-      }));
+      if (ch === 'meta') {
+        const jobs = await this.sideEffects.enqueueMetaInsightsSync(clientId);
+        return jobs.map((j) => ({
+          id: j.id,
+          job_type: j.job_type,
+          status: j.status,
+          created: j.created,
+        }));
+      }
+      if (ch === 'zalo') {
+        const jobs = await this.sideEffects.enqueueZaloInsightsSync(clientId);
+        return jobs.map((j) => ({
+          id: j.id,
+          job_type: j.job_type,
+          status: j.status,
+          created: j.created,
+        }));
+      }
     } catch (err) {
-      this.logger.warn(`enqueue insights after hub map: ${String(err)}`);
-      return undefined;
+      this.logger.warn(`enqueue insights after hub map channel=${channel}: ${String(err)}`);
     }
+    return undefined;
   }
 
   private renderZaloHubPdf(hub: ZaloHubResponse): Promise<Buffer> {

@@ -29,6 +29,7 @@ type StatusTab = 'all' | 'pending_approval' | 'executed' | 'execution_failed' | 
 type WriteRow = {
   id: string;
   client_id: string;
+  channel?: string;
   external_campaign_id: string;
   external_campaign_name: string | null;
   change_type: string;
@@ -43,7 +44,7 @@ type WriteRow = {
 const TABS: Array<{ id: StatusTab; label: string }> = [
   { id: 'all', label: 'Tất cả' },
   { id: 'pending_approval', label: 'Chờ duyệt' },
-  { id: 'executed', label: 'Đã chạy Meta' },
+  { id: 'executed', label: 'Đã chạy' },
   { id: 'execution_failed', label: 'Lỗi execution' },
   { id: 'rejected', label: 'Từ chối' },
 ];
@@ -231,7 +232,7 @@ export function CrmCampaignWritesContent() {
         <div>
           <h1 style={{ margin: 0, fontSize: '1.25rem' }}>Campaign Write Hub</h1>
           <p className="muted" style={{ margin: '0.35rem 0 0' }}>
-            AM gửi đổi budget Meta → GDKD duyệt → executed auto-tick Launch QA budget_confirmed
+            Meta / Zalo campaign writes — duyệt → worker execute → auto hub map (Zalo create)
           </p>
         </div>
         {canSubmit ? (
@@ -252,7 +253,7 @@ export function CrmCampaignWritesContent() {
             fontSize: '0.9rem',
           }}
         >
-          {stats.pending_campaign_writes ?? stats.pending_approval} yêu cầu chờ duyệt Meta write.
+          {stats.pending_campaign_writes ?? stats.pending_approval} yêu cầu chờ duyệt campaign write.
         </p>
       ) : null}
 
@@ -317,7 +318,8 @@ export function CrmCampaignWritesContent() {
           <thead>
             <tr className="muted">
               <th style={{ textAlign: 'left', padding: '0.35rem' }}>Campaign</th>
-              <th style={{ textAlign: 'left', padding: '0.35rem' }}>Budget mới</th>
+              <th style={{ textAlign: 'left', padding: '0.35rem' }}>Kênh</th>
+              <th style={{ textAlign: 'left', padding: '0.35rem' }}>Thay đổi</th>
               <th style={{ textAlign: 'left', padding: '0.35rem' }}>Trạng thái</th>
               <th style={{ textAlign: 'left', padding: '0.35rem' }}>Gửi</th>
               <th style={{ textAlign: 'left', padding: '0.35rem' }}>Thao tác</th>
@@ -326,7 +328,7 @@ export function CrmCampaignWritesContent() {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="muted" style={{ padding: '0.75rem' }}>
+                <td colSpan={6} className="muted" style={{ padding: '0.75rem' }}>
                   Không có yêu cầu.
                 </td>
               </tr>
@@ -335,14 +337,22 @@ export function CrmCampaignWritesContent() {
               <tr key={row.id} style={{ borderTop: '1px solid var(--border)' }}>
                 <td style={{ padding: '0.35rem' }}>
                   <strong>{row.external_campaign_id}</strong>
+                  <div className="muted" style={{ fontSize: '0.8rem' }}>{row.change_type}</div>
                   {row.execution_error ? (
                     <div className="muted" style={{ fontSize: '0.8rem' }}>
                       {row.execution_error}
                     </div>
                   ) : null}
                 </td>
+                <td style={{ padding: '0.35rem' }}>{(row.channel ?? 'meta').toUpperCase()}</td>
                 <td style={{ padding: '0.35rem' }}>
-                  {Number(row.new_value?.daily_budget_vnd ?? 0).toLocaleString('vi-VN')} VND
+                  {row.change_type === 'daily_budget'
+                    ? `${Number(row.new_value?.daily_budget_vnd ?? 0).toLocaleString('vi-VN')} VND`
+                    : row.change_type === 'status'
+                      ? String(row.new_value?.status ?? '—')
+                      : row.change_type === 'create_campaign'
+                        ? String(row.new_value?.campaign_name ?? row.external_campaign_name ?? 'create')
+                        : JSON.stringify(row.new_value ?? {})}
                 </td>
                 <td style={{ padding: '0.35rem' }}>{STATUS_LABEL[row.status] ?? row.status}</td>
                 <td style={{ padding: '0.35rem' }}>{row.created_at?.slice(0, 10) ?? '—'}</td>

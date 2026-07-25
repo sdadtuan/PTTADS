@@ -40,7 +40,7 @@
 | CSKH board `/crm/cskh-board` | CRM-UC-008 | ✅ Prod-S4 | — |
 | Onboard orchestrator deep-links | SYS-001, SVC-002 | ✅ | **PROD-P1-WIZ** UX |
 | Finance gate warn+confirm | SVC-004 | ✅ B5-S4 | **PROD-P1-FIN** strict mode ✅ Prod-S5 |
-| Zalo campaign API write | ZALO-009/010 | ❌ manual | **GAP-Z4-01** |
+| Zalo campaign API write | ZALO-009/010 | ✓ stub/pilot | **PROD-Z4** |
 | Email journeys prod | EM-011 | ⚠ flag off | **PROD-P1-JRN** |
 | Grafana portal embed | EM-013, SEO-014 | ❌ | **GAP-P1-03** |
 | E2E prod smoke all modules | PLAT-010 | ✅ Prod-S4 F1–F7 | — |
@@ -59,7 +59,7 @@
 | CSKH SLA board | CRM-UC-008, CRM-UC-001 | P0 | **PROD-P0-CSKH** |
 | Onboard wizard UX | SYS-001, SVC-002, ZALO-021 | P1 | **PROD-P1-WIZ** |
 | Finance gate strict | SVC-004, GAP-P1-01 | P1 | **PROD-P1-FIN** |
-| Zalo campaign write API | GAP-Z4-01, ZALO-009/010 | P1 | **PROD-Z4** |
+| Zalo campaign write API | GAP-Z4-01, ZALO-009/010 | P1 | **PROD-Z4** ✅ |
 | Email journeys prod | EM-011 | P1 | **PROD-P1-JRN** |
 | Portal Grafana BI | GAP-P1-03 | P2 | **PROD-P2-BI** |
 | Production hardening | SYS-008/009/011, PLAT-010 | P0 | **PROD-H-*** |

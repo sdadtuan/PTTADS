@@ -89,3 +89,7 @@ def reject_campaign_write(request_id: str, body: dict[str, Any]) -> tuple[int, d
 
 def sync_launch_qa_budget_confirmed(body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     return nest_request("POST", "/api/internal/launch-qa/sync-budget-confirmed", body=body)
+
+
+def auto_hub_map_from_campaign_write(body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    return nest_request("POST", "/api/internal/campaign-writes/auto-hub-map", body=body)

@@ -17,6 +17,7 @@ import { MetaIntelligenceModule } from './meta-intelligence/meta-intelligence.mo
 import { MetaCreativeRegistryModule } from './meta-creative-registry/meta-creative-registry.module';
 import { MetaComplianceModule } from './meta-compliance/meta-compliance.module';
 import { MetaAdsOpsModule } from './meta-ads-ops/meta-ads-ops.module';
+import { ZaloAdsOpsModule } from './zalo-ads-ops/zalo-ads-ops.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { MarketingPlansModule } from './marketing-plans/marketing-plans.module';
 import { ServiceLifecycleModule } from './service-lifecycle/service-lifecycle.module';
@@ -128,6 +129,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     MetaCreativeRegistryModule,
     MetaComplianceModule,
     MetaAdsOpsModule,
+    ZaloAdsOpsModule,
     MetricsModule,
     CreativesModule,
     CampaignWritesModule,

@@ -74,7 +74,7 @@
 | Báo cáo BI Grafana khách xem | EM-013, SEO-014 | ⚠️ **GAP-P1-03** — Staff embed OK; portal chưa embed |
 | Subscriber preference center | EM-014 | ✅ Public routes tokenized |
 | Multi-client isolation | SYS-011, PLAT-002/003 | ✅ JWT scope + **Prod-S4** pen test matrix |
-| **Deploy campaign Zalo qua API** | **ZALO-009/010** | ❌ **GAP-Z4-01** — v1 manual go-live + map |
+| **Deploy campaign Zalo qua API** | **ZALO-009/010** | ✓ **Prod-Z4** — stub/pilot; E1 manual fallback |
 
 ---
 
@@ -111,7 +111,7 @@
 
 | ID | Mô tả | UC | Workaround v1 |
 |----|-------|-----|---------------|
-| **GAP-Z4-01** | Campaign create/pause/update qua Zalo API | ZALO-009, ZALO-010 | Manual trên Zalo Ads UI + hub map ([08-ZALO-ACTIONS.md](actions/08-ZALO-ACTIONS.md) nhánh E1/M1) |
+| **GAP-Z4-01** | Campaign create/pause/update qua Zalo API | ZALO-009, ZALO-010 | **Prod-Z4 shipped** — stub/pilot; manual UI fallback [08-ZALO-ACTIONS.md](actions/08-ZALO-ACTIONS.md) E1 |
 
 ---
 

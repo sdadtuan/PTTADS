@@ -18,6 +18,7 @@ import { PortalClientUsersService } from './portal-client-users.service';
 import { OnboardingOrchestratorRepository } from './onboarding-orchestrator.repository';
 import { OnboardingOrchestratorService } from './onboarding-orchestrator.service';
 import { ClientsController } from './clients.controller';
+import { AgencyCampaignWriteInternalController } from './agency-campaign-write-internal.controller';
 import {
   StaffAgencyViewGuard,
   StaffFacebookAdsViewGuard,
@@ -26,6 +27,7 @@ import {
 } from './guards/staff-agency-view.guard';
 import { StaffAgencyConfigureGuard } from './guards/staff-agency-configure.guard';
 import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
+import { InternalKeyGuard } from '../auth/internal-key.guard';
 
 @Module({
   imports: [
@@ -37,7 +39,7 @@ import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
     LeadsContractModule,
     forwardRef(() => ServiceLifecycleModule),
   ],
-  controllers: [ClientsController, AgencyOpsController],
+  controllers: [ClientsController, AgencyOpsController, AgencyCampaignWriteInternalController],
   providers: [
     AgencyService,
     AgencyRepository,
@@ -55,6 +57,7 @@ import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
     StaffZaloAdsViewGuard,
     StaffAgencyWriteGuard,
     StaffAgencyConfigureGuard,
+    InternalKeyGuard,
   ],
   exports: [AgencyService, AgencySideEffectsService, ClientOffboardService, OnboardingOrchestratorService],
 })

@@ -16,6 +16,7 @@ export class TemporalCampaignWriteService {
     changeType: string;
     newValue: Record<string, unknown>;
     submittedBy: string;
+    channel?: string;
   }) {
     const workflowId = this.workflowId(request.requestId);
     return this.temporal.startWorkflow('CampaignWriteApprovalWorkflow', workflowId, [
@@ -26,6 +27,7 @@ export class TemporalCampaignWriteService {
         change_type: request.changeType,
         new_value: request.newValue,
         submitted_by: request.submittedBy,
+        channel: (request.channel ?? 'meta').trim().toLowerCase(),
       },
     ]);
   }
