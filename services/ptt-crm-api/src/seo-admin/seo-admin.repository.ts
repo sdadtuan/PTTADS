@@ -8,6 +8,8 @@ import {
   SeoClientTaskTechnicalRow,
   SeoClientTasksResponse,
   SeoClientWorkspaceResponse,
+  SeoCriticalIssueRow,
+  SeoGscTrendPoint,
   SeoHubAlert,
   SeoHubClientRow,
   SeoHubResponse,
@@ -57,6 +59,15 @@ function parseJsonArray(raw: unknown): string[] {
   } catch {
     return [];
   }
+}
+
+function computeOrganicGrowthPct(trend: SeoGscTrendPoint[]): number {
+  if (trend.length < 2) return 0;
+  const half = Math.max(1, Math.floor(trend.length / 2));
+  const prevClicks = trend.slice(0, half).reduce((s, p) => s + p.clicks, 0);
+  const recentClicks = trend.slice(half).reduce((s, p) => s + p.clicks, 0);
+  if (prevClicks <= 0) return 0;
+  return Math.round((1000 * (recentClicks - prevClicks)) / prevClicks) / 10;
 }
 
 function healthTier(score: number): 'good' | 'warn' | 'bad' {
@@ -191,13 +202,22 @@ export class SeoAdminRepository implements OnModuleDestroy {
       });
     }
 
-    const [openAlerts, failedSync, globalCritical, delivery, gscTotals] = await Promise.all([
+    const cidFilter =
+      params.customerId ?? (clients.length === 1 ? clients[0]?.customer_id : undefined);
+    const trendDays = Math.min(Math.max(1, params.days), 90);
+
+    const [openAlerts, failedSync, globalCritical, delivery, gscTotals, gscTrend, criticalIssues] =
+      await Promise.all([
       this.openAlertsCount(),
       this.failedSyncRuns(),
       this.criticalCount(null),
       this.contentDelivery(params.customerId),
       this.gscTotals(params.customerId, Math.min(params.days, 28)),
+      this.gscDailyTrend(cidFilter, trendDays),
+      this.listOpenCriticalIssues(cidFilter, 8),
     ]);
+
+    const organicGrowth = computeOrganicGrowthPct(gscTrend);
 
     const summary: SeoHubSummaryBlock = {
       seo_clients: clients.length,
@@ -216,7 +236,7 @@ export class SeoAdminRepository implements OnModuleDestroy {
       critical_issues: globalCritical,
       open_alerts: openAlerts,
       failed_sync_runs: failedSync,
-      organic_growth_pct: 0,
+      organic_growth_pct: organicGrowth,
       publish_sla_pct: Math.round(
         (1000 * delivery.published) /
           Math.max(1, delivery.published + delivery.overdue + delivery.in_review),
@@ -266,7 +286,9 @@ export class SeoAdminRepository implements OnModuleDestroy {
       alerts,
       executive: {
         gsc_totals: gscTotals,
+        gsc_trend: gscTrend,
         content_delivery: delivery,
+        critical_issues: criticalIssues,
         filters: {
           customer_id: params.customerId ?? null,
           days: params.days,
@@ -405,6 +427,112 @@ export class SeoAdminRepository implements OnModuleDestroy {
       impressions,
       avg_ctr: impressions > 0 ? Math.round((clicks / impressions) * 10000) / 10000 : 0,
     };
+  }
+
+  async gscDailyTrend(customerId: number | undefined, days: number): Promise<SeoGscTrendPoint[]> {
+    const params: unknown[] = [Math.max(1, days)];
+    let sql = `SELECT stat_date::text AS date,
+                      COALESCE(SUM(clicks), 0) AS clicks,
+                      COALESCE(SUM(impressions), 0) AS impressions
+               FROM ${SCHEMA}.seo_gsc_daily_stats
+               WHERE stat_date >= CURRENT_DATE - ($1::int * INTERVAL '1 day')`;
+    if (customerId != null) {
+      sql += ' AND customer_id = $2';
+      params.push(customerId);
+    }
+    sql += ' GROUP BY stat_date ORDER BY stat_date ASC';
+    const result = await this.db.query<{ date: string; clicks: string; impressions: string }>(sql, params);
+    return result.rows.map((row) => ({
+      date: row.date,
+      clicks: Number(row.clicks ?? 0),
+      impressions: Number(row.impressions ?? 0),
+    }));
+  }
+
+  async listOpenCriticalIssues(
+    customerId: number | undefined,
+    limit: number,
+  ): Promise<SeoCriticalIssueRow[]> {
+    const params: unknown[] = [];
+    let sql = `SELECT id, customer_id, url, issue_type, severity, status
+               FROM ${SCHEMA}.seo_technical_issues
+               WHERE severity = 'critical' AND status NOT IN ('closed', 'verified')`;
+    if (customerId != null) {
+      sql += ' AND customer_id = $1';
+      params.push(customerId);
+    }
+    sql += ` ORDER BY id DESC LIMIT $${params.length + 1}`;
+    params.push(limit);
+    const result = await this.db.query<{
+      id: number;
+      customer_id: number;
+      url: string;
+      issue_type: string;
+      severity: string;
+      status: string;
+    }>(sql, params);
+    return result.rows.map((row) => ({
+      id: row.id,
+      customer_id: row.customer_id,
+      url: row.url ?? '',
+      issue_type: row.issue_type ?? '',
+      severity: row.severity ?? '',
+      status: row.status ?? '',
+      customer_name: this.customerNameFromSqlite(row.customer_id),
+    }));
+  }
+
+  private customerNameFromSqlite(customerId: number): string {
+    const db = this.sqliteDb;
+    if (!db || customerId <= 0) return '';
+    try {
+      const row = db
+        .prepare('SELECT name FROM crm_customers WHERE id = ?')
+        .get(customerId) as { name?: string } | undefined;
+      return String(row?.name ?? '').trim();
+    } catch {
+      return '';
+    }
+  }
+
+  async patchIntegrations(
+    customerId: number,
+    patch: Record<string, Record<string, unknown>>,
+  ): Promise<SeoClientSettings> {
+    const existing = await this.getSettings(customerId);
+    const integrations = { ...existing.integrations };
+    for (const [key, value] of Object.entries(patch)) {
+      integrations[key] = { ...(parseJsonObject(integrations[key]) as object), ...value };
+    }
+    return this.upsertSettings(customerId, { integrations });
+  }
+
+  async saveOAuthIntegration(
+    customerId: number,
+    provider: 'gsc' | 'ga4',
+    tokens: { refresh_token_encrypted: string; site_url?: string; property_id?: string },
+  ): Promise<SeoClientSettings> {
+    const ts = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    if (provider === 'gsc') {
+      return this.patchIntegrations(customerId, {
+        gsc: {
+          status: 'connected',
+          site_url: tokens.site_url ?? '',
+          refresh_token_encrypted: tokens.refresh_token_encrypted,
+          connected_at: ts,
+          token_type: 'Bearer',
+        },
+      });
+    }
+    return this.patchIntegrations(customerId, {
+      ga4: {
+        status: 'connected',
+        property_id: tokens.property_id ?? '',
+        refresh_token_encrypted: tokens.refresh_token_encrypted,
+        connected_at: ts,
+        token_type: 'Bearer',
+      },
+    });
   }
 
   async getClientWorkspace(customerId: number): Promise<SeoClientWorkspaceResponse> {

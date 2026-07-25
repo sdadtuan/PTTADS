@@ -15,6 +15,7 @@ import {
   type StoredStaffUser,
 } from '@/lib/auth';
 import { canViewSeoHub } from '@/lib/seo/caps';
+import { SeoGscTrendChart } from '@/lib/seo/charts';
 
 function tierClass(tier: string): string {
   if (tier === 'good') return 'badge';
@@ -217,6 +218,12 @@ export default function SeoHubPage() {
           </div>
           <div>
             <p className="muted" style={{ margin: 0 }}>
+              Organic growth
+            </p>
+            <strong>{summary.organic_growth_pct}%</strong>
+          </div>
+          <div>
+            <p className="muted" style={{ margin: 0 }}>
               GSC clicks (28d)
             </p>
             <strong>{String(hub?.executive?.gsc_totals?.clicks ?? '—')}</strong>
@@ -227,6 +234,33 @@ export default function SeoHubPage() {
             </p>
             <strong>{summary.publish_sla_pct}%</strong>
           </div>
+        </div>
+      ) : null}
+
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>GSC trend</h2>
+        <SeoGscTrendChart points={hub?.executive?.gsc_trend ?? []} days={days} />
+      </div>
+
+      {(hub?.executive?.critical_issues?.length ?? 0) > 0 ? (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Critical issues</h2>
+          <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
+            {hub!.executive!.critical_issues!.map((issue) => (
+              <li key={issue.id} style={{ marginBottom: '0.35rem' }}>
+                <Link
+                  href={`/seo/clients/${issue.customer_id}?tab=tasks`}
+                  className="nav-link"
+                >
+                  {issue.issue_type || 'issue'}
+                </Link>
+                <span className="muted">
+                  {' '}
+                  · {issue.customer_name || `#${issue.customer_id}`} · {issue.url.slice(0, 60)}
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
 

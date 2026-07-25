@@ -31,6 +31,28 @@ class SeoP0B1QaTests(unittest.TestCase):
         self.assertIn('"/seo/clients"', hub)
         self.assertNotIn('"/crm/seo/clients"', hub)
 
+    def test_seed_script_exists(self) -> None:
+        self.assertTrue((ROOT / "scripts/seed_seo_pilot_client_settings.py").is_file())
+
+    def test_oauth_routes_declared(self) -> None:
+        text = (ROOT / "services/ptt-crm-api/src/seo-admin/seo-admin.controller.ts").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('gsc/oauth/url', text)
+        self.assertIn('ga4/oauth/url', text)
+        callback = (ROOT / "services/ptt-crm-api/src/seo-admin/seo-oauth.controller.ts").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('gsc/oauth/callback', callback)
+        self.assertIn('ga4/oauth/callback', callback)
+
+    def test_hub_has_gsc_trend_type(self) -> None:
+        text = (ROOT / "services/ptt-crm-api/src/seo-admin/seo-admin.types.ts").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('gsc_trend', text)
+
+
     def test_rbac_caps_in_staff_stub(self) -> None:
         text = (ROOT / "services/ptt-crm-api/src/staff-auth/staff-auth.service.ts").read_text(
             encoding="utf-8"

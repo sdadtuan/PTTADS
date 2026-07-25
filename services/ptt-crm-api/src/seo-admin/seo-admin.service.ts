@@ -1,12 +1,22 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { JobQueueRepository } from '../webhooks/job-queue.repository';
 import { SeoAdminRepository } from './seo-admin.repository';
+import {
+  encryptSeoRefreshToken,
+  exchangeSeoAuthorizationCode,
+  opsWebBaseUrl,
+  parseSeoOAuthState,
+  seoOAuthAuthorizationUrl,
+  seoOAuthConfigured,
+  type SeoOAuthProvider,
+} from './seo-oauth.util';
 import {
   SeoClientSettings,
   SeoClientTasksResponse,
   SeoClientWorkspaceResponse,
   SeoClientsListResponse,
   SeoHubResponse,
+  SeoOAuthStartResponse,
   SeoSettingsUpdateBody,
   SeoSyncTriggerResponse,
 } from './seo-admin.types';
@@ -104,5 +114,71 @@ export class SeoAdminService {
       job_id: job.id,
       sync_run_id: syncRunId,
     };
+  }
+
+  oauthStart(
+    customerId: number,
+    provider: SeoOAuthProvider,
+    opts?: { siteUrl?: string; propertyId?: string },
+  ): SeoOAuthStartResponse {
+    if (!seoOAuthConfigured(provider)) {
+      throw new ServiceUnavailableException({
+        error: provider === 'gsc' ? 'missing_gsc_oauth_env' : 'missing_ga4_oauth_env',
+        hint: 'Cấu hình PTT_GSC_OAUTH_* / PTT_GA4_OAUTH_* trên Nest',
+      });
+    }
+    const url = seoOAuthAuthorizationUrl({
+      customerId,
+      provider,
+      siteUrl: opts?.siteUrl?.trim(),
+      propertyId: opts?.propertyId?.trim(),
+    });
+    return {
+      ok: true,
+      authorization_url: url,
+      provider,
+      customer_id: customerId,
+      configured: true,
+    };
+  }
+
+  async oauthCallback(
+    provider: SeoOAuthProvider,
+    code: string | undefined,
+    state: string | undefined,
+    error: string | undefined,
+  ): Promise<string> {
+    const opsWeb = opsWebBaseUrl();
+    let customerId = 0;
+    try {
+      const parsed = parseSeoOAuthState(String(state ?? ''));
+      customerId = parsed.customer_id;
+    } catch {
+      return `${opsWeb}/seo/clients?oauth_error=invalid_state`;
+    }
+    const base = `${opsWeb}/seo/clients/${customerId}?tab=settings`;
+    if (error) {
+      return `${base}&${provider}_oauth_error=${encodeURIComponent(error)}`;
+    }
+    if (!code?.trim()) {
+      return `${base}&${provider}_oauth_error=missing_code`;
+    }
+    try {
+      const parsed = parseSeoOAuthState(String(state ?? ''));
+      if (parsed.provider !== provider) {
+        throw new BadRequestException({ error: 'provider_mismatch' });
+      }
+      const tokens = await exchangeSeoAuthorizationCode(code, provider);
+      const encrypted = encryptSeoRefreshToken(tokens.refresh_token);
+      await this.repo.saveOAuthIntegration(customerId, provider, {
+        refresh_token_encrypted: encrypted,
+        site_url: parsed.site_url,
+        property_id: parsed.property_id,
+      });
+      return `${base}&${provider}_connected=1`;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'oauth_failed';
+      return `${base}&${provider}_oauth_error=${encodeURIComponent(message)}`;
+    }
   }
 }

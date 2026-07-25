@@ -4,12 +4,13 @@ import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
 import { StaffSeoSettingsGuard, StaffSeoViewGuard } from './guards/staff-seo-view.guard';
 import { SeoAdminController } from './seo-admin.controller';
+import { SeoOAuthCallbackController } from './seo-oauth.controller';
 import { SeoAdminRepository } from './seo-admin.repository';
 import { SeoAdminService } from './seo-admin.service';
 
 @Module({
   imports: [ConfigModule, StaffAuthModule, WebhooksModule],
-  controllers: [SeoAdminController],
+  controllers: [SeoAdminController, SeoOAuthCallbackController],
   providers: [SeoAdminRepository, SeoAdminService, StaffSeoViewGuard, StaffSeoSettingsGuard],
   exports: [SeoAdminService],
 })

@@ -84,4 +84,22 @@ export class SeoAdminController {
   ): Promise<SeoSyncTriggerResponse> {
     return this.seo.triggerSync(id, source);
   }
+
+  @Get('clients/:id/gsc/oauth/url')
+  @UseGuards(StaffSeoSettingsGuard)
+  gscOAuthStart(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('site_url') siteUrl?: string,
+  ) {
+    return this.seo.oauthStart(id, 'gsc', { siteUrl });
+  }
+
+  @Get('clients/:id/ga4/oauth/url')
+  @UseGuards(StaffSeoSettingsGuard)
+  ga4OAuthStart(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('property_id') propertyId?: string,
+  ) {
+    return this.seo.oauthStart(id, 'ga4', { propertyId });
+  }
 }

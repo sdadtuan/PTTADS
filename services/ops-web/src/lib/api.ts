@@ -3256,7 +3256,17 @@ export interface SeoHubResponse {
   alerts: SeoHubAlert[];
   executive: {
     gsc_totals: Record<string, unknown>;
+    gsc_trend?: Array<{ date: string; clicks: number; impressions: number }>;
     content_delivery: Record<string, number>;
+    critical_issues?: Array<{
+      id: number;
+      customer_id: number;
+      url: string;
+      issue_type: string;
+      severity: string;
+      status: string;
+      customer_name: string;
+    }>;
   };
 }
 
@@ -3384,6 +3394,24 @@ export async function triggerSeoClientSync(
     method: 'POST',
     body: JSON.stringify({}),
   });
+}
+
+export async function fetchSeoGscOAuthUrl(
+  token: string,
+  customerId: number,
+  siteUrl?: string,
+): Promise<{ ok: boolean; authorization_url: string }> {
+  const qs = siteUrl ? `?site_url=${encodeURIComponent(siteUrl)}` : '';
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/gsc/oauth/url${qs}`);
+}
+
+export async function fetchSeoGa4OAuthUrl(
+  token: string,
+  customerId: number,
+  propertyId?: string,
+): Promise<{ ok: boolean; authorization_url: string }> {
+  const qs = propertyId ? `?property_id=${encodeURIComponent(propertyId)}` : '';
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/ga4/oauth/url${qs}`);
 }
 
 export interface EmailHubSummary {

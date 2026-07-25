@@ -7,6 +7,8 @@ import { OpsNav } from '@/components/OpsNav';
 import {
   fetchSeoClientTasks,
   fetchSeoClientWorkspace,
+  fetchSeoGa4OAuthUrl,
+  fetchSeoGscOAuthUrl,
   staffMe,
   staffRefresh,
   triggerSeoClientSync,
@@ -52,6 +54,9 @@ export default function SeoClientWorkspacePage() {
   const [industry, setIndustry] = useState('');
   const [contractTier, setContractTier] = useState('standard');
   const [notes, setNotes] = useState('');
+  const [gscSiteUrl, setGscSiteUrl] = useState('');
+  const [ga4PropertyId, setGa4PropertyId] = useState('');
+  const [connecting, setConnecting] = useState<'gsc' | 'ga4' | null>(null);
 
   const ensureAuth = useCallback(async (): Promise<string | null> => {
     let access = getAccessToken();
@@ -103,6 +108,9 @@ export default function SeoClientWorkspacePage() {
         setIndustry(data.settings.industry ?? '');
         setContractTier(data.settings.contract_tier ?? 'standard');
         setNotes(data.settings.notes ?? '');
+        const gscSite = data.integrations.gsc.site_url ?? data.settings.domains[0] ?? '';
+        setGscSiteUrl(gscSite.startsWith('http') ? gscSite : gscSite ? `https://${gscSite}` : '');
+        setGa4PropertyId(data.integrations.ga4.property_id ?? '');
         if (tab === 'tasks') {
           const taskData = await fetchSeoClientTasks(access, customerId);
           setTasks(taskData);
@@ -123,6 +131,17 @@ export default function SeoClientWorkspacePage() {
       await loadWorkspace(access);
     })();
   }, [ensureAuth, loadWorkspace]);
+
+  useEffect(() => {
+    const gscOk = searchParams.get('gsc_connected');
+    const ga4Ok = searchParams.get('ga4_connected');
+    const gscErr = searchParams.get('gsc_oauth_error');
+    const ga4Err = searchParams.get('ga4_oauth_error');
+    if (gscOk === '1') setMessage('GSC OAuth kết nối thành công.');
+    if (ga4Ok === '1') setMessage('GA4 OAuth kết nối thành công.');
+    if (gscErr) setError(`GSC OAuth: ${decodeURIComponent(gscErr)}`);
+    if (ga4Err) setError(`GA4 OAuth: ${decodeURIComponent(ga4Err)}`);
+  }, [searchParams]);
 
   const canConfigure = useMemo(() => canConfigureSeoSettings(user), [user]);
 
@@ -184,6 +203,23 @@ export default function SeoClientWorkspacePage() {
       setError(err instanceof Error ? err.message : 'Trigger sync thất bại');
     } finally {
       setSyncing(null);
+    }
+  }
+
+  async function connectOAuth(provider: 'gsc' | 'ga4') {
+    const access = getAccessToken();
+    if (!access || !canConfigure) return;
+    setConnecting(provider);
+    setError('');
+    try {
+      const out =
+        provider === 'gsc'
+          ? await fetchSeoGscOAuthUrl(access, customerId, gscSiteUrl.trim() || undefined)
+          : await fetchSeoGa4OAuthUrl(access, customerId, ga4PropertyId.trim() || undefined);
+      window.location.href = out.authorization_url;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Kết nối ${provider.toUpperCase()} thất bại`);
+      setConnecting(null);
     }
   }
 
@@ -415,6 +451,44 @@ export default function SeoClientWorkspacePage() {
               disabled={!canConfigure}
             />
           </label>
+          <label className="muted" style={{ display: 'block', marginBottom: '0.75rem' }}>
+            GSC site URL (Search Console property)
+            <input
+              value={gscSiteUrl}
+              onChange={(e) => setGscSiteUrl(e.target.value)}
+              placeholder="https://example.com/ hoặc sc-domain:example.com"
+              style={{ display: 'block', width: '100%', marginTop: '0.35rem' }}
+              disabled={!canConfigure}
+            />
+          </label>
+          <label className="muted" style={{ display: 'block', marginBottom: '0.75rem' }}>
+            GA4 property ID
+            <input
+              value={ga4PropertyId}
+              onChange={(e) => setGa4PropertyId(e.target.value)}
+              placeholder="123456789"
+              style={{ display: 'block', width: '100%', marginTop: '0.35rem' }}
+              disabled={!canConfigure}
+            />
+          </label>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={!canConfigure || connecting !== null}
+              onClick={() => void connectOAuth('gsc')}
+            >
+              {connecting === 'gsc' ? 'Redirect GSC…' : 'Kết nối GSC (Google)'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={!canConfigure || connecting !== null}
+              onClick={() => void connectOAuth('ga4')}
+            >
+              {connecting === 'ga4' ? 'Redirect GA4…' : 'Kết nối GA4 (Google)'}
+            </button>
+          </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
             <button type="button" className="btn btn-sm" disabled={!canConfigure || saving} onClick={() => void saveSettings()}>
               {saving ? 'Đang lưu…' : 'Lưu settings'}

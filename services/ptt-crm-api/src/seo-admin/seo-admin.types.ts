@@ -46,6 +46,22 @@ export interface SeoHubSummaryBlock {
   publish_sla_pct: number;
 }
 
+export interface SeoGscTrendPoint {
+  date: string;
+  clicks: number;
+  impressions: number;
+}
+
+export interface SeoCriticalIssueRow {
+  id: number;
+  customer_id: number;
+  url: string;
+  issue_type: string;
+  severity: string;
+  status: string;
+  customer_name: string;
+}
+
 export interface SeoHubResponse {
   ok: boolean;
   summary: SeoHubSummaryBlock;
@@ -53,7 +69,9 @@ export interface SeoHubResponse {
   alerts: SeoHubAlert[];
   executive: {
     gsc_totals: Record<string, unknown>;
+    gsc_trend: SeoGscTrendPoint[];
     content_delivery: Record<string, number>;
+    critical_issues: SeoCriticalIssueRow[];
     filters: { customer_id?: number | null; days: number; market?: string | null };
   };
 }
@@ -164,4 +182,12 @@ export interface SeoSyncTriggerResponse {
   job_id?: string | null;
   sync_run_id?: number | null;
   error?: string;
+}
+
+export interface SeoOAuthStartResponse {
+  ok: boolean;
+  authorization_url: string;
+  provider: 'gsc' | 'ga4';
+  customer_id: number;
+  configured: boolean;
 }

@@ -31,6 +31,10 @@ def _check_module_files() -> dict[str, Any]:
         ROOT / "services/ops-web/src/app/seo/clients/[id]/page.tsx",
         ROOT / "services/ops-web/src/lib/seo/caps.ts",
         ROOT / "services/ops-web/src/lib/seo/flags.ts",
+        ROOT / "scripts/seed_seo_pilot_client_settings.py",
+        ROOT / "services/ptt-crm-api/src/seo-admin/seo-oauth.util.ts",
+        ROOT / "services/ptt-crm-api/src/seo-admin/seo-oauth.controller.ts",
+        ROOT / "services/ops-web/src/lib/seo/charts.tsx",
         ROOT / "scripts/wave_seo_p0_b1_gate.sh",
         ROOT / "tests/test_seo_p0_b1_qa.py",
     ]
