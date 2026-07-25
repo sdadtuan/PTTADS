@@ -31,7 +31,7 @@
 | Khách duyệt email trước gửi | EM-007, PORTAL-008 | ✅ Portal approvals |
 | SEO content duyệt trước publish | SEO-005/006, PORTAL-007 | ✅ Content pipeline + portal review |
 | Tạo tài khoản portal cho khách | PORTAL-001, SYS-001 bước 6 | ✅ Tab **Portal users** trên `/agency/clients/[id]` |
-| Reset mật khẩu portal | PORTAL-001 | ❌ **GAP-P0-02** — Chỉ Admin DB / manual |
+| Reset mật khẩu portal | PORTAL-001 | ✅ `/forgot-password`, `/reset-password`, `/settings` |
 | Offboard → thu hồi hết quyền | SYS-006, SVC-012 | ✅ Nút Offboard trên `/agency/clients/[id]` |
 | Finance chặn handover khi nợ | SVC-004 | ⚠️ **GAP-P1-01** — Gate logic spec; UI cảnh báo hạn chế |
 | Onboard email domain tự phục vụ | EM-001 | ✅ Wizard E-11 `/email/deliverability` |
@@ -49,7 +49,7 @@
 | ID | Mô tả | UC | Workaround hiện tại | Đề xuất |
 |----|-------|-----|---------------------|---------|
 | **GAP-P0-01** | ~~Không có UI CRUD portal users trên ops-web~~ | PORTAL-001, SYS-001 | — | ✅ **Đã implement** — tab Portal users + API CRUD |
-| **GAP-P0-02** | Portal forgot password | PORTAL-001 | AM liên hệ Admin | API reset + email magic link hoặc AM reset trên UI client detail |
+| **GAP-P0-02** | ~~Portal forgot password~~ | PORTAL-001 | Self-serve `/forgot-password` + `/reset-password`; AM reset ops | ✅ **Đã implement** |
 | **GAP-P0-03** | Onboard đa module không có checklist thống nhất 1 màn | SYS-001, SVC-002 | AM nhảy giữa Agency, Meta, SEO, Email | **Onboard orchestrator** trên lifecycle tab: deep-link từng bước + auto tick khi detect done |
 
 ### GAP-P1 — Enterprise depth / workaround được
@@ -91,7 +91,7 @@ Một UC được coi **"đủ bước nghiệp vụ"** khi file actions tương
 
 | Phase | Hạng mục | UC được unblock |
 |-------|----------|-----------------|
-| **A** (2 sprint) | ~~GAP-P0-01~~, GAP-P0-02, GAP-P0-03 | PORTAL-001 partial (create ✅; reset self-serve pending P0-02) |
+| **A** (2 sprint) | ~~GAP-P0-01~~, ~~GAP-P0-02~~, GAP-P0-03 | PORTAL-001 self-serve ✅ |
 | **B** (1 sprint) | GAP-P1-01 finance gate UI, GAP-P1-02 portal notification | SVC-004, PORTAL-006/008 |
 | **C** | GAP-P1-03 Grafana portal read-only | EM-013, SEO-014 client-facing |
 

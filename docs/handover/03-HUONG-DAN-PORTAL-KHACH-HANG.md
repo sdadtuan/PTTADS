@@ -33,11 +33,22 @@
 | **Viewer** | Xem dashboard, báo cáo, export read-only |
 | **Approver** | Viewer + duyệt/từ chối trong approval inbox |
 
-### 2.3. Đổi mật khẩu & hỗ trợ
+### 2.3. Quên mật khẩu & đổi mật khẩu
 
-- Lần đầu đăng nhập: **đổi mật khẩu** nếu PTT yêu cầu (policy agency)
-- Quên mật khẩu: liên hệ AM / support PTT (quy trình reset do Admin thực hiện)
-- **Không** chia sẻ tài khoản approver cho nhiều người — mỗi approver một login để audit
+| Luồng | URL | Mô tả |
+|-------|-----|-------|
+| Quên MK | `/forgot-password` | Nhập email → nhận link (email webhook hoặc dev link staging) |
+| Đặt MK mới | `/reset-password?token=…` | Link one-time, TTL mặc định 60 phút |
+| Đổi MK (đã login) | `/settings` | Nhập MK cũ + MK mới |
+| AM reset | ops `/agency/clients/[id]?tab=portal` | Nút **Reset MK** |
+
+**Env production:** `PTT_PORTAL_PUBLIC_URL`, `PTT_PORTAL_EMAIL_NOTIFY=1`, DDL `2026-07-25-postgresql-ddl-v3-portal-password-reset.sql`
+
+### 2.4. Hỗ trợ & bảo mật tài khoản
+
+- Lần đầu đăng nhập: **đổi mật khẩu** tại `/settings` nếu PTT yêu cầu
+- Quên mật khẩu: self-serve `/forgot-password` hoặc liên hệ AM reset trên ops-web
+- **Không** chia sẻ tài khoản approver — mỗi approver một login để audit
 
 > Mật khẩu ban đầu ghi trên form [`ban-giao-tai-khoan-credentials-a4.html`](../forms/ban-giao-tai-khoan-credentials-a4.html) — bản giao vault, không email plain text.
 

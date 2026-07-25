@@ -1,12 +1,15 @@
 'use client';
 
+import Link from 'next/link';
 import { FormEvent, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { isTenantArchivedError, portalLogin } from '@/lib/api';
 import { saveSession } from '@/lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const resetOk = searchParams.get('reset') === 'ok';
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -51,6 +54,11 @@ export default function LoginPage() {
         <p className="muted" style={{ marginTop: 0, marginBottom: '1.25rem' }}>
           Xem CPL / spend và duyệt creative cho chiến dịch của bạn
         </p>
+        {resetOk ? (
+          <p className="muted" style={{ marginBottom: '1rem', color: 'var(--accent, #0a7)' }}>
+            Mật khẩu đã được cập nhật — đăng nhập bằng mật khẩu mới.
+          </p>
+        ) : null}
         <form onSubmit={onSubmit}>
           <div className="field">
             <label htmlFor="email">Email</label>
@@ -79,6 +87,11 @@ export default function LoginPage() {
             {loading ? 'Đang đăng nhập…' : 'Đăng nhập'}
           </button>
         </form>
+        <p style={{ marginTop: '0.75rem', marginBottom: 0, textAlign: 'center' }}>
+          <Link href="/forgot-password" className="nav-link">
+            Quên mật khẩu?
+          </Link>
+        </p>
         <p className="muted" style={{ marginTop: '1rem', marginBottom: 0 }}>
           Dev: <code>approver@demo.local</code> / <code>demo123</code> ·{' '}
           <code>./scripts/local_portal_up.sh</code>

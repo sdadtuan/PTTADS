@@ -176,6 +176,61 @@ export async function portalLogin(email: string, password: string): Promise<Logi
   return body;
 }
 
+export async function portalForgotPassword(
+  email: string,
+): Promise<{ ok: boolean; message: string; reset_url?: string }> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  const body = await parseJson<{ ok: boolean; message: string; reset_url?: string; error?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? 'Forgot password failed', res.status);
+  }
+  return body;
+}
+
+export async function portalValidateResetToken(
+  token: string,
+): Promise<{ ok: boolean; email_masked?: string; error?: string }> {
+  const qs = new URLSearchParams({ token });
+  const res = await fetch(`${API_BASE}/api/v1/portal/auth/reset-password/validate?${qs.toString()}`, {
+    cache: 'no-store',
+  });
+  return parseJson(res);
+}
+
+export async function portalResetPassword(token: string, password: string): Promise<{ ok: boolean; message?: string }> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, password }),
+  });
+  const body = await parseJson<{ ok: boolean; message?: string; error?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? 'Reset password failed', res.status);
+  }
+  return body;
+}
+
+export async function portalChangePassword(
+  token: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: boolean; message?: string }> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/auth/change-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+  const body = await parseJson<{ ok: boolean; message?: string; error?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? 'Change password failed', res.status);
+  }
+  return body;
+}
+
 export async function portalRefresh(refreshToken: string): Promise<LoginResponse> {
   const res = await fetch(`${API_BASE}/api/v1/portal/auth/refresh`, {
     method: 'POST',

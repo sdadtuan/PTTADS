@@ -36,6 +36,8 @@ export class AppConfigService {
   readonly portalRefreshTtlSec: number;
   readonly portalEmailNotifyEnabled: boolean;
   readonly portalEmailWebhookUrl: string | null;
+  readonly portalPublicUrl: string;
+  readonly portalResetTtlMin: number;
   readonly portalStubUsers: PortalStubUser[];
   readonly portalCorsOrigins: string[];
   readonly opsCorsOrigins: string[];
@@ -103,6 +105,17 @@ export class AppConfigService {
       (process.env.PTT_PORTAL_EMAIL_NOTIFY ?? '0').trim().toLowerCase(),
     );
     this.portalEmailWebhookUrl = (process.env.PTT_PORTAL_EMAIL_WEBHOOK_URL ?? '').trim() || null;
+    this.portalPublicUrl = (
+      process.env.PTT_PORTAL_PUBLIC_URL ??
+      process.env.NEXT_PUBLIC_PORTAL_URL ??
+      'https://portal.pttads.vn'
+    )
+      .trim()
+      .replace(/\/$/, '');
+    this.portalResetTtlMin = Math.max(
+      15,
+      Math.min(24 * 60, Number(process.env.PTT_PORTAL_RESET_TTL_MIN ?? 60) || 60),
+    );
     this.portalStubUsers = this.parsePortalStubUsers();
     this.portalCorsOrigins = this.parsePortalCorsOrigins();
     this.opsCorsOrigins = this.parseOpsCorsOrigins();

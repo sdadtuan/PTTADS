@@ -15,7 +15,7 @@
 | 3 | Client | portal `/login` | Nhập email + password | credentials | ✓ |
 | 4 | System | Auth API | Issue JWT scoped `client_id` | — | ✓ |
 | 5 | Client | `/dashboard` | Redirect after login | — | ✓ widgets load |
-| 6 | Client | (Policy) | Đổi mật khẩu lần đầu | ⚠ GAP-P0-02 no self-serve | ⚠ AM reset |
+| 6 | Client | (Policy) | `/settings` hoặc `/forgot-password` | Đổi MK / quên MK self-serve | ✓ |
 
 #### Nhánh archived client
 Login → redirect `/archived` — không xem KPI.
@@ -123,3 +123,26 @@ Login → redirect `/archived` — không xem KPI.
 |---|-------|----------|----------|------|
 | 1 | Approver | `/settings` | Edit display name, logo URL | ✓ |
 | 2 | Approver | Same | AM contact info | ✓ |
+
+---
+
+## PORTAL-UC-011 — Quên mật khẩu (GAP-P0-02)
+
+| # | Actor | Màn hình | Thao tác | Gate |
+|---|-------|----------|----------|------|
+| 1 | Client | `/login` | Click **Quên mật khẩu?** | ✓ |
+| 2 | Client | `/forgot-password` | Nhập email → **Gửi link** | ✓ generic msg |
+| 3 | System | Email webhook | Gửi link `/reset-password?token=…` | ✓ prod notify |
+| 4 | Client | Email / dev link | Mở link reset | ✓ token valid |
+| 5 | Client | `/reset-password` | MK mới + xác nhận → **Lưu** | ✓ ≥8 chars |
+| 6 | Client | `/login?reset=ok` | Login MK mới | ✓ |
+
+---
+
+## PORTAL-UC-012 — Đổi mật khẩu khi đã login
+
+| # | Actor | Màn hình | Thao tác | Gate |
+|---|-------|----------|----------|------|
+| 1 | Client | `/settings` | Section **Đổi mật khẩu** | ✓ |
+| 2 | Client | Form | MK hiện tại + MK mới + xác nhận | ✓ |
+| 3 | System | `POST /portal/auth/change-password` | Update hash | ✓ |
