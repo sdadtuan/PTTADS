@@ -3,7 +3,7 @@
 > **Phiên bản:** 2.0 · **Cập nhật:** 2026-07-20  
 > **Kiến trúc:** Nest + ops-web + portal-web + Python workers · **Flask HTTP đã retired (Wave 8)**  
 > **Thư mục trên VPS:** `/var/www/ptt`  
-> **Runbook bàn giao:** [`handover-production-flask-to-nest.md`](./handover-production-flask-to-nest.md)  
+> **Runbook bàn giao:** [`handover/README.md`](../handover/README.md) (bộ tài liệu khách hàng v1.0) · [`handover-production-flask-to-nest.md`](./handover-production-flask-to-nest.md) (1 trang kỹ thuật)  
 > **Vận hành hàng ngày (chi tiết phase cũ):** [`vps-production-operations.md`](./vps-production-operations.md)
 
 Tài liệu này mô tả **deploy greenfield** (VPS mới) và **nâng cấp cutover** (VPS đang chạy Flask cũ → stack mới).

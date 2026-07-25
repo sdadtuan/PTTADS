@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ClientOnboardingWidget } from '@/components/ClientOnboardingWidget';
+import { ClientPortalUsersPanel } from '@/components/ClientPortalUsersPanel';
 import { OpsNav } from '@/components/OpsNav';
 import { AgencyReadOnlyBadge, canAgencyConfigure, canAgencyWrite } from '@/components/AgencyReadOnlyBadge';
 import { HubCampaignMapsPanel } from '@/components/HubCampaignMapsPanel';
@@ -50,7 +51,7 @@ import {
   type StoredStaffUser,
 } from '@/lib/auth';
 
-type TabId = 'overview' | 'checklist' | 'channels' | 'campaigns' | 'leads' | 'contracts';
+type TabId = 'overview' | 'checklist' | 'channels' | 'campaigns' | 'leads' | 'contracts' | 'portal';
 
 const CLIENT_STATUSES = ['prospect', 'onboarding', 'active', 'paused'] as const;
 
@@ -618,6 +619,7 @@ export function AgencyClientDetailContent() {
                   ['campaigns', 'Campaign map'],
                   ['leads', `Leads (${clientLeads.length})`],
                   ['contracts', `Hợp đồng (${clientContracts.length})`],
+                  ['portal', 'Portal users'],
                 ] as const
               ).map(([id, label]) => (
                 <button
@@ -1165,6 +1167,18 @@ export function AgencyClientDetailContent() {
                     ) : null}
                   </tbody>
                 </table>
+              </div>
+            ) : null}
+
+            {tab === 'portal' && accessToken ? (
+              <div style={{ marginTop: '1rem' }}>
+                <ClientPortalUsersPanel
+                  token={accessToken}
+                  clientId={clientId}
+                  canMutate={canMutate}
+                  onMessage={(msg) => setActionMsg(msg)}
+                  onError={(msg) => setError(msg)}
+                />
               </div>
             ) : null}
           </>

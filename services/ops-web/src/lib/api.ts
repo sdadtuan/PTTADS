@@ -2983,6 +2983,67 @@ export async function fetchClientOffboardAudit(
   return agencyFetch(token, `/api/v1/clients/${clientId}/offboard/audit`);
 }
 
+export type PortalClientRole = 'viewer' | 'approver';
+
+export interface PortalClientUser {
+  id: string;
+  email: string;
+  role: PortalClientRole;
+  active: boolean;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PortalClientUsersListResult {
+  ok: boolean;
+  client_id: string;
+  users: PortalClientUser[];
+  table_ready: boolean;
+}
+
+export async function fetchClientPortalUsers(
+  token: string,
+  clientId: string,
+): Promise<PortalClientUsersListResult> {
+  return agencyFetch(token, `/api/v1/clients/${clientId}/portal-users`);
+}
+
+export async function createClientPortalUser(
+  token: string,
+  clientId: string,
+  body: { email: string; password?: string; role?: PortalClientRole },
+): Promise<{ ok: boolean; user: PortalClientUser; temporary_password?: string }> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/portal-users`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchClientPortalUser(
+  token: string,
+  clientId: string,
+  userId: string,
+  body: { role?: PortalClientRole; active?: boolean },
+): Promise<PortalClientUser> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/portal-users/${userId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function resetClientPortalUserPassword(
+  token: string,
+  clientId: string,
+  userId: string,
+  body: { password?: string } = {},
+): Promise<{ ok: boolean; temporary_password?: string }> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/portal-users/${userId}/reset-password`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
 export async function addClientChannelAccount(
   token: string,
   clientId: string,

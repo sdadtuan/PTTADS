@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Biên bản nghiệm thu bàn giao PTTADS — A4</title>
+<style>
+:root { --navy:#0F172A; --green:#398b43; --green-light:#ecf3ee; --gray:#64748B; --light:#F1F5F9; --border:#CBD5E1; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:"Segoe UI",system-ui,sans-serif; color:var(--navy); background:#fff; line-height:1.45; font-size:12px; }
+.page { max-width:920px; margin:0 auto; padding:1rem 1.1rem 2rem; }
+header.doc-header { background:var(--navy); color:#fff; padding:1rem 1.25rem; border-radius:8px; margin-bottom:1rem; }
+header.doc-header h1 { font-size:1.25rem; margin-bottom:.2rem; }
+header.doc-header .meta { font-size:.82rem; opacity:.88; }
+header.doc-header .slug { color:#86efac; font-size:.78rem; }
+.meta-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:.5rem 1rem; margin-top:.85rem; background:rgba(255,255,255,.08); padding:.85rem; border-radius:6px; }
+.field { margin-bottom:.5rem; }
+.field label { display:block; font-weight:600; font-size:.75rem; margin-bottom:.15rem; color:var(--gray); }
+.line { border-bottom:1px solid var(--border); height:1.35rem; }
+.form-section { margin-bottom:1.25rem; page-break-inside:avoid; }
+.section-head { display:flex; align-items:center; gap:.6rem; border-bottom:3px solid var(--green); padding-bottom:.35rem; margin-bottom:.65rem; }
+.section-head h2 { font-size:1rem; }
+.part-badge { background:var(--green); color:#fff; font-size:.68rem; font-weight:600; padding:.18rem .5rem; border-radius:4px; }
+.check-table { width:100%; border-collapse:collapse; margin:.5rem 0; font-size:.78rem; }
+.check-table th { background:var(--green); color:#fff; padding:.4rem .55rem; text-align:left; }
+.check-table td { border:1px solid var(--border); padding:.35rem .55rem; vertical-align:top; }
+.check-table tr:nth-child(even) td { background:var(--light); }
+.cb { display:inline-block; width:1.1rem; height:1.1rem; border:1.5px solid var(--border); border-radius:3px; }
+.cb-col { width:2rem; text-align:center; }
+.sign-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-top:1rem; }
+.sign-box { border:1px solid var(--border); border-radius:6px; padding:.65rem; min-height:5rem; }
+.sign-line { border-bottom:1px solid var(--border); margin-top:2.5rem; }
+.footer-note { margin-top:1.25rem; padding:.75rem; background:var(--green-light); border-radius:6px; font-size:.75rem; color:var(--gray); border-left:4px solid var(--green); }
+@media print { @page { size:A4; margin:12mm; } body { font-size:10.5px; } .page { padding:0; max-width:100%; } }
+</style>
+</head>
+<body>
+<div class="page">
+<header class="doc-header">
+  <div class="slug">PTTADS · Customer Handover · Biên bản nghiệm thu v1.0</div>
+  <h1>Biên bản nghiệm thu bàn giao hệ thống PTTADS</h1>
+  <div class="meta">In A4 · Ký sau UAT · Nest + Next.js Agency Operating Platform</div>
+  <div class="meta-grid">
+    <div class="field"><label>Khách hàng / Tổ chức</label><div class="line"></div></div>
+    <div class="field"><label>Số HĐ / PO tham chiếu</label><div class="line"></div></div>
+    <div class="field"><label>Ngày nghiệm thu</label><div class="line"></div></div>
+    <div class="field"><label>Địa điểm / Hình thức</label><div class="line"></div></div>
+    <div class="field"><label>Phiên bản release / tag</label><div class="line"></div></div>
+    <div class="field"><label>Bộ tài liệu</label><div class="line">docs/handover/ v1.0</div></div>
+  </div>
+</header>
+
+<section class="form-section">
+  <div class="section-head"><h2>A. Phạm vi đã bàn giao</h2><span class="part-badge">SCOPE</span></div>
+  <table class="check-table">
+    <thead><tr><th class="cb-col">☐</th><th>Module</th><th>URL / ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Staff console (CRM + Agency)</td><td>https://ops.pttads.vn</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Client portal</td><td>https://portal.pttads.vn</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Meta Enterprise Ops</td><td>/meta/*</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>SEO/AEO Enterprise Ops</td><td>/seo/*</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Email Marketing Ops</td><td>/email/*</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Webhooks 4 kênh</td><td>/api/v1/webhooks/*</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Bộ tài liệu handover 01–06</td><td>docs/handover/</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Slide đào tạo PPT</td><td>PTTADS_Ban_Giao_Dao_Tao.pptx</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="form-section">
+  <div class="section-head"><h2>B. UAT smoke test</h2><span class="part-badge">UAT</span></div>
+  <table class="check-table">
+    <thead><tr><th class="cb-col">☐</th><th>Kiểm tra</th><th>Người thực hiện</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Staff login → CRM leads</td><td></td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Portal login → dashboard</td><td></td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Meta hub data T-1</td><td></td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>SEO hub load</td><td></td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Email hub load</td><td></td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Webhook lead → CRM</td><td></td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Portal approver test</td><td></td><td></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="form-section">
+  <div class="section-head"><h2>C. Pilot client</h2><span class="part-badge">PILOT</span></div>
+  <div class="meta-grid" style="background:var(--light);color:var(--navy);margin-top:.5rem;">
+    <div class="field"><label>Tên client pilot</label><div class="line"></div></div>
+    <div class="field"><label>Client UUID / customer_id</label><div class="line"></div></div>
+    <div class="field"><label>Portal approver email</label><div class="line"></div></div>
+  </div>
+</section>
+
+<section class="form-section">
+  <div class="section-head"><h2>D. Defect / điều kiện ký</h2><span class="part-badge">NOTES</span></div>
+  <p class="field" style="margin-top:.5rem;"><label>Ghi chú defect còn lại (P2/P3) hoặc điều kiện hypercare</label></p>
+  <div class="line" style="height:3rem;margin-bottom:.5rem;"></div>
+  <div class="line" style="height:3rem;"></div>
+</section>
+
+<div class="sign-row">
+  <div class="sign-box"><label>Đại diện khách hàng (PO)</label><div class="sign-line"></div><label style="margin-top:.35rem;font-size:.72rem;">Họ tên · Chức vụ</label></div>
+  <div class="sign-box"><label>PTT Tech Lead</label><div class="sign-line"></div></div>
+  <div class="sign-box"><label>PTT Account Manager</label><div class="sign-line"></div></div>
+</div>
+
+<div class="footer-note">
+  Tham chiếu: <code>docs/handover/06-NGHIEM-THU-VA-BAO-CAO.md</code> · Hypercare gợi ý 2–4 tuần post go-live.
+</div>
+</div>
+</body>
+</html>

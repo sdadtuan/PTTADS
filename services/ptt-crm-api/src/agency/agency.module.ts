@@ -12,6 +12,8 @@ import { AgencyService } from './agency.service';
 import { ClientOffboardRepository } from './client-offboard.repository';
 import { ClientOffboardFollowUpService } from './client-offboard-follow-up.service';
 import { ClientOffboardService } from './client-offboard.service';
+import { PortalClientUsersRepository } from './portal-client-users.repository';
+import { PortalClientUsersService } from './portal-client-users.service';
 import { ClientsController } from './clients.controller';
 import {
   StaffAgencyViewGuard,
@@ -30,6 +32,8 @@ import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
     ClientOffboardRepository,
     ClientOffboardFollowUpService,
     ClientOffboardService,
+    PortalClientUsersRepository,
+    PortalClientUsersService,
     StaffAgencyViewGuard,
     StaffFacebookAdsViewGuard,
     StaffAgencyWriteGuard,

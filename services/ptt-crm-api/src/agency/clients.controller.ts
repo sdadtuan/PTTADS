@@ -36,6 +36,16 @@ import {
   ChannelAlertConfigResponse,
 } from './agency.types';
 import { OffboardClientBody, OffboardAuditListResponse, OffboardClientResponse } from './client-offboard.types';
+import { PortalClientUsersService } from './portal-client-users.service';
+import {
+  CreatePortalClientUserBody,
+  CreatePortalClientUserResponse,
+  PortalClientUsersListResponse,
+  PortalClientUserPublic,
+  ResetPortalClientUserPasswordBody,
+  ResetPortalClientUserPasswordResponse,
+  UpdatePortalClientUserBody,
+} from './portal-client-users.types';
 import { StaffAgencyConfigureGuard } from './guards/staff-agency-configure.guard';
 import { StaffAgencyViewGuard } from './guards/staff-agency-view.guard';
 import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
@@ -46,6 +56,7 @@ export class ClientsController {
   constructor(
     private readonly agency: AgencyService,
     private readonly performance: PerformanceService,
+    private readonly portalUsers: PortalClientUsersService,
   ) {}
 
   @Get()
@@ -277,5 +288,41 @@ export class ClientsController {
   @Get(':id/offboard/audit')
   async offboardAudit(@Param('id') id: string): Promise<OffboardAuditListResponse> {
     return this.agency.getOffboardAudit(id.trim());
+  }
+
+  @Get(':id/portal-users')
+  async listPortalUsers(@Param('id') id: string): Promise<PortalClientUsersListResponse> {
+    return this.portalUsers.list(id.trim());
+  }
+
+  @Post(':id/portal-users')
+  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(StaffAgencyWriteGuard)
+  async createPortalUser(
+    @Param('id') id: string,
+    @Body() body: CreatePortalClientUserBody,
+  ): Promise<CreatePortalClientUserResponse> {
+    return this.portalUsers.create(id.trim(), body ?? {});
+  }
+
+  @Patch(':id/portal-users/:userId')
+  @UseGuards(StaffAgencyWriteGuard)
+  async patchPortalUser(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body() body: UpdatePortalClientUserBody,
+  ): Promise<PortalClientUserPublic> {
+    return this.portalUsers.update(id.trim(), userId.trim(), body ?? {});
+  }
+
+  @Post(':id/portal-users/:userId/reset-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(StaffAgencyWriteGuard)
+  async resetPortalUserPassword(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body() body: ResetPortalClientUserPasswordBody,
+  ): Promise<ResetPortalClientUserPasswordResponse> {
+    return this.portalUsers.resetPassword(id.trim(), userId.trim(), body ?? {});
   }
 }
