@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -12,6 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { StaffOrInternalKeyGuard } from '../staff-auth/staff-or-internal-key.guard';
 import { StaffJwtPayload } from '../staff-auth/staff-jwt.util';
 import { EmailMarketingService } from './email-marketing.service';
@@ -39,6 +41,8 @@ import {
   EmailDeliverabilityReport,
   EmailReportScheduleRow,
   EmailClickhouseExportResult,
+  EmailBiStatus,
+  EmailGovernanceRule,
 } from './email-marketing.types';
 import { StaffEmailApproveGuard } from './guards/staff-email-approve.guard';
 import { StaffEmailDeliverabilityGuard } from './guards/staff-email-deliverability.guard';
@@ -58,7 +62,10 @@ function actorFromReq(req: StaffReq): string {
 @Controller('api/v1/email')
 @UseGuards(StaffOrInternalKeyGuard, StaffEmailViewGuard)
 export class EmailMarketingController {
-  constructor(private readonly email: EmailMarketingService) {}
+  constructor(
+    private readonly email: EmailMarketingService,
+    private readonly staffAuth: StaffAuthService,
+  ) {}
 
   @Get('hub')
   async hub(
@@ -67,7 +74,7 @@ export class EmailMarketingController {
     @Query('domain') domain?: string,
   ): Promise<EmailHubResponse> {
     const parsedDays = days ? Number.parseInt(days, 10) : undefined;
-    return this.email.hub({
+    return this.email.hubWithAlerts({
       clientId,
       days: Number.isFinite(parsedDays) ? parsedDays : undefined,
       domain,
@@ -75,8 +82,62 @@ export class EmailMarketingController {
   }
 
   @Get('governance')
-  async governance(@Query('scope') scope?: string): Promise<EmailGovernanceResponse> {
-    return this.email.governance({ scope });
+  async governance(
+    @Query('scope') scope?: string,
+    @Req() req?: StaffReq,
+  ): Promise<EmailGovernanceResponse> {
+    let canWrite = req?.staffAuthVia === 'internal';
+    if (!canWrite && req?.staffUser) {
+      const me = await this.staffAuth.me(req.staffUser);
+      canWrite =
+        this.staffAuth.hasCap(me.caps, 'crm_email_mkt', 'settings') ||
+        this.staffAuth.hasCap(me.caps, 'crm_agency', 'create');
+    }
+    return this.email.governance({ scope, canWrite });
+  }
+
+  @Post('governance/rules')
+  @UseGuards(StaffEmailSettingsGuard)
+  async createGovernanceRule(
+    @Body()
+    body: {
+      scope: string;
+      client_id?: string | null;
+      rule_type: string;
+      config_json: Record<string, unknown>;
+      priority?: number;
+      enabled?: boolean;
+    },
+    @Req() req: StaffReq,
+  ): Promise<{ ok: boolean; rule: EmailGovernanceRule }> {
+    const rule = await this.email.createGovernanceRule(body, actorFromReq(req));
+    return { ok: true, rule };
+  }
+
+  @Patch('governance/rules/:id')
+  @UseGuards(StaffEmailSettingsGuard)
+  async patchGovernanceRule(
+    @Param('id') id: string,
+    @Body() body: { config_json?: Record<string, unknown>; priority?: number; enabled?: boolean },
+    @Req() req: StaffReq,
+  ): Promise<{ ok: boolean; rule: EmailGovernanceRule }> {
+    const rule = await this.email.updateGovernanceRule(id, body, actorFromReq(req));
+    return { ok: true, rule };
+  }
+
+  @Delete('governance/rules/:id')
+  @UseGuards(StaffEmailSettingsGuard)
+  async deleteGovernanceRule(
+    @Param('id') id: string,
+    @Req() req: StaffReq,
+  ): Promise<{ ok: boolean }> {
+    return this.email.deleteGovernanceRule(id, actorFromReq(req));
+  }
+
+  @Get('reports/bi-status')
+  @UseGuards(StaffEmailReportsGuard)
+  biStatus(): EmailBiStatus {
+    return this.email.biStatus();
   }
 
   @Get('clients')

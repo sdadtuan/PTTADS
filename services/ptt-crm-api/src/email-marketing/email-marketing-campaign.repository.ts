@@ -189,13 +189,45 @@ export class EmailMarketingCampaignRepository implements OnModuleDestroy {
 
     if (segment.segment_type === 'static' && Array.isArray(def.contact_ids)) {
       contactIds = def.contact_ids.map(String);
-    } else {
+    } else if (segment.segment_type === 'rfm') {
+      const recencyDays = Number(def.r_recency_days ?? 30);
+      const minOpens = Number(def.f_min_opens ?? 1);
+      const rows = await this.db.query<{ id: string }>(
+        `SELECT ct.id::text FROM ${SCHEMA}.contacts ct
+         WHERE ct.client_id = $1::uuid
+           AND (
+             SELECT COUNT(*) FROM ${SCHEMA}.engagement_events ee
+             WHERE ee.contact_id = ct.id AND ee.event_type IN ('open','click')
+               AND ee.occurred_at >= NOW() - ($2 || ' days')::interval
+           ) >= $3`,
+        [clientId, String(Math.max(1, recencyDays)), Math.max(1, minOpens)],
+      );
+      contactIds = rows.rows.map((r) => r.id);
+    } else if (segment.segment_type === 'lifecycle' || segment.segment_type === 'dynamic') {
       const lifecycle = typeof def.lifecycle_stage === 'string' ? def.lifecycle_stage : null;
+      const openDays = Number(def.last_open_within_days ?? 0);
+      const clickDays = Number(def.last_click_within_days ?? 0);
       const values: unknown[] = [clientId];
       let sql = `SELECT ct.id::text FROM ${SCHEMA}.contacts ct WHERE ct.client_id = $1::uuid`;
       if (lifecycle) {
         values.push(lifecycle);
-        sql += ` AND ct.lifecycle_stage = $2`;
+        sql += ` AND ct.lifecycle_stage = $${values.length}`;
+      }
+      if (openDays > 0) {
+        values.push(String(openDays));
+        sql += ` AND EXISTS (
+          SELECT 1 FROM ${SCHEMA}.engagement_events ee
+          WHERE ee.contact_id = ct.id AND ee.event_type = 'open'
+            AND ee.occurred_at >= NOW() - ($${values.length} || ' days')::interval
+        )`;
+      }
+      if (clickDays > 0) {
+        values.push(String(clickDays));
+        sql += ` AND EXISTS (
+          SELECT 1 FROM ${SCHEMA}.engagement_events ee
+          WHERE ee.contact_id = ct.id AND ee.event_type = 'click'
+            AND ee.occurred_at >= NOW() - ($${values.length} || ' days')::interval
+        )`;
       }
       const rows = await this.db.query<{ id: string }>(sql, values);
       contactIds = rows.rows.map((r) => r.id);

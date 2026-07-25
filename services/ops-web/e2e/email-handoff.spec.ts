@@ -101,4 +101,50 @@ test.describe('Email Marketing ops-web §13 handoff', () => {
     await page.goto('/email/contacts');
     await expect(page.getByText(/Danh bạ contacts|E-04/i)).toBeVisible({ timeout: 15_000 });
   });
+
+  test('E-07 segments — RFM/lifecycle/behavior tabs', async ({ page }) => {
+    await loginAsStaff(page);
+    await page.goto('/email/segments');
+    await expect(page.getByText(/Segment builder|E-07/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('button', { name: 'RFM' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Lifecycle' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Behavior' })).toBeVisible();
+  });
+
+  test('E-11 deliverability — domain onboarding wizard', async ({ page }) => {
+    await loginAsStaff(page);
+    await page.goto('/email/deliverability');
+    await expect(page.getByText(/Deliverability|E-11/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Domain onboarding wizard/i)).toBeVisible();
+  });
+
+  test('E-12 reports — BI & Grafana section', async ({ page }) => {
+    await loginAsStaff(page);
+    await page.goto('/email/reports');
+    await expect(page.getByText(/Analytics center|E-12/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/BI & Grafana/i)).toBeVisible();
+  });
+
+  test('E-13 governance — audit log section', async ({ page }) => {
+    await loginAsStaff(page);
+    await page.goto('/email/governance');
+    await expect(page.getByRole('heading', { name: /Audit log/i })).toBeVisible({ timeout: 15_000 });
+  });
+
+  test('§13 bi-status API smoke (Nest)', async ({ request }) => {
+    const login = await request.post(`${API_URL}/api/v1/staff/auth/login`, {
+      data: { email: STAFF_EMAIL, password: STAFF_PASSWORD },
+    });
+    expect(login.ok()).toBeTruthy();
+    const { access_token: token } = (await login.json()) as { access_token?: string };
+    expect(token).toBeTruthy();
+
+    const res = await request.get(`${API_URL}/api/v1/email/reports/bi-status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    expect(res.ok(), `bi-status API: ${res.status()} ${await res.text()}`).toBeTruthy();
+    const body = (await res.json()) as { ok?: boolean; grafana_dashboard?: string };
+    expect(body.ok).toBe(true);
+    expect(body.grafana_dashboard).toContain('grafana');
+  });
 });

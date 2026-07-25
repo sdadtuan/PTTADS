@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checklist vận hành Email Marketing Ops — A4 — PTTADS</title>
+<style>
+:root { --navy:#0F172A; --green:#398b43; --green-light:#ecf3ee; --gray:#64748B; --light:#F1F5F9; --border:#CBD5E1; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:"Segoe UI",system-ui,sans-serif; color:var(--navy); background:#fff; line-height:1.45; font-size:12px; }
+.page { max-width:920px; margin:0 auto; padding:1rem 1.1rem 2rem; }
+header.doc-header { background:var(--navy); color:#fff; padding:1rem 1.25rem; border-radius:8px; margin-bottom:1rem; }
+header.doc-header h1 { font-size:1.25rem; margin-bottom:.2rem; }
+header.doc-header .meta { font-size:.82rem; opacity:.88; }
+header.doc-header .slug { color:#86efac; font-size:.78rem; }
+.meta-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:.5rem 1rem; margin-top:.85rem; background:rgba(255,255,255,.08); padding:.85rem; border-radius:6px; }
+.field { margin-bottom:.5rem; }
+.field label { display:block; font-weight:600; font-size:.75rem; margin-bottom:.15rem; color:var(--gray); }
+.line { border-bottom:1px solid var(--border); height:1.35rem; }
+.form-section { margin-bottom:1.25rem; }
+.section-head { display:flex; align-items:center; gap:.6rem; border-bottom:3px solid var(--green); padding-bottom:.35rem; margin-bottom:.65rem; }
+.section-head h2 { font-size:1rem; }
+.part-badge { background:var(--green); color:#fff; font-size:.68rem; font-weight:600; padding:.18rem .5rem; border-radius:4px; }
+.check-table { width:100%; border-collapse:collapse; margin:.5rem 0; font-size:.78rem; }
+.check-table th { background:var(--green); color:#fff; padding:.4rem .55rem; text-align:left; }
+.check-table td { border:1px solid var(--border); padding:.35rem .55rem; vertical-align:top; }
+.check-table tr:nth-child(even) td { background:var(--light); }
+.cb { display:inline-block; width:1.1rem; height:1.1rem; border:1.5px solid var(--border); border-radius:3px; }
+.cb-col { width:2rem; text-align:center; }
+.sign-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-top:1rem; }
+.sign-box { border:1px solid var(--border); border-radius:6px; padding:.65rem; min-height:4.5rem; }
+.sign-line { border-bottom:1px solid var(--border); margin-top:2.2rem; }
+.footer-note { margin-top:1.25rem; padding:.75rem; background:var(--green-light); border-radius:6px; font-size:.75rem; color:var(--gray); border-left:4px solid var(--green); }
+@media print { @page { size:A4; margin:12mm; } body { font-size:10.5px; } .page { padding:0; max-width:100%; } }
+</style>
+</head>
+<body>
+<div class="page">
+<header class="doc-header">
+  <div class="slug">PTTADS · Email Marketing Ops · Checklist A4 v1.0 (P1)</div>
+  <h1>Checklist vận hành Email Marketing Enterprise Ops</h1>
+  <div class="meta">In A4 · Hàng ngày / onboard / send gate · ops-web /email/* · không Flask</div>
+  <div class="meta-grid">
+    <div class="field"><label>Người vận hành</label><div class="line"></div></div>
+    <div class="field"><label>Ngày / Ca</label><div class="line"></div></div>
+    <div class="field"><label>Vai trò (Head CRM / AM / Deliverability)</label><div class="line"></div></div>
+    <div class="field"><label>Client UUID</label><div class="line"></div></div>
+    <div class="field"><label>Sending domain</label><div class="line"></div></div>
+    <div class="field"><label>URL ops-web</label><div class="line">https://rs.pttads.vn/email/hub</div></div>
+  </div>
+</header>
+
+<section class="form-section">
+  <div class="section-head"><h2>A. Checklist hàng ngày</h2><span class="part-badge">HÀNG NGÀY</span></div>
+  <table class="check-table">
+    <thead><tr><th class="cb-col">☐</th><th>Hạng mục</th><th>Route / hành động</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Hub KPI &amp; alerts</td><td>/email/hub — complaint, queue lag</td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Deliverability banner</td><td>Click alert → /email/deliverability</td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Send calendar 7d</td><td>Hub — lịch campaign scheduled</td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Pending approvals</td><td>Hub KPI pending_approvals</td><td>Số: _____</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Bounce / complaint</td><td>/email/reports deliverability card</td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Suppression mới</td><td>/email/suppression</td><td></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="form-section">
+  <div class="section-head"><h2>B. Onboard client (AM) — Domain wizard P1.5</h2><span class="part-badge">ONBOARD</span></div>
+  <table class="check-table">
+    <thead><tr><th class="cb-col">☐</th><th>Bước</th><th>Route</th></tr></thead>
+    <tbody>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>1. Workspace settings</td><td>/email/clients/:id?tab=settings</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>2. Wizard bước 1 — nhập domain</td><td>/email/deliverability</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>3. Wizard bước 2 — DNS SPF/DKIM/DMARC</td><td>Client DNS provider</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>4. Wizard bước 3 — Verify + warm-up</td><td>/email/deliverability</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>5. Import contacts + consent</td><td>/email/contacts · /email/consent</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>6. Segment test compute</td><td>/email/segments — Lifecycle/RFM</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="form-section">
+  <div class="section-head"><h2>C. Send gate (trước broadcast)</h2><span class="part-badge">CAMPAIGN</span></div>
+  <table class="check-table">
+    <thead><tr><th class="cb-col">☐</th><th>Điều kiện</th></tr></thead>
+    <tbody>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Domain verified (SPF/DKIM pass)</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Segment computed — member_count OK</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Template có unsubscribe link</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Preflight PASS (/email/campaigns/:id/review)</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Staff approve + governance rules OK</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>PTT_EMAIL_SEND_ENABLED=1 (prod B2)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="form-section">
+  <div class="section-head"><h2>D. Governance &amp; BI (P1)</h2><span class="part-badge">P1</span></div>
+  <table class="check-table">
+    <thead><tr><th class="cb-col">☐</th><th>Hạng mục</th><th>Route</th></tr></thead>
+    <tbody>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Global rules reviewed</td><td>/email/governance</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Audit log tail checked</td><td>/email/governance</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Grafana dashboard live</td><td>/email/reports — BI card</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Slack/Teams webhook tested</td><td>Hub load → alert test</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="sign-row">
+  <div class="sign-box"><label>Head CRM / Email</label><div class="sign-line"></div></div>
+  <div class="sign-box"><label>AM phụ trách client</label><div class="sign-line"></div></div>
+  <div class="sign-box"><label>Ngày ký</label><div class="sign-line"></div></div>
+</div>
+
+<div class="footer-note">
+  Tham chiếu: <code>docs/huong-dan-email-marketing-ops.md</code> · Gate P1: <code>./scripts/email_p1_gate.sh</code>
+</div>
+</div>
+</body>
+</html>

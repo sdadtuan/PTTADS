@@ -8,10 +8,12 @@ import { SegmentBuilder } from '@/components/email';
 import {
   computeEmailSegment,
   createEmailSegment,
+  fetchEmailClients,
   fetchEmailSegments,
   patchEmailSegment,
   staffMe,
   staffRefresh,
+  type EmailClientListRow,
   type EmailSegmentComputeResult,
   type EmailSegmentRow,
 } from '@/lib/api';
@@ -32,6 +34,7 @@ export default function EmailSegmentsPage() {
   const { push } = useToast();
   const [user, setUser] = useState<StoredStaffUser | null>(null);
   const [segments, setSegments] = useState<EmailSegmentRow[]>([]);
+  const [clients, setClients] = useState<EmailClientListRow[]>([]);
   const [clientId, setClientId] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -96,6 +99,18 @@ export default function EmailSegmentsPage() {
     void (async () => {
       const access = await ensureAuth();
       if (!access) return;
+      try {
+        const q = new URLSearchParams(window.location.search).get('client_id');
+        const data = await fetchEmailClients(access, { limit: 100 });
+        setClients(data.items);
+        if (q) {
+          setClientId(q);
+        } else if (!clientId && data.items[0]?.client_id) {
+          setClientId(data.items[0].client_id);
+        }
+      } catch {
+        /* client list optional */
+      }
       await load(access);
     })();
   }, [ensureAuth, load]);
@@ -166,8 +181,15 @@ export default function EmailSegmentsPage() {
         <Link href="/email/hub" className="btn btn-secondary btn-sm">← Hub</Link>
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
           <label style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            Client UUID
-            <input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="Client UUID" style={{ width: 280 }} />
+            Client
+            <select value={clientId} onChange={(e) => setClientId(e.target.value)} style={{ minWidth: 280 }}>
+              <option value="">— Chọn client —</option>
+              {clients.map((c) => (
+                <option key={c.client_id} value={c.client_id}>
+                  {c.client_name} ({c.client_code})
+                </option>
+              ))}
+            </select>
           </label>
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => { const a = getAccessToken(); if (a) void load(a); }}>
             Làm mới

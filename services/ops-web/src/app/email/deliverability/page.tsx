@@ -6,17 +6,20 @@ import { useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
 import {
   EmailDnsStatus,
+  EmailDomainOnboardingWizard,
   EmailEmptyState,
   EmailStatusBadge,
   EmailWarmupMeter,
 } from '@/components/email';
 import {
+  fetchEmailClients,
   fetchEmailDeliverabilityDomains,
   pauseEmailDomain,
   registerEmailDomain,
   verifyEmailDomain,
   staffMe,
   staffRefresh,
+  type EmailClientListRow,
   type EmailDeliverabilityDomainRow,
 } from '@/lib/api';
 import {
@@ -33,6 +36,7 @@ import {
 export default function EmailDeliverabilityPage() {
   const router = useRouter();
   const [user, setUser] = useState<StoredStaffUser | null>(null);
+  const [clients, setClients] = useState<EmailClientListRow[]>([]);
   const [domains, setDomains] = useState<EmailDeliverabilityDomainRow[]>([]);
   const [clientId, setClientId] = useState('');
   const [domainInput, setDomainInput] = useState('');
@@ -88,9 +92,26 @@ export default function EmailDeliverabilityPage() {
   );
 
   useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('client_id');
+    if (q) setClientId(q);
+  }, []);
+
+  useEffect(() => {
     void (async () => {
       const access = await ensureAuth();
       if (!access) return;
+      try {
+        const q = new URLSearchParams(window.location.search).get('client_id');
+        const data = await fetchEmailClients(access, { limit: 100 });
+        setClients(data.items);
+        if (q) {
+          setClientId(q);
+        } else if (!clientId && data.items[0]?.client_id) {
+          setClientId(data.items[0].client_id);
+        }
+      } catch {
+        /* client list optional */
+      }
       await load(access);
     })();
   }, [ensureAuth, load]);
@@ -144,12 +165,45 @@ export default function EmailDeliverabilityPage() {
       <div className="card" style={{ marginBottom: '1rem' }}>
         <p className="muted" style={{ marginTop: 0 }}>EM-3 E-11 — Deliverability console</p>
         <Link href="/email/hub" className="btn btn-secondary btn-sm">← Hub</Link>
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
-          <input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="Client UUID" style={{ width: 280 }} />
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <label className="muted" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            Client
+            <select
+              value={clientId}
+              onChange={(e) => setClientId(e.target.value)}
+              style={{ minWidth: 280 }}
+            >
+              <option value="">— Chọn client —</option>
+              {clients.map((c) => (
+                <option key={c.client_id} value={c.client_id}>
+                  {c.client_name} ({c.client_code})
+                </option>
+              ))}
+            </select>
+          </label>
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => { const a = getAccessToken(); if (a) void load(a); }}>Làm mới</button>
         </div>
       </div>
       {error ? <p className="error">{error}</p> : null}
+      {clientId.trim() ? (
+        <EmailDomainOnboardingWizard
+          clientId={clientId.trim()}
+          canWrite={canDeliverability}
+          domains={domains.filter((d) => d.client_id === clientId.trim())}
+          onRegister={async (domain) => {
+            const access = getAccessToken();
+            if (!access) return;
+            await registerEmailDomain(access, { client_id: clientId.trim(), domain });
+            await load(access);
+          }}
+          onVerify={async (domainId) => {
+            const access = getAccessToken();
+            if (!access) return;
+            await verifyEmailDomain(access, domainId);
+            await load(access);
+          }}
+        />
+      ) : null}
       {canDeliverability ? (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <input value={domainInput} onChange={(e) => setDomainInput(e.target.value)} placeholder="mail.client.com" style={{ marginRight: '0.5rem', minWidth: 220 }} />

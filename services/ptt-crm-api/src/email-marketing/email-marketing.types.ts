@@ -78,18 +78,29 @@ export interface EmailGovernanceAuditRow {
   action: string;
   entity_type: string;
   entity_id: string | null;
+  before_json?: Record<string, unknown> | null;
+  after_json?: Record<string, unknown> | null;
   created_at: string;
 }
 
 export interface EmailGovernanceResponse {
   ok: boolean;
   read_only: boolean;
+  can_write?: boolean;
   schema_ready: boolean;
   rules: EmailGovernanceRule[];
   audit_log: EmailGovernanceAuditRow[];
   filters: {
     scope?: string | null;
   };
+}
+
+export interface EmailBiStatus {
+  ok: boolean;
+  clickhouse_configured: boolean;
+  bi_export_enabled: boolean;
+  grafana_dashboard: string;
+  grafana_url: string | null;
 }
 
 export interface EmailWorkspaceRow {

@@ -9,6 +9,7 @@ import { EmailKpiCard } from '@/components/email';
 import {
   createEmailReportSchedule,
   exportEmailClickhouse,
+  fetchEmailBiStatus,
   fetchEmailDeliverabilityReport,
   fetchEmailEngagementSeries,
   fetchEmailReportSchedules,
@@ -16,6 +17,7 @@ import {
   runEmailReportSchedule,
   staffMe,
   staffRefresh,
+  type EmailBiStatus,
   type EmailDeliverabilityReport,
   type EmailEngagementPoint,
   type EmailReportScheduleRow,
@@ -38,6 +40,7 @@ export default function EmailReportsPage() {
   const [deliverability, setDeliverability] = useState<EmailDeliverabilityReport | null>(null);
   const [series, setSeries] = useState<EmailEngagementPoint[]>([]);
   const [schedules, setSchedules] = useState<EmailReportScheduleRow[]>([]);
+  const [biStatus, setBiStatus] = useState<EmailBiStatus | null>(null);
   const [exportMsg, setExportMsg] = useState('');
   const [scheduleMsg, setScheduleMsg] = useState('');
   const [scheduleEmail, setScheduleEmail] = useState('');
@@ -82,14 +85,16 @@ export default function EmailReportsPage() {
       setError('');
       try {
         const cid = clientId.trim() || undefined;
-        const [sum, del, eng] = await Promise.all([
+        const [sum, del, eng, bi] = await Promise.all([
           fetchEmailReportsSummary(access, { client_id: cid, days }),
           fetchEmailDeliverabilityReport(access, { client_id: cid, days: 30 }),
           fetchEmailEngagementSeries(access, { client_id: cid, days }),
+          fetchEmailBiStatus(access),
         ]);
         setSummary(sum);
         setDeliverability(del);
         setSeries(eng.points);
+        setBiStatus(bi);
         if (cid) {
           const sched = await fetchEmailReportSchedules(access, cid);
           setSchedules(sched.items ?? []);
@@ -154,6 +159,29 @@ export default function EmailReportsPage() {
       </div>
       {exportMsg ? <p className="muted">{exportMsg}</p> : null}
       {error ? <p className="error">{error}</p> : null}
+      {biStatus ? (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>BI &amp; Grafana (P1.4)</h2>
+          <ul className="muted" style={{ margin: '0 0 0.75rem', paddingLeft: '1.2rem' }}>
+            <li>ClickHouse: {biStatus.clickhouse_configured ? 'configured' : 'chưa cấu hình'}</li>
+            <li>BI export: {biStatus.bi_export_enabled ? 'enabled' : 'disabled'}</li>
+            <li>Dashboard JSON: <code>{biStatus.grafana_dashboard}</code></li>
+          </ul>
+          {biStatus.grafana_url ? (
+            <iframe
+              title="Email ops Grafana"
+              src={biStatus.grafana_url}
+              style={{ width: '100%', height: 360, border: '1px solid var(--border, #CBD5E1)', borderRadius: 6 }}
+              loading="lazy"
+            />
+          ) : (
+            <p className="muted">
+              Set <code>PTT_EMAIL_GRAFANA_URL</code> để embed Grafana. Import dashboard từ{' '}
+              <code>{biStatus.grafana_dashboard}</code>.
+            </p>
+          )}
+        </div>
+      ) : null}
       {summary ? (
         <div className="email-kpi-grid" style={{ marginBottom: '1rem' }}>
           <EmailKpiCard label="Sent" value={summary.sent.toLocaleString()} />

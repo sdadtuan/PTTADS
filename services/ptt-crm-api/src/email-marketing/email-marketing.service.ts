@@ -62,10 +62,54 @@ export class EmailMarketingService {
     });
   }
 
-  async governance(params: { scope?: string }): Promise<EmailGovernanceResponse> {
+  async governance(params: { scope?: string; canWrite?: boolean }): Promise<EmailGovernanceResponse> {
     return this.repo.governance({
       scope: params.scope?.trim() || undefined,
+      canWrite: params.canWrite,
     });
+  }
+
+  async createGovernanceRule(
+    body: {
+      scope: string;
+      client_id?: string | null;
+      rule_type: string;
+      config_json: Record<string, unknown>;
+      priority?: number;
+      enabled?: boolean;
+    },
+    actor: string,
+  ) {
+    return this.repo.createGovernanceRule(body, actor);
+  }
+
+  async updateGovernanceRule(
+    id: string,
+    body: { config_json?: Record<string, unknown>; priority?: number; enabled?: boolean },
+    actor: string,
+  ) {
+    return this.repo.updateGovernanceRule(id, body, actor);
+  }
+
+  async deleteGovernanceRule(id: string, actor: string) {
+    return this.repo.deleteGovernanceRule(id, actor);
+  }
+
+  biStatus() {
+    return this.repo.biStatus();
+  }
+
+  async hubWithAlerts(params: {
+    clientId?: string;
+    days?: number;
+    domain?: string;
+  }): Promise<EmailHubResponse> {
+    const hub = await this.hub(params);
+    if ((process.env.PTT_EMAIL_DELIVERABILITY_ALERTS ?? '1').trim() !== '0') {
+      const { notifyEmailDeliverabilityAlerts } = await import('./email-alert-notify.util');
+      await notifyEmailDeliverabilityAlerts(hub.alerts ?? []);
+    }
+    return hub;
   }
 
   async listClients(params: {

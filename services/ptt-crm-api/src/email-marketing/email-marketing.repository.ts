@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
 import { Pool } from 'pg';
 import { AppConfigService } from '../config/app-config.service';
 import { revenueAttributedQuery } from './email-marketing-attribution.util';
@@ -318,12 +318,12 @@ export class EmailMarketingRepository implements OnModuleDestroy {
       });
     }
     if (summary.complaint_rate_pct >= 0.1) {
-      alerts.push({
-        severity: 'danger',
-        message: `Complaint rate ${summary.complaint_rate_pct}% vượt ngưỡng cảnh báo.`,
-        link: '/email/governance',
-        link_label: 'Xem rules',
-      });
+        alerts.push({
+          severity: 'danger',
+          message: `Complaint rate ${summary.complaint_rate_pct}% vượt ngưỡng cảnh báo.`,
+          link: '/email/deliverability',
+          link_label: 'Deliverability (E-11)',
+        });
     }
     if (summary.send_queue_lag_minutes >= 5) {
       alerts.push({
@@ -338,8 +338,8 @@ export class EmailMarketingRepository implements OnModuleDestroy {
         alerts.push({
           severity: 'warn',
           message: `Domain ${c.primary_domain} — deliverability at risk (${c.client_name}).`,
-          link: '/email/governance',
-          link_label: 'Deliverability',
+          link: `/email/deliverability?client_id=${c.client_id}`,
+          link_label: 'Deliverability (E-11)',
         });
       }
     }
@@ -368,7 +368,7 @@ export class EmailMarketingRepository implements OnModuleDestroy {
     };
   }
 
-  async governance(params: { scope?: string }): Promise<EmailGovernanceResponse> {
+  async governance(params: { scope?: string; canWrite?: boolean }): Promise<EmailGovernanceResponse> {
     const ready = await this.schemaReady();
     if (!ready) {
       return {
@@ -406,7 +406,8 @@ export class EmailMarketingRepository implements OnModuleDestroy {
     }));
 
     const auditResult = await this.db.query(
-      `SELECT id, client_id::text, actor, action, entity_type, entity_id::text, created_at
+      `SELECT id, client_id::text, actor, action, entity_type, entity_id::text,
+              before_json, after_json, created_at
        FROM ${SCHEMA}.audit_log
        ORDER BY created_at DESC
        LIMIT 50`,
@@ -418,16 +419,158 @@ export class EmailMarketingRepository implements OnModuleDestroy {
       action: String(r.action),
       entity_type: String(r.entity_type),
       entity_id: r.entity_id ? String(r.entity_id) : null,
+      before_json: (r.before_json ?? null) as Record<string, unknown> | null,
+      after_json: (r.after_json ?? null) as Record<string, unknown> | null,
       created_at: iso(r.created_at) ?? '',
     }));
 
     return {
       ok: true,
-      read_only: true,
+      read_only: params.canWrite === false,
+      can_write: params.canWrite !== false,
       schema_ready: true,
       rules,
       audit_log,
       filters: { scope: params.scope ?? null },
+    };
+  }
+
+  private mapRuleRow(r: Record<string, unknown>): EmailGovernanceRule {
+    return {
+      id: String(r.id),
+      scope: String(r.scope),
+      client_id: r.client_id ? String(r.client_id) : null,
+      rule_type: String(r.rule_type),
+      config_json: (r.config_json ?? {}) as Record<string, unknown>,
+      priority: Number(r.priority),
+      enabled: Boolean(r.enabled),
+      created_at: iso(r.created_at) ?? '',
+    };
+  }
+
+  private async writeGovernanceAudit(params: {
+    clientId?: string | null;
+    actor: string;
+    action: string;
+    entityId: string;
+    before?: Record<string, unknown> | null;
+    after?: Record<string, unknown> | null;
+  }): Promise<void> {
+    await this.db.query(
+      `INSERT INTO ${SCHEMA}.audit_log (client_id, actor, action, entity_type, entity_id, before_json, after_json)
+       VALUES ($1::uuid, $2, $3, 'rule', $4::uuid, $5::jsonb, $6::jsonb)`,
+      [
+        params.clientId ?? null,
+        params.actor,
+        params.action,
+        params.entityId,
+        params.before ? JSON.stringify(params.before) : null,
+        params.after ? JSON.stringify(params.after) : null,
+      ],
+    );
+  }
+
+  async createGovernanceRule(
+    params: {
+      scope: string;
+      client_id?: string | null;
+      rule_type: string;
+      config_json: Record<string, unknown>;
+      priority?: number;
+      enabled?: boolean;
+    },
+    actor: string,
+  ): Promise<EmailGovernanceRule> {
+    const result = await this.db.query(
+      `INSERT INTO ${SCHEMA}.rules (scope, client_id, rule_type, config_json, priority, enabled)
+       VALUES ($1, $2::uuid, $3, $4::jsonb, $5, $6)
+       RETURNING id::text, scope, client_id::text, rule_type, config_json, priority, enabled, created_at`,
+      [
+        params.scope,
+        params.client_id ?? null,
+        params.rule_type,
+        JSON.stringify(params.config_json ?? {}),
+        params.priority ?? 100,
+        params.enabled !== false,
+      ],
+    );
+    const row = this.mapRuleRow(result.rows[0]);
+    await this.writeGovernanceAudit({
+      clientId: params.client_id ?? null,
+      actor,
+      action: 'rule_created',
+      entityId: row.id,
+      after: row.config_json,
+    });
+    return row;
+  }
+
+  async updateGovernanceRule(
+    id: string,
+    params: {
+      config_json?: Record<string, unknown>;
+      priority?: number;
+      enabled?: boolean;
+    },
+    actor: string,
+  ): Promise<EmailGovernanceRule> {
+    const existing = await this.db.query(
+      `SELECT id::text, scope, client_id::text, rule_type, config_json, priority, enabled, created_at
+       FROM ${SCHEMA}.rules WHERE id = $1::uuid`,
+      [id],
+    );
+    if (!existing.rowCount) throw new NotFoundException({ error: 'rule_not_found' });
+    const before = this.mapRuleRow(existing.rows[0]);
+    const configJson = params.config_json ?? before.config_json;
+    const priority = params.priority ?? before.priority;
+    const enabled = params.enabled ?? before.enabled;
+    const result = await this.db.query(
+      `UPDATE ${SCHEMA}.rules SET config_json = $2::jsonb, priority = $3, enabled = $4
+       WHERE id = $1::uuid
+       RETURNING id::text, scope, client_id::text, rule_type, config_json, priority, enabled, created_at`,
+      [id, JSON.stringify(configJson), priority, enabled],
+    );
+    const row = this.mapRuleRow(result.rows[0]);
+    await this.writeGovernanceAudit({
+      clientId: before.client_id,
+      actor,
+      action: 'rule_updated',
+      entityId: id,
+      before: before.config_json,
+      after: row.config_json,
+    });
+    return row;
+  }
+
+  async deleteGovernanceRule(id: string, actor: string): Promise<{ ok: boolean }> {
+    const existing = await this.db.query(
+      `SELECT id::text, client_id::text, rule_type, config_json FROM ${SCHEMA}.rules WHERE id = $1::uuid`,
+      [id],
+    );
+    if (!existing.rowCount) throw new NotFoundException({ error: 'rule_not_found' });
+    const before = existing.rows[0];
+    await this.db.query(`DELETE FROM ${SCHEMA}.rules WHERE id = $1::uuid`, [id]);
+    await this.writeGovernanceAudit({
+      clientId: before.client_id ? String(before.client_id) : null,
+      actor,
+      action: 'rule_deleted',
+      entityId: id,
+      before: (before.config_json ?? {}) as Record<string, unknown>,
+      after: null,
+    });
+    return { ok: true };
+  }
+
+  biStatus(): { ok: boolean; clickhouse_configured: boolean; bi_export_enabled: boolean; grafana_dashboard: string; grafana_url: string | null } {
+    const chUrl = (process.env.CLICKHOUSE_URL ?? process.env.PTT_CLICKHOUSE_URL ?? '').trim();
+    const grafanaUrl = (process.env.PTT_EMAIL_GRAFANA_URL ?? process.env.PTT_GRAFANA_URL ?? '').trim() || null;
+    const exportEnabled = (process.env.PTT_EMAIL_CLICKHOUSE_EXPORT ?? '1').trim() !== '0';
+    return {
+      ok: true,
+      clickhouse_configured: Boolean(chUrl),
+      bi_export_enabled: exportEnabled,
+      grafana_dashboard: 'deploy/grafana/email-ops-dashboard.json',
+      grafana_url: grafanaUrl,
     };
   }
 }

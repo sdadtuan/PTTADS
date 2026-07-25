@@ -4369,6 +4369,7 @@ export interface EmailGovernanceRule {
 export interface EmailGovernanceResponse {
   ok: boolean;
   read_only: boolean;
+  can_write?: boolean;
   schema_ready: boolean;
   rules: EmailGovernanceRule[];
   audit_log: Array<{
@@ -4378,9 +4379,19 @@ export interface EmailGovernanceResponse {
     action: string;
     entity_type: string;
     entity_id: string | null;
+    before_json?: Record<string, unknown> | null;
+    after_json?: Record<string, unknown> | null;
     created_at: string;
   }>;
   filters: { scope?: string | null };
+}
+
+export interface EmailBiStatus {
+  ok: boolean;
+  clickhouse_configured: boolean;
+  bi_export_enabled: boolean;
+  grafana_dashboard: string;
+  grafana_url: string | null;
 }
 
 export async function fetchEmailHub(
@@ -4403,6 +4414,45 @@ export async function fetchEmailGovernance(
   if (params?.scope) qs.set('scope', params.scope);
   const suffix = qs.toString() ? `?${qs.toString()}` : '';
   return agencyFetch(token, `/api/v1/email/governance${suffix}`);
+}
+
+export async function createEmailGovernanceRule(
+  token: string,
+  body: {
+    scope: string;
+    client_id?: string | null;
+    rule_type: string;
+    config_json: Record<string, unknown>;
+    priority?: number;
+    enabled?: boolean;
+  },
+): Promise<{ ok: boolean; rule: EmailGovernanceRule }> {
+  return agencyFetch(token, '/api/v1/email/governance/rules', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function patchEmailGovernanceRule(
+  token: string,
+  ruleId: string,
+  body: { config_json?: Record<string, unknown>; priority?: number; enabled?: boolean },
+): Promise<{ ok: boolean; rule: EmailGovernanceRule }> {
+  return agencyFetch(token, `/api/v1/email/governance/rules/${ruleId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function deleteEmailGovernanceRule(
+  token: string,
+  ruleId: string,
+): Promise<{ ok: boolean }> {
+  return agencyFetch(token, `/api/v1/email/governance/rules/${ruleId}`, { method: 'DELETE' });
+}
+
+export async function fetchEmailBiStatus(token: string): Promise<EmailBiStatus> {
+  return agencyFetch(token, '/api/v1/email/reports/bi-status');
 }
 
 export interface EmailClientListRow {

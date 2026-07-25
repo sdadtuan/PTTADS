@@ -4,7 +4,16 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
-import { fetchEmailGovernance, staffMe, staffRefresh, type EmailGovernanceResponse } from '@/lib/api';
+import {
+  createEmailGovernanceRule,
+  deleteEmailGovernanceRule,
+  fetchEmailGovernance,
+  patchEmailGovernanceRule,
+  staffMe,
+  staffRefresh,
+  type EmailGovernanceResponse,
+  type EmailGovernanceRule,
+} from '@/lib/api';
 import {
   clearSession,
   getAccessToken,
@@ -16,6 +25,14 @@ import {
   type StoredStaffUser,
 } from '@/lib/auth';
 
+const RULE_TYPES = [
+  'frequency_cap_7d',
+  'quiet_hours',
+  'complaint_rate_threshold',
+  'approval_threshold_audience',
+  'custom',
+];
+
 export default function EmailGovernancePage() {
   const router = useRouter();
   const [user, setUser] = useState<StoredStaffUser | null>(null);
@@ -23,6 +40,13 @@ export default function EmailGovernancePage() {
   const [scope, setScope] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editConfig, setEditConfig] = useState('{}');
+  const [newRule, setNewRule] = useState({ rule_type: 'custom', config_json: '{}', priority: 100 });
+
+  const canWrite =
+    Boolean(data?.can_write) ||
+    (user ? hasCap(user, 'crm_email_mkt', 'settings') || hasCap(user, 'crm_agency', 'create') : false);
 
   const ensureAuth = useCallback(async (): Promise<string | null> => {
     let access = getAccessToken();
@@ -63,9 +87,7 @@ export default function EmailGovernancePage() {
       setLoading(true);
       setError('');
       try {
-        const out = await fetchEmailGovernance(access, {
-          scope: scope.trim() || undefined,
-        });
+        const out = await fetchEmailGovernance(access, { scope: scope.trim() || undefined });
         setData(out);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Tải governance thất bại');
@@ -83,6 +105,55 @@ export default function EmailGovernancePage() {
       await load(access);
     })();
   }, [ensureAuth, load]);
+
+  async function toggleRule(rule: EmailGovernanceRule) {
+    const access = getAccessToken();
+    if (!access || !canWrite) return;
+    await patchEmailGovernanceRule(access, rule.id, { enabled: !rule.enabled });
+    await load(access);
+  }
+
+  async function saveEdit(ruleId: string) {
+    const access = getAccessToken();
+    if (!access) return;
+    let parsed: Record<string, unknown> = {};
+    try {
+      parsed = JSON.parse(editConfig) as Record<string, unknown>;
+    } catch {
+      setError('Config JSON không hợp lệ');
+      return;
+    }
+    await patchEmailGovernanceRule(access, ruleId, { config_json: parsed });
+    setEditId(null);
+    await load(access);
+  }
+
+  async function createRule() {
+    const access = getAccessToken();
+    if (!access) return;
+    let parsed: Record<string, unknown> = {};
+    try {
+      parsed = JSON.parse(newRule.config_json) as Record<string, unknown>;
+    } catch {
+      setError('Config JSON không hợp lệ');
+      return;
+    }
+    await createEmailGovernanceRule(access, {
+      scope: 'global',
+      rule_type: newRule.rule_type,
+      config_json: parsed,
+      priority: newRule.priority,
+      enabled: true,
+    });
+    await load(access);
+  }
+
+  async function removeRule(ruleId: string) {
+    const access = getAccessToken();
+    if (!access || !window.confirm('Xóa rule này?')) return;
+    await deleteEmailGovernanceRule(access, ruleId);
+    await load(access);
+  }
 
   function logout() {
     clearSession();
@@ -102,13 +173,11 @@ export default function EmailGovernancePage() {
       <OpsNav user={user} onLogout={logout} />
       <div className="card" style={{ marginBottom: '1rem' }}>
         <p className="muted" style={{ marginTop: 0 }}>
-          EM-0 — E-13 Governance hub (read-only) · global rules + audit tail
+          E-13 Governance hub · {canWrite ? 'read/write' : 'read-only'}
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <Link href="/email/hub" className="btn btn-sm">
-            ← Email hub
-          </Link>
-          {data?.read_only ? <span className="badge">Read-only</span> : null}
+          <Link href="/email/hub" className="btn btn-sm">← Email hub</Link>
+          {!canWrite ? <span className="badge">Read-only</span> : null}
           <label className="muted">
             Scope{' '}
             <select value={scope} onChange={(e) => setScope(e.target.value)} style={{ marginLeft: '0.35rem' }}>
@@ -119,21 +188,38 @@ export default function EmailGovernancePage() {
               <option value="client">Client</option>
             </select>
           </label>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            disabled={loading}
-            onClick={() => {
-              const access = getAccessToken();
-              if (access) void load(access);
-            }}
-          >
+          <button type="button" className="btn btn-secondary btn-sm" disabled={loading} onClick={() => { const a = getAccessToken(); if (a) void load(a); }}>
             Làm mới
           </button>
         </div>
       </div>
 
       {error ? <p className="error">{error}</p> : null}
+
+      {canWrite ? (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Thêm global rule</h2>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <label>
+              Type
+              <select value={newRule.rule_type} onChange={(e) => setNewRule({ ...newRule, rule_type: e.target.value })} style={{ display: 'block', marginTop: '0.25rem' }}>
+                {RULE_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Priority
+              <input type="number" value={newRule.priority} onChange={(e) => setNewRule({ ...newRule, priority: Number(e.target.value) })} style={{ display: 'block', width: 80, marginTop: '0.25rem' }} />
+            </label>
+            <label style={{ flex: 1, minWidth: 240 }}>
+              config_json
+              <input value={newRule.config_json} onChange={(e) => setNewRule({ ...newRule, config_json: e.target.value })} style={{ display: 'block', width: '100%', marginTop: '0.25rem', fontFamily: 'monospace' }} />
+            </label>
+            <button type="button" className="btn btn-sm" onClick={() => void createRule()}>+ Thêm rule</button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="card" style={{ marginBottom: '1rem' }}>
         <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Global rules</h2>
@@ -146,6 +232,7 @@ export default function EmailGovernancePage() {
                 <th>Config</th>
                 <th>Priority</th>
                 <th>Enabled</th>
+                {canWrite ? <th /> : null}
               </tr>
             </thead>
             <tbody>
@@ -154,19 +241,37 @@ export default function EmailGovernancePage() {
                   <td>{rule.scope}</td>
                   <td>{rule.rule_type}</td>
                   <td>
-                    <code style={{ fontSize: '0.85rem' }}>{JSON.stringify(rule.config_json)}</code>
+                    {editId === rule.id ? (
+                      <textarea value={editConfig} onChange={(e) => setEditConfig(e.target.value)} rows={3} style={{ width: '100%', fontFamily: 'monospace', fontSize: '0.85rem' }} />
+                    ) : (
+                      <code style={{ fontSize: '0.85rem' }}>{JSON.stringify(rule.config_json)}</code>
+                    )}
                   </td>
                   <td>{rule.priority}</td>
-                  <td>{rule.enabled ? '✓' : '—'}</td>
+                  <td>
+                    {canWrite ? (
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => void toggleRule(rule)}>
+                        {rule.enabled ? '✓ ON' : '— OFF'}
+                      </button>
+                    ) : (
+                      rule.enabled ? '✓' : '—'
+                    )}
+                  </td>
+                  {canWrite ? (
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {editId === rule.id ? (
+                        <button type="button" className="btn btn-sm" onClick={() => void saveEdit(rule.id)}>Lưu</button>
+                      ) : (
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setEditId(rule.id); setEditConfig(JSON.stringify(rule.config_json, null, 2)); }}>Sửa</button>
+                      )}
+                      {' '}
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => void removeRule(rule.id)}>Xóa</button>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
           </table>
-          {!loading && (data?.rules?.length ?? 0) === 0 ? (
-            <p className="muted">
-              Chưa có rules — apply DDL để seed global defaults hoặc cấu hình EM-1.
-            </p>
-          ) : null}
         </div>
       </div>
 
@@ -180,6 +285,7 @@ export default function EmailGovernancePage() {
                 <th>Actor</th>
                 <th>Action</th>
                 <th>Entity</th>
+                <th>Diff</th>
               </tr>
             </thead>
             <tbody>
@@ -188,17 +294,18 @@ export default function EmailGovernancePage() {
                   <td>{row.created_at ? row.created_at.slice(0, 19) : '—'}</td>
                   <td>{row.actor}</td>
                   <td>{row.action}</td>
+                  <td>{row.entity_type}{row.entity_id ? ` · ${row.entity_id.slice(0, 8)}…` : ''}</td>
                   <td>
-                    {row.entity_type}
-                    {row.entity_id ? ` · ${row.entity_id.slice(0, 8)}…` : ''}
+                    <code style={{ fontSize: '0.75rem' }}>
+                      {row.before_json || row.after_json
+                        ? `${row.before_json ? 'before' : ''}${row.before_json && row.after_json ? ' → ' : ''}${row.after_json ? 'after' : ''}`
+                        : '—'}
+                    </code>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          {!loading && (data?.audit_log?.length ?? 0) === 0 ? (
-            <p className="muted">Chưa có audit entries.</p>
-          ) : null}
         </div>
       </div>
     </main>

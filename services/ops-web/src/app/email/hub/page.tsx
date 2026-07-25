@@ -237,16 +237,17 @@ export default function EmailHubPage() {
       {hub?.alerts?.length ? (
         <div className="card" style={{ marginBottom: '1rem' }}>
           <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Alerts</h2>
-          <ul style={{ margin: 0, paddingLeft: '1.2rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {hub.alerts.map((alert) => (
-              <li key={alert.message} style={{ marginBottom: '0.5rem' }}>
-                <span className={alert.severity === 'danger' ? 'error' : 'muted'}>{alert.message}</span>{' '}
-                <Link href={alert.link} className="nav-link">
-                  {alert.link_label}
-                </Link>
-              </li>
+              <EmailAlertBanner
+                key={alert.message}
+                severity={alert.severity}
+                message={alert.message}
+                link={alert.link}
+                linkLabel={alert.link_label}
+              />
             ))}
-          </ul>
+          </div>
         </div>
       ) : null}
 

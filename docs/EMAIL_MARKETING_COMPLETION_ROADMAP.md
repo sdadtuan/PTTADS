@@ -169,7 +169,7 @@ flowchart TB
 
 | # | Việc | Trạng thái | Ghi chú |
 |---|------|------------|---------|
-| 2.1 | E-07 Segment builder (lifecycle) | 🟡 | RFM tab = backlog Phase 3 |
+| 2.1 | E-07 Segment builder (lifecycle + RFM + behavior) | ✅ | P1.2 tabs + compute |
 | 2.2 | E-08/E-08b Template studio + blocks | 🟡 | Blocks/HTML; drag-drop defer |
 | 2.3 | E-09 Campaign console | ✅ | |
 | 2.4 | E-09b Campaign detail + schedule | ✅ | EM-10 schedule send |
@@ -257,7 +257,7 @@ flowchart TB
 | 5.5 | Deliverability incident drill | [`email-deliverability-incident.md`](runbooks/email-deliverability-incident.md) | 🟡 |
 | 5.6 | Human sign-off | `docs/evidence/em5-email-pilot-signoff.json` | ❌ |
 | 5.7 | Horizon 0 pack (cross SEO+Email+Meta) | `horizon0_gate_a_pack.sh` | 🟡 |
-| 5.8 | **Huong-dan vận hành VI** | `huong-dan-email-marketing-ops.md` | ❌ backlog |
+| 5.8 | **Huong-dan vận hành VI** | `huong-dan-email-marketing-ops.md` | ✅ P1.6 |
 | 5.9 | Playwright E2E ops-web email handoff | `email-handoff.spec.ts` + `email_handoff_gate.sh` | ✅ P0 |
 | 5.10 | nginx `/crm/email` redirect verify | `nginx-rs-delivery-admin-retired.conf` | ✅ |
 
@@ -289,17 +289,19 @@ PTT_EMAIL_JOURNEYS_ENABLED=1
 
 Không chặn Gate A — lên kế hoạch sau prod pilot ổn định.
 
-### P1 — UX parity & ops (4–6 tuần)
+### P1 — UX parity & ops (4–6 tuần) ✅ 2026-07-25
 
-| # | Hạng mục | Screen / module | Effort |
-|---|----------|-----------------|--------|
-| P1.1 | E-13 Governance **write** — CRUD policy, audit tail | E-13 + Nest API | M |
-| P1.2 | E-07 RFM + behavior segment tabs | SegmentBuilder | M |
-| P1.3 | Slack/Teams deliverability alerts | hub banner + job | S |
-| P1.4 | Grafana embed trên E-12 / hub | reports page | S |
-| P1.5 | Domain onboarding wizard (AM-friendly) | E-11 + workspace settings | M |
-| P1.6 | `huong-dan-email-marketing-ops.md` + checklist A4 + training PPT | docs | S |
-| P1.7 | Playwright E2E handoff gate | ops-web e2e | M |
+| # | Hạng mục | Screen / module | Effort | Trạng thái |
+|---|----------|-----------------|--------|------------|
+| P1.1 | E-13 Governance **write** — CRUD policy, audit tail | E-13 + Nest API | M | ✅ |
+| P1.2 | E-07 RFM + behavior segment tabs | SegmentBuilder | M | ✅ |
+| P1.3 | Slack/Teams deliverability alerts | hub banner + job | S | ✅ |
+| P1.4 | Grafana embed trên E-12 / hub | reports page | S | ✅ |
+| P1.5 | Domain onboarding wizard (AM-friendly) | E-11 + workspace settings | M | ✅ |
+| P1.6 | `huong-dan-email-marketing-ops.md` + checklist A4 + training PPT | docs | S | ✅ |
+| P1.7 | Playwright E2E handoff gate | ops-web e2e + `email_p1_gate.sh` | M | ✅ |
+
+**Gate:** `./scripts/email_p1_gate.sh` · pytest `tests/test_email_p1_qa.py`
 
 ### P2 — Enterprise depth (6–8 tuần)
 
@@ -325,7 +327,7 @@ Không chặn Gate A — lên kế hoạch sau prod pilot ổn định.
 | E-04 | Contacts | `/email/contacts` | 1 | ✅ | 🟡 |
 | E-05 | Consent | `/email/consent` | 1 | ✅ | 🟡 |
 | E-06 | Suppression | `/email/suppression` | 1 | ✅ | 🟡 |
-| E-07 | Segments | `/email/segments` | 2 | 🟡 | 🟡 |
+| E-07 | Segments | `/email/segments` | 2 | ✅ | 🟡 |
 | E-08 | Templates | `/email/templates` | 2 | 🟡 | 🟡 |
 | E-08b | Template editor | `/email/templates/:id` | 2 | 🟡 | 🟡 |
 | E-09 | Campaigns | `/email/campaigns` | 2 | ✅ | 🟡 |

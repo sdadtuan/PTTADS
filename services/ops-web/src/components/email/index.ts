@@ -12,4 +12,5 @@ export { JourneyCanvas } from './JourneyCanvas';
 export { JourneyCanvasEditor } from './JourneyCanvasEditor';
 export { CampaignExperimentPanel } from './CampaignExperimentPanel';
 export { SegmentBuilder } from './SegmentBuilder';
+export { EmailDomainOnboardingWizard } from './EmailDomainOnboardingWizard';
 export { TemplateBlockLibrary, TEMPLATE_BLOCKS } from './TemplateBlockLibrary';
