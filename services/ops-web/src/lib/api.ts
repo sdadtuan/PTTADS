@@ -2928,6 +2928,64 @@ export async function patchClientOnboardingItem(
   });
 }
 
+export interface OnboardOrchestratorStep {
+  key: string;
+  label: string;
+  module: string;
+  sort_order: number;
+  status: 'pending' | 'done' | 'skipped' | 'optional';
+  href: string | null;
+  auto_detected: boolean;
+  manual_only: boolean;
+  optional: boolean;
+  checklist_item_key: string | null;
+  hint: string | null;
+  detection_detail: string | null;
+}
+
+export interface OnboardOrchestratorResponse {
+  client_id: string;
+  client_code: string;
+  client_name: string;
+  client_status: string;
+  steps: OnboardOrchestratorStep[];
+  progress: {
+    total: number;
+    completed: number;
+    percent: number;
+    required_total: number;
+    required_completed: number;
+    required_percent: number;
+  };
+  checklist_progress: {
+    total: number;
+    completed: number;
+    percent: number;
+    required_total: number;
+    required_completed: number;
+    required_percent: number;
+  };
+  linked_lifecycle_url: string | null;
+  synced_at: string | null;
+}
+
+export async function fetchClientOnboardingOrchestrator(
+  token: string,
+  clientId: string,
+): Promise<OnboardOrchestratorResponse> {
+  return agencyFetch(token, `/api/v1/clients/${clientId}/onboarding/orchestrator`);
+}
+
+export async function syncClientOnboardingOrchestrator(
+  token: string,
+  clientId: string,
+): Promise<{ client_id: string; synced_items: string[]; orchestrator: OnboardOrchestratorResponse }> {
+  return agencyMutate(token, `/api/v1/clients/${clientId}/onboarding/orchestrator/sync`, {
+    method: 'POST',
+    body: '{}',
+  });
+}
+
 export async function activateAgencyClient(
   token: string,
   clientId: string,

@@ -50,7 +50,7 @@
 |----|-------|-----|---------------------|---------|
 | **GAP-P0-01** | ~~Không có UI CRUD portal users trên ops-web~~ | PORTAL-001, SYS-001 | — | ✅ **Đã implement** — tab Portal users + API CRUD |
 | **GAP-P0-02** | ~~Portal forgot password~~ | PORTAL-001 | Self-serve `/forgot-password` + `/reset-password`; AM reset ops | ✅ **Đã implement** |
-| **GAP-P0-03** | Onboard đa module không có checklist thống nhất 1 màn | SYS-001, SVC-002 | AM nhảy giữa Agency, Meta, SEO, Email | **Onboard orchestrator** trên lifecycle tab: deep-link từng bước + auto tick khi detect done |
+| **GAP-P0-03** | ~~Onboard đa module không có checklist thống nhất 1 màn~~ | SYS-001, SVC-002 | ~~AM nhảy giữa Agency, Meta, SEO, Email~~ | **Onboard orchestrator** ✅ tab `/agency/clients/[id]?tab=onboard` + lifecycle panel: deep-link + `POST .../orchestrator/sync` auto-tick |
 
 ### GAP-P1 — Enterprise depth / workaround được
 
@@ -91,7 +91,7 @@ Một UC được coi **"đủ bước nghiệp vụ"** khi file actions tương
 
 | Phase | Hạng mục | UC được unblock |
 |-------|----------|-----------------|
-| **A** (2 sprint) | ~~GAP-P0-01~~, ~~GAP-P0-02~~, GAP-P0-03 | PORTAL-001 self-serve ✅ |
+| **A** (2 sprint) | ~~GAP-P0-01~~, ~~GAP-P0-02~~, ~~GAP-P0-03~~ | PORTAL-001 self-serve ✅ · Onboard orchestrator ✅ |
 | **B** (1 sprint) | GAP-P1-01 finance gate UI, GAP-P1-02 portal notification | SVC-004, PORTAL-006/008 |
 | **C** | GAP-P1-03 Grafana portal read-only | EM-013, SEO-014 client-facing |
 

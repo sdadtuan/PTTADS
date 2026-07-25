@@ -14,6 +14,8 @@ import { ClientOffboardFollowUpService } from './client-offboard-follow-up.servi
 import { ClientOffboardService } from './client-offboard.service';
 import { PortalClientUsersRepository } from './portal-client-users.repository';
 import { PortalClientUsersService } from './portal-client-users.service';
+import { OnboardingOrchestratorRepository } from './onboarding-orchestrator.repository';
+import { OnboardingOrchestratorService } from './onboarding-orchestrator.service';
 import { ClientsController } from './clients.controller';
 import {
   StaffAgencyViewGuard,
@@ -34,11 +36,13 @@ import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
     ClientOffboardService,
     PortalClientUsersRepository,
     PortalClientUsersService,
+    OnboardingOrchestratorRepository,
+    OnboardingOrchestratorService,
     StaffAgencyViewGuard,
     StaffFacebookAdsViewGuard,
     StaffAgencyWriteGuard,
     StaffAgencyConfigureGuard,
   ],
-  exports: [AgencyService, ClientOffboardService],
+  exports: [AgencyService, ClientOffboardService, OnboardingOrchestratorService],
 })
 export class AgencyModule {}

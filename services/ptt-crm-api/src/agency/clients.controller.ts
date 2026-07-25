@@ -37,6 +37,11 @@ import {
 } from './agency.types';
 import { OffboardClientBody, OffboardAuditListResponse, OffboardClientResponse } from './client-offboard.types';
 import { PortalClientUsersService } from './portal-client-users.service';
+import { OnboardingOrchestratorService } from './onboarding-orchestrator.service';
+import {
+  OnboardOrchestratorResponse,
+  OnboardOrchestratorSyncResponse,
+} from './onboarding-orchestrator.types';
 import {
   CreatePortalClientUserBody,
   CreatePortalClientUserResponse,
@@ -57,6 +62,7 @@ export class ClientsController {
     private readonly agency: AgencyService,
     private readonly performance: PerformanceService,
     private readonly portalUsers: PortalClientUsersService,
+    private readonly orchestrator: OnboardingOrchestratorService,
   ) {}
 
   @Get()
@@ -167,6 +173,18 @@ export class ClientsController {
   @Get(':id/onboarding/workflow-status')
   async onboardingWorkflowStatus(@Param('id') id: string) {
     return this.agency.getOnboardingWorkflowStatus(id);
+  }
+
+  @Get(':id/onboarding/orchestrator')
+  async onboardingOrchestrator(@Param('id') id: string): Promise<OnboardOrchestratorResponse> {
+    return this.orchestrator.getOrchestrator(id.trim());
+  }
+
+  @Post(':id/onboarding/orchestrator/sync')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(StaffAgencyWriteGuard)
+  async syncOnboardingOrchestrator(@Param('id') id: string): Promise<OnboardOrchestratorSyncResponse> {
+    return this.orchestrator.syncOrchestrator(id.trim());
   }
 
   @Get(':id/onboarding/summary')

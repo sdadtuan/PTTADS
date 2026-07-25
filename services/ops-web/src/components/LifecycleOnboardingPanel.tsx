@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { fetchServiceLifecycleOnboardingBrief } from '@/lib/api';
+import { ClientOnboardOrchestrator } from '@/components/ClientOnboardOrchestrator';
+import { fetchServiceLifecycleOnboardingBrief, syncClientOnboardingOrchestrator } from '@/lib/api';
+import type { OnboardOrchestratorResponse } from '@/lib/api';
 import { hasCap, type StoredStaffUser } from '@/lib/auth';
 
 type BriefPayload = {
@@ -19,8 +21,10 @@ type BriefPayload = {
     found: boolean;
     temporal_enabled: boolean;
   } | null;
+  orchestrator?: OnboardOrchestratorResponse | null;
   links: {
     agency_checklist: string | null;
+    agency_onboard?: string | null;
   };
   gate: {
     ok: boolean;
@@ -40,8 +44,10 @@ type Props = {
 
 export function LifecycleOnboardingPanel({ token, user, lifecycleId, stage }: Props) {
   const canView = hasCap(user, 'crm_board', 'view');
+  const canWrite = hasCap(user, 'crm_agency', 'write');
   const [brief, setBrief] = useState<BriefPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const reload = useCallback(async () => {
@@ -63,17 +69,31 @@ export function LifecycleOnboardingPanel({ token, user, lifecycleId, stage }: Pr
     void reload();
   }, [reload]);
 
+  async function handleSync() {
+    if (!brief?.client_id || !canWrite) return;
+    setBusy(true);
+    setError('');
+    try {
+      const out = await syncClientOnboardingOrchestrator(token, brief.client_id);
+      setBrief((prev) => (prev ? { ...prev, orchestrator: out.orchestrator } : prev));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Auto-sync thất bại');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!canView || stage !== 'onboard') return null;
   if (loading && !brief) {
     return (
       <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
         <p className="muted" style={{ margin: 0 }}>
-          Đang tải checklist client…
+          Đang tải onboard orchestrator…
         </p>
       </div>
     );
   }
-  if (error) {
+  if (error && !brief) {
     return (
       <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
         <p className="error" style={{ margin: 0 }}>
@@ -85,7 +105,7 @@ export function LifecycleOnboardingPanel({ token, user, lifecycleId, stage }: Pr
   if (!brief) return null;
 
   const showWarn = !brief.gate.ok && brief.gate.messages.length > 0;
-  const checklistLink = brief.links.agency_checklist;
+  const onboardLink = brief.links.agency_onboard ?? brief.links.agency_checklist;
 
   return (
     <div
@@ -98,14 +118,19 @@ export function LifecycleOnboardingPanel({ token, user, lifecycleId, stage }: Pr
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div>
-          <h3 style={{ margin: 0, fontSize: '1rem' }}>Checklist agency client</h3>
+          <h3 style={{ margin: 0, fontSize: '1rem' }}>Onboard orchestrator</h3>
           <p className="muted" style={{ margin: '0.35rem 0 0' }}>
             {brief.has_context && brief.client_name
               ? `${brief.client_name}${brief.client_code ? ` (${brief.client_code})` : ''} · ${brief.client_status ?? '—'}`
               : brief.message ?? 'Chưa liên kết agency client'}
           </p>
         </div>
-        {brief.has_context ? (
+        {brief.orchestrator ? (
+          <span className="muted" style={{ fontWeight: 600 }}>
+            {brief.orchestrator.progress.required_percent}% · {brief.orchestrator.progress.required_completed}/
+            {brief.orchestrator.progress.required_total}
+          </span>
+        ) : brief.has_context ? (
           <span className="muted" style={{ fontWeight: 600 }}>
             {brief.progress.percent}% · {brief.progress.completed}/{brief.progress.total}
           </span>
@@ -115,7 +140,7 @@ export function LifecycleOnboardingPanel({ token, user, lifecycleId, stage }: Pr
       {showWarn ? (
         <div style={{ marginTop: '0.75rem' }}>
           <p className="error" style={{ margin: '0 0 0.35rem', fontWeight: 600 }}>
-            Checklist client chưa đủ
+            Onboard chưa đủ
           </p>
           <ul className="error" style={{ margin: 0, paddingLeft: '1.1rem' }}>
             {brief.gate.messages.map((m) => (
@@ -134,11 +159,30 @@ export function LifecycleOnboardingPanel({ token, user, lifecycleId, stage }: Pr
         </p>
       ) : null}
 
-      {checklistLink ? (
+      {brief.orchestrator ? (
+        <div style={{ marginTop: '0.75rem' }}>
+          <ClientOnboardOrchestrator
+            data={brief.orchestrator}
+            compact
+            canWrite={canWrite}
+            busy={busy}
+            clientActive={brief.client_status === 'active'}
+            onSync={() => void handleSync()}
+          />
+        </div>
+      ) : null}
+
+      {onboardLink ? (
         <p style={{ margin: '0.75rem 0 0' }}>
-          <Link href={checklistLink} className="nav-link">
-            Mở checklist agency client →
+          <Link href={onboardLink} className="nav-link">
+            Mở onboard orchestrator đầy đủ →
           </Link>
+        </p>
+      ) : null}
+
+      {error ? (
+        <p className="error" style={{ margin: '0.5rem 0 0', fontSize: '0.9rem' }}>
+          {error}
         </p>
       ) : null}
     </div>

@@ -16,7 +16,7 @@
 | 2 | AM | `/crm/customers` | Tìm hoặc xác nhận customer sau convert | search name/phone | Danh sách customer | ✓ customer tồn tại |
 | 3 | AM | `/agency/clients/new` hoặc `/agency` | **+ Client** nếu chưa có agency client | name, industry, owner_am | Client UUID tạo | ✓ link customer_id |
 | 4 | AM | `/crm/service-delivery` | Tạo / mở lifecycle → stage **Onboard** | service slug, AM assign | Kanban card Onboard | ✓ lifecycle id |
-| 5 | AM | `/crm/service-delivery/[id]` tab **Onboard** | Xem **Onboarding panel** progress | — | % checklist, link agency | ✓ panel load |
+| 5 | AM | `/crm/service-delivery/[id]` tab **Onboard** | Xem **Onboard orchestrator** (cross-module steps + deep-links) | — | % required steps, auto-detect badges | ✓ panel load |
 | 6 | AM | `/agency/clients/[id]` | Tick **onboarding checklist** items | legal, billing, brief… | progress % tăng | ✓ ≥100% nếu strict |
 | 7 | Tracking | `/agency/clients/[id]` | **+ Channel account** Meta | ad_account_id, label | Account row | ✓ |
 | 8 | Tracking | `/agency/clients/[id]` | **Lưu token** Meta / OAuth Google | access_token hoặc OAuth | "sync job queued" | ✓ token valid |

@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { AgencyService } from '../agency/agency.service';
+import { OnboardingOrchestratorService } from '../agency/onboarding-orchestrator.service';
 import { ServiceLifecycleSqliteRepository } from './service-lifecycle-sqlite.repository';
 
 @Injectable()
@@ -7,6 +8,7 @@ export class LifecycleOnboardingService {
   constructor(
     private readonly sqlite: ServiceLifecycleSqliteRepository,
     private readonly agency: AgencyService,
+    private readonly orchestrator: OnboardingOrchestratorService,
   ) {}
 
   async onboardingBrief(lifecycleId: number) {
@@ -74,6 +76,13 @@ export class LifecycleOnboardingService {
       gateMessages.push('Agency client đã active — checklist coi như pass.');
     }
 
+    let orchestrator = null;
+    try {
+      orchestrator = await this.orchestrator.getOrchestrator(clientId);
+    } catch {
+      orchestrator = null;
+    }
+
     return {
       lifecycle_id: lifecycleId,
       has_context: true,
@@ -91,8 +100,10 @@ export class LifecycleOnboardingService {
       incomplete_preview: incomplete.map((i) => i.label),
       workflow: summary.workflow,
       strict_onboarding: summary.strict_onboarding,
+      orchestrator,
       links: {
         agency_checklist: `/agency/clients/${encodeURIComponent(clientId)}?tab=checklist`,
+        agency_onboard: `/agency/clients/${encodeURIComponent(clientId)}?tab=onboard`,
         service_delivery: ctx.links.service_delivery,
       },
       gate: {

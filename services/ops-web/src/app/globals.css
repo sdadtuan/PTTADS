@@ -1280,6 +1280,123 @@ body:has(.ops-sidebar) main {
   align-items: center;
 }
 
+.onboard-orchestrator {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1rem;
+  background: var(--surface);
+}
+
+.onboard-orchestrator.is-compact {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+.onboard-orchestrator-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.onboard-orchestrator-steps {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.onboard-orchestrator-step {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.onboard-orchestrator-step.is-done {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.onboard-orchestrator-step.is-auto {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.onboard-orchestrator-step.is-pending {
+  border-color: var(--border);
+}
+
+.onboard-orchestrator-step.is-optional {
+  opacity: 0.75;
+}
+
+.onboard-orchestrator-step-main {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.onboard-orchestrator-module {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.15rem 0.35rem;
+  margin-top: 0.1rem;
+}
+
+.onboard-orchestrator-step-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.onboard-orchestrator-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+}
+
+.onboard-orchestrator-badge.is-done,
+.onboard-orchestrator-badge.is-auto {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.onboard-orchestrator-badge.is-pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.onboard-orchestrator-badge.is-optional {
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.onboard-orchestrator-footer {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
 .agency-dlq-banner {
   background: #fef2f2;
   border: 1px solid #fecaca;

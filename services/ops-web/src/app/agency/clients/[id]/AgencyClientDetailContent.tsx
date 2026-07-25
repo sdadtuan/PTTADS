@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ClientOnboardingWidget } from '@/components/ClientOnboardingWidget';
+import { ClientOnboardOrchestrator } from '@/components/ClientOnboardOrchestrator';
 import { ClientPortalUsersPanel } from '@/components/ClientPortalUsersPanel';
 import { OpsNav } from '@/components/OpsNav';
 import { AgencyReadOnlyBadge, canAgencyConfigure, canAgencyWrite } from '@/components/AgencyReadOnlyBadge';
@@ -17,6 +18,8 @@ import {
   fetchClientOffboardAudit,
   fetchClientLeads,
   fetchClientOnboardingSummary,
+  fetchClientOnboardingOrchestrator,
+  syncClientOnboardingOrchestrator,
   fetchClientPerformance,
   offboardAgencyClient,
   patchAgencyClient,
@@ -38,6 +41,7 @@ import type {
   ClientOffboardAuditRow,
   OnboardingItem,
   OnboardingSummaryResponse,
+  OnboardOrchestratorResponse,
   PerformanceRow,
 } from '@/lib/api';
 import {
@@ -51,7 +55,7 @@ import {
   type StoredStaffUser,
 } from '@/lib/auth';
 
-type TabId = 'overview' | 'checklist' | 'channels' | 'campaigns' | 'leads' | 'contracts' | 'portal';
+type TabId = 'overview' | 'onboard' | 'checklist' | 'channels' | 'campaigns' | 'leads' | 'contracts' | 'portal';
 
 const CLIENT_STATUSES = ['prospect', 'onboarding', 'active', 'paused'] as const;
 
@@ -94,6 +98,7 @@ export function AgencyClientDetailContent() {
   const [user, setUser] = useState<StoredStaffUser | null>(null);
   const [client, setClient] = useState<AgencyClient | null>(null);
   const [onboarding, setOnboarding] = useState<OnboardingSummaryResponse | null>(null);
+  const [orchestrator, setOrchestrator] = useState<OnboardOrchestratorResponse | null>(null);
   const [perfRows, setPerfRows] = useState<PerformanceRow[]>([]);
   const [error, setError] = useState('');
   const [actionMsg, setActionMsg] = useState('');
@@ -172,15 +177,17 @@ export function AgencyClientDetailContent() {
 
   const reload = useCallback(
     async (access: string) => {
-      const [detail, perf, ob, leadsOut] = await Promise.all([
+      const [detail, perf, ob, orch, leadsOut] = await Promise.all([
         fetchAgencyClient(access, clientId),
         fetchClientPerformance(access, clientId, { group_by: 'campaign' }),
         fetchClientOnboardingSummary(access, clientId),
+        fetchClientOnboardingOrchestrator(access, clientId).catch(() => null),
         fetchClientLeads(access, clientId).catch(() => ({ leads: [] })),
       ]);
       setClient(detail);
       setPerfRows(perf.rows ?? []);
       setOnboarding(ob);
+      setOrchestrator(orch);
       setClientLeads(leadsOut.leads ?? []);
       setEditForm({
         name: detail.name ?? '',
@@ -314,6 +321,8 @@ export function AgencyClientDetailContent() {
       setClient(updated);
       const summary = await fetchClientOnboardingSummary(access, clientId);
       setOnboarding(summary);
+      const orch = await fetchClientOnboardingOrchestrator(access, clientId).catch(() => null);
+      setOrchestrator(orch);
       const fx = updated.side_effects;
       if (fx?.jobs_enqueued?.length) {
         setActionMsg(
@@ -324,6 +333,26 @@ export function AgencyClientDetailContent() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Kích hoạt thất bại');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSyncOrchestrator() {
+    const access = getAccessToken();
+    if (!access || !canMutate) return;
+    setBusy(true);
+    setActionMsg('');
+    setError('');
+    try {
+      const out = await syncClientOnboardingOrchestrator(access, clientId);
+      setOrchestrator(out.orchestrator);
+      const summary = await fetchClientOnboardingSummary(access, clientId);
+      setOnboarding(summary);
+      const n = out.synced_items.length;
+      setActionMsg(n ? `Auto-sync ${n} mục checklist` : 'Không có mục mới để auto-sync');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Auto-sync thất bại');
     } finally {
       setBusy(false);
     }
@@ -578,7 +607,10 @@ export function AgencyClientDetailContent() {
     );
   }
 
-  const progress = onboarding?.progress ?? { total: 0, completed: 0, percent: 0 };
+  const orchestratorPercent = orchestrator?.progress.required_percent ?? onboarding?.progress.percent ?? 0;
+  const checklistLabel = onboarding?.progress
+    ? `${onboarding.progress.completed}/${onboarding.progress.total}`
+    : '0/0';
 
   return (
     <main style={{ maxWidth: 1100, margin: '0 auto', padding: '1.5rem' }}>
@@ -614,7 +646,8 @@ export function AgencyClientDetailContent() {
               {(
                 [
                   ['overview', 'Tổng quan'],
-                  ['checklist', `Checklist ${progress.completed}/${progress.total}`],
+                  ['onboard', `Onboard ${orchestratorPercent}%`],
+                  ['checklist', `Checklist ${checklistLabel}`],
                   ['channels', 'Kênh ads'],
                   ['campaigns', 'Campaign map'],
                   ['leads', `Leads (${clientLeads.length})`],
@@ -861,6 +894,38 @@ export function AgencyClientDetailContent() {
                   </table>
                 </div>
               </>
+            ) : null}
+
+            {tab === 'onboard' && orchestrator ? (
+              <div style={{ marginTop: '1rem' }}>
+                <ClientOnboardOrchestrator
+                  data={orchestrator}
+                  canWrite={canMutate}
+                  busy={busy}
+                  clientActive={client.status === 'active'}
+                  onSync={() => void handleSyncOrchestrator()}
+                  onActivate={() => void handleActivate(false)}
+                />
+                {onboarding ? (
+                  <details style={{ marginTop: '1.25rem' }}>
+                    <summary className="muted" style={{ cursor: 'pointer' }}>
+                      Checklist chi tiết ({onboarding.progress.completed}/{onboarding.progress.total})
+                    </summary>
+                    <div style={{ marginTop: '0.75rem' }}>
+                      <ClientOnboardingWidget
+                        client={client}
+                        summary={onboarding}
+                        canWrite={canMutate}
+                        busy={busy}
+                        onToggleItem={(item) => void toggleChecklist(item)}
+                        onActivate={(force) => void handleActivate(force)}
+                        onNudgeWorkflow={() => void handleNudgeWorkflow()}
+                        onStartWorkflow={() => void handleStartWorkflow()}
+                      />
+                    </div>
+                  </details>
+                ) : null}
+              </div>
             ) : null}
 
             {tab === 'checklist' && onboarding ? (
