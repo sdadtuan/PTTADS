@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { PortalNav } from '@/components/PortalNav';
 import { fetchPendingCreativeCount, fetchPortalSettings, type PortalSettingsResponse } from '@/lib/api';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { usePortalSeoNav } from '@/hooks/usePortalSeoNav';
 
 interface PortalPageShellProps {
   children: (ctx: { token: string; user: NonNullable<ReturnType<typeof usePortalAuth>['user']> }) => ReactNode;
@@ -11,6 +12,7 @@ interface PortalPageShellProps {
 
 export function PortalPageShell({ children }: PortalPageShellProps) {
   const { user, token, loading, sessionWarning, logout } = usePortalAuth();
+  const seoEnabled = usePortalSeoNav(token);
   const [pendingCount, setPendingCount] = useState(0);
   const [branding, setBranding] = useState<PortalSettingsResponse | null>(null);
 
@@ -37,7 +39,7 @@ export function PortalPageShell({ children }: PortalPageShellProps) {
         onLogout={logout}
         pendingCount={pendingCount}
         branding={branding}
-        seoEnabled={false}
+        seoEnabled={seoEnabled}
         emailEnabled={false}
       />
       {sessionWarning ? (

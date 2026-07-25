@@ -16,6 +16,11 @@ export class PortalSeoController {
     return this.seo.summary(user);
   }
 
+  @Get('status')
+  status(@PortalUser() user: PortalJwtPayload) {
+    return this.seo.status(user);
+  }
+
   @Get('widgets')
   widgets(@PortalUser() user: PortalJwtPayload) {
     return this.seo.widgets(user);

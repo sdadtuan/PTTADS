@@ -385,6 +385,14 @@ export interface PortalSeoExecutiveReportResponse {
   generated_at: string;
 }
 
+export interface PortalSeoStatusResponse {
+  ok: boolean;
+  enabled: boolean;
+  mapped: boolean;
+  customer_id?: number;
+  pending_client_review?: number;
+}
+
 export async function portalSeoSummary(token: string): Promise<PortalSeoSummaryResponse> {
   const res = await fetch(`${API_BASE}/api/v1/portal/seo/summary`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -393,6 +401,18 @@ export async function portalSeoSummary(token: string): Promise<PortalSeoSummaryR
   const body = await parseJson<PortalSeoSummaryResponse & { error?: string; message?: string }>(res);
   if (!res.ok) {
     throw new ApiError(body.error ?? body.message ?? 'SEO summary failed', res.status);
+  }
+  return body;
+}
+
+export async function portalSeoStatus(token: string): Promise<PortalSeoStatusResponse> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/seo/status`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await parseJson<PortalSeoStatusResponse & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'SEO status failed', res.status);
   }
   return body;
 }

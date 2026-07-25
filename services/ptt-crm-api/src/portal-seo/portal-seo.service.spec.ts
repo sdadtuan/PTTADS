@@ -47,6 +47,25 @@ describe('PortalSeoService', () => {
     await expect(svc.summary(mockUser)).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
+  it('returns status when mapped', async () => {
+    process.env.PTT_PORTAL_SEO_ENABLED = '1';
+    repo.customerIdForPortalClient.mockResolvedValue(1);
+    repo.listPendingContent.mockResolvedValue([{ id: 1, title: 'T', content_type: 'blog' }]);
+    const svc = new PortalSeoService(repo);
+    const out = await svc.status(mockUser);
+    expect(out.enabled).toBe(true);
+    expect(out.mapped).toBe(true);
+    expect(out.pending_client_review).toBe(1);
+  });
+
+  it('returns disabled status when flag off', async () => {
+    process.env.PTT_PORTAL_SEO_ENABLED = '0';
+    const svc = new PortalSeoService(repo);
+    const out = await svc.status(mockUser);
+    expect(out.enabled).toBe(false);
+    expect(out.mapped).toBe(false);
+  });
+
   it('loads widgets from PG repository', async () => {
     process.env.PTT_PORTAL_SEO_ENABLED = '1';
     repo.customerIdForPortalClient.mockResolvedValue(1);

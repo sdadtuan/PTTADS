@@ -6,6 +6,7 @@ import { PortalNav } from '@/components/PortalNav';
 import { SeoWidgetsPanel } from '@/components/SeoWidgetsPanel';
 import { portalMe, portalSeoSummary } from '@/lib/api';
 import { clearSession, getStoredUser, getToken, type StoredUser } from '@/lib/auth';
+import { usePortalSeoNav } from '@/hooks/usePortalSeoNav';
 
 export default function SeoDashboardPage() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function SeoDashboardPage() {
   const [token, setToken] = useState('');
   const [seoEnabled, setSeoEnabled] = useState(true);
   const [error, setError] = useState('');
+  const navSeoEnabled = usePortalSeoNav(token || null);
 
   useEffect(() => {
     const authToken = getToken();
@@ -56,7 +58,7 @@ export default function SeoDashboardPage() {
 
   return (
     <main style={{ maxWidth: 960, margin: '0 auto', padding: '1.5rem' }}>
-      <PortalNav user={user} onLogout={logout} seoEnabled={seoEnabled} />
+      <PortalNav user={user} onLogout={logout} seoEnabled={navSeoEnabled && seoEnabled} />
       {error ? <p className="error">{error}</p> : null}
       {seoEnabled ? <SeoWidgetsPanel token={token} /> : null}
     </main>

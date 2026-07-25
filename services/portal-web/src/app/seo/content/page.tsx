@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PortalNav } from '@/components/PortalNav';
 import { portalSeoPendingContent, portalMe } from '@/lib/api';
 import { clearSession, getStoredUser, getToken, type StoredUser } from '@/lib/auth';
+import { usePortalSeoNav } from '@/hooks/usePortalSeoNav';
 
 export default function SeoContentPage() {
   const router = useRouter();
@@ -13,8 +14,10 @@ export default function SeoContentPage() {
   const [items, setItems] = useState<Array<{ id: number; title: string; content_type: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [token, setToken] = useState('');
+  const seoEnabled = usePortalSeoNav(token || null);
 
-  const load = useCallback(async (token: string) => {
+  const load = useCallback(async (authToken: string) => {
     setLoading(true);
     try {
       const data = await portalSeoPendingContent(token);
@@ -27,17 +30,18 @@ export default function SeoContentPage() {
   }, []);
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
+    const authToken = getToken();
+    if (!authToken) {
       router.replace('/login');
       return;
     }
+    setToken(authToken);
     const cached = getStoredUser();
     if (cached) setUser(cached);
-    portalMe(token)
+    portalMe(authToken)
       .then((me) => {
         setUser(me);
-        return load(token);
+        return load(authToken);
       })
       .catch(() => {
         clearSession();
@@ -52,7 +56,7 @@ export default function SeoContentPage() {
 
   return (
     <main style={{ maxWidth: 900, margin: '0 auto', padding: '1.5rem' }}>
-      <PortalNav user={user} onLogout={logout} seoEnabled />
+      <PortalNav user={user} onLogout={logout} seoEnabled={seoEnabled} />
       <section className="card">
         <h2 style={{ marginTop: 0 }}>Nội dung chờ duyệt (client review)</h2>
         {user && user.role !== 'approver' ? (

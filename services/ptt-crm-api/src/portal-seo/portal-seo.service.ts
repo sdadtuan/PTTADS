@@ -114,6 +114,31 @@ export class PortalSeoService {
     };
   }
 
+  async status(user: PortalJwtPayload): Promise<{
+    ok: boolean;
+    enabled: boolean;
+    mapped: boolean;
+    customer_id?: number;
+    pending_client_review?: number;
+  }> {
+    const enabled = this.portalSeoEnabled();
+    if (!enabled) {
+      return { ok: true, enabled: false, mapped: false };
+    }
+    const customerId = await this.resolveCustomerId(user.client_id);
+    if (customerId == null) {
+      return { ok: true, enabled: true, mapped: false };
+    }
+    const pending = await this.repo.listPendingContent(customerId);
+    return {
+      ok: true,
+      enabled: true,
+      mapped: true,
+      customer_id: customerId,
+      pending_client_review: pending.length,
+    };
+  }
+
   async widgets(user: PortalJwtPayload): Promise<PortalSeoWidgets> {
     this.assertEnabled();
     const customerId = await this.resolveCustomerId(user.client_id);

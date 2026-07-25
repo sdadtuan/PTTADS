@@ -110,24 +110,28 @@ export class PortalSeoRepository implements OnModuleDestroy {
     const base: Record<string, unknown> = { type: dtype, customer_id: customerId };
 
     if (dtype === 'executive') {
-      const [gsc, gscTrend, criticalIssues, contentByStatus, aeo, syncRuns] = await Promise.all([
+      const [gsc, gscTrend, criticalIssues, contentByStatus, aeo, syncRuns, openAlerts, authority] =
+        await Promise.all([
         this.gscSummary(customerId, 28),
         this.gscDailyTrend(customerId, 28),
         this.countOpenCritical(customerId),
         this.countByStatus(customerId),
         this.aeoCoverage(customerId),
         this.listSyncRuns(customerId, 5),
+        this.countOpenAlerts(customerId),
+        this.authoritySummary(customerId),
       ]);
       return {
         ...base,
         days: 28,
         gsc,
         gsc_trend: gscTrend,
-        authority: {},
+        authority,
         attribution: {},
         critical_issues: criticalIssues,
         content_by_status: contentByStatus,
         aeo,
+        open_alerts: openAlerts,
         sync_runs_recent: syncRuns,
       };
     }
@@ -166,8 +170,11 @@ export class PortalSeoRepository implements OnModuleDestroy {
     }
 
     if (dtype === 'aeo') {
-      const aeo = await this.aeoCoverage(customerId);
-      return { ...base, aeo, mentions_recent: [] };
+      const [aeo, mentionsRecent] = await Promise.all([
+        this.aeoCoverage(customerId),
+        this.listMentionsRecent(customerId, 30),
+      ]);
+      return { ...base, aeo, mentions_recent: mentionsRecent };
     }
 
     return base;
@@ -386,9 +393,13 @@ export class PortalSeoRepository implements OnModuleDestroy {
   private async aeoCoverage(customerId: number): Promise<Record<string, unknown>> {
     const result = await this.db.query<{ total: string; visible: string }>(
       `SELECT COUNT(*) AS total,
-              COALESCE(SUM(CASE WHEN brand_visible THEN 1 ELSE 0 END), 0) AS visible
-       FROM ${SCHEMA}.seo_questions
-       WHERE customer_id = $1`,
+              COALESCE(SUM(CASE WHEN COALESCE(m.brand_visible, false) THEN 1 ELSE 0 END), 0) AS visible
+       FROM ${SCHEMA}.seo_questions q
+       LEFT JOIN LATERAL (
+         SELECT brand_visible FROM ${SCHEMA}.seo_ai_mentions
+         WHERE question_id = q.id ORDER BY id DESC LIMIT 1
+       ) m ON true
+       WHERE q.customer_id = $1 AND q.status = 'active'`,
       [customerId],
     );
     const total = Number(result.rows[0]?.total ?? 0);
@@ -398,6 +409,78 @@ export class PortalSeoRepository implements OnModuleDestroy {
       visible,
       coverage_pct: total > 0 ? Math.round((1000 * visible) / total) / 10 : 0,
     };
+  }
+
+  private async countOpenAlerts(customerId: number): Promise<number> {
+    const result = await this.db.query<{ c: string }>(
+      `SELECT COUNT(*) AS c FROM ${SCHEMA}.seo_alerts
+       WHERE customer_id = $1 AND status = 'open'`,
+      [customerId],
+    );
+    return Number(result.rows[0]?.c ?? 0);
+  }
+
+  private async authoritySummary(customerId: number): Promise<Record<string, unknown>> {
+    const result = await this.db.query<{ signal_type: string; status: string; c: string }>(
+      `SELECT signal_type, status, COUNT(*) AS c
+       FROM ${SCHEMA}.seo_authority_signals
+       WHERE customer_id = $1
+       GROUP BY signal_type, status`,
+      [customerId],
+    );
+    const summary: Record<string, number> = {
+      backlinks_active: 0,
+      backlinks_lost: 0,
+      citations: 0,
+      brand_mentions: 0,
+      pr_signals: 0,
+      total_signals: 0,
+    };
+    for (const row of result.rows) {
+      const st = String(row.signal_type ?? '');
+      const status = String(row.status ?? '');
+      const count = Number(row.c ?? 0);
+      if (st === 'backlink') {
+        if (status === 'lost') summary.backlinks_lost += count;
+        else summary.backlinks_active += count;
+      } else if (st === 'citation') summary.citations += count;
+      else if (st === 'brand_mention') summary.brand_mentions += count;
+      else if (st === 'pr') summary.pr_signals += count;
+    }
+    summary.total_signals =
+      summary.backlinks_active +
+      summary.backlinks_lost +
+      summary.citations +
+      summary.brand_mentions +
+      summary.pr_signals;
+    return summary;
+  }
+
+  private async listMentionsRecent(
+    customerId: number,
+    days: number,
+  ): Promise<Array<Record<string, unknown>>> {
+    const result = await this.db.query<{
+      stat_date: string;
+      mention_count: string;
+      citation_status: string;
+    }>(
+      `SELECT detected_at::date::text AS stat_date,
+              COUNT(*) AS mention_count,
+              MAX(citation_status) AS citation_status
+       FROM ${SCHEMA}.seo_ai_mentions
+       WHERE customer_id = $1
+         AND detected_at >= NOW() - ($2::int * INTERVAL '1 day')
+       GROUP BY detected_at::date
+       ORDER BY stat_date DESC
+       LIMIT 30`,
+      [customerId, Math.max(1, days)],
+    );
+    return result.rows.map((row) => ({
+      stat_date: String(row.stat_date),
+      mention_count: Number(row.mention_count ?? 0),
+      citation_status: String(row.citation_status ?? ''),
+    }));
   }
 
   private async listSyncRuns(customerId: number, limit: number): Promise<Array<Record<string, unknown>>> {

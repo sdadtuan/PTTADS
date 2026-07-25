@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { PortalNav } from '@/components/PortalNav';
 import { portalMe, portalSeoExecutiveReport, type PortalSeoReportType } from '@/lib/api';
 import { clearSession, getStoredUser, getToken, type StoredUser } from '@/lib/auth';
+import { usePortalSeoNav } from '@/hooks/usePortalSeoNav';
 
 const REPORT_TABS: { id: PortalSeoReportType; label: string }[] = [
   { id: 'executive', label: 'Tổng quan' },
@@ -155,6 +156,8 @@ export default function SeoReportsPage() {
   const [generatedAt, setGeneratedAt] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [token, setToken] = useState('');
+  const seoEnabled = usePortalSeoNav(token || null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -178,17 +181,18 @@ export default function SeoReportsPage() {
   }, []);
 
   useEffect(() => {
-    const token = getToken();
-    if (!token) {
+    const authToken = getToken();
+    if (!authToken) {
       router.replace('/login');
       return;
     }
+    setToken(authToken);
     const cached = getStoredUser();
     if (cached) setUser(cached);
-    portalMe(token)
+    portalMe(authToken)
       .then((me) => {
         setUser(me);
-        return loadReport(token, tab);
+        return loadReport(authToken, tab);
       })
       .catch(() => {
         clearSession();
@@ -203,7 +207,7 @@ export default function SeoReportsPage() {
 
   return (
     <main style={{ maxWidth: 960, margin: '0 auto', padding: '1.5rem' }}>
-      <PortalNav user={user} onLogout={logout} seoEnabled />
+      <PortalNav user={user} onLogout={logout} seoEnabled={seoEnabled} />
 
       <section className="card">
         <div
