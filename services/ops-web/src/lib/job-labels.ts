@@ -12,6 +12,7 @@ const JOB_TYPE_LABELS: Record<string, string> = {
   seo_gsc_sync: 'Đồng bộ Google Search Console',
   seo_ga4_sync: 'Đồng bộ Google Analytics 4',
   seo_aeo_scan: 'Quét AEO / SEO',
+  seo_clickhouse_export: 'Export SEO → ClickHouse',
   seo_freshness_scan: 'Quét độ mới nội dung SEO',
   seo_report_schedules: 'Lịch báo cáo SEO',
   email_campaign_prepare: 'Chuẩn bị chiến dịch email',

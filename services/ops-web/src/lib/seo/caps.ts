@@ -6,6 +6,8 @@ import {
   seoClientWorkspaceEnabled,
   seoContentEnabled,
   seoExperimentsEnabled,
+  seoBiEnabled,
+  seoCmsEnabled,
   seoFreshnessEnabled,
   seoGovernanceEnabled,
   seoHubEnabled,
@@ -136,4 +138,14 @@ export function canViewSeoFreshness(user: StoredStaffUser | null): boolean {
 export function canViewSeoExperiments(user: StoredStaffUser | null): boolean {
   if (!user || !seoExperimentsEnabled()) return false;
   return canViewSeoHub(user);
+}
+
+export function canViewSeoBi(user: StoredStaffUser | null): boolean {
+  if (!user || !seoBiEnabled()) return false;
+  return canConfigureSeoSettings(user) || canViewSeoReports(user);
+}
+
+export function canViewSeoCms(user: StoredStaffUser | null): boolean {
+  if (!user || !seoCmsEnabled()) return false;
+  return canConfigureSeoSettings(user) || canWriteSeoTechnical(user);
 }

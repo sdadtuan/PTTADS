@@ -51,3 +51,13 @@ export interface SeoCwvCaptureResult {
   skipped?: boolean;
   reason?: string;
 }
+
+export interface SeoCrawlScheduleRow {
+  customer_id: number;
+  frequency_days: number;
+  webhook_secret: string;
+  last_ingest_at: string | null;
+  active: boolean;
+  updated_at: string | null;
+  ingest_url?: string;
+}

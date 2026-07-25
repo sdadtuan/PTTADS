@@ -248,6 +248,22 @@ export class JobQueueRepository implements OnModuleDestroy {
     });
   }
 
+  /** SEO daily facts → ClickHouse (Gate D / Phase 6). */
+  async enqueueSeoClickhouseExportJob(input: {
+    payload: Record<string, unknown>;
+    idempotencyKey: string;
+  }): Promise<EnqueuedJob | null> {
+    if (!this.config.jobsEnabled) {
+      return null;
+    }
+    return this.enqueueJobRecord({
+      jobType: 'seo_clickhouse_export',
+      payload: input.payload,
+      idempotencyKey: input.idempotencyKey,
+      clientId: null,
+    });
+  }
+
   async cancelPendingJobsForClient(clientId: string): Promise<number> {
     if (!this.config.jobsEnabled) {
       return 0;

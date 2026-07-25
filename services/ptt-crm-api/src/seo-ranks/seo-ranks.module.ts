@@ -10,6 +10,6 @@ import { SeoRanksService } from './seo-ranks.service';
   imports: [ConfigModule, StaffAuthModule],
   controllers: [SeoRanksController],
   providers: [SeoRanksRepository, SeoRanksService, StaffSeoViewGuard, StaffSeoWriteGuard],
-  exports: [SeoRanksService],
+  exports: [SeoRanksService, SeoRanksRepository],
 })
 export class SeoRanksModule {}

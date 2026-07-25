@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 import { SeoTechnicalRepository } from './seo-technical.repository';
 import {
+  SeoCrawlScheduleRow,
   SeoCwvCaptureResult,
   SeoCwvSnapshotRow,
   SeoCwvSummary,
@@ -41,5 +43,31 @@ export class SeoTechnicalService {
 
   captureCwv(customerId: number): Promise<SeoCwvCaptureResult> {
     return this.repo.captureCwv(customerId);
+  }
+
+  getCrawlSchedule(customerId: number): Promise<{ ok: boolean; schedule: SeoCrawlScheduleRow | null }> {
+    return this.repo.getCrawlSchedule(customerId).then((schedule) => ({ ok: true, schedule }));
+  }
+
+  upsertCrawlSchedule(
+    customerId: number,
+    body: Record<string, unknown>,
+  ): Promise<{ ok: boolean; schedule: SeoCrawlScheduleRow }> {
+    return this.repo.upsertCrawlSchedule(customerId, body).then((schedule) => ({ ok: true, schedule }));
+  }
+
+  verifyCrawlSecret(customerId: number, secret: string): Promise<boolean> {
+    return this.repo.verifyCrawlSecret(customerId, secret);
+  }
+
+  ingestCrawlPayload(
+    customerId: number,
+    payload: { csv?: string; rows?: Array<Record<string, unknown>> },
+  ): Promise<{ ok: boolean; rows_imported: number; customer_id: number }> {
+    return this.repo.ingestCrawlPayload(customerId, payload);
+  }
+
+  generateCrawlSecret(): string {
+    return randomBytes(18).toString('base64url');
   }
 }

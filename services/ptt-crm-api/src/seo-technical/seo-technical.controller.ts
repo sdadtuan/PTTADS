@@ -6,6 +6,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -69,5 +70,16 @@ export class SeoTechnicalController {
   async captureCwv(@Param('id', ParseIntPipe) id: number) {
     const result = await this.technical.captureCwv(id);
     return { ok: true, ...result };
+  }
+
+  @Get('clients/:id/crawl-schedule')
+  crawlSchedule(@Param('id', ParseIntPipe) id: number) {
+    return this.technical.getCrawlSchedule(id);
+  }
+
+  @Put('clients/:id/crawl-schedule')
+  @UseGuards(StaffSeoTechnicalGuard)
+  upsertCrawlSchedule(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>) {
+    return this.technical.upsertCrawlSchedule(id, body);
   }
 }

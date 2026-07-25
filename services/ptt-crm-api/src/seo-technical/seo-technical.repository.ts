@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
 import { AppConfigService } from '../config/app-config.service';
 import { effectivePageSpeed } from './seo-cwv.util';
@@ -300,5 +301,98 @@ export class SeoTechnicalRepository implements OnModuleDestroy {
       }
     }
     return { customer_id: customerId, captured: snapshots.length, snapshots, errors };
+  }
+
+  async getCrawlSchedule(customerId: number): Promise<import('./seo-technical.types').SeoCrawlScheduleRow | null> {
+    const result = await this.db.query(
+      `SELECT * FROM ${SCHEMA}.seo_crawl_schedules WHERE customer_id = $1`,
+      [customerId],
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      customer_id: Number(row.customer_id),
+      frequency_days: Number(row.frequency_days ?? 30),
+      webhook_secret: String(row.webhook_secret ?? ''),
+      last_ingest_at: row.last_ingest_at != null ? String(row.last_ingest_at) : null,
+      active: Boolean(row.active),
+      updated_at: row.updated_at != null ? String(row.updated_at) : null,
+      ingest_url: `/api/v1/seo/internal/crawl-ingest/${customerId}`,
+    };
+  }
+
+  async upsertCrawlSchedule(
+    customerId: number,
+    payload: Record<string, unknown>,
+  ): Promise<import('./seo-technical.types').SeoCrawlScheduleRow> {
+    const existing = await this.getCrawlSchedule(customerId);
+    let secret = String(payload.webhook_secret ?? '').trim();
+    if (!secret && existing) secret = existing.webhook_secret;
+    if (!secret) secret = randomBytes(18).toString('base64url');
+    const freq = Math.max(7, Number.parseInt(String(payload.frequency_days ?? 30), 10) || 30);
+    const active = payload.active !== false;
+    await this.db.query(
+      `INSERT INTO ${SCHEMA}.seo_crawl_schedules
+         (customer_id, frequency_days, webhook_secret, last_ingest_at, active, updated_at)
+       VALUES ($1,$2,$3,$4,$5,NOW())
+       ON CONFLICT (customer_id) DO UPDATE SET
+         frequency_days = EXCLUDED.frequency_days,
+         webhook_secret = EXCLUDED.webhook_secret,
+         active = EXCLUDED.active,
+         updated_at = NOW()`,
+      [customerId, freq, secret, existing?.last_ingest_at ?? null, active],
+    );
+    const schedule = await this.getCrawlSchedule(customerId);
+    if (!schedule) throw new Error('crawl_schedule_upsert_failed');
+    return schedule;
+  }
+
+  async verifyCrawlSecret(customerId: number, secret: string): Promise<boolean> {
+    const schedule = await this.getCrawlSchedule(customerId);
+    if (!schedule?.active) return false;
+    const expected = schedule.webhook_secret.trim();
+    if (!expected || !secret.trim()) return false;
+    const a = Buffer.from(secret.trim());
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    const { timingSafeEqual } = await import('node:crypto');
+    return timingSafeEqual(a, b);
+  }
+
+  async recordCrawlImport(customerId: number, rowsImported: number): Promise<void> {
+    await this.db.query(
+      `INSERT INTO ${SCHEMA}.seo_crawl_import_log (customer_id, rows_imported, imported_at)
+       VALUES ($1, $2, NOW())`,
+      [customerId, Math.max(0, rowsImported)],
+    );
+    await this.db.query(
+      `UPDATE ${SCHEMA}.seo_crawl_schedules SET last_ingest_at = NOW(), updated_at = NOW()
+       WHERE customer_id = $1`,
+      [customerId],
+    );
+  }
+
+  async ingestCrawlPayload(
+    customerId: number,
+    payload: { csv?: string; rows?: Array<Record<string, unknown>> },
+  ): Promise<{ ok: boolean; rows_imported: number; customer_id: number }> {
+    let count = 0;
+    if (payload.csv) {
+      count = await this.importCrawlCsv(customerId, payload.csv);
+    } else if (payload.rows?.length) {
+      const lines = ['url,issue_type,severity,description'];
+      for (const row of payload.rows) {
+        const url = String(row.url ?? '').replace(/,/g, '%2C');
+        const issueType = String(row.issue_type ?? row.type ?? 'crawl').replace(/,/g, '%2C');
+        const severity = String(row.severity ?? 'medium');
+        const description = String(row.description ?? row.message ?? '').replace(/,/g, '%2C');
+        lines.push(`${url},${issueType},${severity},${description}`);
+      }
+      count = await this.importCrawlCsv(customerId, lines.join('\n'));
+    } else {
+      throw new Error('Thiếu csv hoặc rows');
+    }
+    await this.recordCrawlImport(customerId, count);
+    return { ok: true, rows_imported: count, customer_id: customerId };
   }
 }

@@ -4001,6 +4001,101 @@ export async function createSeoExperiment(
   });
 }
 
+export async function fetchSeoBiStatus(
+  token: string,
+): Promise<{ ok: boolean; clickhouse_configured: boolean; bi_export_enabled: boolean; cwv_stub: boolean; serp_provider: string; grafana_dashboard: string; gate_d_flags: Record<string, unknown>; gate_e_flags: Record<string, unknown> }> {
+  return agencyFetch(token, '/api/v1/seo/bi/status');
+}
+
+export async function fetchSeoBiDashboard(
+  token: string,
+  customerId?: number,
+  days = 28,
+): Promise<{ type: string; gsc_series: Array<Record<string, unknown>>; totals: Record<string, number> }> {
+  const params = new URLSearchParams({ days: String(days) });
+  if (customerId != null) params.set('customer_id', String(customerId));
+  return agencyFetch(token, `/api/v1/seo/bi/dashboard?${params}`);
+}
+
+export async function fetchSeoBiParity(
+  token: string,
+  days = 7,
+): Promise<{ ok: boolean; metrics: string[]; sample_facts: Array<Record<string, unknown>>; totals_by_metric: Record<string, number> }> {
+  return agencyFetch(token, `/api/v1/seo/bi/parity?days=${days}`);
+}
+
+export async function exportSeoClickhouse(
+  token: string,
+  factDate?: string,
+): Promise<{ ok: boolean; job_id?: string; mode: string; error?: string }> {
+  const qs = factDate ? `?fact_date=${encodeURIComponent(factDate)}` : '';
+  return agencyMutate(token, `/api/v1/seo/bi/export-clickhouse${qs}`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function fetchSeoAttribution(
+  token: string,
+  customerId: number,
+  days = 28,
+): Promise<{ ok: boolean; summary: Record<string, unknown>; top_landing_pages: Array<Record<string, unknown>> }> {
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/attribution?days=${days}`);
+}
+
+export async function fetchSeoCrawlSchedule(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; schedule: Record<string, unknown> | null }> {
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/crawl-schedule`);
+}
+
+export async function upsertSeoCrawlSchedule(
+  token: string,
+  customerId: number,
+  body: Record<string, unknown>,
+): Promise<{ ok: boolean; schedule: Record<string, unknown> }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/crawl-schedule`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchSeoCmsTarget(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; target: Record<string, unknown> | null }> {
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/cms-target`);
+}
+
+export async function upsertSeoCmsTarget(
+  token: string,
+  customerId: number,
+  body: Record<string, unknown>,
+): Promise<{ ok: boolean; target: Record<string, unknown> }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/cms-target`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchSeoCmsJobs(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; jobs: Array<Record<string, unknown>> }> {
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/cms-jobs`);
+}
+
+export async function testSeoCmsWebhook(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; status: string; remote_url?: string; response?: Record<string, unknown> }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/cms/test`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
 export async function fetchSeoAlerts(
   token: string,
   status = 'open',

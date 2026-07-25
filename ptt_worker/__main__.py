@@ -144,6 +144,10 @@ def run_worker(*, poll_interval: float = 1.0, once: bool = False) -> int:
                 from ptt_jobs.handlers.seo_report_schedule import run_seo_report_schedules_job
 
                 run_seo_report_schedules_job(job)
+            elif job_type == "seo_clickhouse_export":
+                from ptt_jobs.handlers.seo_clickhouse_export import run_seo_clickhouse_export_job
+
+                run_seo_clickhouse_export_job(job)
             elif job_type == "email_campaign_prepare":
                 from ptt_jobs.handlers.email_campaign_prepare import run_email_campaign_prepare_job
 

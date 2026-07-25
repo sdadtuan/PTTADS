@@ -17,7 +17,11 @@ describe('SeoContentService', () => {
     assertPublishAllowed: jest.fn().mockResolvedValue(undefined),
   } as unknown as import('../seo-governance/seo-governance.service').SeoGovernanceService;
 
-  const service = new SeoContentService(repo, governance);
+  const cms = {
+    maybeAutoPublish: jest.fn().mockResolvedValue(null),
+  } as unknown as import('../seo-cms/seo-cms.service').SeoCmsService;
+
+  const service = new SeoContentService(repo, governance, cms);
 
   beforeEach(() => {
     jest.resetAllMocks();

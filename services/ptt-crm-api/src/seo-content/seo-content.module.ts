@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '../config/config.module';
 import { SeoGovernanceModule } from '../seo-governance/seo-governance.module';
+import { SeoCmsModule } from '../seo-cms/seo-cms.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import {
   StaffSeoApproveGuard,
@@ -13,7 +14,7 @@ import { SeoContentRepository } from './seo-content.repository';
 import { SeoContentService } from './seo-content.service';
 
 @Module({
-  imports: [ConfigModule, StaffAuthModule, SeoGovernanceModule],
+  imports: [ConfigModule, StaffAuthModule, SeoGovernanceModule, SeoCmsModule],
   controllers: [SeoContentController],
   providers: [
     SeoContentRepository,

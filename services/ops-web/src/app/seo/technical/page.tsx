@@ -7,10 +7,12 @@ import { OpsNav } from '@/components/OpsNav';
 import {
   captureSeoCwv,
   fetchSeoClients,
+  fetchSeoCrawlSchedule,
   fetchSeoCwv,
   fetchSeoTechnicalIssues,
   importSeoTechnicalCsv,
   patchSeoTechnicalIssue,
+  upsertSeoCrawlSchedule,
   staffMe,
   staffRefresh,
   type SeoHubClientRow,
@@ -61,6 +63,8 @@ function SeoTechnicalContent() {
   const [statusFilter, setStatusFilter] = useState('');
   const [cwvSummary, setCwvSummary] = useState<Record<string, unknown>>({});
   const [cwvSnapshots, setCwvSnapshots] = useState<Array<Record<string, unknown>>>([]);
+  const [crawlSchedule, setCrawlSchedule] = useState<Record<string, unknown> | null>(null);
+  const [crawlFreq, setCrawlFreq] = useState('30');
   const [loading, setLoading] = useState(true);
   const [cwvBusy, setCwvBusy] = useState(false);
   const [error, setError] = useState('');
@@ -105,17 +109,20 @@ function SeoTechnicalContent() {
       setLoading(true);
       setError('');
       try {
-        const [issuesOut, cwvOut] = await Promise.all([
+        const [issuesOut, cwvOut, crawlOut] = await Promise.all([
           fetchSeoTechnicalIssues(access, cid, {
             severity: severityFilter || undefined,
             status: statusFilter || undefined,
           }),
           fetchSeoCwv(access, cid),
+          fetchSeoCrawlSchedule(access, cid),
         ]);
         setIssues(issuesOut.issues);
         setSeverityMatrix(issuesOut.severity_matrix ?? {});
         setCwvSummary(cwvOut.summary ?? {});
         setCwvSnapshots(cwvOut.snapshots ?? []);
+        setCrawlSchedule(crawlOut.schedule);
+        setCrawlFreq(String(crawlOut.schedule?.frequency_days ?? 30));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Không tải được technical console');
       } finally {
@@ -355,6 +362,76 @@ function SeoTechnicalContent() {
                     </tbody>
                   </table>
                 </div>
+              )}
+            </div>
+
+            <div className="card" style={{ marginBottom: '1rem' }}>
+              <h2 style={{ margin: '0 0 0.75rem', fontSize: '1.1rem' }}>Crawl connector (Gate E2)</h2>
+              {crawlSchedule ? (
+                <>
+                  <p className="muted" style={{ marginTop: 0 }}>
+                    Webhook: <code>{String(crawlSchedule.ingest_url ?? '')}</code>
+                    {' · '}Secret: <code>{String(crawlSchedule.webhook_secret ?? '').slice(0, 8)}…</code>
+                    {' · '}Last ingest: {String(crawlSchedule.last_ingest_at ?? '—')}
+                  </p>
+                  {canWrite && (
+                    <div className="form-row" style={{ alignItems: 'end', gap: '0.75rem' }}>
+                      <label>
+                        Frequency (days)
+                        <input
+                          type="number"
+                          min={7}
+                          value={crawlFreq}
+                          onChange={(e) => setCrawlFreq(e.target.value)}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => {
+                          const access = getAccessToken();
+                          const cid = Number.parseInt(customerId, 10);
+                          if (!access || Number.isNaN(cid)) return;
+                          void upsertSeoCrawlSchedule(access, cid, {
+                            frequency_days: Number.parseInt(crawlFreq, 10) || 30,
+                            active: true,
+                          }).then(async () => {
+                            setToast('Đã lưu crawl schedule');
+                            await loadData(access, cid);
+                          });
+                        }}
+                      >
+                        Lưu schedule
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="muted">
+                  Chưa cấu hình crawl webhook.
+                  {canWrite && customerId ? (
+                    <>
+                      {' '}
+                      <button
+                        type="button"
+                        className="btn btn-sm"
+                        onClick={() => {
+                          const access = getAccessToken();
+                          const cid = Number.parseInt(customerId, 10);
+                          if (!access || Number.isNaN(cid)) return;
+                          void upsertSeoCrawlSchedule(access, cid, { frequency_days: 30, active: true }).then(
+                            async () => {
+                              setToast('Đã tạo crawl schedule');
+                              await loadData(access, cid);
+                            },
+                          );
+                        }}
+                      >
+                        Tạo schedule
+                      </button>
+                    </>
+                  ) : null}
+                </p>
               )}
             </div>
 

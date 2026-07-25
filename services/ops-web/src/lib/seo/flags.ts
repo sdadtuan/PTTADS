@@ -67,3 +67,13 @@ export function seoExperimentsEnabled(): boolean {
   const raw = process.env.NEXT_PUBLIC_PTT_SEO_EXPERIMENTS_ENABLED ?? '0';
   return raw.trim().toLowerCase() !== '0' && raw.trim().toLowerCase() !== 'false';
 }
+
+export function seoBiEnabled(): boolean {
+  const raw = process.env.NEXT_PUBLIC_PTT_SEO_BI_ENABLED ?? '1';
+  return raw.trim().toLowerCase() !== '0';
+}
+
+export function seoCmsEnabled(): boolean {
+  const raw = process.env.NEXT_PUBLIC_PTT_SEO_CMS_ENABLED ?? '1';
+  return raw.trim().toLowerCase() !== '0';
+}

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { SeoCmsService } from '../seo-cms/seo-cms.service';
 import { SeoGovernanceService } from '../seo-governance/seo-governance.service';
 import { SeoContentRepository } from './seo-content.repository';
 import {
@@ -18,6 +19,7 @@ export class SeoContentService {
   constructor(
     private readonly repo: SeoContentRepository,
     private readonly governance: SeoGovernanceService,
+    private readonly cms: SeoCmsService,
   ) {}
 
   researchConsole(customerId: number, tab?: string): Promise<SeoResearchConsoleResponse> {
@@ -135,7 +137,14 @@ export class SeoContentService {
     if (targetStatus === 'published') {
       await this.governance.assertPublishAllowed(contentId, 'publish');
     }
-    return this.repo.transitionStatus(contentId, targetStatus, actorId, notes);
+    const result = await this.repo.transitionStatus(contentId, targetStatus, actorId, notes);
+    if (targetStatus === 'published') {
+      const cmsPublish = await this.cms.maybeAutoPublish(contentId);
+      if (cmsPublish) {
+        return { ...result, cms_publish: cmsPublish };
+      }
+    }
+    return result;
   }
 
   async approveStage(params: {
