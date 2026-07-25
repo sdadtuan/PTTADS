@@ -1,7 +1,7 @@
 # Chi tiết hành động người dùng — Use Case PTTADS
 
 > **Phiên bản:** 1.1 · **Ngày:** 2026-07-25  
-> **Phase A–B:** ZALO 21/21 · SYS multi-channel · CRM 15/15 · SVC 12/12  
+> **Phase A–C:** ZALO 21/21 · CRM 15/15 · SVC 12/12 · META 14/14 · SEO 14/14 · EM 14/14 · PLAT 10/10  
 > **Index UC:** [`../README.md`](../README.md) · **Gap analysis:** [`../ACTION-GAP-ANALYSIS.md`](../ACTION-GAP-ANALYSIS.md)
 
 ---

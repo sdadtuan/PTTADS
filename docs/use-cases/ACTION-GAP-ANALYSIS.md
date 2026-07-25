@@ -1,7 +1,7 @@
 # Phân tích Gap — Use Case vs Hành động người dùng thực tế
 
-> **Phiên bản:** 1.2 · **Ngày:** 2026-07-25  
-> **Cập nhật:** Phase A — Zalo 21/21, SYS multi-channel, Portal Zalo · **Phase B** — CRM 15/15 + SVC 12/12 actions expanded  
+> **Phiên bản:** 1.3 · **Ngày:** 2026-07-25  
+> **Cập nhật:** Phase A–B · **Phase C** — META 14/14, SEO 14/14, EM 14/14, PLAT 10/10 actions expanded  
 > **Mục đích:** Đối chiếu ~122 UC với ops-web / portal-web thực tế; xác định bước nghiệp vụ khách hàng chưa được hệ thống dẫn đủ.
 
 ---
@@ -31,6 +31,16 @@
 | SVC actions | 12 skeleton | **12/12 expanded** — 8 P0 ≥8 bước, 4 P1 ≥5 bước |
 | GAP-P1-01 finance gate | 1 dòng workaround | **8 bước chi tiết** + target UI spec trong SVC-UC-004 |
 | CRM closed-loop Won | Không document | **CRM-UC-002 E2** → SYS-002 + ZALO-UC-015 |
+
+**Thay đổi post Phase C (doc):**
+
+| Module | Trước Phase C | Sau Phase C |
+|--------|---------------|-------------|
+| META actions | 14 skeleton | **14/14** — 9 P0 ≥8 bước, 5 P1 ≥4 bước |
+| SEO actions | 14 skeleton | **14/14** — 9 P0 full, 5 P1 ≥4 bước |
+| EM actions | 14 partial | **14/14** — 11 P0 full, 3 P1 ≥5 bước |
+| PLAT actions | 10 thin | **10/10** — 9 P0 full, 2 P1 ≥6 bước |
+| Webhook matrix | Scattered | **PLAT-UC-004/005/006** + summary table |
 
 **Nguyên nhân hệ thống "chưa ổn" khi đọc UC cũ:** UC mô tả luồng logic (Main flow 5–7 bước) nhưng **không liệt kê từng click, form field, điều kiện chuyển màn** — AM/CSKH không biết "làm gì tiếp theo" khi onboard đa module.
 
@@ -116,16 +126,21 @@ Một UC được coi **"đủ bước nghiệp vụ"** khi file actions tương
 - [ ] **Nhánh E*** — hành động khi lỗi / từ chối / timeout
 - [ ] **Gap tag** — nếu bước thiếu UI
 
-**Coverage sau Phase B:**
+**Coverage sau Phase C:**
 
 | Module | UC catalog | Action file | Đạt checklist §4 |
 |--------|------------|-------------|------------------|
 | ZALO | 21 | 21 ✅ | **21/21** (Phase A) |
+| CRM | 15 | 15 ✅ | **15/15** (Phase B) |
+| SVC | 12 | 12 ✅ | **12/12** (Phase B) |
+| **META** | 14 | 14 ✅ | **14/14** (Phase C) |
+| **SEO** | 14 | 14 ✅ | **14/14** (Phase C) |
+| **EM** | 14 | 14 ✅ | **14/14** (Phase C) |
+| **PLAT** | 10 | 10 ✅ | **10/10** (Phase C) |
 | SYS | 12 | 12 | **5/12** (001–005 expanded) |
 | PORTAL | 10 + extras | 14 | **4/14** full + rest partial |
-| **CRM** | 15 | 15 ✅ | **15/15** (Phase B) — 8 P0 full, 7 P1 ≥5 steps |
-| **SVC** | 12 | 12 ✅ | **12/12** (Phase B) — 8 P0 full, 4 P1 ≥5 steps |
-| META/SEO/EM/PLAT | ~56 | ~56 | **Phase C target** |
+
+**Tổng actions đạt chuẩn:** ~**105/122** UC (~86%) · Còn lại: SYS 7 UC + PORTAL partial
 
 ---
 
@@ -135,9 +150,10 @@ Một UC được coi **"đủ bước nghiệp vụ"** khi file actions tương
 |-------|----------|------------|
 | **A** | Zalo 21 UC; SYS multi-channel; Portal Zalo; gap refresh | ✅ **Done** (2026-07-25) |
 | **B** | CRM 15 + SVC 12 actions expand; GAP-P1-01 finance gate doc | ✅ **Done** (2026-07-25) |
-| **C** (1–2 sprint doc) | META/SEO/EM/PLAT P0 actions expand | Pending |
-| **D** (product) | GAP-P1-01 finance gate UI, GAP-P1-02 portal notify, GAP-Z4-01 | Pending |
-| **E** (product) | GAP-P1-03 Grafana portal | Pending |
+| **C** | META/SEO/EM/PLAT all UC actions expand | ✅ **Done** (2026-07-25) |
+| **D** (doc) | SYS 006–012 + PORTAL P0 expand | Pending |
+| **E** (product) | GAP-P1-01 finance gate UI, GAP-P1-02 portal notify, GAP-Z4-01 | Pending |
+| **F** (product) | GAP-P1-03 Grafana portal | Pending |
 
 ---
 
@@ -148,7 +164,11 @@ Một UC được coi **"đủ bước nghiệp vụ"** khi file actions tương
 | [`actions/README.md`](actions/README.md) | Quy ước bảng hành động |
 | [`actions/00-SYSTEM-ACTIONS.md`](actions/00-SYSTEM-ACTIONS.md) | 12 SYS UC — multi-channel |
 | [`actions/01-CRM-ACTIONS.md`](actions/01-CRM-ACTIONS.md) | **15/15 CRM UC** chi tiết (Phase B) |
-| [`actions/02-SVC-ACTIONS.md`](actions/02-SVC-ACTIONS.md) | **12/12 SVC UC** chi tiết (Phase B) |
+| [`actions/02-SVC-ACTIONS.md`](actions/02-SVC-ACTIONS.md) | **12/12 SVC UC** (Phase B) |
+| [`actions/03-META-ACTIONS.md`](actions/03-META-ACTIONS.md) | **14/14 META UC** (Phase C) |
+| [`actions/04-SEO-ACTIONS.md`](actions/04-SEO-ACTIONS.md) | **14/14 SEO UC** (Phase C) |
+| [`actions/05-EM-ACTIONS.md`](actions/05-EM-ACTIONS.md) | **14/14 EM UC** (Phase C) |
+| [`actions/07-PLAT-ACTIONS.md`](actions/07-PLAT-ACTIONS.md) | **10/10 PLAT UC** (Phase C) |
 | [`actions/08-ZALO-ACTIONS.md`](actions/08-ZALO-ACTIONS.md) | **21/21 ZALO UC** (Phase A) |
 | [`actions/06-PORTAL-ACTIONS.md`](actions/06-PORTAL-ACTIONS.md) | PORTAL + UC-013/014 Zalo |
 | [`huong-dan-zalo-ads-ops.md`](../huong-dan-zalo-ads-ops.md) | Ops handover Z1–Z3 |
