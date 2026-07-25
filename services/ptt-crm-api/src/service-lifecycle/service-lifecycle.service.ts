@@ -1,10 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { AppConfigService } from '../config/app-config.service';
+import { StaffAuthService } from '../staff-auth/staff-auth.service';
 import { SopSqliteRepository } from '../sop/sop-sqlite.repository';
 import { SvcFinanceService } from '../svc-finance/svc-finance.service';
 import { LifecycleConsultService } from './lifecycle-consult.service';
+import { LifecycleFinanceConfirmRepository } from './lifecycle-finance-confirm.repository';
 import { LifecycleLaunchQaService } from './lifecycle-launch-qa.service';
 import { LifecycleOnboardingService } from './lifecycle-onboarding.service';
+import { validateOnboardDeliverGate } from './lifecycle-onboard-gate.util';
 import {
   buildOfficialPlanPayload,
   mergeStrategyFramework,
@@ -34,6 +37,8 @@ export class ServiceLifecycleService {
     private readonly config: AppConfigService,
     private readonly lifecycleLaunchQa: LifecycleLaunchQaService,
     private readonly lifecycleOnboarding: LifecycleOnboardingService,
+    private readonly financeConfirmRepo: LifecycleFinanceConfirmRepository,
+    private readonly staffAuth: StaffAuthService,
   ) {}
 
   list(serviceSlug?: string, amId?: string, includeDraft?: string) {
@@ -71,7 +76,11 @@ export class ServiceLifecycleService {
     return this.sqlite.createDraft(body);
   }
 
-  async patch(id: number, body: PatchServiceLifecycleBody) {
+  async patch(
+    id: number,
+    body: PatchServiceLifecycleBody,
+    actor?: { staffId?: number; email?: string; positionId?: number },
+  ) {
     const existing = this.sqlite.getLifecycleById(id);
     if (!existing) {
       throw new NotFoundException({ error: 'Không tìm thấy lifecycle' });
@@ -82,13 +91,24 @@ export class ServiceLifecycleService {
       if (!isValidStage(toStage)) {
         throw new BadRequestException({ error: `Stage không hợp lệ: ${toStage}` });
       }
+      const financeConfirm = Boolean(body.finance_confirm);
+      if (financeConfirm) {
+        const gate = await this.paymentGate(id, existing.stage, toStage, true, actor?.positionId);
+        if (this.config.financeGateStrict && gate && !gate.can_confirm) {
+          throw new BadRequestException({
+            error: 'finance_role_required',
+            message: 'Strict mode — chỉ Finance mới được xác nhận công nợ',
+          });
+        }
+      }
       try {
         validateStageAdvance({
           fromStage: existing.stage,
           toStage,
           currentStageComplete: this.tasks.isStageComplete(id, existing.stage),
           tmmtGate: this.tmmtGate(id, existing.stage, toStage),
-          paymentGate: this.paymentGate(id, existing.stage, toStage, Boolean(body.finance_confirm)),
+          onboardGate: await this.onboardGate(id, existing.stage, toStage),
+          paymentGate: await this.paymentGate(id, existing.stage, toStage, financeConfirm, actor?.positionId),
           launchQaGate: await this.launchQaGate(id, existing.stage, toStage, Boolean(body.launch_qa_confirm)),
         });
       } catch (err) {
@@ -102,6 +122,23 @@ export class ServiceLifecycleService {
           ? body.notes.trim().slice(0, 2000)
           : existing.notes;
       const advanced = this.sqlite.advanceStage(id, toStage, notes);
+      if (existing.stage === 'handover' && toStage === 'retain' && financeConfirm && advanced) {
+        const summary = this.svcFinance.summary(id) as {
+          outstanding_vnd?: number;
+          ar_pending_vnd?: number;
+          ar_overdue_vnd?: number;
+        };
+        this.financeConfirmRepo.insertConfirm({
+          lifecycleId: id,
+          staffId: actor?.staffId ?? null,
+          staffEmail: actor?.email ?? 'staff',
+          outstandingVnd: Number(summary.outstanding_vnd ?? 0),
+          arPendingVnd: Number(summary.ar_pending_vnd ?? 0),
+          arOverdueVnd: Number(summary.ar_overdue_vnd ?? 0),
+          strictMode: this.config.financeGateStrict,
+          note: body.notes != null ? String(body.notes).slice(0, 500) : null,
+        });
+      }
       if (toStage === 'consult' && advanced) {
         try {
           this.consult.prefillConsultTask(id, { overwrite: false });
@@ -133,7 +170,7 @@ export class ServiceLifecycleService {
     return updated;
   }
 
-  async advanceInfo(id: number) {
+  async advanceInfo(id: number, actorPositionId?: number) {
     const lc = this.requireLifecycle(id);
     const prog = this.tasks.getProgress(id)[lc.stage] ?? { done: 0, total: 0 };
     const complete = this.tasks.isStageComplete(id, lc.stage);
@@ -141,9 +178,11 @@ export class ServiceLifecycleService {
       lc.stage === 'onboard'
         ? validateOfficialTmmt(this.sqlite.getOfficialMarketingPlan(id))
         : undefined;
+    const onboardGate =
+      lc.stage === 'onboard' ? await this.onboardGate(id, lc.stage, 'deliver') : undefined;
     const paymentGate =
       lc.stage === 'handover'
-        ? paymentGateFromSummary(this.svcFinance.summary(id) as { outstanding_vnd?: number })
+        ? await this.paymentGate(id, lc.stage, 'retain', false, actorPositionId)
         : undefined;
     let launchQaGate: LaunchQaHandoverGateResult | undefined;
     if (lc.stage === 'deliver') {
@@ -159,9 +198,61 @@ export class ServiceLifecycleService {
       currentDone: prog.done,
       currentTotal: prog.total,
       tmmtGate,
+      onboardGate: onboardGate
+        ? {
+            ok: onboardGate.ok,
+            messages: onboardGate.messages,
+            orchestrator_percent: onboardGate.orchestrator_percent,
+            checklist_percent: onboardGate.checklist_percent,
+          }
+        : undefined,
       paymentGate,
       launchQaGate,
     });
+  }
+
+  listFinanceConfirms(id: number) {
+    this.requireLifecycle(id);
+    return { rows: this.financeConfirmRepo.listForLifecycle(id) };
+  }
+
+  async autoAdvanceOnboardIfEligible(clientId: string): Promise<{
+    advanced: boolean;
+    lifecycle_id: number | null;
+    reason: string;
+  }> {
+    if (!this.config.onboardAutoAdvanceLifecycle) {
+      return { advanced: false, lifecycle_id: null, reason: 'auto_advance_disabled' };
+    }
+    const ctx = this.sqlite.findOnboardLifecycleByAgencyClientId(clientId);
+    if (!ctx) {
+      return { advanced: false, lifecycle_id: null, reason: 'no_onboard_lifecycle' };
+    }
+    const lifecycleId = ctx.lifecycle_id;
+    if (!this.tasks.isStageComplete(lifecycleId, 'onboard')) {
+      return { advanced: false, lifecycle_id: lifecycleId, reason: 'onboard_tasks_incomplete' };
+    }
+    const onboardGate = await this.onboardGate(lifecycleId, 'onboard', 'deliver');
+    if (!onboardGate?.ok) {
+      return { advanced: false, lifecycle_id: lifecycleId, reason: 'onboard_gate_blocked' };
+    }
+    const tmmtGate = validateOfficialTmmt(this.sqlite.getOfficialMarketingPlan(lifecycleId));
+    if (!tmmtGate.ok) {
+      return { advanced: false, lifecycle_id: lifecycleId, reason: 'tmmt_incomplete' };
+    }
+    const advanced = this.sqlite.advanceStage(lifecycleId, 'deliver', 'Auto-advance orchestrator 100%');
+    if (advanced) {
+      try {
+        await this.lifecycleLaunchQa.maybeAutoStartOnDeliver(lifecycleId);
+      } catch {
+        /* best-effort */
+      }
+    }
+    return {
+      advanced: Boolean(advanced),
+      lifecycle_id: lifecycleId,
+      reason: advanced ? 'advanced_to_deliver' : 'advance_failed',
+    };
   }
 
   listTasks(id: number) {
@@ -378,17 +469,44 @@ export class ServiceLifecycleService {
     return undefined;
   }
 
-  private paymentGate(
+  private async paymentGate(
     lifecycleId: number,
     fromStage: string,
     toStage: string,
     financeConfirm: boolean,
+    positionId?: number,
   ) {
     if (toStage !== 'retain' || fromStage !== 'handover') return undefined;
-    return paymentGateFromSummary(
-      this.svcFinance.summary(lifecycleId) as { outstanding_vnd?: number },
+    const summary = this.svcFinance.summary(lifecycleId) as {
+      outstanding_vnd?: number;
+      ar_pending_vnd?: number;
+      ar_overdue_vnd?: number;
+    };
+    let financeCap = false;
+    if (positionId) {
+      financeCap = await this.staffAuth.hasCapForPosition(
+        positionId,
+        'crm_business_dashboard',
+        'view',
+      );
+    }
+    return paymentGateFromSummary(summary, {
       financeConfirm,
-    );
+      strictMode: this.config.financeGateStrict,
+      hasFinanceCap: financeCap,
+    });
+  }
+
+  private async onboardGate(lifecycleId: number, fromStage: string, toStage: string) {
+    if (toStage !== 'deliver' || fromStage !== 'onboard') return undefined;
+    const brief = await this.lifecycleOnboarding.onboardingBrief(lifecycleId);
+    const orchestratorPercent = Number(brief.orchestrator?.progress.required_percent ?? brief.progress.percent ?? 0);
+    const checklistPercent = Number(brief.progress.percent ?? 0);
+    return validateOnboardDeliverGate({
+      orchestratorRequiredPercent: orchestratorPercent,
+      checklistPercent,
+      clientActive: brief.client_status === 'active',
+    });
   }
 
   private async launchQaGate(

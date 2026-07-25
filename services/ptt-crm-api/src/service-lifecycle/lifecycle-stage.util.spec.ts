@@ -43,6 +43,31 @@ describe('lifecycle-stage.util', () => {
     ).toThrow('TMMT chưa đủ');
   });
 
+  it('blocks onboard→deliver when onboard gate fails', () => {
+    expect(() =>
+      validateStageAdvance({
+        fromStage: 'onboard',
+        toStage: 'deliver',
+        currentStageComplete: true,
+        tmmtGate: { ok: true, messages: [] },
+        onboardGate: { ok: false, messages: ['Orchestrator 80%'] },
+      }),
+    ).toThrow(/Orchestrator/i);
+  });
+
+  it('advance info shows onboard gate on onboard', () => {
+    const info = getStageAdvanceInfo({
+      currentStage: 'onboard',
+      currentStageComplete: true,
+      currentDone: 3,
+      currentTotal: 3,
+      tmmtGate: { ok: true, messages: [] },
+      onboardGate: { ok: false, messages: ['Orchestrator 80%'], orchestrator_percent: 80, checklist_percent: 90 },
+    });
+    expect(info.can_advance_forward).toBe(false);
+    expect(info.onboard_gate?.orchestrator_percent).toBe(80);
+  });
+
   it('blocks handover→retain without finance confirm when outstanding', () => {
     expect(() =>
       validateStageAdvance({

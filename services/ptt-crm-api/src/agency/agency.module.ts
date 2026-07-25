@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { EventsModule } from '../events/events.module';
 import { LeadsContractModule } from '../leads-contract/leads-contract.module';
 import { PerformanceModule } from '../performance/performance.module';
+import { ServiceLifecycleModule } from '../service-lifecycle/service-lifecycle.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
 import { WorkflowsModule } from '../workflows/workflows.module';
@@ -27,7 +28,15 @@ import { StaffAgencyConfigureGuard } from './guards/staff-agency-configure.guard
 import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
 
 @Module({
-  imports: [StaffAuthModule, PerformanceModule, EventsModule, WebhooksModule, WorkflowsModule, LeadsContractModule],
+  imports: [
+    StaffAuthModule,
+    PerformanceModule,
+    EventsModule,
+    WebhooksModule,
+    WorkflowsModule,
+    LeadsContractModule,
+    forwardRef(() => ServiceLifecycleModule),
+  ],
   controllers: [ClientsController, AgencyOpsController],
   providers: [
     AgencyService,

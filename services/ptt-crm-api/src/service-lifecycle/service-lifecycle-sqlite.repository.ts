@@ -397,6 +397,27 @@ export class ServiceLifecycleSqliteRepository implements OnModuleDestroy {
     return out;
   }
 
+  /** Find active lifecycle in onboard stage for agency client (Prod-S5 auto-advance). */
+  findOnboardLifecycleByAgencyClientId(clientId: string): { lifecycle_id: number } | null {
+    try {
+      const row = this.database
+        .prepare(
+          `SELECT sl.id AS lifecycle_id
+           FROM crm_service_lifecycle sl
+           INNER JOIN crm_contracts ct ON ct.id = sl.contract_id
+           WHERE sl.status = 'active'
+             AND sl.stage = 'onboard'
+             AND TRIM(COALESCE(ct.agency_client_id, '')) = ?
+           ORDER BY sl.updated_at DESC
+           LIMIT 1`,
+        )
+        .get(clientId.trim()) as { lifecycle_id: number } | undefined;
+      return row ? { lifecycle_id: Number(row.lifecycle_id) } : null;
+    } catch {
+      return null;
+    }
+  }
+
   /** Reverse lookup for Launch QA board: agency_client_id + campaign.code → lifecycle_id */
   buildLaunchQaLifecycleIndex(): Map<string, number> {
     const index = new Map<string, number>();

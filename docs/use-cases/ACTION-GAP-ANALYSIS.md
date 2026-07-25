@@ -1,7 +1,7 @@
 # Phân tích Gap — Use Case vs Hành động người dùng thực tế
 
 > **Phiên bản:** 1.4 · **Ngày:** 2026-07-26  
-> **Cập nhật:** **Prod-S4** — CSKH SLA board + PROD-H hardening · Prod-S3 Zalo cutover · Prod-S2 report schedules · Prod-S1 portal notify  
+> **Cập nhật:** **Prod-S5** — onboard wizard + finance strict · Prod-S4 CSKH + PROD-H · Prod-S3 Zalo cutover  
 > **Mục đích:** Đối chiếu ~122 UC với ops-web / portal-web thực tế; xác định bước nghiệp vụ khách hàng chưa được hệ thống dẫn đủ.
 
 ---
@@ -66,7 +66,7 @@
 | Tạo tài khoản portal cho khách | PORTAL-001, SYS-001 bước 13 | ✅ Tab **Portal users** |
 | Reset mật khẩu portal | PORTAL-001 | ✅ `/forgot-password`, `/reset-password` |
 | Offboard → thu hồi hết quyền | SYS-006, **SVC-012** | ✅ **SVC-UC-012** 6 bước + Offboard client |
-| Finance chặn handover khi nợ | **SVC-004**, CRM-011 | ⚠️ **GAP-P1-01** — **8 bước workaround doc**; UI auto-block pending |
+| Finance chặn handover khi nợ | **SVC-004**, CRM-011 | ✅ **Prod-S5** strict + AR aging · warn mode default |
 | **Cảnh báo Zalo CPL/zero leads** | **ZALO-017** | ✅ Alerts Z3 + Slack + hub banner |
 | **Thông báo tiến độ campaign Zalo** | **ZALO-020** | ✅ **Prod-S1** — `/notifications` + emit creative/email/milestone |
 | Onboard email domain tự phục vụ | EM-001 | ✅ Wizard E-11 |

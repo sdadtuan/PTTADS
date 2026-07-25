@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ClientOnboardingWidget } from '@/components/ClientOnboardingWidget';
-import { ClientOnboardOrchestrator } from '@/components/ClientOnboardOrchestrator';
+import { ClientOnboardWizard } from '@/components/ClientOnboardWizard';
 import { ClientPortalUsersPanel } from '@/components/ClientPortalUsersPanel';
 import { OpsNav } from '@/components/OpsNav';
 import { AgencyReadOnlyBadge, canAgencyConfigure, canAgencyWrite } from '@/components/AgencyReadOnlyBadge';
@@ -950,13 +950,31 @@ export function AgencyClientDetailContent() {
 
             {tab === 'onboard' && orchestrator ? (
               <div style={{ marginTop: '1rem' }}>
-                <ClientOnboardOrchestrator
+                <ClientOnboardWizard
                   data={orchestrator}
                   canWrite={canMutate}
                   busy={busy}
                   clientActive={client.status === 'active'}
                   onSync={() => void handleSyncOrchestrator()}
                   onActivate={() => void handleActivate(false)}
+                  embed={{
+                    portal: accessToken ? (
+                      <ClientPortalUsersPanel
+                        token={accessToken}
+                        clientId={client.id}
+                        canMutate={canMutate}
+                      />
+                    ) : null,
+                    channels: (
+                      <p className="muted" style={{ margin: 0 }}>
+                        Thêm / sửa Meta · Zalo · Google ở tab{' '}
+                        <button type="button" className="nav-link" style={{ padding: 0 }} onClick={() => setTab('channels')}>
+                          Channels
+                        </button>{' '}
+                        — {(client.channel_accounts ?? []).length} account đã map.
+                      </p>
+                    ),
+                  }}
                 />
                 {onboarding ? (
                   <details style={{ marginTop: '1.25rem' }}>

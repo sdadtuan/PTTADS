@@ -93,7 +93,6 @@ export class CskhBoardRepository implements OnModuleDestroy {
       source: lead.source,
       channel: lead.channel,
       owner_id: lead.owner_id,
-      owner_name: null,
       received_at: lead.received_at,
       created_at: lead.created_at,
     };

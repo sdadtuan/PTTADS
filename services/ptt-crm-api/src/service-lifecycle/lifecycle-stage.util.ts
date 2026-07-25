@@ -18,10 +18,11 @@ export function validateStageAdvance(input: {
   toStage: string;
   currentStageComplete: boolean;
   tmmtGate?: { ok: boolean; messages?: string[] };
+  onboardGate?: { ok: boolean; messages?: string[] };
   paymentGate?: { ok: boolean; messages?: string[] };
   launchQaGate?: { ok: boolean; messages?: string[] };
 }): void {
-  const { fromStage, toStage, currentStageComplete, tmmtGate, paymentGate, launchQaGate } = input;
+  const { fromStage, toStage, currentStageComplete, tmmtGate, onboardGate, paymentGate, launchQaGate } = input;
   if (!(VALID_STAGES as readonly string[]).includes(toStage)) {
     throw new StageAdvanceError(`Stage không hợp lệ: ${toStage}`);
   }
@@ -40,6 +41,11 @@ export function validateStageAdvance(input: {
     );
   }
   if (toStage === 'deliver' && fromStage === 'onboard') {
+    if (onboardGate && !onboardGate.ok) {
+      throw new StageAdvanceError(
+        (onboardGate.messages ?? ['Onboard orchestrator chưa đủ'])[0] ?? 'Onboard orchestrator chưa đủ',
+      );
+    }
     if (!tmmtGate?.ok) {
       throw new StageAdvanceError((tmmtGate?.messages ?? ['TMMT chưa đủ'])[0] ?? 'TMMT chưa đủ');
     }
@@ -68,7 +74,18 @@ export function getStageAdvanceInfo(input: {
   currentDone: number;
   currentTotal: number;
   tmmtGate?: { ok: boolean; messages?: string[] };
-  paymentGate?: { ok: boolean; requires_confirm?: boolean; messages?: string[]; outstanding_vnd?: number };
+  onboardGate?: { ok: boolean; messages?: string[]; orchestrator_percent?: number; checklist_percent?: number };
+  paymentGate?: {
+    ok: boolean;
+    requires_confirm?: boolean;
+    requires_finance_role?: boolean;
+    strict_mode?: boolean;
+    can_confirm?: boolean;
+    messages?: string[];
+    outstanding_vnd?: number;
+    ar_pending_vnd?: number;
+    ar_overdue_vnd?: number;
+  };
   launchQaGate?: {
     ok: boolean;
     warn_only: true;
@@ -91,7 +108,18 @@ export function getStageAdvanceInfo(input: {
   payment_gate?: {
     ok: boolean;
     requires_confirm: boolean;
+    requires_finance_role: boolean;
+    strict_mode: boolean;
+    can_confirm: boolean;
     outstanding_vnd: number;
+    ar_pending_vnd: number;
+    ar_overdue_vnd: number;
+    messages: string[];
+  };
+  onboard_gate?: {
+    ok: boolean;
+    orchestrator_percent: number;
+    checklist_percent: number;
     messages: string[];
   };
   launch_qa_gate?: {
@@ -106,7 +134,7 @@ export function getStageAdvanceInfo(input: {
     messages: string[];
   };
 } {
-  const { currentStage, currentStageComplete, currentDone, currentTotal, tmmtGate, paymentGate, launchQaGate } =
+  const { currentStage, currentStageComplete, currentDone, currentTotal, tmmtGate, onboardGate, paymentGate, launchQaGate } =
     input;
   const nxt = nextStage(currentStage);
   let blockReason = '';
@@ -116,7 +144,10 @@ export function getStageAdvanceInfo(input: {
   } else if (!currentStageComplete) {
     blockReason = 'Hoàn thành tất cả task giai đoạn hiện tại trước khi chuyển bước.';
   } else if (nxt === 'deliver' && currentStage === 'onboard') {
-    if (!tmmtGate?.ok) {
+    if (onboardGate && !onboardGate.ok) {
+      blockReason =
+        (onboardGate.messages ?? ['Onboard orchestrator chưa đủ'])[0] ?? 'Onboard orchestrator chưa đủ';
+    } else if (!tmmtGate?.ok) {
       blockReason = (tmmtGate?.messages ?? ['TMMT chưa đủ'])[0] ?? 'TMMT chưa đủ';
     } else {
       canForward = true;
@@ -145,8 +176,22 @@ export function getStageAdvanceInfo(input: {
       ? {
           ok: paymentGate.ok ?? false,
           requires_confirm: Boolean(paymentGate.requires_confirm),
+          requires_finance_role: Boolean(paymentGate.requires_finance_role),
+          strict_mode: Boolean(paymentGate.strict_mode),
+          can_confirm: paymentGate.can_confirm !== false,
           outstanding_vnd: Number(paymentGate.outstanding_vnd ?? 0),
+          ar_pending_vnd: Number(paymentGate.ar_pending_vnd ?? 0),
+          ar_overdue_vnd: Number(paymentGate.ar_overdue_vnd ?? 0),
           messages: paymentGate.messages ?? [],
+        }
+      : undefined;
+  const onboardGateOut =
+    nxt === 'deliver' && currentStage === 'onboard' && onboardGate
+      ? {
+          ok: onboardGate.ok,
+          orchestrator_percent: Number(onboardGate.orchestrator_percent ?? 0),
+          checklist_percent: Number(onboardGate.checklist_percent ?? 0),
+          messages: onboardGate.messages ?? [],
         }
       : undefined;
   const launchQaGateOut =
@@ -172,6 +217,7 @@ export function getStageAdvanceInfo(input: {
     current_done: currentDone,
     current_total: currentTotal,
     payment_gate: paymentGateOut,
+    onboard_gate: onboardGateOut,
     launch_qa_gate: launchQaGateOut,
   };
 }

@@ -41,8 +41,9 @@ export class ServiceLifecycleController {
   }
 
   @Get(':id/advance-info')
-  advanceInfo(@Param('id', ParseIntPipe) id: number) {
-    return this.serviceLifecycle.advanceInfo(id);
+  advanceInfo(@Param('id', ParseIntPipe) id: number, @Req() req: Request) {
+    const staff = (req as Request & { staffUser?: { position_id?: number } }).staffUser;
+    return this.serviceLifecycle.advanceInfo(id, staff?.position_id);
   }
 
   @Get(':id/events')
@@ -108,6 +109,11 @@ export class ServiceLifecycleController {
   @Get(':id/creative-brief')
   creativeBrief(@Param('id', ParseIntPipe) id: number) {
     return this.serviceLifecycle.creativeBrief(id);
+  }
+
+  @Get(':id/finance-confirms')
+  listFinanceConfirms(@Param('id', ParseIntPipe) id: number) {
+    return this.serviceLifecycle.listFinanceConfirms(id);
   }
 
   @Get(':id/onboarding-brief')
@@ -217,7 +223,17 @@ export class ServiceLifecycleController {
 
   @Patch(':id')
   @UseGuards(StaffServiceLifecycleWriteGuard)
-  patch(@Param('id', ParseIntPipe) id: number, @Body() body: PatchServiceLifecycleBody) {
-    return this.serviceLifecycle.patch(id, body);
+  patch(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: PatchServiceLifecycleBody,
+    @Req() req: Request,
+  ) {
+    const staff = (req as Request & { staffUser?: { sub?: string; email?: string; position_id?: number } })
+      .staffUser;
+    return this.serviceLifecycle.patch(id, body, {
+      staffId: staff?.sub ? Number(staff.sub) || undefined : undefined,
+      email: staff?.email,
+      positionId: staff?.position_id,
+    });
   }
 }

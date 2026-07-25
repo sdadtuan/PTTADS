@@ -497,7 +497,7 @@ export class OnboardingOrchestratorService {
       steps,
       progress: progressFromSteps(steps),
       checklist_progress: signals.checklistProgress,
-      linked_lifecycle_url: lifecycleUrl ? `${lifecycleUrl}?tab=onboard` : null,
+      linked_lifecycle_url: lifecycleUrl ? `${lifecycleUrl}?tab=workflow` : null,
       synced_at: syncedAt,
     };
   }

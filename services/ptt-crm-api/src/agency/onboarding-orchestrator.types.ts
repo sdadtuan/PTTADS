@@ -42,6 +42,12 @@ export interface OnboardOrchestratorSyncResponse {
   client_id: string;
   synced_items: string[];
   orchestrator: OnboardOrchestratorResponse;
+  lifecycle_auto_advance?: {
+    eligible: boolean;
+    lifecycle_id: number | null;
+    advanced: boolean;
+    reason: string;
+  };
 }
 
 export interface OnboardOrchestratorSignals {

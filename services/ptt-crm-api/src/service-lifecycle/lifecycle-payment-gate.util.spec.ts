@@ -18,4 +18,26 @@ describe('lifecycle-payment-gate.util', () => {
     expect(gate.ok).toBe(true);
     expect(gate.level).toBe('warn');
   });
+
+  it('strict mode blocks without finance cap', () => {
+    const gate = validatePaymentRetainGate({
+      outstandingVnd: 3_000_000,
+      arOverdueVnd: 1_000_000,
+      strictMode: true,
+      hasFinanceCap: false,
+    });
+    expect(gate.ok).toBe(false);
+    expect(gate.requires_finance_role).toBe(true);
+    expect(gate.can_confirm).toBe(false);
+  });
+
+  it('strict mode passes with finance cap and confirm', () => {
+    const gate = validatePaymentRetainGate({
+      outstandingVnd: 3_000_000,
+      strictMode: true,
+      hasFinanceCap: true,
+      financeConfirm: true,
+    });
+    expect(gate.ok).toBe(true);
+  });
 });

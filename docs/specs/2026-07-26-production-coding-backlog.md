@@ -39,7 +39,7 @@
 | Portal email notify (creative/reset) | PORTAL-001 | ✅ webhook wired | — |
 | CSKH board `/crm/cskh-board` | CRM-UC-008 | ✅ Prod-S4 | — |
 | Onboard orchestrator deep-links | SYS-001, SVC-002 | ✅ | **PROD-P1-WIZ** UX |
-| Finance gate warn+confirm | SVC-004 | ✅ B5-S4 | **PROD-P1-FIN** strict mode |
+| Finance gate warn+confirm | SVC-004 | ✅ B5-S4 | **PROD-P1-FIN** strict mode ✅ Prod-S5 |
 | Zalo campaign API write | ZALO-009/010 | ❌ manual | **GAP-Z4-01** |
 | Email journeys prod | EM-011 | ⚠ flag off | **PROD-P1-JRN** |
 | Grafana portal embed | EM-013, SEO-014 | ❌ | **GAP-P1-03** |
@@ -355,5 +355,6 @@ PROD-Z4 (independent — Zalo API permission gate)
 
 | Date | Version | Change |
 |------|---------|--------|
+| 2026-07-26 | 1.2 | **Prod-S5** — onboard wizard + finance strict gate |
 | 2026-07-26 | 1.1 | **Prod-S4** — CSKH board + PROD-H gates/E2E/PEN/STUB/MON |
 | 2026-07-26 | 1.0 | Initial backlog from Phase A–C action analysis |

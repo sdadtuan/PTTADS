@@ -64,17 +64,8 @@ export class LifecycleOnboardingService {
       throw err;
     }
 
-    const incomplete = summary.items.filter((i) => !i.completed).slice(0, 5);
     const onOnboardStage = ctx.stage === 'onboard';
     const gateMessages: string[] = [];
-    if (onOnboardStage && summary.progress.percent < 100 && summary.client_status !== 'active') {
-      gateMessages.push(
-        `Checklist client ${summary.progress.completed}/${summary.progress.total} (${summary.progress.percent}%) — hoàn thiện trước khi Deliver.`,
-      );
-    }
-    if (summary.client_status === 'active') {
-      gateMessages.push('Agency client đã active — checklist coi như pass.');
-    }
 
     let orchestrator = null;
     try {
@@ -82,6 +73,20 @@ export class LifecycleOnboardingService {
     } catch {
       orchestrator = null;
     }
+
+    const orchestratorOk =
+      (orchestrator?.progress.required_percent ?? 0) >= 100 && summary.progress.percent >= 100;
+    const gateOk = summary.client_status === 'active' || orchestratorOk;
+    if (onOnboardStage && !gateOk && summary.client_status !== 'active') {
+      gateMessages.push(
+        `Onboard orchestrator ${orchestrator?.progress.required_percent ?? 0}% · checklist ${summary.progress.completed}/${summary.progress.total} — hoàn thiện trước Deliver.`,
+      );
+    }
+    if (summary.client_status === 'active') {
+      gateMessages.push('Agency client đã active — checklist coi như pass.');
+    }
+
+    const incomplete = summary.items.filter((i) => !i.completed).slice(0, 5);
 
     return {
       lifecycle_id: lifecycleId,
@@ -107,9 +112,10 @@ export class LifecycleOnboardingService {
         service_delivery: ctx.links.service_delivery,
       },
       gate: {
-        ok: summary.client_status === 'active' || summary.progress.percent >= 100,
-        warn_only: true,
+        ok: gateOk,
+        warn_only: gateOk,
         progress_percent: summary.progress.percent,
+        orchestrator_percent: orchestrator?.progress.required_percent ?? null,
         messages: gateMessages.length
           ? gateMessages
           : ['Checklist client đạt yêu cầu cho giai đoạn Onboard.'],

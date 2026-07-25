@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { ConsultBriefPanel } from '@/components/ConsultBriefPanel';
 import { LifecycleOnboardingPanel } from '@/components/LifecycleOnboardingPanel';
@@ -27,7 +28,19 @@ const STAGE_LABELS: Record<string, string> = {
 type PaymentGate = {
   ok?: boolean;
   requires_confirm?: boolean;
+  requires_finance_role?: boolean;
+  strict_mode?: boolean;
+  can_confirm?: boolean;
   outstanding_vnd?: number;
+  ar_pending_vnd?: number;
+  ar_overdue_vnd?: number;
+  messages?: string[];
+};
+
+type OnboardGate = {
+  ok?: boolean;
+  orchestrator_percent?: number;
+  checklist_percent?: number;
   messages?: string[];
 };
 
@@ -74,6 +87,7 @@ export function ServiceDeliveryWorkflowPanel({
   onOpenLaunchQaTab,
 }: Props) {
   const canEdit = hasCap(user, 'crm_board', 'edit');
+  const canFinanceConfirm = hasCap(user, 'crm_business_dashboard', 'view');
   const [tab, setTab] = useState(initialStage);
   const [tasks, setTasks] = useState<Record<string, TaskRow[]>>({});
   const [progress, setProgress] = useState<Record<string, { total: number; done: number; pct: number }>>({});
@@ -133,12 +147,21 @@ export function ServiceDeliveryWorkflowPanel({
   }
 
   const paymentGate = advance.payment_gate as PaymentGate | undefined;
+  const onboardGate = advance.onboard_gate as OnboardGate | undefined;
   const launchQaGate = advance.launch_qa_gate as LaunchQaGate | undefined;
+  const showOnboardGate =
+    tab === 'onboard' &&
+    String(advance.current_stage ?? '') === 'onboard' &&
+    String(advance.next_stage ?? '') === 'deliver' &&
+    onboardGate &&
+    !onboardGate.ok;
   const showPaymentGate =
     tab === 'handover' &&
     String(advance.current_stage ?? '') === 'handover' &&
     String(advance.next_stage ?? '') === 'retain' &&
     Boolean(paymentGate?.requires_confirm);
+  const paymentConfirmAllowed =
+    !paymentGate?.strict_mode || paymentGate?.can_confirm !== false || canFinanceConfirm;
 
   const showLaunchQaGate =
     tab === 'deliver' &&
@@ -149,7 +172,7 @@ export function ServiceDeliveryWorkflowPanel({
   async function advanceForward() {
     const nxt = String(advance.next_stage ?? '');
     if (!nxt || !canEdit) return;
-    if (showPaymentGate && !financeConfirm) return;
+    if (showPaymentGate && (!financeConfirm || !paymentConfirmAllowed)) return;
     if (showLaunchQaGate && !launchQaConfirm) return;
     setSaving(true);
     setMessage('');
@@ -273,37 +296,78 @@ export function ServiceDeliveryWorkflowPanel({
         </div>
       ) : null}
 
+      {showOnboardGate ? (
+        <div
+          style={{
+            marginTop: '0.75rem',
+            padding: '0.65rem 0.75rem',
+            borderRadius: 8,
+            border: '1px solid var(--accent)',
+            background: 'rgba(37, 99, 235, 0.04)',
+          }}
+        >
+          <p style={{ margin: '0 0 0.35rem', fontWeight: 600 }}>Gate Onboard — chưa đủ checklist</p>
+          <p style={{ margin: '0 0 0.35rem', fontSize: '0.9rem' }}>
+            Orchestrator {onboardGate?.orchestrator_percent ?? 0}% · Checklist {onboardGate?.checklist_percent ?? 0}%
+          </p>
+          <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.9rem' }}>
+            {(onboardGate?.messages ?? []).map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {showPaymentGate ? (
         <div
           style={{
             marginTop: '0.75rem',
             padding: '0.65rem 0.75rem',
             borderRadius: 8,
-            border: '1px solid #c90',
-            background: 'rgba(255, 200, 0, 0.04)',
+            border: `1px solid ${paymentGate?.strict_mode ? '#c33' : '#c90'}`,
+            background: paymentGate?.strict_mode ? 'rgba(200, 50, 50, 0.04)' : 'rgba(255, 200, 0, 0.04)',
           }}
         >
-          <p style={{ margin: '0 0 0.35rem', fontWeight: 600, color: '#c90' }}>Gate Payment — còn công nợ HĐ</p>
+          <p style={{ margin: '0 0 0.35rem', fontWeight: 600, color: paymentGate?.strict_mode ? '#c33' : '#c90' }}>
+            Gate Payment — {paymentGate?.strict_mode ? 'strict mode' : 'còn công nợ HĐ'}
+          </p>
           <p style={{ margin: '0 0 0.5rem', fontSize: '0.9rem' }}>
             {(paymentGate?.messages ?? [])[0] ??
               `Còn ${Number(paymentGate?.outstanding_vnd ?? 0).toLocaleString('vi-VN')} VND chưa thu`}
           </p>
+          {Number(paymentGate?.ar_overdue_vnd ?? 0) > 0 ? (
+            <p className="muted" style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}>
+              AR quá hạn: {Number(paymentGate?.ar_overdue_vnd).toLocaleString('vi-VN')} VND · AR chờ thu:{' '}
+              {Number(paymentGate?.ar_pending_vnd ?? 0).toLocaleString('vi-VN')} VND
+            </p>
+          ) : null}
           {onOpenFinanceTab ? (
             <button type="button" className="btn btn-sm btn-secondary" style={{ marginBottom: '0.5rem' }} onClick={onOpenFinanceTab}>
               Mở tab Tài chính
             </button>
           ) : null}
-          <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'flex-start', fontSize: '0.9rem' }}>
-            <input
-              type="checkbox"
-              checked={financeConfirm}
-              onChange={(e) => setFinanceConfirm(e.target.checked)}
-              disabled={!canEdit || saving}
-            />
-            <span>
-              Xác nhận chuyển sang <strong>Giữ chân</strong> dù còn công nợ (AM/SP chịu trách nhiệm thu hồi)
-            </span>
-          </label>
+          <Link href="/crm/financials" className="nav-link" style={{ display: 'inline-block', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
+            Xem AR aging org-wide →
+          </Link>
+          {paymentConfirmAllowed ? (
+            <label style={{ display: 'flex', gap: '0.4rem', alignItems: 'flex-start', fontSize: '0.9rem' }}>
+              <input
+                type="checkbox"
+                checked={financeConfirm}
+                onChange={(e) => setFinanceConfirm(e.target.checked)}
+                disabled={!canEdit || saving}
+              />
+              <span>
+                {paymentGate?.strict_mode
+                  ? 'Finance xác nhận chuyển sang Giữ chân dù còn công nợ / AR quá hạn'
+                  : 'Xác nhận chuyển sang Giữ chân dù còn công nợ (AM/SP chịu trách nhiệm thu hồi)'}
+              </span>
+            </label>
+          ) : (
+            <p className="error" style={{ margin: 0, fontSize: '0.9rem' }}>
+              Strict mode — cần quyền Finance (`crm_business_dashboard.view`) để override.
+            </p>
+          )}
         </div>
       ) : null}
 

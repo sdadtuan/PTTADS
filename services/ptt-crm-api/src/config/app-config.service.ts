@@ -72,6 +72,8 @@ export class AppConfigService {
   readonly sopAutoStartOnLaunch: boolean;
   readonly sopOverdueEscalate: boolean;
   readonly launchQaAutoStartOnDeliver: boolean;
+  readonly financeGateStrict: boolean;
+  readonly onboardAutoAdvanceLifecycle: boolean;
 
   constructor() {
     this.port = Number(process.env.PORT ?? process.env.CRM_API_PORT ?? 3000);
@@ -177,6 +179,12 @@ export class AppConfigService {
     );
     this.launchQaAutoStartOnDeliver = ['1', 'true', 'yes', 'on'].includes(
       (process.env.PTT_LAUNCH_QA_AUTO_START_ON_DELIVER ?? '0').trim().toLowerCase(),
+    );
+    this.financeGateStrict = ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_FINANCE_GATE_STRICT ?? '0').trim().toLowerCase(),
+    );
+    this.onboardAutoAdvanceLifecycle = ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_ONBOARD_AUTO_ADVANCE_LIFECYCLE ?? '0').trim().toLowerCase(),
     );
   }
 

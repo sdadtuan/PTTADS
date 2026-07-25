@@ -195,6 +195,11 @@ export class StaffAuthService {
     };
   }
 
+  async hasCapForPosition(positionId: number, section: string, action: string): Promise<boolean> {
+    const caps = await this.loadCaps(positionId);
+    return this.hasCap(caps, section, action);
+  }
+
   private async resolveUser(
     email: string,
     password: string,

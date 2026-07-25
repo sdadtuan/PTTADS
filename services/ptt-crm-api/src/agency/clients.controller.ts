@@ -37,6 +37,7 @@ import {
 } from './agency.types';
 import { OffboardClientBody, OffboardAuditListResponse, OffboardClientResponse } from './client-offboard.types';
 import { PortalClientUsersService } from './portal-client-users.service';
+import { ServiceLifecycleService } from '../service-lifecycle/service-lifecycle.service';
 import { OnboardingOrchestratorService } from './onboarding-orchestrator.service';
 import {
   OnboardOrchestratorResponse,
@@ -63,6 +64,7 @@ export class ClientsController {
     private readonly performance: PerformanceService,
     private readonly portalUsers: PortalClientUsersService,
     private readonly orchestrator: OnboardingOrchestratorService,
+    private readonly serviceLifecycle: ServiceLifecycleService,
   ) {}
 
   @Get()
@@ -184,7 +186,21 @@ export class ClientsController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(StaffAgencyWriteGuard)
   async syncOnboardingOrchestrator(@Param('id') id: string): Promise<OnboardOrchestratorSyncResponse> {
-    return this.orchestrator.syncOrchestrator(id.trim());
+    const clientId = id.trim();
+    const out = await this.orchestrator.syncOrchestrator(clientId);
+    const auto = await this.serviceLifecycle.autoAdvanceOnboardIfEligible(clientId);
+    if (out.orchestrator.progress.required_percent >= 100) {
+      return {
+        ...out,
+        lifecycle_auto_advance: {
+          eligible: auto.advanced || auto.reason !== 'auto_advance_disabled',
+          lifecycle_id: auto.lifecycle_id,
+          advanced: auto.advanced,
+          reason: auto.reason,
+        },
+      };
+    }
+    return out;
   }
 
   @Get(':id/onboarding/summary')
