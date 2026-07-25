@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AgencyModule } from './agency/agency.module';
+import { ZaloLeadsModule } from './zalo-leads/zalo-leads.module';
 import { CasesModule } from './cases/cases.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { CrmBoardModule } from './crm-board/crm-board.module';
@@ -93,6 +94,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     CrmBoardModule,
     SopModule,
     AgencyModule,
+    ZaloLeadsModule,
     PortalModule,
     StaffAuthModule,
     WebhooksModule,

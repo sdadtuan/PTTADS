@@ -113,6 +113,69 @@ const ORCHESTRATOR_STEP_DEFS: OnboardOrchestratorStepDef[] = [
     },
   },
   {
+    key: 'zalo_account',
+    label: 'Zalo OA / ad account',
+    module: 'zalo',
+    sort_order: 15,
+    optional: true,
+    href: ({ clientId }) => `/agency/clients/${encodeURIComponent(clientId)}?tab=channels`,
+    detect: (s) => ({
+      done: s.zaloAccounts.length > 0,
+      detail: s.zaloAccounts.length > 0 ? `${s.zaloAccounts.length} Zalo account` : 'Chưa có Zalo account',
+    }),
+  },
+  {
+    key: 'zalo_token',
+    label: 'Zalo OAuth token',
+    module: 'zalo',
+    sort_order: 16,
+    optional: true,
+    href: ({ clientId }) => `/agency/clients/${encodeURIComponent(clientId)}?tab=channels`,
+    detect: (s) => {
+      const withToken = s.zaloAccounts.filter((a) => a.has_token && a.token_status !== 'expired');
+      return {
+        done: withToken.length > 0,
+        detail: withToken.length > 0 ? `${withToken.length} account có token hợp lệ` : 'Chưa connect OAuth Zalo',
+      };
+    },
+  },
+  {
+    key: 'zalo_form',
+    label: 'Lead form IDs configured',
+    module: 'zalo',
+    sort_order: 17,
+    optional: true,
+    href: ({ clientId }) => `/zalo/leads?client_id=${encodeURIComponent(clientId)}`,
+    detect: (s) => ({
+      done: s.zaloFormConfigured,
+      detail: s.zaloFormConfigured ? 'Form IDs đã cấu hình' : 'Chưa cấu hình form IDs trên channel Zalo',
+    }),
+  },
+  {
+    key: 'zalo_sync',
+    label: 'Zalo insights sync OK',
+    module: 'zalo',
+    sort_order: 18,
+    optional: true,
+    href: ({ clientId }) => `/zalo/zalo-ads?client_id=${encodeURIComponent(clientId)}`,
+    detect: (s) => ({
+      done: s.zaloSyncOk,
+      detail: s.zaloSyncOk ? 'Có dữ liệu daily_performance channel=zalo' : 'Chưa sync insights Zalo',
+    }),
+  },
+  {
+    key: 'zalo_first_lead',
+    label: 'First Zalo lead in CRM',
+    module: 'zalo',
+    sort_order: 19,
+    optional: true,
+    href: ({ clientId }) => `/agency/clients/${encodeURIComponent(clientId)}?tab=leads`,
+    detect: (s) => ({
+      done: s.zaloLeadCount > 0,
+      detail: s.zaloLeadCount > 0 ? `${s.zaloLeadCount} lead Zalo` : 'Chưa có lead Zalo trong CRM',
+    }),
+  },
+  {
     key: 'seo_workspace',
     label: 'SEO workspace + GSC OAuth',
     module: 'seo',
@@ -221,7 +284,7 @@ const ORCHESTRATOR_STEP_DEFS: OnboardOrchestratorStepDef[] = [
     key: 'activate_client',
     label: 'Activate client',
     module: 'agency',
-    sort_order: 14,
+    sort_order: 20,
     manual_only: true,
     href: ({ clientId }) => `/agency/clients/${encodeURIComponent(clientId)}?tab=onboard`,
     detect: (s) => ({
@@ -330,16 +393,28 @@ export class OnboardingOrchestratorService {
         pixel_id: a.pixel_id ?? null,
       }));
 
+    const zaloAccounts = (client.channel_accounts ?? [])
+      .filter((a) => a.channel === 'zalo')
+      .map((a) => ({
+        has_token: Boolean(a.has_token),
+        token_status: a.token_status ?? null,
+        form_ids: Array.isArray(a.form_ids) ? a.form_ids.filter(Boolean) : [],
+      }));
+
     const portalReady = await this.portalUsers.tableReady();
     const portalUsers = portalReady
       ? (await this.portalUsers.listByClient(clientId)).map((u) => ({ role: u.role, active: u.active }))
       : [];
 
-    const [seo, email, leadCount] = await Promise.all([
+    const [seo, email, leadCount, zaloLeadCount, zaloSyncOk] = await Promise.all([
       this.detectRepo.detectSeo(clientId),
       this.detectRepo.detectEmail(clientId),
       this.detectRepo.countLeads(clientId),
+      this.detectRepo.countZaloLeads(clientId),
+      this.detectRepo.zaloInsightsSynced(clientId),
     ]);
+
+    const zaloFormConfigured = zaloAccounts.some((a) => a.form_ids.length > 0);
 
     return {
       clientCode: summary.client_code,
@@ -353,6 +428,10 @@ export class OnboardingOrchestratorService {
       checklistProgress: checklistProgress(checklistItems),
       clientStatus: client.status,
       metaAccounts,
+      zaloAccounts,
+      zaloLeadCount,
+      zaloFormConfigured,
+      zaloSyncOk,
       portalUsers,
       seo,
       email,
@@ -389,6 +468,9 @@ export class OnboardingOrchestratorService {
         } else if (def.key === 'email_workspace' && !signals.email.workspace) {
           status = 'optional';
         }
+      }
+      if (def.optional && def.module === 'zalo' && signals.zaloAccounts.length === 0) {
+        status = 'optional';
       }
 
       return {

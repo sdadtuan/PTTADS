@@ -130,4 +130,25 @@ export class AgencySideEffectsService {
     });
     return job ? [job] : [];
   }
+
+  async enqueueZaloFormLeadPoll(params: {
+    clientId: string;
+    formId: string;
+    oaId: string;
+    force?: boolean;
+  }): Promise<EnqueuedJob[]> {
+    const cursorKey = params.force ? `force:${Date.now()}` : 'auto';
+    const job = await this.jobQueue.enqueueAgencyJob({
+      jobType: 'zalo_form_lead_poll',
+      payload: {
+        client_id: params.clientId,
+        form_id: params.formId,
+        oa_id: params.oaId,
+        force: Boolean(params.force),
+      },
+      idempotencyKey: `zalo_form_poll:${params.oaId}:${params.formId}:${cursorKey}`,
+      clientId: params.clientId,
+    });
+    return job ? [job] : [];
+  }
 }

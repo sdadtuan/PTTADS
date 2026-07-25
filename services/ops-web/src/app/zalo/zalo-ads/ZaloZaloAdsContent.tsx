@@ -216,6 +216,9 @@ export function ZaloZaloAdsContent() {
           <Link href="/google/google-ads" className="btn btn-sm btn-secondary">
             Google Ads hub
           </Link>
+          <Link href="/zalo/leads" className="btn btn-sm btn-secondary">
+            Zalo Leads
+          </Link>
           <Link href="/crm/hub" className="btn btn-sm btn-secondary">
             Hub campaign map
           </Link>

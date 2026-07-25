@@ -47,6 +47,6 @@ import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
     StaffAgencyWriteGuard,
     StaffAgencyConfigureGuard,
   ],
-  exports: [AgencyService, ClientOffboardService, OnboardingOrchestratorService],
+  exports: [AgencyService, AgencySideEffectsService, ClientOffboardService, OnboardingOrchestratorService],
 })
 export class AgencyModule {}

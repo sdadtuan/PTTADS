@@ -91,6 +91,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/meta/intelligence': 'Meta Intelligence',
   '/google/google-ads': 'Google Ads',
   '/zalo/zalo-ads': 'Zalo Ads',
+  '/zalo/leads': 'Zalo Leads',
   '/meta/ads-combined': 'Ads CPL',
   '/meta/migration': 'Meta Migration',
   '/crm/hub': 'Hub · Hợp đồng',
@@ -270,6 +271,7 @@ function buildSections(
   }
   if (hasCap(user, 'crm_zalo_ads', 'view') || hasCap(user, 'crm_agency', 'view')) {
     agency.push({ href: '/zalo/zalo-ads', label: 'Zalo Ads' });
+    agency.push({ href: '/zalo/leads', label: 'Zalo Leads' });
   }
   if (seoHubEnabled() && canViewSeoHub(user)) {
     agency.push({ href: '/seo/hub', label: 'SEO/AEO Hub' });

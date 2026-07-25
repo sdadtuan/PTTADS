@@ -14,6 +14,8 @@ describe('OnboardingOrchestratorService', () => {
     detectSeo: jest.fn(),
     detectEmail: jest.fn(),
     countLeads: jest.fn(),
+    countZaloLeads: jest.fn(),
+    zaloInsightsSynced: jest.fn(),
   };
   const portalUsers = {
     tableReady: jest.fn(),
@@ -74,6 +76,8 @@ describe('OnboardingOrchestratorService', () => {
     });
     detectRepo.detectEmail.mockResolvedValue({ workspace: false, verified_domain: false });
     detectRepo.countLeads.mockResolvedValue(3);
+    detectRepo.countZaloLeads.mockResolvedValue(0);
+    detectRepo.zaloInsightsSynced.mockResolvedValue(false);
   });
 
   it('returns cross-module steps with auto detection', async () => {

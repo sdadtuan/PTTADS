@@ -113,4 +113,31 @@ export class OnboardingOrchestratorRepository implements OnModuleDestroy {
       return 0;
     }
   }
+
+  async countZaloLeads(clientId: string): Promise<number> {
+    try {
+      const result = await this.db.query<{ c: number }>(
+        `SELECT COUNT(*)::int AS c FROM crm_leads
+         WHERE agency_client_id = $1::uuid AND lower(COALESCE(channel, '')) = 'zalo'`,
+        [clientId],
+      );
+      return Number(result.rows[0]?.c ?? 0);
+    } catch {
+      return 0;
+    }
+  }
+
+  async zaloInsightsSynced(clientId: string): Promise<boolean> {
+    try {
+      const result = await this.db.query(
+        `SELECT 1 FROM daily_performance
+         WHERE client_id = $1::uuid AND channel = 'zalo'
+         LIMIT 1`,
+        [clientId],
+      );
+      return (result.rowCount ?? 0) > 0;
+    } catch {
+      return false;
+    }
+  }
 }

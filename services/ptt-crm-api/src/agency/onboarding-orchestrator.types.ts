@@ -1,4 +1,4 @@
-export type OnboardOrchestratorModule = 'crm' | 'agency' | 'meta' | 'seo' | 'email' | 'portal';
+export type OnboardOrchestratorModule = 'crm' | 'agency' | 'meta' | 'zalo' | 'seo' | 'email' | 'portal';
 
 export type OnboardOrchestratorStepStatus = 'pending' | 'done' | 'skipped' | 'optional';
 
@@ -50,6 +50,10 @@ export interface OnboardOrchestratorSignals {
   checklistProgress: OnboardOrchestratorProgress;
   clientStatus: string;
   metaAccounts: Array<{ has_token: boolean; token_status: string | null; pixel_id: string | null }>;
+  zaloAccounts: Array<{ has_token: boolean; token_status: string | null; form_ids: string[] }>;
+  zaloLeadCount: number;
+  zaloFormConfigured: boolean;
+  zaloSyncOk: boolean;
   portalUsers: Array<{ role: string; active: boolean }>;
   seo: { mapped: boolean; customer_id: number | null; gsc_connected: boolean; has_settings: boolean };
   email: { workspace: boolean; verified_domain: boolean };

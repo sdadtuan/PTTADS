@@ -2815,6 +2815,78 @@ export async function fetchZaloHub(
   return agencyFetch(token, `/api/v1/zalo-ads/hub${suffix}`);
 }
 
+export interface ZaloLeadRow {
+  id: string;
+  full_name: string | null;
+  phone: string | null;
+  email: string | null;
+  status: string | null;
+  channel: string | null;
+  external_lead_id: string | null;
+  form_id: string | null;
+  oa_id: string | null;
+  is_duplicate: boolean;
+  created_at: string | null;
+}
+
+export interface ZaloLeadsResponse {
+  ok: boolean;
+  leads: ZaloLeadRow[];
+  total: number;
+}
+
+export interface ZaloFormSyncRow {
+  client_id: string;
+  client_code: string | null;
+  client_name: string | null;
+  oa_id: string;
+  form_id: string;
+  channel_account_id: string;
+  last_form_data_id: string | null;
+  last_polled_at: string | null;
+  last_status: string | null;
+  last_error: string | null;
+  has_token: boolean;
+}
+
+export interface ZaloFormsResponse {
+  ok: boolean;
+  forms: ZaloFormSyncRow[];
+}
+
+export async function fetchZaloLeads(
+  token: string,
+  params: { client_id?: string; form_id?: string; q?: string; limit?: number } = {},
+): Promise<ZaloLeadsResponse> {
+  const qs = new URLSearchParams();
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.form_id) qs.set('form_id', params.form_id);
+  if (params.q) qs.set('q', params.q);
+  if (params.limit != null) qs.set('limit', String(params.limit));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return agencyFetch(token, `/api/v1/zalo/leads${suffix}`);
+}
+
+export async function fetchZaloForms(token: string, clientId?: string): Promise<ZaloFormsResponse> {
+  const qs = clientId ? `?client_id=${encodeURIComponent(clientId)}` : '';
+  return agencyFetch(token, `/api/v1/zalo/forms${qs}`);
+}
+
+export async function pollZaloForm(
+  token: string,
+  formId: string,
+  params: { client_id?: string; force?: boolean } = {},
+): Promise<{ ok: boolean; jobs_enqueued: Array<{ id: string; job_type: string; status: string }> }> {
+  const qs = new URLSearchParams();
+  if (params.client_id) qs.set('client_id', params.client_id);
+  if (params.force) qs.set('force', '1');
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return agencyMutate(token, `/api/v1/zalo/forms/${encodeURIComponent(formId)}/poll${suffix}`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
 export async function downloadZaloHubExport(
   token: string,
   params: ZaloHubQuery & { scope?: 'clients' | 'campaigns' } = {},
