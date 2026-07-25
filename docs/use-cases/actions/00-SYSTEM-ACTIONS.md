@@ -56,7 +56,11 @@ Bước 13: Skip; AM cấu hình báo cáo PDF email manual ([SYS-UC-005](#sys-u
 
 ## SYS-UC-002 — Closed-loop Spend → Lead → Revenue
 
-**Mục tiêu khách hàng:** *"Biết chính xác bao nhiêu tiền ads → bao nhiêu lead → bao nhiêu doanh thu."*
+**Mục tiêu khách hàng:** *"Biết chính xác bao nhiêu tiền ads → bao nhiêu lead → bao nhiêu doanh thu — theo từng kênh."*
+
+**Actors:** System, CSKH, Sales, Buyer, AM, Client
+
+### Nhánh M — Meta (mặc định)
 
 | # | Actor | Màn hình | Thao tác | Input | Phản hồi | Gate |
 |---|-------|----------|----------|-------|----------|------|
@@ -71,68 +75,153 @@ Bước 13: Skip; AM cấu hình báo cáo PDF email manual ([SYS-UC-005](#sys-u
 | 9 | AM | `/meta/facebook-ads` | **Export** hoặc brief client | CSV | File download | ✓ |
 | 10 | Client | portal `/meta` | Xem CPL read-only | T-7/T-30 | KPI cards | ✓ portal flag |
 
-#### Nhánh E1 — Unmapped spend
-Bước 8 bắt buộc trước khi AM gửi báo cáo client (disclaimer nếu còn vàng).
+### Nhánh Z1 — Zalo Ads
+
+| # | Actor | Màn hình | Thao tác | Input | Phản hồi | Gate |
+|---|-------|----------|----------|-------|----------|------|
+| Z1 | System | worker | **zalo_insights_sync** T-1 | client mapped | daily_performance | ✓ |
+| Z2 | System | `POST /webhooks/zalo` + poll | Lead ingest webhook/poll | form payload | crm_leads | ✓ [ZALO-UC-011/012](../actions/08-ZALO-ACTIONS.md) |
+| Z3 | CSKH | `/crm/leads` | Filter **source=zalo** | — | Lead row | ✓ dedup |
+| Z4 | CSKH | `/crm/leads/[id]` | Qualified → **Won** + deal_value_vnd | status | Timeline | ✓ |
+| Z5 | System | — | Hub CPA/conversion refresh | channel=zalo | metrics update | ✓ Z2-B7 |
+| Z6 | Buyer | `/zalo/zalo-ads` | Verify CPL + Won columns | T-7 | Hub green | ✓ |
+| Z7 | Buyer | `/meta/ads-combined` | Tab **Zalo** cross-check | T-7 | Combined row | ✓ Z3-7 |
+| Z8 | Client | portal `/zalo` | Xem CPL read-only | T-7/T-30 | KPI cards | ✓ |
+
+### Nhánh G1 — Google Ads (nếu HĐ có Google)
+
+| # | Actor | Màn hình | Thao tác | Input | Phản hồi | Gate |
+|---|-------|----------|----------|-------|----------|------|
+| G1 | Tracking | `/agency/clients/[id]?tab=channels` | Channel **Google** + OAuth | account id | Token valid | ✓ |
+| G2 | System | worker | Google insights sync T-1 | mapped campaigns | daily_performance | ✓ |
+| G3 | Buyer | `/meta/ads-combined` | Tab **Google** | T-7 | Spend/CPL | ✓ |
+| G4 | CSKH | `/crm/leads` | Lead source=google (nếu webhook) | — | Row | ○ tùy setup |
+
+#### Nhánh E1 — Unmapped spend (mọi kênh)
+Bước map campaign bắt buộc trước khi AM gửi báo cáo client (disclaimer nếu còn vàng).
 
 #### Tiêu chí nghiệm thu
-- [ ] CPL = spend/leads cùng kỳ khớp hub vs portal ± rounding
-- [ ] Won deal trigger CAPI trong 15 phút
+- [ ] CPL = spend/leads cùng kỳ khớp hub vs portal ± rounding (per channel)
+- [ ] Meta Won → CAPI trong 15 phút
+- [ ] Zalo Won → hub CPA refresh T+0 ([ZALO-UC-015](../actions/08-ZALO-ACTIONS.md))
 
 ---
 
 ## SYS-UC-003 — Launch campaign đa kênh có governance
 
-**Mục tiêu khách hàng:** *"Campaign go-live an toàn — QA nội bộ + khách duyệt trước khi tiêu tiền."*
+**Mục tiêu khách hàng:** *"Campaign go-live an toàn — QA nội bộ + khách duyệt trước khi tiêu tiền (Meta / Zalo / Google)."*
+
+**Actors:** Creative, Creative Lead, Client Approver, Buyer, GDKD, System
+
+### Luồng chung (bước 1–5 — mọi kênh)
 
 | # | Actor | Màn hình | Thao tác | Input | Phản hồi | Gate |
 |---|-------|----------|----------|-------|----------|------|
-| 1 | Creative | `/crm/creatives` | **Submit creative** | files, copy, client | status pending | ✓ |
+| 1 | Creative | `/crm/creatives` | **Submit creative** (tag channel) | files, copy, channel | status pending | ✓ |
 | 2 | Creative Lead | `/crm/creatives` | Internal review → approve internal | comment | approved internal | ✓ |
 | 3 | Creative | `/crm/creatives` | **Submit client approval** | — | pending_client | ✓ |
-| 4 | Client Approver | portal `/creatives` | **Approve** creative | optional note | approved | ✓ |
+| 4 | Client Approver | portal `/creatives` | **Approve** hoặc **Reject** | optional note / comment | approved / rejected | ✓ |
 | 5 | Buyer | `/crm/launch-qa` | Tạo / pass **Launch QA run** | checklist items tick | status passed | ✓ critical items |
-| 6 | Buyer | `/meta/ads-ops` | **Launch wizard** step 1–4 | objective, budget, audience, creative | preview | ✓ |
-| 7 | Buyer | `/meta/ads-ops` | **Submit** launch | — | job → campaign-writes queue | ✓ |
-| 8 | GDKD | `/crm/campaign-writes` | **Approve** nếu budget > threshold | approve/reject | approved | ✓ |
-| 9 | System | Temporal | Execute Meta create API | — | campaign id | ✓ API 200 |
-| 10 | Buyer | `/meta/facebook-ads` | Verify campaign **Active** | filter client | spend > 0 next day | ✓ |
+
+### Nhánh M — Meta launch
+
+| # | Actor | Màn hình | Thao tác | Input | Phản hồi | Gate |
+|---|-------|----------|----------|-------|----------|------|
+| M6 | Buyer | `/meta/ads-ops` | **Launch wizard** step 1–4 | objective, budget, audience | preview | ✓ |
+| M7 | Buyer | `/meta/ads-ops` | **Submit** launch | — | job → campaign-writes queue | ✓ |
+| M8 | GDKD | `/crm/campaign-writes` | **Approve** nếu budget > threshold | approve/reject | approved | ✓ |
+| M9 | System | Temporal | Execute Meta create API | — | campaign id | ✓ API 200 |
+| M10 | Buyer | `/meta/facebook-ads` | Verify campaign **Active** | filter client | spend > 0 next day | ✓ |
+
+### Nhánh Z1 — Zalo launch
+
+| # | Actor | Màn hình | Thao tác | Input | Phản hồi | Gate |
+|---|-------|----------|----------|-------|----------|------|
+| Z6 | Creative | `/crm/creatives` | Tag **channel=zalo** trên submit | channel=zalo | Filterable | ✓ Z3-1 |
+| Z7 | Buyer | `/crm/launch-qa` | Pass checklist auto: `zalo_oauth_token`, `zalo_form_ids_configured` | — | Auto eval pass | ✓ Z3-2 |
+| Z8 | Buyer | Zalo Ads UI | **Go live manual** + map campaign ID | external id | Hub green | ✓ v1 |
+| Z9 | Buyer | `/agency/clients/[id]?tab=campaigns` | Verify map + sync | — | CPL row | ✓ [ZALO-UC-002](../actions/08-ZALO-ACTIONS.md) |
+| Z10 | System | notification_inbox | Milestone notify launch | — | AM + Client | ✓ Z3-8 |
+
+### Nhánh G1 — Google launch (nếu có)
+
+| # | Actor | Màn hình | Thao tác | Gate |
+|---|-------|----------|----------|------|
+| G6 | Buyer | Google Ads UI | Create campaign manual | ✓ |
+| G7 | Buyer | `/agency/clients/[id]?tab=campaigns` | Map Google campaign | ✓ |
+| G8 | Buyer | `/meta/ads-combined` | Verify tab Google spend T+1 | ✓ |
 
 #### Nhánh E1 — Client reject creative
 Bước 4 → Reject + comment → quay bước 1 Creative sửa → resubmit bước 3.
 
 #### Tiêu chí nghiệm thu
-- [ ] Không launch được khi Launch QA failed (nếu strict mode)
-- [ ] Audit log đủ: creative approval + write queue + Meta id
+- [ ] Không launch được khi Launch QA failed (strict mode)
+- [ ] Audit log đủ: creative approval + write queue + external campaign id
+- [ ] Zalo: Launch QA Zalo checklist pass trước go-live manual
 
 ---
 
 ## SYS-UC-004 — Client approval cross-module
 
-**Mục tiêu khách hàng:** *"Mọi thứ gửi khách phải qua inbox duyệt thống nhất."*
+**Mục tiêu khách hàng:** *"Mọi thứ gửi khách phải qua inbox duyệt thống nhất — Meta, Zalo, SEO, Email."*
+
+**Actors:** Staff, Client Approver
 
 | # | Actor | Màn hình | Thao tác | Input | Phản hồi | Gate |
 |---|-------|----------|----------|-------|----------|------|
 | 1 | Staff | Module tương ứng | Submit for client approval | item id | status pending_client | ✓ |
-| 2 | Client | portal login | Đăng nhập | credentials | JWT scoped client | ✓ approver role |
-| 3 | Client | `/creatives` hoặc `/seo/content` hoặc `/email/approvals` | Mở item pending | — | Preview full | ✓ |
+| 2 | Client | portal `/login` | Đăng nhập | credentials | JWT scoped client | ✓ approver role |
+| 3 | Client | Inbox tương ứng (xem bảng dưới) | Mở item pending | — | Preview full | ✓ |
 | 4 | Client | Same | **Approve** hoặc **Reject** | reject: comment ≥ N chars | decision saved | ✓ |
 | 5 | Staff | ops module | Refresh → status updated | — | can launch/send | ✓ approved |
+| 6 | System | notification_inbox | Notify staff on decision | — | Staff inbox | ✓ |
+| 7 | Client | `/dashboard` | Widget pending approvals | — | Count badge | ⚠ GAP-P1-02 |
+
+**Inbox theo module:**
+
+| Module | Route portal | Ops submit | UC |
+|--------|--------------|------------|-----|
+| Meta creative | `/creatives` | `/crm/creatives` | PORTAL-006 |
+| **Zalo creative** | `/creatives` (filter channel=zalo) | `/crm/creatives` channel=zalo | [ZALO-UC-019](../actions/08-ZALO-ACTIONS.md) |
+| SEO content | `/seo/content` | `/seo/content` | PORTAL-007 |
+| Email campaign | `/email/approvals` | `/email/campaigns` | PORTAL-008 |
+| Budget (GDKD) | — (staff only) | `/crm/campaign-writes` | ZALO-UC-019 bước 2 |
+
+#### Nhánh E1 — Zalo budget + creative
+Client duyệt creative portal bước 3–4; GDKD duyệt budget trên ops nếu vượt ngưỡng — xem [ZALO-UC-019](../actions/08-ZALO-ACTIONS.md).
 
 #### Tiêu chí nghiệm thu
 - [ ] Reject không comment → UI block
 - [ ] Approver không thấy client khác
+- [ ] Zalo creative có tag channel=zalo visible trên preview
 
 ---
 
 ## SYS-UC-005 — Báo cáo định kỳ cho khách hàng
 
+**Mục tiêu khách hàng:** *"Khách nhận báo cáo T-1 định kỳ hoặc tự tải — Meta, Zalo, SEO, Email."*
+
 | # | Actor | Màn hình | Thao tác | Input | Phản hồi | Gate |
 |---|-------|----------|----------|-------|----------|------|
 | 1 | System | Scheduler | Trigger weekly/monthly job | client list | PDF/blob | ✓ sync OK |
-| 2 | AM | `/meta/facebook-ads` hoặc `/seo/reports` hoặc `/email/reports` | Verify data T-1 trước gửi | period | KPI sane | ✓ |
+| 2 | AM | Hub tương ứng (xem bảng) | Verify data T-1 trước gửi | period | KPI sane | ✓ |
 | 3 | System | Email/webhook | Deliver PDF link | recipient | delivery log | ✓ |
-| 4 | Client | portal `/meta` `/seo/reports` | Self-serve download | Export CSV/PDF | file | ✓ |
-| 5 | AM | Email/ call | Confirm client received | — | hypercare note | ○ |
+| 4 | Client | portal self-serve (xem bảng) | **Export CSV/PDF** | period | file | ✓ |
+| 5 | AM | Email / call | Confirm client received | — | hypercare note | ○ |
+
+**Hub export theo module:**
+
+| Module | Ops export | Portal export | UC |
+|--------|------------|---------------|-----|
+| Meta | `/meta/facebook-ads` CSV/PDF | portal `/meta` | META-013 |
+| **Zalo** | `/zalo/zalo-ads` CSV + `?format=pdf` | portal `/zalo` | [ZALO-UC-016](../actions/08-ZALO-ACTIONS.md) |
+| SEO | `/seo/reports` | portal `/seo/reports` | SEO-013 |
+| Email | `/email/reports` | portal `/email` | EM-013 |
+| Combined | `/meta/ads-combined` tabs All/Meta/Google/Zalo | — | SYS-002 |
+
+#### Tiêu chí nghiệm thu
+- [ ] Unmapped spend = 0 trước gửi báo cáo (per channel)
+- [ ] Portal export khớp ops export ± rounding
 
 ---
 

@@ -26,10 +26,11 @@ Login → redirect `/archived` — không xem KPI.
 
 | # | Actor | Màn hình | Thao tác | Gate |
 |---|-------|----------|----------|------|
-| 1 | Viewer | `/dashboard` | View Meta/SEO/Email widgets | ✓ flags |
+| 1 | Viewer | `/dashboard` | View Meta/SEO/Email/**Zalo** widgets | ✓ flags |
 | 2 | Viewer | Date picker | T-7 / T-30 | ✓ |
 | 3 | Viewer | Pending approvals widget | Click → inbox | ✓ if approver |
-| 4 | Viewer | Footer | Read attribution disclaimer | ✓ |
+| 4 | Viewer | Zalo widget (nếu enabled) | Click → `/zalo` | ✓ [ZALO-UC-005](../actions/08-ZALO-ACTIONS.md) |
+| 5 | Viewer | Footer | Read attribution disclaimer | ✓ |
 
 ---
 
@@ -111,9 +112,55 @@ Login → redirect `/archived` — không xem KPI.
 
 | # | Actor | Màn hình | Thao tác | Gate |
 |---|-------|----------|----------|------|
-| 1 | Viewer | `/meta`, `/seo/reports`, `/dashboard` | **Export CSV/PDF** | ✓ signed URL |
+| 1 | Viewer | `/meta`, `/seo/reports`, `/dashboard`, **`/zalo`** | **Export CSV/PDF** | ✓ signed URL |
 | 2 | System | — | Log download audit | ✓ |
 | 3 | Viewer | Link expiry | Re-export if expired | ✓ |
+
+---
+
+## PORTAL-UC-013 — Zalo performance view + export
+
+**Mục tiêu khách hàng:** *"Khách tự xem và tải báo cáo Zalo — không phụ thuộc AM gửi file."*
+
+**Map UC:** [ZALO-UC-005](../actions/08-ZALO-ACTIONS.md#zalo-uc-005--portal-performance-zalo), [ZALO-UC-016](../actions/08-ZALO-ACTIONS.md#zalo-uc-016--xuất-báo-cáo-khách-hàng)
+
+| # | Actor | Màn hình | Thao tác | Input | Phản hồi | Gate |
+|---|-------|----------|----------|-------|----------|------|
+| 1 | Viewer | `/zalo` | Mở trang performance Zalo | — | KPI cards load | ✓ `zalo_enabled` |
+| 2 | Viewer | Same | Chọn **T-7 / T-30** | date range | CPL recalc | ✓ |
+| 3 | Viewer | Same | Xem Spend, Leads, CPL | — | Read-only scoped | ✓ tenant |
+| 4 | Viewer | Same | **Export CSV** | period | File download | ✓ Z3-6 |
+| 5 | Viewer | Same | **Export PDF** | period | PDF blob | ✓ Z3-6 |
+| 6 | Viewer | Same | Read CPL disclaimer nếu unmapped | yellow note | ✓ |
+| 7 | Viewer | `/dashboard` | Widget Zalo shortcut | click | Redirect `/zalo` | ✓ |
+
+#### Tiêu chí nghiệm thu
+- [ ] KPI khớp ops `/zalo/zalo-ads` ± rounding
+- [ ] Export không leak client khác
+
+---
+
+## PORTAL-UC-014 — Zalo creative & budget approval
+
+**Mục tiêu khách hàng:** *"Khách duyệt creative Zalo (và ngân sách nếu vượt ngưỡng) trước go-live."*
+
+**Map UC:** [ZALO-UC-019](../actions/08-ZALO-ACTIONS.md#zalo-uc-019--client-duyệt-ngân-sách--nội-dung)
+
+| # | Actor | Màn hình | Thao tác | Input | Phản hồi | Gate |
+|---|-------|----------|----------|-------|----------|------|
+| 1 | Approver | `/creatives` | List pending (filter Zalo tag) | — | Rows channel=zalo | ✓ approver role |
+| 2 | Approver | Row | Preview image/copy Zalo | — | Full preview | ✓ |
+| 3 | Approver | Same | **Approve** | optional note | approved | ✓ staff notified |
+| 4 | Approver | Same | **Reject** | comment required | → [PORTAL-UC-009](#portal-uc-009--reject-with-comment) | ✓ |
+| 5 | System | notification_inbox | Milestone notify on approve | — | Staff inbox | ✓ Z3-8 |
+| 6 | Approver | `/dashboard` | Pending widget | — | Count | ⚠ GAP-P1-02 |
+| 7 | Staff | `/crm/launch-qa` | Launch QA pass sau approve | checklist | passed | ✓ Z3-2 |
+
+**Lưu ý:** Budget vượt ngưỡng do **GDKD** duyệt trên ops `/crm/campaign-writes` — không qua portal.
+
+#### Tiêu chí nghiệm thu
+- [ ] Reject block nếu thiếu comment
+- [ ] Creative Zalo không launch khi pending_client
 
 ---
 
