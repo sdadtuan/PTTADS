@@ -13,6 +13,7 @@ import {
 } from '../events/event-idempotency';
 import { PortalJwtPayload } from '../portal/portal-jwt.util';
 import { PortalCreativeNotifyService } from '../portal/portal-creative-notify.service';
+import { PortalNotificationService } from '../portal/portal-notification.service';
 import { LaunchQaCreativeBridgeService } from '../launch-qa/launch-qa-creative-bridge.service';
 import { CreativesRepository } from './creatives.repository';
 import {
@@ -32,6 +33,7 @@ export class CreativesService {
     private readonly temporal: TemporalCreativeService,
     private readonly launchQaBridge: LaunchQaCreativeBridgeService,
     private readonly portalNotify: PortalCreativeNotifyService,
+    private readonly portalNotifications: PortalNotificationService,
   ) {}
 
   async listPending(clientId: string): Promise<CreativePendingResponse> {
@@ -88,9 +90,11 @@ export class CreativesService {
     });
 
     const linked = await this.repo.updateTemporalMeta(creative.id, wf.workflowId, wf.runId);
+    const finalCreative = linked ?? creative;
+    await this.portalNotifications.emitCreativePending(finalCreative);
     return {
       ok: true,
-      creative: linked ?? creative,
+      creative: finalCreative,
       workflow_id: wf.workflowId,
       workflow_started: wf.started,
       temporal_run_id: wf.runId,

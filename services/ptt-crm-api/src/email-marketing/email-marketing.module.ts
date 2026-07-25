@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '../config/config.module';
+import { PortalModule } from '../portal/portal.module';
 import { StaffAuthModule } from '../staff-auth/staff-auth.module';
 import { TemporalModule } from '../temporal/temporal.module';
 import { WebhooksModule } from '../webhooks/webhooks.module';
@@ -24,7 +25,7 @@ import { StaffEmailViewGuard } from './guards/staff-email-view.guard';
 import { StaffEmailWriteGuard } from './guards/staff-email-write.guard';
 
 @Module({
-  imports: [ConfigModule, StaffAuthModule, WebhooksModule, TemporalModule],
+  imports: [ConfigModule, StaffAuthModule, WebhooksModule, TemporalModule, PortalModule],
   controllers: [EmailMarketingController, EmailPublicController, EmailCaptureController],
   providers: [
     EmailMarketingRepository,

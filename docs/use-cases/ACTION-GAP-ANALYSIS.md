@@ -1,7 +1,7 @@
 # Phân tích Gap — Use Case vs Hành động người dùng thực tế
 
-> **Phiên bản:** 1.3 · **Ngày:** 2026-07-25  
-> **Cập nhật:** Phase A–B · **Phase C** — META 14/14, SEO 14/14, EM 14/14, PLAT 10/10 actions expanded  
+> **Phiên bản:** 1.4 · **Ngày:** 2026-07-26  
+> **Cập nhật:** **Prod-S1** — Portal notification center (GAP-P1-02 code) · Phase C doc complete  
 > **Mục đích:** Đối chiếu ~122 UC với ops-web / portal-web thực tế; xác định bước nghiệp vụ khách hàng chưa được hệ thống dẫn đủ.
 
 ---
@@ -67,7 +67,7 @@
 | Offboard → thu hồi hết quyền | SYS-006, **SVC-012** | ✅ **SVC-UC-012** 6 bước + Offboard client |
 | Finance chặn handover khi nợ | **SVC-004**, CRM-011 | ⚠️ **GAP-P1-01** — **8 bước workaround doc**; UI auto-block pending |
 | **Cảnh báo Zalo CPL/zero leads** | **ZALO-017** | ✅ Alerts Z3 + Slack + hub banner |
-| **Thông báo tiến độ campaign Zalo** | **ZALO-020** | ⚠️ Staff inbox ✅; portal client ⚠ GAP-P1-02 |
+| **Thông báo tiến độ campaign Zalo** | **ZALO-020** | ✅ **Prod-S1** — `/notifications` + emit creative/email/milestone |
 | Onboard email domain tự phục vụ | EM-001 | ✅ Wizard E-11 |
 | Journey email tự động | EM-011 | ⚠️ **GAP-P1-02** — Flag `PTT_EMAIL_JOURNEYS=1` |
 | Báo cáo BI Grafana khách xem | EM-013, SEO-014 | ⚠️ **GAP-P1-03** — Staff embed OK; portal chưa embed |
@@ -92,7 +92,7 @@
 | ID | Mô tả | UC | Workaround |
 |----|-------|-----|------------|
 | **GAP-P1-01** | Finance gate handover | SVC-004 | **Doc Phase B:** 8 bước manual `/crm/financials` + block policy; target UI on lifecycle advance |
-| **GAP-P1-02** | Notification client khi có approval pending / milestone | PORTAL-006/008, **ZALO-020** | Email manual từ AM; staff inbox có; portal widget partial |
+| **GAP-P1-02** | Notification client khi có approval pending / milestone | PORTAL-006/008, **ZALO-020** | ✅ **Prod-S1** — `portal_notification` + `/notifications` + webhook `PTT_PORTAL_NOTIFY_WEBHOOK` |
 | **GAP-P1-03** | Grafana BI trên portal khách | EM-013, SEO-014 | Khách xem PDF export; staff xem Grafana |
 | **GAP-P1-04** | Campaign map bulk AI suggest | META-002 | Hub có suggest; buyer confirm từng dòng |
 | **GAP-P1-05** | Double opt-in email public confirm | EM-002 | Route có; thiếu UI embed builder trong ops |
@@ -152,7 +152,7 @@ Một UC được coi **"đủ bước nghiệp vụ"** khi file actions tương
 | **B** | CRM 15 + SVC 12 actions expand; GAP-P1-01 finance gate doc | ✅ **Done** (2026-07-25) |
 | **C** | META/SEO/EM/PLAT all UC actions expand | ✅ **Done** (2026-07-25) |
 | **D** (doc) | SYS 006–012 + PORTAL P0 expand | Pending |
-| **E** (product) | GAP-P1-01 finance gate UI, GAP-P1-02 portal notify, GAP-Z4-01 | Pending |
+| **E** (product) | GAP-P1-01 finance gate UI, ~~GAP-P1-02 portal notify~~, GAP-Z4-01 | **Partial** — P1-02 ✅ Prod-S1 |
 | **F** (product) | GAP-P1-03 Grafana portal | Pending |
 
 ---

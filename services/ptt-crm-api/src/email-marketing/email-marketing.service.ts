@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { PortalNotificationService } from '../portal/portal-notification.service';
 import { EmailMarketingCampaignRepository } from './email-marketing-campaign.repository';
 import { EmailMarketingEnterpriseRepository } from './email-marketing-enterprise.repository';
 import { EmailMarketingExperimentRepository } from './email-marketing-experiment.repository';
@@ -46,6 +47,7 @@ export class EmailMarketingService {
     private readonly sendOrchestrator: EmailSendOrchestratorService,
     private readonly jobQueue: EmailJobQueueService,
     private readonly temporalJourney: TemporalEmailJourneyService,
+    private readonly portalNotifications: PortalNotificationService,
   ) {}
 
   async hub(params: {
@@ -409,6 +411,13 @@ export class EmailMarketingService {
       clientId: row.client_id,
       campaignName: row.name,
       submittedBy: actor,
+    });
+    await this.portalNotifications.emitEmailPending({
+      clientId: row.client_id,
+      campaignId: row.id,
+      campaignName: row.name,
+      submittedBy: actor,
+      audienceCount: row.audience_count,
     });
     return row;
   }

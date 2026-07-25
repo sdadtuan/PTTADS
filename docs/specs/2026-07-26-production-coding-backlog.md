@@ -35,8 +35,8 @@
 | SEO/Email report **schedule** | SEO-013, EM-013 | ✅ worker | — |
 | Meta/Zalo report **schedule** | SYS-005, META-013, ZALO-016 | ❌ | **PROD-P0-RPT** |
 | Portal approval inbox | PORTAL-006/008 | ✅ | — |
-| Portal **client notification** center | ZALO-020, SYS-004 | ❌ partial | **GAP-P1-02** |
-| Portal email notify (creative/reset) | PORTAL-001 | ⚠ stub webhook | **PROD-P0-NOTIFY** |
+| Portal **client notification** center | ZALO-020, SYS-004 | ✅ Prod-S1 | — |
+| Portal email notify (creative/reset) | PORTAL-001 | ✅ webhook wired | — |
 | CSKH board `/crm/cskh-board` | CRM-UC-008 | ❌ route missing | **PROD-P0-CSKH** |
 | Onboard orchestrator deep-links | SYS-001, SVC-002 | ✅ | **PROD-P1-WIZ** UX |
 | Finance gate warn+confirm | SVC-004 | ✅ B5-S4 | **PROD-P1-FIN** strict mode |
@@ -88,10 +88,10 @@
 
 **API checklist:**
 
-- [ ] `GET /portal/notifications?unread_only=1`
-- [ ] `PATCH /portal/notifications/:id/read`
-- [ ] `PATCH /portal/notifications/read-all`
-- [ ] Webhook env documented in handover
+- [x] `GET /portal/notifications?unread_only=1`
+- [x] `PATCH /portal/notifications/:id/read`
+- [x] `PATCH /portal/notifications/read-all`
+- [x] Webhook env documented in handover
 
 **Env:**
 

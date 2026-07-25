@@ -9,6 +9,9 @@ interface PortalNavProps {
   user: StoredUser | null;
   onLogout: () => void;
   pendingCount?: number;
+  notificationUnread?: number;
+  emailPending?: number;
+  seoPending?: number;
   branding?: PortalSettingsResponse | null;
   seoEnabled?: boolean;
   emailEnabled?: boolean;
@@ -20,6 +23,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/google': 'Google Performance',
   '/zalo': 'Zalo Performance',
   '/creatives': 'Creative inbox',
+  '/notifications': 'Thông báo',
   '/settings': 'Cài đặt',
   '/seo': 'SEO/AEO',
   '/seo/reports': 'SEO Reports',
@@ -28,10 +32,17 @@ const PAGE_TITLES: Record<string, string> = {
   '/email/approvals': 'Email approvals',
 };
 
+function badgeLabel(label: string, count: number): string {
+  return count > 0 ? `${label} (${count})` : label;
+}
+
 export function PortalNav({
   user,
   onLogout,
   pendingCount = 0,
+  notificationUnread = 0,
+  emailPending = 0,
+  seoPending = 0,
   branding,
   seoEnabled = false,
   emailEnabled = false,
@@ -44,24 +55,36 @@ export function PortalNav({
     { href: '/zalo', label: 'Zalo Ads' },
     {
       href: '/creatives',
-      label: pendingCount > 0 ? `Creative inbox (${pendingCount})` : 'Creative inbox',
+      label: badgeLabel('Creative inbox', pendingCount),
+    },
+    {
+      href: '/notifications',
+      label: badgeLabel('Thông báo', notificationUnread),
     },
     { href: '/settings', label: 'Cài đặt' },
   ];
   if (seoEnabled) {
     links.push({ href: '/seo', label: 'SEO/AEO' });
     links.push({ href: '/seo/reports', label: 'SEO reports' });
-    links.push({ href: '/seo/content', label: 'SEO review' });
+    links.push({
+      href: '/seo/content',
+      label: badgeLabel('SEO review', seoPending),
+    });
   }
   if (emailEnabled) {
     links.push({ href: '/email', label: 'Email' });
     if (user?.role === 'approver') {
-      links.push({ href: '/email/approvals', label: 'Email approvals' });
+      links.push({
+        href: '/email/approvals',
+        label: badgeLabel('Email approvals', emailPending),
+      });
     }
   }
 
   const pageTitle =
-    pathname.startsWith('/email/campaigns/') ? 'Campaign performance' : PAGE_TITLES[pathname] ?? 'Dashboard';
+    pathname.startsWith('/email/campaigns/')
+      ? 'Campaign performance'
+      : PAGE_TITLES[pathname] ?? 'Dashboard';
   const displayName = branding?.display_name ?? branding?.client_name ?? 'Client portal';
 
   return (

@@ -83,6 +83,10 @@ describe('EmailMarketingService', () => {
     start: jest.fn().mockResolvedValue({ started: false }),
   };
 
+  const portalNotifications = {
+    emitEmailPending: jest.fn().mockResolvedValue({ ok: true, ids: [] }),
+  };
+
   function makeService() {
     return new EmailMarketingService(
       repo,
@@ -93,6 +97,7 @@ describe('EmailMarketingService', () => {
       sendOrchestrator as never,
       jobQueue as never,
       temporalJourney as never,
+      portalNotifications as never,
     );
   }
 

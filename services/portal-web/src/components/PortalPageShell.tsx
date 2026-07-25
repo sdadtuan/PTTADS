@@ -2,8 +2,16 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { PortalNav } from '@/components/PortalNav';
-import { fetchPendingCreativeCount, fetchPortalSettings, type PortalSettingsResponse } from '@/lib/api';
+import {
+  fetchPendingCreativeCount,
+  fetchPortalNotificationSummary,
+  fetchPortalSettings,
+  portalSeoStatus,
+  type PortalNotificationSummaryResponse,
+  type PortalSettingsResponse,
+} from '@/lib/api';
 import { usePortalAuth } from '@/hooks/usePortalAuth';
+import { usePortalEmailNav } from '@/hooks/usePortalEmailNav';
 import { usePortalSeoNav } from '@/hooks/usePortalSeoNav';
 
 interface PortalPageShellProps {
@@ -13,7 +21,12 @@ interface PortalPageShellProps {
 export function PortalPageShell({ children }: PortalPageShellProps) {
   const { user, token, loading, sessionWarning, logout } = usePortalAuth();
   const seoEnabled = usePortalSeoNav(token);
+  const { emailEnabled, pendingEmail } = usePortalEmailNav(token);
   const [pendingCount, setPendingCount] = useState(0);
+  const [seoPending, setSeoPending] = useState(0);
+  const [notificationSummary, setNotificationSummary] = useState<PortalNotificationSummaryResponse | null>(
+    null,
+  );
   const [branding, setBranding] = useState<PortalSettingsResponse | null>(null);
 
   useEffect(() => {
@@ -22,7 +35,17 @@ export function PortalPageShell({ children }: PortalPageShellProps) {
     void fetchPortalSettings(token)
       .then(setBranding)
       .catch(() => setBranding(null));
-  }, [token]);
+    void fetchPortalNotificationSummary(token)
+      .then(setNotificationSummary)
+      .catch(() => setNotificationSummary(null));
+    if (seoEnabled) {
+      void portalSeoStatus(token)
+        .then((status) => setSeoPending(Number(status.pending_client_review ?? 0)))
+        .catch(() => setSeoPending(0));
+    } else {
+      setSeoPending(0);
+    }
+  }, [token, seoEnabled]);
 
   if (loading || !user || !token) {
     return (
@@ -38,9 +61,12 @@ export function PortalPageShell({ children }: PortalPageShellProps) {
         user={user}
         onLogout={logout}
         pendingCount={pendingCount}
+        notificationUnread={notificationSummary?.unread ?? 0}
+        emailPending={pendingEmail}
+        seoPending={seoPending}
         branding={branding}
         seoEnabled={seoEnabled}
-        emailEnabled={false}
+        emailEnabled={emailEnabled}
       />
       {sessionWarning ? (
         <p className="badge" style={{ marginBottom: '1rem' }}>

@@ -36,6 +36,8 @@ export class AppConfigService {
   readonly portalRefreshTtlSec: number;
   readonly portalEmailNotifyEnabled: boolean;
   readonly portalEmailWebhookUrl: string | null;
+  readonly portalNotifyWebhookUrl: string | null;
+  readonly portalClientNotifyEnabled: boolean;
   readonly portalPublicUrl: string;
   readonly portalResetTtlMin: number;
   readonly portalStubUsers: PortalStubUser[];
@@ -105,6 +107,12 @@ export class AppConfigService {
       (process.env.PTT_PORTAL_EMAIL_NOTIFY ?? '0').trim().toLowerCase(),
     );
     this.portalEmailWebhookUrl = (process.env.PTT_PORTAL_EMAIL_WEBHOOK_URL ?? '').trim() || null;
+    this.portalNotifyWebhookUrl =
+      (process.env.PTT_PORTAL_NOTIFY_WEBHOOK ?? process.env.PTT_PORTAL_EMAIL_WEBHOOK_URL ?? '').trim() ||
+      null;
+    this.portalClientNotifyEnabled = ['1', 'true', 'yes', 'on'].includes(
+      (process.env.PTT_PORTAL_CLIENT_NOTIFY ?? '1').trim().toLowerCase(),
+    );
     this.portalPublicUrl = (
       process.env.PTT_PORTAL_PUBLIC_URL ??
       process.env.NEXT_PUBLIC_PORTAL_URL ??

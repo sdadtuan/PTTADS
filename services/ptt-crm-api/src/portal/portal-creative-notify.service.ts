@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Pool } from 'pg';
 import { AppConfigService } from '../config/app-config.service';
 import { CreativeRow } from '../creatives/creatives.types';
+import { PortalNotifyWebhookService } from './portal-notify-webhook.service';
 
 export interface CreativeNotifyResult {
   inbox: { ok: boolean; notification_id?: string | null; error?: string };
@@ -13,7 +14,10 @@ export class PortalCreativeNotifyService {
   private readonly logger = new Logger(PortalCreativeNotifyService.name);
   private pool: Pool | null = null;
 
-  constructor(private readonly config: AppConfigService) {}
+  constructor(
+    private readonly config: AppConfigService,
+    private readonly webhook: PortalNotifyWebhookService,
+  ) {}
 
   private get db(): Pool {
     if (!this.pool) {
@@ -87,27 +91,16 @@ export class PortalCreativeNotifyService {
     skipped?: boolean;
     error?: string;
   }> {
-    if (!this.config.portalEmailNotifyEnabled) {
+    const result = await this.webhook.send({
+      source: 'portal_creative_decision',
+      ...payload,
+    });
+    if (result.skipped) {
       return { ok: true, skipped: true };
     }
-    const url = this.config.portalEmailWebhookUrl;
-    if (!url) {
-      this.logger.log('portal email notify stub: %j', payload);
-      return { ok: true, stub: true };
+    if (!result.ok) {
+      return { ok: false, error: result.error };
     }
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({ source: 'portal_creative_decision', ...payload }),
-      });
-      if (!res.ok) {
-        return { ok: false, error: `webhook HTTP ${res.status}` };
-      }
-      return { ok: true };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return { ok: false, error: message };
-    }
+    return { ok: true };
   }
 }

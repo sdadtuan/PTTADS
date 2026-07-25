@@ -711,3 +711,99 @@ export async function portalEmailCampaignStats(
   }
   return body;
 }
+
+export interface PortalNotificationRow {
+  id: string;
+  client_id: string;
+  category: string;
+  title: string;
+  body: string | null;
+  link_url: string | null;
+  read: boolean;
+  read_at: string | null;
+  created_at: string;
+  meta?: Record<string, unknown>;
+}
+
+export interface PortalNotificationListResponse {
+  ok: boolean;
+  client_id: string;
+  count: number;
+  unread: number;
+  rows: PortalNotificationRow[];
+  table_ready: boolean;
+}
+
+export interface PortalNotificationSummaryResponse {
+  ok: boolean;
+  client_id: string;
+  unread: number;
+  pending_creatives: number;
+  pending_email: number;
+  pending_seo: number;
+  table_ready: boolean;
+}
+
+export async function fetchPortalNotifications(
+  token: string,
+  params?: { unreadOnly?: boolean; limit?: number },
+): Promise<PortalNotificationListResponse> {
+  const qs = new URLSearchParams();
+  if (params?.unreadOnly) qs.set('unread_only', '1');
+  if (params?.limit) qs.set('limit', String(params.limit));
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const res = await fetch(`${API_BASE}/api/v1/portal/notifications${suffix}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await parseJson<PortalNotificationListResponse & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Notifications fetch failed', res.status);
+  }
+  return body;
+}
+
+export async function fetchPortalNotificationSummary(
+  token: string,
+): Promise<PortalNotificationSummaryResponse> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/notifications/summary`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: 'no-store',
+  });
+  const body = await parseJson<PortalNotificationSummaryResponse & { error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Notification summary failed', res.status);
+  }
+  return body;
+}
+
+export async function markPortalNotificationRead(
+  token: string,
+  notificationId: string,
+): Promise<{ ok: boolean; notification: PortalNotificationRow }> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/notifications/${encodeURIComponent(notificationId)}/read`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = await parseJson<
+    { ok: boolean; notification: PortalNotificationRow } & { error?: string; message?: string }
+  >(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Mark read failed', res.status);
+  }
+  return body;
+}
+
+export async function markAllPortalNotificationsRead(
+  token: string,
+): Promise<{ ok: boolean; updated: number }> {
+  const res = await fetch(`${API_BASE}/api/v1/portal/notifications/read-all`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = await parseJson<{ ok: boolean; updated: number; error?: string; message?: string }>(res);
+  if (!res.ok) {
+    throw new ApiError(body.error ?? body.message ?? 'Mark all read failed', res.status);
+  }
+  return body;
+}

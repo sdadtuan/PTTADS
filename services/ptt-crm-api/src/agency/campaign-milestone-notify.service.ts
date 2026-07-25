@@ -1,13 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Pool } from 'pg';
 import { AppConfigService } from '../config/app-config.service';
+import { PortalNotificationService } from '../portal/portal-notification.service';
 
 @Injectable()
 export class CampaignMilestoneNotifyService {
   private readonly logger = new Logger(CampaignMilestoneNotifyService.name);
   private pool: Pool | null = null;
 
-  constructor(private readonly config: AppConfigService) {}
+  constructor(
+    private readonly config: AppConfigService,
+    private readonly portalNotifications: PortalNotificationService,
+  ) {}
 
   private get db(): Pool {
     if (!this.pool) {
@@ -45,7 +49,24 @@ export class CampaignMilestoneNotifyService {
           }),
         ],
       );
-      return { ok: true, notification_id: result.rows[0]?.id ?? null };
+      const notificationId = result.rows[0]?.id ?? null;
+
+      if (input.clientId) {
+        const portalPath =
+          input.link?.startsWith('/') && !input.link.startsWith('/crm')
+            ? input.link
+            : '/zalo';
+        await this.portalNotifications.emitMilestone({
+          clientId: input.clientId,
+          milestone: input.milestone,
+          title: input.title,
+          body: input.body,
+          linkUrl: portalPath,
+          meta: { channel: 'zalo', ...(input.meta ?? {}) },
+        });
+      }
+
+      return { ok: true, notification_id: notificationId };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn('zalo milestone notify failed: %s', message);
