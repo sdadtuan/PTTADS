@@ -64,4 +64,7 @@ export {
   upsertSeoCmsTarget,
   fetchSeoCmsJobs,
   testSeoCmsWebhook,
+  fetchSeoGateAStatus,
+  fetchSeoGateAReadiness,
+  fetchSeoGateASignoffTemplate,
 } from '@/lib/api';

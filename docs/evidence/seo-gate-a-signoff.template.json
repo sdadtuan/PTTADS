@@ -1,0 +1,56 @@
+{
+  "phase": "7",
+  "component": "seo_aeo_gate_a_ops_web",
+  "environment": "production",
+  "cutover_started_at": null,
+  "signed_at": null,
+  "pilot": {
+    "customer_id": null,
+    "portal_client_uuid": null,
+    "content_id_client_review": null
+  },
+  "flags_applied": {
+    "PTT_SEO_GOVERNANCE_ENABLED": false,
+    "PTT_PORTAL_SEO_ENABLED": false,
+    "PTT_SEO_EXPERIMENTS_ENABLED": false
+  },
+  "staged_steps": {
+    "B1_governance": false,
+    "B2_portal": false,
+    "B3_experiments": false
+  },
+  "gates": {
+    "wave_b2_b6_ok": false,
+    "phase5_gate_report_ok": false,
+    "portal_playwright_e2e": false,
+    "soak_7d_ok": false,
+    "soak_span_days": null,
+    "soak_sample_count": null,
+    "nginx_crm_seo_redirect": false,
+    "flask_seo_retired": true,
+    "ops_web_routes_complete": false
+  },
+  "manual_uat": {
+    "governance_modal": false,
+    "governance_override_admin": false,
+    "portal_viewer_read_only": false,
+    "portal_approver_client_review": false,
+    "experiments_create_to_decision": false,
+    "cwv_panel_snapshots": false,
+    "cms_autopublish_pilot": false
+  },
+  "artifacts": {
+    "seo_b7_gate_report": ".local-dev/wave-gates/seo_b7_gate_report.json",
+    "phase5_gate_report": ".local-dev/phase5-gate-report.json",
+    "portal_uat_signoff": ".local-dev/phase5-portal-seo-uat-signoff.json",
+    "soak_evidence": ".local-dev/phase5-soak-evidence.jsonl"
+  },
+  "signoffs": {
+    "head_seo_aeo": null,
+    "qa_compliance": null,
+    "am_pilot": null,
+    "client_approver": null,
+    "devops": null
+  },
+  "notes": "Gate A — Nest + ops-web staff SEO; Flask /crm/seo retired. See docs/runbooks/phase5-prod-signoff-checklist.md"
+}

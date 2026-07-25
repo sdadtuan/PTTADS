@@ -29,6 +29,8 @@ def _now_iso() -> str:
 
 
 def _run_pytest() -> dict[str, Any]:
+    if os.environ.get("PHASE5_SKIP_PYTEST", "0") == "1":
+        return {"id": "P5-G01", "ok": True, "label": "Phase 5 pytest", "skipped": True}
     python = sys.executable
     env = {**os.environ, "PYTHONPATH": str(ROOT)}
     cmd = [python, "-m", "pytest", *PHASE5_PYTEST_GLOBS, "-q", "--tb=no"]

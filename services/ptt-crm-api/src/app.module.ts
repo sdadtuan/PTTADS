@@ -42,6 +42,7 @@ import { ProposalsModule } from './proposals/proposals.module';
 import { ReProjectsModule } from './re-projects/re-projects.module';
 import { EmailMarketingModule } from './email-marketing/email-marketing.module';
 import { SeoAdminModule } from './seo-admin/seo-admin.module';
+import { SeoGateAModule } from './seo-gate-a/seo-gate-a.module';
 import { SeoBiModule } from './seo-bi/seo-bi.module';
 import { SeoCmsModule } from './seo-cms/seo-cms.module';
 import { SeoCronModule } from './seo-cron/seo-cron.module';
@@ -111,6 +112,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     SeoBiModule,
     SeoCronModule,
     SeoCmsModule,
+    SeoGateAModule,
     EmailMarketingModule,
     PerformanceModule,
     MetaTrackingModule,

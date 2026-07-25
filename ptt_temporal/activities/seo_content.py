@@ -42,7 +42,7 @@ def _pg_conn():
 async def notify_am_seo_content_pending(inp: SeoContentPendingInput) -> dict[str, Any]:
     title = f"SEO content chờ client duyệt: {inp.title}"
     body = f"Client {inp.client_id} — content #{inp.content_id} đang ở client_review."
-    link = f"/crm/seo/content?customer_id={inp.customer_id}&content_id={inp.content_id}"
+    link = f"/seo/content?customer_id={inp.customer_id}&content_id={inp.content_id}"
     meta = {
         "content_id": inp.content_id,
         "customer_id": inp.customer_id,
@@ -63,7 +63,7 @@ async def notify_am_seo_content_decision(inp: SeoContentDecisionInput) -> dict[s
     body = inp.note or f"Quyết định: {inp.decision}"
     if inp.reviewed_by:
         body = f"{body} — bởi {inp.reviewed_by}"
-    link = f"/crm/seo/content?customer_id={inp.customer_id}&content_id={inp.content_id}"
+    link = f"/seo/content?customer_id={inp.customer_id}&content_id={inp.content_id}"
     meta = {
         "content_id": inp.content_id,
         "customer_id": inp.customer_id,

@@ -15,6 +15,7 @@ import {
   canViewSeoContent,
   canViewSeoBi,
   canViewSeoCms,
+  canViewSeoGateA,
   canViewSeoExperiments,
   canViewSeoFreshness,
   canViewSeoGovernance,
@@ -31,6 +32,7 @@ import {
   seoAutomationsEnabled,
   seoBiEnabled,
   seoCmsEnabled,
+  seoGateAEnabled,
   seoContentEnabled,
   seoExperimentsEnabled,
   seoFreshnessEnabled,
@@ -106,6 +108,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/seo/experiments': 'SEO Experiments',
   '/seo/bi': 'SEO BI & Grafana',
   '/seo/cms': 'CMS Publish Pilot',
+  '/seo/gate-a': 'SEO Gate A Go-live',
   '/email/hub': 'Email Hub',
   '/email/clients': 'Email Clients',
   '/email/contacts': 'Contacts',
@@ -306,6 +309,9 @@ function buildSections(
     }
     if (seoCmsEnabled() && canViewSeoCms(user)) {
       agency.push({ href: '/seo/cms', label: 'CMS Pilot' });
+    }
+    if (seoGateAEnabled() && canViewSeoGateA(user)) {
+      agency.push({ href: '/seo/gate-a', label: 'Gate A Go-live' });
     }
   }
   if (agency.length) sections.push({ label: 'Agency & Hub', links: agency });

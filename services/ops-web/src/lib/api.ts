@@ -4096,6 +4096,24 @@ export async function testSeoCmsWebhook(
   });
 }
 
+export async function fetchSeoGateAStatus(
+  token: string,
+): Promise<Record<string, unknown>> {
+  return agencyFetch(token, '/api/v1/seo/gate-a/status');
+}
+
+export async function fetchSeoGateAReadiness(
+  token: string,
+): Promise<Record<string, unknown>> {
+  return agencyFetch(token, '/api/v1/seo/gate-a/readiness');
+}
+
+export async function fetchSeoGateASignoffTemplate(
+  token: string,
+): Promise<{ ok: boolean; template: Record<string, unknown> }> {
+  return agencyFetch(token, '/api/v1/seo/gate-a/signoff-template');
+}
+
 export async function fetchSeoAlerts(
   token: string,
   status = 'open',

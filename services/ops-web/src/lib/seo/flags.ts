@@ -77,3 +77,8 @@ export function seoCmsEnabled(): boolean {
   const raw = process.env.NEXT_PUBLIC_PTT_SEO_CMS_ENABLED ?? '1';
   return raw.trim().toLowerCase() !== '0';
 }
+
+export function seoGateAEnabled(): boolean {
+  const raw = process.env.NEXT_PUBLIC_PTT_SEO_GATE_A_ENABLED ?? '1';
+  return raw.trim().toLowerCase() !== '0';
+}

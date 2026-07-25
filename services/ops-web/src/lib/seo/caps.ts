@@ -8,6 +8,7 @@ import {
   seoExperimentsEnabled,
   seoBiEnabled,
   seoCmsEnabled,
+  seoGateAEnabled,
   seoFreshnessEnabled,
   seoGovernanceEnabled,
   seoHubEnabled,
@@ -148,4 +149,9 @@ export function canViewSeoBi(user: StoredStaffUser | null): boolean {
 export function canViewSeoCms(user: StoredStaffUser | null): boolean {
   if (!user || !seoCmsEnabled()) return false;
   return canConfigureSeoSettings(user) || canWriteSeoTechnical(user);
+}
+
+export function canViewSeoGateA(user: StoredStaffUser | null): boolean {
+  if (!user || !seoGateAEnabled()) return false;
+  return canConfigureSeoSettings(user) || hasCap(user, 'crm_agency', 'configure');
 }

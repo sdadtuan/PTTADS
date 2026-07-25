@@ -33,22 +33,26 @@ Chiến lược → Nghiên cứu → Sản xuất nội dung → QA kỹ thuậ
 
 ### 1.1. Module đã triển khai
 
+Staff console: **ops-web** tại `https://rs.pttads.vn/seo/*` (Nest API `ptt-crm-api`). Bookmark legacy Flask SEO redirect tự động sang `/seo/*` (nginx Gate A).
+
 | Nhóm | Module | Route chính |
 |------|--------|-------------|
-| Hub | Tổng quan Executive | `/crm/seo` |
-| Client | Workspace khách hàng SEO | `/crm/seo/clients/:id` |
-| Strategy | OKR/KPI & Roadmap | `/crm/seo/strategy` |
-| Research | Nghiên cứu (keyword, cluster, SERP…) | `/crm/seo/research` |
-| Content | Pipeline nội dung | `/crm/seo/content` |
-| Technical | Kỹ thuật, GSC/GA4, CWV, crawl | `/crm/seo/technical` |
-| AEO | AEO Console | `/crm/seo/aeo` |
-| Authority | Mentions & citations | `/crm/seo/authority` |
-| Reports | Báo cáo & attribution | `/crm/seo/reports` |
-| Ranks | Rank tracker & SOV | `/crm/seo/ranks` |
-| Automations | Cảnh báo & rule | `/crm/seo/automations` |
-| Governance | Chính sách publish | `/crm/seo/governance` |
-| Experiments | A/B SEO | `/crm/seo/experiments` |
-| Freshness | Hàng đợi refresh | `/crm/seo/freshness` |
+| Hub | Tổng quan Executive | `/seo/hub` |
+| Client | Workspace khách hàng SEO | `/seo/clients/:id` |
+| Strategy | OKR/KPI & Roadmap | `/seo/strategy` |
+| Research | Nghiên cứu (keyword, cluster, SERP…) | `/seo/research` |
+| Content | Pipeline nội dung | `/seo/content` |
+| Technical | Kỹ thuật, GSC/GA4, CWV, crawl | `/seo/technical` |
+| AEO | AEO Console | `/seo/aeo` |
+| Authority | Mentions & citations | `/seo/authority` |
+| Reports | Báo cáo & attribution | `/seo/reports` |
+| Ranks | Rank tracker & SOV | `/seo/ranks` |
+| Automations | Cảnh báo & rule | `/seo/automations` |
+| Governance | Chính sách publish | `/seo/governance` |
+| Experiments | A/B SEO | `/seo/experiments` |
+| Freshness | Hàng đợi refresh | `/seo/freshness` |
+| BI / CMS | Grafana export · CMS pilot | `/seo/bi` · `/seo/cms` |
+| Gate A | Go-live readiness & soak | `/seo/gate-a` |
 | Portal | Client xem/duyệt (Next.js) | `/seo` (portal) |
 
 ### 1.2. Luồng dữ liệu chính
@@ -65,15 +69,19 @@ Chiến lược → Nghiên cứu → Sản xuất nội dung → QA kỹ thuậ
 ┌─────────────────────────────────────────────────────────────┐
 │  VPS (vd. /var/www/ptt)                                     │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│  │ systemd: ptt │  │ ptt-worker   │  │ portal-web (opt) │  │
-│  │ Flask :5000  │  │ job queue    │  │ Next.js :3000    │  │
+│  │ ops-web :3200│  │ ptt-worker   │  │ portal-web (opt) │  │
+│  │ staff /seo/* │  │ job queue    │  │ Next.js :3001    │  │
 │  └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘  │
 │         │                 │                    │            │
+│  ┌──────┴───────┐         │                    │            │
+│  │ ptt-crm-api  │         │                    │            │
+│  │ Nest :3000   │         │                    │            │
+│  └──────┬───────┘         │                    │            │
 │         └────────┬────────┴────────────────────┘            │
 │                  ▼                                          │
 │         PostgreSQL (seo_aeo.*) + SQLite (CRM)               │
 │                  │                                          │
-│    systemd timers: GSC sync · GA4 sync · Gate D · ClickHouse │
+│    systemd timers: GSC sync · GA4 sync · Gate D/E · ClickHouse│
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -84,7 +92,8 @@ Chiến lược → Nghiên cứu → Sản xuất nội dung → QA kỹ thuậ
 | Repo | `/var/www/ptt` |
 | Env | `/var/www/ptt/.env` |
 | User SSH deploy | `deploy` |
-| Service Flask | `ptt` |
+| Staff console | `rs.pttads.vn` → ops-web |
+| Nest API | `ptt-crm-api` (systemd) |
 | Log cron SEO | `/var/log/seo_aeo_cron_*.log` |
 
 ---
@@ -302,9 +311,10 @@ Soak ≥ 7 ngày: `./scripts/phase5_soak_record.sh` hàng ngày.
 
 ### 4.1. Đăng nhập
 
-1. Truy cập `https://pttads.vn/admin` (hoặc domain CRM của agency)
-2. Sidebar → **CRM · SEO/AEO Ops**
-3. Legacy AEO: `/crm/aeo` tự redirect → `/crm/seo/aeo`
+1. Truy cập `https://rs.pttads.vn/login` (staff ops-web)
+2. Sidebar → **Agency & Hub** → **SEO/AEO Hub**
+3. Bookmark legacy Flask SEO tự redirect sang `/seo/*` (nginx Gate A)
+4. Legacy AEO: `/crm/aeo` redirect → `/seo/aeo`
 
 ### 4.2. Section keys (Admin → Phân quyền trang)
 
@@ -335,7 +345,7 @@ Template ẩn/hiện nút qua flags: `can_seo_write`, `can_seo_approve`, `can_se
 
 ## 5. Hướng dẫn từng module
 
-### 5.1. S-01 — Tổng quan Executive (`/crm/seo`)
+### 5.1. S-01 — Tổng quan Executive (`/seo`)
 
 **Mục đích:** Dashboard cấp lãnh đạo — KPI tổng, client health, issue nghiêm trọng, tiến độ content.
 
@@ -352,7 +362,7 @@ Template ẩn/hiện nút qua flags: `can_seo_write`, `can_seo_approve`, `can_se
 
 ### 5.2. S-02 / S-03 / S-04 — Khách hàng SEO & Workspace
 
-**Routes:** `/crm/seo/clients` · `/crm/seo/clients/:id` · tab Cài đặt
+**Routes:** `/seo/clients` · `/seo/clients/:id` · tab Cài đặt
 
 **Tính năng workspace (tabs):**
 
@@ -380,14 +390,14 @@ Template ẩn/hiện nút qua flags: `can_seo_write`, `can_seo_approve`, `can_se
 **Onboard client mới:**
 
 1. Tạo/chọn customer trong CRM
-2. Vào `/crm/seo/clients/:id/settings` → lưu domain + tier
+2. Vào `/seo/clients/:id/settings` → lưu domain + tier
 3. Technical Console → kết nối GSC + GA4 OAuth
 4. Research → import keyword CSV
 5. (Tuỳ chọn) Seed CMS pilot: **Áp dụng pilot mặc định**
 
 ---
 
-### 5.3. S-05 — Chiến lược & OKR (`/crm/seo/strategy`)
+### 5.3. S-05 — Chiến lược & OKR (`/seo/strategy`)
 
 **Tính năng (Gate E1):**
 
@@ -410,7 +420,7 @@ Template ẩn/hiện nút qua flags: `can_seo_write`, `can_seo_approve`, `can_se
 
 ---
 
-### 5.4. S-06 — Research Console (`/crm/seo/research`)
+### 5.4. S-06 — Research Console (`/seo/research`)
 
 **7 tabs:** Keywords · Questions · Entities · Clusters · SERP · Pages · Opportunities
 
@@ -437,7 +447,7 @@ Template ẩn/hiện nút qua flags: `can_seo_write`, `can_seo_approve`, `can_se
 
 ### 5.5. S-07 / S-08 — Content Pipeline & Detail
 
-**Pipeline (`/crm/seo/content`):**
+**Pipeline (`/seo/content`):**
 
 - Kanban 13 giai đoạn workflow
 - Filter client, owner, status
@@ -451,7 +461,7 @@ Idea → Researching → Brief Ready → In Writing → SEO Review → AEO Revie
      → Monitoring → Refresh Required → Archived
 ```
 
-**Content detail (`/crm/seo/content/:id`):**
+**Content detail (`/seo/content/:id`):**
 
 | Khu vực | Thao tác |
 |---------|----------|
@@ -474,7 +484,7 @@ Runbook CMS: [`runbooks/seo-cms-webhook-pilot.md`](runbooks/seo-cms-webhook-pilo
 
 ---
 
-### 5.6. S-09 — Technical Console (`/crm/seo/technical`)
+### 5.6. S-09 — Technical Console (`/seo/technical`)
 
 **Tính năng:**
 
@@ -488,7 +498,7 @@ Runbook CMS: [`runbooks/seo-cms-webhook-pilot.md`](runbooks/seo-cms-webhook-pilo
 
 **Onboard GSC/GA4 (pilot client):**
 
-1. Vào `/crm/seo/technical?customer_id=<ID>`
+1. Vào `/seo/technical?customer_id=<ID>`
 2. Nhập GA4 Property ID (nếu cần)
 3. **Kết nối Google** (GSC) → consent → callback OK
 4. Lặp lại cho GA4
@@ -518,7 +528,7 @@ curl -X POST \
 
 ---
 
-### 5.7. S-10 — AEO Console (`/crm/seo/aeo`)
+### 5.7. S-10 — AEO Console (`/seo/aeo`)
 
 **Tính năng:**
 
@@ -539,20 +549,20 @@ curl -X POST \
 
 ---
 
-### 5.8. S-11 — Authority Console (`/crm/seo/authority`)
+### 5.8. S-11 — Authority Console (`/seo/authority`)
 
 **Tính năng:** Theo dõi mentions, citations, backlink quality.
 
 **Cách sử dụng:**
 
-1. Chọn client tại `/crm/seo/authority`
+1. Chọn client tại `/seo/authority`
 2. Xem summary mentions/citations
 3. Thêm mention thủ công hoặc import (nếu có connector)
 4. Dùng trong executive dashboard (authority block)
 
 ---
 
-### 5.9. S-12 — Reporting Center (`/crm/seo/reports`)
+### 5.9. S-12 — Reporting Center (`/seo/reports`)
 
 **Dashboard types:** Executive · SEO/GSC · Content · Technical · Ops · BI/Warehouse
 
@@ -579,7 +589,7 @@ curl -X POST \
 
 ---
 
-### 5.10. S-17 — Rank Tracker (`/crm/seo/ranks`)
+### 5.10. S-17 — Rank Tracker (`/seo/ranks`)
 
 **Tính năng (Gate E6):**
 
@@ -599,7 +609,7 @@ curl -X POST \
 
 ---
 
-### 5.11. S-13 — Automations & Alerts (`/crm/seo/automations`)
+### 5.11. S-13 — Automations & Alerts (`/seo/automations`)
 
 **Tính năng:**
 
@@ -609,14 +619,14 @@ curl -X POST \
 
 **Cách sử dụng:**
 
-1. Vào `/crm/seo/automations`
+1. Vào `/seo/automations`
 2. Xem alert đang mở
 3. **Run checks** — trigger anomaly detection
 4. Alerts gửi Slack (`PTT_SEO_SLACK_WEBHOOK`) và/hoặc Teams (`PTT_SEO_TEAMS_WEBHOOK`)
 
 ---
 
-### 5.12. S-14 — Governance Hub (`/crm/seo/governance`)
+### 5.12. S-14 — Governance Hub (`/seo/governance`)
 
 **Bật khi:** `PTT_SEO_GOVERNANCE_ENABLED=1`
 
@@ -634,7 +644,7 @@ curl -X POST \
 
 ---
 
-### 5.13. S-16 — Experiments (`/crm/seo/experiments`)
+### 5.13. S-16 — Experiments (`/seo/experiments`)
 
 **Bật khi:** `PTT_SEO_EXPERIMENTS_ENABLED=1`
 
@@ -648,7 +658,7 @@ curl -X POST \
 
 ---
 
-### 5.14. Freshness Queue (`/crm/seo/freshness`)
+### 5.14. Freshness Queue (`/seo/freshness`)
 
 **Tính năng:** Hàng đợi content cần refresh (decay score, traffic giảm).
 

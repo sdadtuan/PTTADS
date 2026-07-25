@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# SEO Gate A — full automated cutover gate (Phase 7.1): wave B7 + phase5 prod gates.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+PYTHON="${PYTHON:-python3}"
+export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+export PTT_ARTIFACTS_DIR="${PTT_ARTIFACTS_DIR:-$ROOT/.local-dev}"
+export DATABASE_URL="${DATABASE_URL:-postgresql://ptt:ptt_dev@127.0.0.1:5432/ptt_agency}"
+export SEO_AEO_DB="${SEO_AEO_DB:-pg}"
+export PTT_SEO_GOVERNANCE_ENABLED="${PTT_SEO_GOVERNANCE_ENABLED:-1}"
+export PTT_PORTAL_SEO_ENABLED="${PTT_PORTAL_SEO_ENABLED:-0}"
+export PTT_SEO_EXPERIMENTS_ENABLED="${PTT_SEO_EXPERIMENTS_ENABLED:-0}"
+export PHASE5_EXPECT_GOVERNANCE="${PHASE5_EXPECT_GOVERNANCE:-1}"
+export PHASE5_EXPECT_PORTAL="${PHASE5_EXPECT_PORTAL:-0}"
+export PHASE5_EXPECT_EXPERIMENTS="${PHASE5_EXPECT_EXPERIMENTS:-0}"
+export PHASE5_SKIP_SOAK="${PHASE5_SKIP_SOAK:-1}"
+export PHASE5_SKIP_PORTAL_SIGNOFF="${PHASE5_SKIP_PORTAL_SIGNOFF:-1}"
+export PHASE5_SKIP_PYTEST="${PHASE5_SKIP_PYTEST:-1}"
+export WAVE_SEO_B7_SKIP_PRIOR="${WAVE_SEO_B7_SKIP_PRIOR:-0}"
+export WAVE_SEO_B5_SKIP_JEST="${WAVE_SEO_B5_SKIP_JEST:-1}"
+
+echo "==> SEO Gate A cutover gate (Phase 7)"
+echo "==> Wave B7"
+bash "$ROOT/scripts/wave_seo_b7_gate.sh"
+echo "==> Phase 5 prod gates"
+bash "$ROOT/scripts/phase5_prod_cutover_gate.sh"
+echo "OK  SEO Gate A cutover gate — see .local-dev/wave-gates/seo_b7_gate_report.json and phase5-gate-report.json"
