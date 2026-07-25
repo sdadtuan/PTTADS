@@ -19,8 +19,10 @@ import {
   SeoContentVersionRow,
   SeoEntityGroupRow,
   SeoKeywordRow,
+  SeoPageRow,
   SeoPipelineBoard,
   SeoQuestionRow,
+  SeoSerpSnapshotRow,
 } from './seo-content.types';
 
 const SCHEMA = SEO_CONTENT_SCHEMA;
@@ -911,6 +913,64 @@ export class SeoContentRepository implements OnModuleDestroy {
         message: 'Còn issue kỹ thuật critical mở',
       });
     }
+  }
+
+  async listSerpSnapshots(customerId: number, limit = 50): Promise<SeoSerpSnapshotRow[]> {
+    const safeLimit = Math.max(1, Math.min(limit, 200));
+    const result = await this.db.query(
+      `SELECT id, customer_id, keyword_id, phrase, snapshot_date, results_json, source, created_at
+       FROM ${SCHEMA}.seo_serp_snapshots
+       WHERE customer_id = $1
+       ORDER BY snapshot_date DESC, id DESC
+       LIMIT $2`,
+      [customerId, safeLimit],
+    );
+    return result.rows.map((row) => {
+      let results: unknown[] = [];
+      try {
+        const parsed = JSON.parse(String(row.results_json ?? '[]'));
+        results = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        results = [];
+      }
+      return {
+        id: Number(row.id),
+        customer_id: Number(row.customer_id),
+        keyword_id: row.keyword_id != null ? Number(row.keyword_id) : null,
+        phrase: String(row.phrase ?? ''),
+        snapshot_date: String(row.snapshot_date ?? ''),
+        source: String(row.source ?? ''),
+        created_at: String(row.created_at ?? ''),
+        result_count: results.length,
+        top_results: results.slice(0, 5).map((item) =>
+          typeof item === 'object' && item != null ? (item as Record<string, unknown>) : { value: item },
+        ),
+      };
+    });
+  }
+
+  async listPages(customerId: number, limit = 500): Promise<SeoPageRow[]> {
+    const safeLimit = Math.max(1, Math.min(limit, 500));
+    const result = await this.db.query(
+      `SELECT id, customer_id, url, title, slug, content_type, schema_type, status, last_crawled_at, created_at
+       FROM ${SCHEMA}.seo_pages
+       WHERE customer_id = $1
+       ORDER BY url ASC
+       LIMIT $2`,
+      [customerId, safeLimit],
+    );
+    return result.rows.map((row) => ({
+      id: Number(row.id),
+      customer_id: Number(row.customer_id),
+      url: String(row.url ?? ''),
+      title: String(row.title ?? ''),
+      slug: String(row.slug ?? ''),
+      content_type: String(row.content_type ?? ''),
+      schema_type: String(row.schema_type ?? ''),
+      status: String(row.status ?? ''),
+      last_crawled_at: row.last_crawled_at != null ? String(row.last_crawled_at) : null,
+      created_at: row.created_at != null ? String(row.created_at) : null,
+    }));
   }
 
   private async logAudit(

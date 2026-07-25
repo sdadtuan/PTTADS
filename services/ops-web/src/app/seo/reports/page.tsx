@@ -7,6 +7,7 @@ import { OpsNav } from '@/components/OpsNav';
 import {
   downloadSeoReportExport,
   fetchSeoAlerts,
+  fetchSeoAttribution,
   fetchSeoClients,
   fetchSeoDashboard,
   fetchSeoReportSchedules,
@@ -98,6 +99,10 @@ function SeoReportsContent() {
   const [dashboard, setDashboard] = useState<SeoDashboardData | null>(null);
   const [schedules, setSchedules] = useState<SeoReportScheduleRow[]>([]);
   const [alerts, setAlerts] = useState<Array<Record<string, unknown>>>([]);
+  const [attribution, setAttribution] = useState<{
+    summary: Record<string, unknown>;
+    top_landing_pages: Array<Record<string, unknown>>;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [exportBusy, setExportBusy] = useState(false);
   const [error, setError] = useState('');
@@ -146,14 +151,16 @@ function SeoReportsContent() {
       setLoading(true);
       setError('');
       try {
-        const [dashOut, schedOut, alertsOut] = await Promise.all([
+        const [dashOut, schedOut, alertsOut, attrOut] = await Promise.all([
           fetchSeoDashboard(access, cid, type),
           fetchSeoReportSchedules(access, cid),
           fetchSeoAlerts(access, 'open'),
+          fetchSeoAttribution(access, cid, 28),
         ]);
         setDashboard(dashOut.dashboard);
         setSchedules(schedOut.schedules);
         setAlerts(alertsOut.alerts);
+        setAttribution({ summary: attrOut.summary, top_landing_pages: attrOut.top_landing_pages });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Không tải được báo cáo');
       } finally {
@@ -351,6 +358,64 @@ function SeoReportsContent() {
 
             {dashboard?.severity_chart && dashboard.severity_chart.length > 0 && (
               <BarChart items={dashboard.severity_chart} title="Issues theo severity" />
+            )}
+
+            {attribution && (
+              <div className="card" style={{ marginBottom: '1rem' }}>
+                <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Organic attribution (28 ngày)</h2>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                    gap: '1rem',
+                    marginBottom: '1rem',
+                  }}
+                >
+                  {[
+                    { label: 'Sessions', value: attribution.summary.sessions },
+                    { label: 'Users', value: attribution.summary.users },
+                    { label: 'Conversions', value: attribution.summary.conversions },
+                    { label: 'Revenue', value: attribution.summary.revenue },
+                    { label: 'Conv. rate', value: attribution.summary.conversion_rate },
+                    { label: 'Rev/session', value: attribution.summary.revenue_per_session },
+                  ].map((item) => (
+                    <div key={item.label}>
+                      <p className="muted" style={{ margin: 0 }}>
+                        {item.label}
+                      </p>
+                      <strong>{String(item.value ?? '—')}</strong>
+                    </div>
+                  ))}
+                </div>
+                {attribution.top_landing_pages.length > 0 ? (
+                  <div className="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Landing page</th>
+                          <th>Sessions</th>
+                          <th>Conversions</th>
+                          <th>Revenue</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {attribution.top_landing_pages.map((row, idx) => (
+                          <tr key={String(row.landing_page ?? idx)}>
+                            <td style={{ maxWidth: 320, wordBreak: 'break-all' }}>
+                              {String(row.landing_page ?? '—')}
+                            </td>
+                            <td>{String(row.sessions ?? '—')}</td>
+                            <td>{String(row.conversions ?? '—')}</td>
+                            <td>{String(row.revenue ?? '—')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="muted">Chưa có GA4 organic landing pages — chạy sync GA4 trước.</p>
+                )}
+              </div>
             )}
 
             <div className="card" style={{ marginBottom: '1rem' }}>

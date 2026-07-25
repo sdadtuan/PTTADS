@@ -108,6 +108,54 @@ export class SeoStrategyRepository implements OnModuleDestroy {
     return { id: Number(result.rows[0].id), metric_label: label };
   }
 
+  async updateKpi(customerId: number, kpiId: number, payload: Record<string, unknown>) {
+    const existing = await this.db.query(
+      `SELECT id FROM ${SCHEMA}.seo_strategy_kpis WHERE id = $1 AND customer_id = $2`,
+      [kpiId, customerId],
+    );
+    if (!existing.rows[0]) throw new NotFoundException({ error: 'kpi_not_found' });
+
+    if (payload.goal_id != null) {
+      const goalId = Number(payload.goal_id);
+      const g = await this.db.query(
+        `SELECT id FROM ${SCHEMA}.seo_strategy_goals WHERE id = $1 AND customer_id = $2`,
+        [goalId, customerId],
+      );
+      if (!g.rows[0]) throw new BadRequestException({ error: 'goal_not_found' });
+    }
+
+    const updates: string[] = [];
+    const params: unknown[] = [kpiId, customerId];
+    let p = 3;
+
+    const setField = (col: string, val: unknown) => {
+      updates.push(`${col} = $${p}`);
+      params.push(val);
+      p += 1;
+    };
+
+    if (payload.goal_id != null) setField('goal_id', Number(payload.goal_id));
+    if (payload.metric_label != null) setField('metric_label', String(payload.metric_label).trim());
+    if (payload.metric_key != null) setField('metric_key', String(payload.metric_key).trim());
+    if (payload.target_value !== undefined) setField('target_value', payload.target_value);
+    if (payload.current_value !== undefined) setField('current_value', payload.current_value);
+    if (payload.unit != null) setField('unit', String(payload.unit));
+    if (payload.initiative_id !== undefined) setField('initiative_id', payload.initiative_id ?? null);
+
+    if (updates.length === 0) throw new BadRequestException({ error: 'no_fields' });
+
+    updates.push(`updated_at = $${p}`);
+    params.push(tsUtc());
+
+    await this.db.query(
+      `UPDATE ${SCHEMA}.seo_strategy_kpis SET ${updates.join(', ')} WHERE id = $1 AND customer_id = $2`,
+      params,
+    );
+
+    const row = await this.db.query(`SELECT * FROM ${SCHEMA}.seo_strategy_kpis WHERE id = $1`, [kpiId]);
+    return row.rows[0];
+  }
+
   async linkInitiative(customerId: number, initiativeId: number, goalId: number | null) {
     const row = await this.db.query(
       `SELECT id FROM ${SCHEMA}.seo_initiatives WHERE id = $1 AND customer_id = $2`,

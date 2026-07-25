@@ -9,6 +9,8 @@ export {
   createSeoKeyword,
   createSeoQuestion,
   createSeoStrategyGoal,
+  createSeoStrategyKpi,
+  updateSeoStrategyKpi,
   downloadSeoReportExport,
   enqueueSeoAeoScan,
   fetchSeoAeoChecklist,

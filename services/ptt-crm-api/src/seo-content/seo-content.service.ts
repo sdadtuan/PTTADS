@@ -48,6 +48,14 @@ export class SeoContentService {
       const opportunities = await this.repo.listOpportunities(customerId);
       return { keywords: [], questions: [], entities: [], opportunities, clusters: [] };
     }
+    if (activeTab === 'serp') {
+      const serp_snapshots = await this.repo.listSerpSnapshots(customerId);
+      return { keywords: [], questions: [], entities: [], opportunities: [], clusters: [], serp_snapshots };
+    }
+    if (activeTab === 'pages') {
+      const pages = await this.repo.listPages(customerId);
+      return { keywords: [], questions: [], entities: [], opportunities: [], clusters: [], pages };
+    }
     const [keywords, questions, entities, opportunities, clusters] = await Promise.all([
       this.repo.listKeywords(customerId, { limit: 100 }),
       this.repo.listQuestions(customerId, { limit: 100 }),

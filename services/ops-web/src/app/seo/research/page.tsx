@@ -19,7 +19,9 @@ import {
   type SeoClusterRow,
   type SeoHubClientRow,
   type SeoKeywordRow,
+  type SeoPageRow,
   type SeoQuestionRow,
+  type SeoSerpSnapshotRow,
 } from '@/lib/api';
 import {
   clearSession,
@@ -33,18 +35,17 @@ import {
 import { canViewSeoResearch, canWriteSeo } from '@/lib/seo/caps';
 import type { SeoResearchTab } from '@/lib/seo/types';
 
-const TABS: Array<{ key: SeoResearchTab; label: string; stub?: boolean }> = [
+const TABS: Array<{ key: SeoResearchTab; label: string }> = [
   { key: 'keywords', label: 'Keywords' },
   { key: 'questions', label: 'Questions' },
   { key: 'entities', label: 'Entities' },
   { key: 'clusters', label: 'Clusters' },
-  { key: 'serp', label: 'SERP', stub: true },
-  { key: 'pages', label: 'Pages', stub: true },
+  { key: 'serp', label: 'SERP' },
+  { key: 'pages', label: 'Pages' },
   { key: 'opportunities', label: 'Opportunities' },
 ];
 
 function tabApiKey(tab: SeoResearchTab): string | undefined {
-  if (tab === 'serp' || tab === 'pages') return undefined;
   return tab;
 }
 
@@ -83,6 +84,8 @@ function SeoResearchContent() {
   >([]);
   const [clusters, setClusters] = useState<SeoClusterRow[]>([]);
   const [opportunities, setOpportunities] = useState<SeoKeywordRow[]>([]);
+  const [serpSnapshots, setSerpSnapshots] = useState<SeoSerpSnapshotRow[]>([]);
+  const [pages, setPages] = useState<SeoPageRow[]>([]);
   const [searchQ, setSearchQ] = useState('');
   const [intentFilter, setIntentFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -138,10 +141,6 @@ function SeoResearchContent() {
 
   const loadResearch = useCallback(
     async (access: string, cid: number, activeTab: SeoResearchTab) => {
-      if (activeTab === 'serp' || activeTab === 'pages') {
-        setLoading(false);
-        return;
-      }
       setLoading(true);
       setError('');
       try {
@@ -151,6 +150,8 @@ function SeoResearchContent() {
         setEntities(data.entities);
         setClusters(data.clusters);
         setOpportunities(data.opportunities);
+        setSerpSnapshots(data.serp_snapshots ?? []);
+        setPages(data.pages ?? []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Không tải được research console');
       } finally {
@@ -199,6 +200,20 @@ function SeoResearchContent() {
     if (!q) return questions;
     return questions.filter((item) => item.question_text.toLowerCase().includes(q));
   }, [questions, searchQ]);
+
+  const filteredPages = useMemo(() => {
+    const q = searchQ.trim().toLowerCase();
+    if (!q) return pages;
+    return pages.filter(
+      (p) => p.url.toLowerCase().includes(q) || p.title.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q),
+    );
+  }, [pages, searchQ]);
+
+  const filteredSerp = useMemo(() => {
+    const q = searchQ.trim().toLowerCase();
+    if (!q) return serpSnapshots;
+    return serpSnapshots.filter((s) => s.phrase.toLowerCase().includes(q));
+  }, [serpSnapshots, searchQ]);
 
   const logout = () => {
     clearSession();
@@ -388,12 +403,69 @@ function SeoResearchContent() {
           <p className="muted">Chọn client để xem dữ liệu research.</p>
         ) : loading ? (
           <p className="muted">Đang tải…</p>
-        ) : tab === 'serp' || tab === 'pages' ? (
-          <div className="card">
-            <p>
-              Tab <strong>{tab.toUpperCase()}</strong> sẽ kết nối SerpAPI/GSC sync ở Phase 3. Hiện dùng Keywords /
-              Opportunities cho brief pipeline.
-            </p>
+        ) : tab === 'serp' ? (
+          <div className="table-wrap">
+            {filteredSerp.length === 0 ? (
+              <p className="muted">Chưa có SERP snapshot — chạy rank capture hoặc SerpAPI sync.</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>Keyword</th>
+                    <th>Date</th>
+                    <th>Source</th>
+                    <th>Results</th>
+                    <th>Top SERP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredSerp.map((s) => (
+                    <tr key={s.id}>
+                      <td>{s.phrase || '—'}</td>
+                      <td>{s.snapshot_date || '—'}</td>
+                      <td>{s.source || '—'}</td>
+                      <td>{s.result_count}</td>
+                      <td style={{ fontSize: '0.85rem', maxWidth: 360 }}>
+                        {s.top_results.length > 0
+                          ? s.top_results
+                              .map((r) => String(r.title ?? r.url ?? r.link ?? '—'))
+                              .join(' · ')
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        ) : tab === 'pages' ? (
+          <div className="table-wrap">
+            {filteredPages.length === 0 ? (
+              <p className="muted">Chưa có page inventory — sync GSC hoặc crawl technical.</p>
+            ) : (
+              <table>
+                <thead>
+                  <tr>
+                    <th>URL</th>
+                    <th>Title</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Last crawled</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredPages.map((p) => (
+                    <tr key={p.id}>
+                      <td style={{ maxWidth: 280, wordBreak: 'break-all' }}>{p.url}</td>
+                      <td>{p.title || p.slug || '—'}</td>
+                      <td>{p.content_type || '—'}</td>
+                      <td>{p.status || '—'}</td>
+                      <td>{p.last_crawled_at ?? '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         ) : tab === 'keywords' ? (
           <div className="table-wrap">

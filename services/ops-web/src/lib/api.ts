@@ -3520,6 +3520,33 @@ export interface SeoResearchConsoleResponse {
   entities: SeoEntityGroupRow[];
   opportunities: SeoKeywordRow[];
   clusters: SeoClusterRow[];
+  serp_snapshots?: SeoSerpSnapshotRow[];
+  pages?: SeoPageRow[];
+}
+
+export interface SeoSerpSnapshotRow {
+  id: number;
+  customer_id: number;
+  keyword_id: number | null;
+  phrase: string;
+  snapshot_date: string;
+  source: string;
+  created_at: string;
+  result_count: number;
+  top_results: Array<Record<string, unknown>>;
+}
+
+export interface SeoPageRow {
+  id: number;
+  customer_id: number;
+  url: string;
+  title: string;
+  slug: string;
+  content_type: string;
+  schema_type: string;
+  status: string;
+  last_crawled_at: string | null;
+  created_at: string | null;
 }
 
 export interface SeoAeoChecklistResponse {
@@ -4157,6 +4184,45 @@ export async function createSeoStrategyGoal(
 ): Promise<{ ok: boolean; goal: { id: number; title: string } }> {
   return agencyMutate(token, `/api/v1/seo/clients/${customerId}/strategy/goals`, {
     method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function createSeoStrategyKpi(
+  token: string,
+  customerId: number,
+  body: {
+    goal_id: number;
+    metric_label: string;
+    metric_key?: string;
+    target_value?: number | string | null;
+    current_value?: number | string | null;
+    unit?: string;
+    initiative_id?: number | null;
+  },
+): Promise<{ ok: boolean; kpi: { id: number; metric_label: string } }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/strategy/kpis`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function updateSeoStrategyKpi(
+  token: string,
+  customerId: number,
+  kpiId: number,
+  body: {
+    goal_id?: number;
+    metric_label?: string;
+    metric_key?: string;
+    target_value?: number | string | null;
+    current_value?: number | string | null;
+    unit?: string;
+    initiative_id?: number | null;
+  },
+): Promise<{ ok: boolean; kpi: Record<string, unknown> }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/strategy/kpis/${kpiId}`, {
+    method: 'PATCH',
     body: JSON.stringify(body),
   });
 }

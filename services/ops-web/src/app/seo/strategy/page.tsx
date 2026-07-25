@@ -6,9 +6,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
 import {
   createSeoStrategyGoal,
+  createSeoStrategyKpi,
   fetchSeoClients,
   fetchSeoOkrTree,
   refreshSeoStrategyKpis,
+  updateSeoStrategyKpi,
   staffMe,
   staffRefresh,
   type SeoHubClientRow,
@@ -60,6 +62,15 @@ function SeoStrategyContent() {
   const [refreshBusy, setRefreshBusy] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
+  const [showKpiForm, setShowKpiForm] = useState(false);
+  const [editingKpiId, setEditingKpiId] = useState<number | null>(null);
+  const [kpiGoalId, setKpiGoalId] = useState('');
+  const [kpiLabel, setKpiLabel] = useState('');
+  const [kpiKey, setKpiKey] = useState('');
+  const [kpiTarget, setKpiTarget] = useState('');
+  const [kpiCurrent, setKpiCurrent] = useState('');
+  const [kpiUnit, setKpiUnit] = useState('');
+  const [kpiBusy, setKpiBusy] = useState(false);
 
   const ensureAuth = useCallback(async (): Promise<string | null> => {
     let access = getAccessToken();
@@ -175,6 +186,66 @@ function SeoStrategyContent() {
     }
   }
 
+  function resetKpiForm() {
+    setShowKpiForm(false);
+    setEditingKpiId(null);
+    setKpiGoalId('');
+    setKpiLabel('');
+    setKpiKey('');
+    setKpiTarget('');
+    setKpiCurrent('');
+    setKpiUnit('');
+  }
+
+  function startCreateKpi(goalId?: number) {
+    resetKpiForm();
+    setShowKpiForm(true);
+    if (goalId) setKpiGoalId(String(goalId));
+  }
+
+  function startEditKpi(goalId: number, kpi: Record<string, unknown>) {
+    setEditingKpiId(Number(kpi.id));
+    setKpiGoalId(String(goalId));
+    setKpiLabel(String(kpi.metric_label ?? ''));
+    setKpiKey(String(kpi.metric_key ?? ''));
+    setKpiTarget(kpi.target_value != null ? String(kpi.target_value) : '');
+    setKpiCurrent(kpi.current_value != null ? String(kpi.current_value) : '');
+    setKpiUnit(String(kpi.unit ?? ''));
+    setShowKpiForm(true);
+  }
+
+  async function handleSaveKpi() {
+    if (!canWrite || !customerId || !kpiGoalId || !kpiLabel.trim()) return;
+    const access = await ensureAuth();
+    if (!access) return;
+    setKpiBusy(true);
+    setError('');
+    try {
+      const cid = Number.parseInt(customerId, 10);
+      const body = {
+        goal_id: Number.parseInt(kpiGoalId, 10),
+        metric_label: kpiLabel.trim(),
+        metric_key: kpiKey.trim() || undefined,
+        target_value: kpiTarget.trim() ? Number(kpiTarget) : null,
+        current_value: kpiCurrent.trim() ? Number(kpiCurrent) : null,
+        unit: kpiUnit.trim(),
+      };
+      if (editingKpiId) {
+        await updateSeoStrategyKpi(access, cid, editingKpiId, body);
+        setToast(`Đã cập nhật KPI "${kpiLabel.trim()}"`);
+      } else {
+        await createSeoStrategyKpi(access, cid, body);
+        setToast(`Đã tạo KPI "${kpiLabel.trim()}"`);
+      }
+      resetKpiForm();
+      await loadOkr(access, cid);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Lưu KPI thất bại');
+    } finally {
+      setKpiBusy(false);
+    }
+  }
+
   return (
     <div className="page">
       <OpsNav user={user} onLogout={logout} />
@@ -212,6 +283,11 @@ function SeoStrategyContent() {
                 + Goal
               </button>
             )}
+            {canWrite && goals.length > 0 && (
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => startCreateKpi()}>
+                + KPI
+              </button>
+            )}
             {canRefresh && (
               <button
                 type="button"
@@ -227,6 +303,62 @@ function SeoStrategyContent() {
 
         {error && <p className="error">{error}</p>}
         {toast && <p className="badge">{toast}</p>}
+
+        {showKpiForm && canWrite ? (
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>
+              {editingKpiId ? 'Chỉnh sửa KPI' : 'Thêm KPI'}
+            </h2>
+            <div className="form-row" style={{ alignItems: 'end', gap: '1rem', flexWrap: 'wrap' }}>
+              <label>
+                Goal
+                <select value={kpiGoalId} onChange={(e) => setKpiGoalId(e.target.value)}>
+                  <option value="">— Chọn goal —</option>
+                  {goals.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {String(g.title ?? `Goal #${g.id}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Metric label
+                <input value={kpiLabel} onChange={(e) => setKpiLabel(e.target.value)} />
+              </label>
+              <label>
+                Metric key
+                <input
+                  value={kpiKey}
+                  onChange={(e) => setKpiKey(e.target.value)}
+                  placeholder="gsc_clicks"
+                />
+              </label>
+              <label>
+                Current
+                <input value={kpiCurrent} onChange={(e) => setKpiCurrent(e.target.value)} type="number" />
+              </label>
+              <label>
+                Target
+                <input value={kpiTarget} onChange={(e) => setKpiTarget(e.target.value)} type="number" />
+              </label>
+              <label>
+                Unit
+                <input value={kpiUnit} onChange={(e) => setKpiUnit(e.target.value)} placeholder="%" />
+              </label>
+              <button
+                type="button"
+                className="btn btn-sm"
+                disabled={kpiBusy || !kpiGoalId || !kpiLabel.trim()}
+                onClick={() => void handleSaveKpi()}
+              >
+                {kpiBusy ? 'Đang lưu…' : editingKpiId ? 'Cập nhật' : 'Tạo KPI'}
+              </button>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={resetKpiForm}>
+                Hủy
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {!customerId ? (
           <p className="muted">Chọn client để xem OKR tree.</p>
@@ -260,6 +392,7 @@ function SeoStrategyContent() {
                           <th>Current</th>
                           <th>Target</th>
                           <th>Unit</th>
+                          {canWrite ? <th /> : null}
                         </tr>
                       </thead>
                       <tbody>
@@ -269,11 +402,32 @@ function SeoStrategyContent() {
                             <td>{String(kpi.current_value ?? '—')}</td>
                             <td>{String(kpi.target_value ?? '—')}</td>
                             <td>{String(kpi.unit ?? '—')}</td>
+                            {canWrite ? (
+                              <td>
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => startEditKpi(goal.id, kpi)}
+                                >
+                                  Sửa
+                                </button>
+                              </td>
+                            ) : null}
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
+                )}
+                {canWrite && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    style={{ marginBottom: '0.75rem' }}
+                    onClick={() => startCreateKpi(goal.id)}
+                  >
+                    + KPI cho goal này
+                  </button>
                 )}
 
                 {(goal.initiatives ?? []).length > 0 && (

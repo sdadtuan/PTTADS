@@ -116,10 +116,37 @@ export interface SeoAeoChecklistResponse {
   score_pct: number;
 }
 
+export interface SeoSerpSnapshotRow {
+  id: number;
+  customer_id: number;
+  keyword_id: number | null;
+  phrase: string;
+  snapshot_date: string;
+  source: string;
+  created_at: string;
+  result_count: number;
+  top_results: Array<Record<string, unknown>>;
+}
+
+export interface SeoPageRow {
+  id: number;
+  customer_id: number;
+  url: string;
+  title: string;
+  slug: string;
+  content_type: string;
+  schema_type: string;
+  status: string;
+  last_crawled_at: string | null;
+  created_at: string | null;
+}
+
 export interface SeoResearchConsoleResponse {
   keywords: SeoKeywordRow[];
   questions: SeoQuestionRow[];
   entities: SeoEntityGroupRow[];
   opportunities: SeoKeywordRow[];
   clusters: SeoClusterRow[];
+  serp_snapshots?: SeoSerpSnapshotRow[];
+  pages?: SeoPageRow[];
 }

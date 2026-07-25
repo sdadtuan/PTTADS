@@ -17,6 +17,10 @@ export class SeoStrategyService {
     return this.repo.createKpi(customerId, payload);
   }
 
+  updateKpi(customerId: number, kpiId: number, payload: Record<string, unknown>) {
+    return this.repo.updateKpi(customerId, kpiId, payload);
+  }
+
   linkInitiative(customerId: number, initiativeId: number, goalId: number | null) {
     return this.repo.linkInitiative(customerId, initiativeId, goalId);
   }

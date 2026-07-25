@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -37,6 +38,17 @@ export class SeoStrategyController {
   @UseGuards(StaffSeoWriteGuard)
   async createKpi(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>) {
     const kpi = await this.strategy.createKpi(id, body);
+    return { ok: true, kpi };
+  }
+
+  @Patch('clients/:id/strategy/kpis/:kpiId')
+  @UseGuards(StaffSeoWriteGuard)
+  async updateKpi(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('kpiId', ParseIntPipe) kpiId: number,
+    @Body() body: Record<string, unknown>,
+  ) {
+    const kpi = await this.strategy.updateKpi(id, kpiId, body);
     return { ok: true, kpi };
   }
 

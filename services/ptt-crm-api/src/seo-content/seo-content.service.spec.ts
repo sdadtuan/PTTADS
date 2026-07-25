@@ -8,6 +8,8 @@ describe('SeoContentService', () => {
     listEntityGroups: jest.fn(),
     listOpportunities: jest.fn(),
     listClusters: jest.fn(),
+    listSerpSnapshots: jest.fn(),
+    listPages: jest.fn(),
     previewBrief: jest.fn(),
     pipelineBoard: jest.fn(),
     getContentDetail: jest.fn(),
@@ -44,6 +46,20 @@ describe('SeoContentService', () => {
     expect(out.keywords).toHaveLength(1);
     expect(out.questions).toEqual([]);
     expect(repo.listQuestions).not.toHaveBeenCalled();
+  });
+
+  it('loads serp tab only', async () => {
+    (repo.listSerpSnapshots as jest.Mock).mockResolvedValue([{ id: 1, phrase: 'test' }]);
+    const out = await service.researchConsole(5, 'serp');
+    expect(out.serp_snapshots).toHaveLength(1);
+    expect(repo.listKeywords).not.toHaveBeenCalled();
+  });
+
+  it('loads pages tab only', async () => {
+    (repo.listPages as jest.Mock).mockResolvedValue([{ id: 1, url: 'https://example.com' }]);
+    const out = await service.researchConsole(5, 'pages');
+    expect(out.pages).toHaveLength(1);
+    expect(repo.listKeywords).not.toHaveBeenCalled();
   });
 
   it('returns pipeline board', async () => {

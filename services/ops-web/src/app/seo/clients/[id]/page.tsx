@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
+import { SeoClientWorkspaceNav } from '@/components/SeoClientWorkspaceNav';
 import {
   fetchSeoClientTasks,
   fetchSeoClientWorkspace,
@@ -258,18 +259,13 @@ export default function SeoClientWorkspacePage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
-          {(['overview', 'tasks', 'settings'] as SeoClientTab[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              className={tab === t ? 'btn btn-sm' : 'btn btn-secondary btn-sm'}
-              onClick={() => setTab(t)}
-            >
-              {t === 'overview' ? 'Tổng quan' : t === 'tasks' ? 'Tasks' : 'Settings'}
-            </button>
-          ))}
-        </div>
+        <SeoClientWorkspaceNav
+          customerId={customerId}
+          activeTab={tab}
+          onTabChange={setTab}
+          domains={workspace?.settings.domains}
+          markets={workspace?.settings.markets}
+        />
       </div>
 
       {error ? <p className="error">{error}</p> : null}
