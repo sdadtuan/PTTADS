@@ -1,5 +1,5 @@
 import { hasCap, type StoredStaffUser } from '@/lib/auth';
-import { seoClientWorkspaceEnabled, seoContentEnabled, seoHubEnabled, seoResearchEnabled } from './flags';
+import { seoClientWorkspaceEnabled, seoContentEnabled, seoGovernanceEnabled, seoHubEnabled, seoReportsEnabled, seoResearchEnabled, seoStrategyEnabled, seoTechnicalEnabled } from './flags';
 
 const SEO_VIEW_SECTIONS = [
   'crm_seo_aeo',
@@ -61,4 +61,34 @@ export function canApproveSeo(user: StoredStaffUser | null): boolean {
   if (hasCap(user, 'crm_seo_aeo_approve', 'approve')) return true;
   if (hasCap(user, 'crm_seo_aeo', 'approve')) return true;
   return hasCap(user, 'crm_board', 'edit');
+}
+
+export function canViewSeoTechnical(user: StoredStaffUser | null): boolean {
+  if (!user || !seoTechnicalEnabled()) return false;
+  if (hasCap(user, 'crm_seo_aeo_technical', 'view')) return true;
+  return canViewSeoHub(user);
+}
+
+export function canWriteSeoTechnical(user: StoredStaffUser | null): boolean {
+  if (!user) return false;
+  if (hasCap(user, 'crm_seo_aeo_technical', 'edit') || hasCap(user, 'crm_seo_aeo_technical', 'create')) {
+    return true;
+  }
+  return canWriteSeo(user);
+}
+
+export function canViewSeoReports(user: StoredStaffUser | null): boolean {
+  if (!user || !seoReportsEnabled()) return false;
+  if (hasCap(user, 'crm_seo_aeo_reports', 'view')) return true;
+  return canViewSeoHub(user);
+}
+
+export function canViewSeoGovernance(user: StoredStaffUser | null): boolean {
+  if (!user || !seoGovernanceEnabled()) return false;
+  return canConfigureSeoSettings(user) || canApproveSeo(user);
+}
+
+export function canViewSeoStrategy(user: StoredStaffUser | null): boolean {
+  if (!user || !seoStrategyEnabled()) return false;
+  return canViewSeoHub(user);
 }

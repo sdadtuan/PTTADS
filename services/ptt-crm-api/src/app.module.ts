@@ -43,6 +43,10 @@ import { ReProjectsModule } from './re-projects/re-projects.module';
 import { EmailMarketingModule } from './email-marketing/email-marketing.module';
 import { SeoAdminModule } from './seo-admin/seo-admin.module';
 import { SeoContentModule } from './seo-content/seo-content.module';
+import { SeoGovernanceModule } from './seo-governance/seo-governance.module';
+import { SeoReportsModule } from './seo-reports/seo-reports.module';
+import { SeoStrategyModule } from './seo-strategy/seo-strategy.module';
+import { SeoTechnicalModule } from './seo-technical/seo-technical.module';
 import { StaffAuthModule } from './staff-auth/staff-auth.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { TemporalModule } from './temporal/temporal.module';
@@ -85,6 +89,10 @@ import { WorkflowsModule } from './workflows/workflows.module';
     PortalEmailModule,
     SeoAdminModule,
     SeoContentModule,
+    SeoTechnicalModule,
+    SeoReportsModule,
+    SeoGovernanceModule,
+    SeoStrategyModule,
     EmailMarketingModule,
     PerformanceModule,
     MetaTrackingModule,

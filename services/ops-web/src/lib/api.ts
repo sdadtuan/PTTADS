@@ -3702,6 +3702,204 @@ export async function patchSeoContent(
   });
 }
 
+export interface SeoTechnicalIssueRow {
+  id: number;
+  customer_id: number;
+  url: string;
+  issue_type: string;
+  severity: string;
+  status: string;
+  description: string;
+  impact_notes: string;
+  assignee_id: number | null;
+  discovered_at: string | null;
+  resolved_at: string | null;
+}
+
+export interface SeoDashboardData {
+  type: string;
+  customer_id: number | null;
+  days?: number;
+  gsc?: Record<string, unknown>;
+  gsc_trend?: Array<{ stat_date: string; clicks: number; impressions: number }>;
+  content_by_status?: Record<string, number>;
+  content_chart?: Array<{ label: string; value: number }>;
+  severity?: Record<string, number>;
+  severity_chart?: Array<{ label: string; value: number }>;
+  issues?: Array<Record<string, unknown>>;
+  critical_issues?: number;
+  aeo?: Record<string, unknown>;
+  open_alerts?: number;
+}
+
+export async function fetchSeoTechnicalIssues(
+  token: string,
+  customerId: number,
+  params?: { severity?: string; status?: string },
+): Promise<{ ok: boolean; issues: SeoTechnicalIssueRow[]; severity_matrix: Record<string, number> }> {
+  const qs = new URLSearchParams();
+  if (params?.severity) qs.set('severity', params.severity);
+  if (params?.status) qs.set('status', params.status);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/issues${suffix}`);
+}
+
+export async function importSeoTechnicalCsv(
+  token: string,
+  customerId: number,
+  csv: string,
+): Promise<{ ok: boolean; imported: number }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/issues/import`, {
+    method: 'POST',
+    body: JSON.stringify({ csv }),
+  });
+}
+
+export async function patchSeoTechnicalIssue(
+  token: string,
+  issueId: number,
+  body: Record<string, unknown>,
+): Promise<{ ok: boolean; issue: SeoTechnicalIssueRow }> {
+  return agencyMutate(token, `/api/v1/seo/issues/${issueId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchSeoCwv(
+  token: string,
+  customerId: number,
+): Promise<{
+  ok: boolean;
+  summary: Record<string, unknown>;
+  snapshots: Array<Record<string, unknown>>;
+}> {
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/cwv`);
+}
+
+export async function captureSeoCwv(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; captured: number; errors: string[] }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/cwv/capture`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function fetchSeoDashboard(
+  token: string,
+  customerId: number,
+  type: string,
+): Promise<{ ok: boolean; dashboard: SeoDashboardData }> {
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/dashboard/${type}`);
+}
+
+export async function fetchSeoGovernancePolicies(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; policies: Array<Record<string, unknown>> }> {
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/governance/policies`);
+}
+
+export async function fetchSeoGovernanceCompliance(
+  token: string,
+  customerId?: number,
+  days = 7,
+): Promise<{ ok: boolean; summary: Record<string, unknown> }> {
+  const qs = new URLSearchParams({ days: String(days) });
+  if (customerId != null) qs.set('customer_id', String(customerId));
+  return agencyFetch(token, `/api/v1/seo/governance/compliance?${qs.toString()}`);
+}
+
+export async function fetchSeoOkrTree(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; goals: Array<Record<string, unknown>>; unlinked_initiatives: Array<Record<string, unknown>> }> {
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/strategy/okr`);
+}
+
+export async function refreshSeoStrategyKpis(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; updated: number }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/strategy/kpis/refresh`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function fetchSeoAlerts(
+  token: string,
+  status = 'open',
+): Promise<{ ok: boolean; alerts: Array<Record<string, unknown>> }> {
+  return agencyFetch(token, `/api/v1/seo/alerts?status=${encodeURIComponent(status)}`);
+}
+
+export async function fetchSeoGovernanceStatus(
+  token: string,
+): Promise<{ ok: boolean; enabled: boolean }> {
+  return agencyFetch(token, '/api/v1/seo/governance/status');
+}
+
+export interface SeoReportScheduleRow {
+  id: number;
+  customer_id: number;
+  dashboard_type: string;
+  cadence: string;
+  day_of_week: number;
+  day_of_month: number;
+  recipient_emails: string[];
+  cc_emails: string[];
+  bcc_emails: string[];
+  active: boolean;
+  next_run_at: string | null;
+  last_run_at: string | null;
+  created_at: string | null;
+}
+
+export async function fetchSeoReportSchedules(
+  token: string,
+  customerId: number,
+): Promise<{ ok: boolean; schedules: SeoReportScheduleRow[] }> {
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/reports/schedules`);
+}
+
+export async function createSeoStrategyGoal(
+  token: string,
+  customerId: number,
+  body: { title: string; description?: string; period?: string; status?: string; sort_order?: number },
+): Promise<{ ok: boolean; goal: { id: number; title: string } }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/strategy/goals`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function downloadSeoReportExport(
+  token: string,
+  customerId: number,
+  params: { type?: string; format?: string; customer_label?: string } = {},
+): Promise<{ blob: Blob; filename: string }> {
+  const qs = new URLSearchParams();
+  if (params.type) qs.set('type', params.type);
+  if (params.format) qs.set('format', params.format);
+  if (params.customer_label) qs.set('customer_label', params.customer_label);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const res = await fetch(`${API_BASE}/api/v1/seo/clients/${customerId}/reports/export${suffix}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `Export failed (${res.status})`);
+  }
+  const cd = res.headers.get('content-disposition') ?? '';
+  const match = /filename="([^"]+)"/.exec(cd);
+  const filename = match?.[1] ?? 'seo-report.csv';
+  const blob = await res.blob();
+  return { blob, filename };
+}
+
 export interface EmailHubSummary {
   workspaces: number;
   contacts: number;

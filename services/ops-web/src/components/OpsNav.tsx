@@ -8,8 +8,24 @@ import { getAccessToken, hasCap } from '@/lib/auth';
 import { fetchReviewQueueCount } from '@/lib/api';
 import { emailJourneysEnabled, emailModuleEnabled } from '@/lib/email-flags';
 import { canViewMetaAdsOps, canViewMetaIntelligence, canViewMetaTracking } from '@/lib/meta/caps';
-import { canViewSeoContent, canViewSeoHub, canViewSeoResearch } from '@/lib/seo/caps';
-import { seoContentEnabled, seoHubEnabled, seoResearchEnabled } from '@/lib/seo/flags';
+import {
+  canViewSeoContent,
+  canViewSeoGovernance,
+  canViewSeoHub,
+  canViewSeoReports,
+  canViewSeoResearch,
+  canViewSeoStrategy,
+  canViewSeoTechnical,
+} from '@/lib/seo/caps';
+import {
+  seoContentEnabled,
+  seoGovernanceEnabled,
+  seoHubEnabled,
+  seoReportsEnabled,
+  seoResearchEnabled,
+  seoStrategyEnabled,
+  seoTechnicalEnabled,
+} from '@/lib/seo/flags';
 import { metaAdsOpsEnabled, metaIntelligenceEnabled, metaTrackingEnabled } from '@/lib/meta/flags';
 
 interface OpsNavProps {
@@ -62,6 +78,10 @@ const PAGE_TITLES: Record<string, string> = {
   '/seo/clients': 'SEO Clients',
   '/seo/research': 'SEO Research',
   '/seo/content': 'SEO Content Pipeline',
+  '/seo/technical': 'SEO Technical',
+  '/seo/reports': 'SEO Reports',
+  '/seo/governance': 'SEO Governance',
+  '/seo/strategy': 'SEO Strategy',
   '/email/hub': 'Email Hub',
   '/email/clients': 'Email Clients',
   '/email/contacts': 'Contacts',
@@ -226,6 +246,18 @@ function buildSections(
     }
     if (seoContentEnabled() && canViewSeoContent(user)) {
       agency.push({ href: '/seo/content', label: 'SEO Content' });
+    }
+    if (seoTechnicalEnabled() && canViewSeoTechnical(user)) {
+      agency.push({ href: '/seo/technical', label: 'SEO Technical' });
+    }
+    if (seoReportsEnabled() && canViewSeoReports(user)) {
+      agency.push({ href: '/seo/reports', label: 'SEO Reports' });
+    }
+    if (seoStrategyEnabled() && canViewSeoStrategy(user)) {
+      agency.push({ href: '/seo/strategy', label: 'SEO Strategy' });
+    }
+    if (seoGovernanceEnabled() && canViewSeoGovernance(user)) {
+      agency.push({ href: '/seo/governance', label: 'SEO Governance' });
     }
   }
   if (agency.length) sections.push({ label: 'Agency & Hub', links: agency });
