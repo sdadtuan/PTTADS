@@ -8,6 +8,8 @@ import { getAccessToken, hasCap } from '@/lib/auth';
 import { fetchReviewQueueCount } from '@/lib/api';
 import { emailJourneysEnabled, emailModuleEnabled } from '@/lib/email-flags';
 import { canViewMetaAdsOps, canViewMetaIntelligence, canViewMetaTracking } from '@/lib/meta/caps';
+import { canViewSeoHub } from '@/lib/seo/caps';
+import { seoHubEnabled } from '@/lib/seo/flags';
 import { metaAdsOpsEnabled, metaIntelligenceEnabled, metaTrackingEnabled } from '@/lib/meta/flags';
 
 interface OpsNavProps {
@@ -213,7 +215,7 @@ function buildSections(
     agency.push({ href: '/google/google-ads', label: 'Google Ads' });
     agency.push({ href: '/meta/ads-combined', label: 'Ads CPL' });
   }
-  if (hasCap(user, 'crm_seo', 'view') || hasCap(user, 'crm_agency', 'view')) {
+  if (seoHubEnabled() && canViewSeoHub(user)) {
     agency.push({ href: '/seo/hub', label: 'SEO/AEO Hub' });
     agency.push({ href: '/seo/clients', label: 'SEO Clients' });
   }

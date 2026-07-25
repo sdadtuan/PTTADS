@@ -274,7 +274,7 @@ def seo_hub_summary(
             {
                 "severity": "warn",
                 "message": f"{settings_missing} client SEO chưa cấu hình domain/industry.",
-                "link": "/crm/seo/clients",
+                "link": "/seo/clients",
                 "link_label": "Xem client",
             }
         )
@@ -284,7 +284,7 @@ def seo_hub_summary(
             {
                 "severity": "danger",
                 "message": f"{critical} issue kỹ thuật nghiêm trọng (critical) đang mở.",
-                "link": "/crm/seo/technical",
+                "link": "/seo/technical",
                 "link_label": "Technical Console",
             }
         )
@@ -297,7 +297,7 @@ def seo_hub_summary(
             {
                 "severity": "warn",
                 "message": f"{open_alerts} cảnh báo automation đang mở.",
-                "link": "/crm/seo/automations",
+                "link": "/seo/automations",
                 "link_label": "Automations",
             }
         )
@@ -315,7 +315,7 @@ def seo_hub_summary(
             {
                 "severity": "danger",
                 "message": f"{failed_sync_runs} lần sync GSC/GA4 thất bại trong 7 ngày qua.",
-                "link": "/crm/seo/reports?type=ops",
+                "link": "/seo/reports?type=ops",
                 "link_label": "Xem sync runs",
             }
         )
@@ -326,7 +326,7 @@ def seo_hub_summary(
                 {
                     "severity": "warn",
                     "message": f"AEO coverage thấp ({c['aeo_coverage_pct']}%) — {c['customer_name']}.",
-                    "link": f"/crm/seo/clients/{c['customer_id']}",
+                    "link": f"/seo/clients/{c['customer_id']}",
                     "link_label": "Mở client",
                 }
             )

@@ -86,5 +86,5 @@ def notify_slack_report_failed(
     return notify_slack_for_alert(
         alert_type="report_schedule_failed",
         message=msg,
-        link="/crm/seo/reports",
+        link="/seo/reports",
     )

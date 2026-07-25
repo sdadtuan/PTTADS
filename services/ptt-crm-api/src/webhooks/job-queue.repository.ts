@@ -215,6 +215,23 @@ export class JobQueueRepository implements OnModuleDestroy {
     });
   }
 
+  /** SEO/AEO sync jobs (GSC, GA4) — customer_id in payload. */
+  async enqueueSeoSyncJob(input: {
+    jobType: 'seo_gsc_sync' | 'seo_ga4_sync';
+    payload: Record<string, unknown>;
+    idempotencyKey: string;
+  }): Promise<EnqueuedJob | null> {
+    if (!this.config.jobsEnabled) {
+      return null;
+    }
+    return this.enqueueJobRecord({
+      jobType: input.jobType,
+      payload: input.payload,
+      idempotencyKey: input.idempotencyKey,
+      clientId: null,
+    });
+  }
+
   async cancelPendingJobsForClient(clientId: string): Promise<number> {
     if (!this.config.jobsEnabled) {
       return 0;

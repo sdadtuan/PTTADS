@@ -140,7 +140,7 @@ def run_crawl_schedule_checks(conn: sqlite3.Connection) -> dict[str, Any]:
             alert_type="crawl_connector_due",
             severity="warn",
             message=msg,
-            link=f"/crm/seo/technical?customer_id={cid}",
+            link=f"/seo/technical?customer_id={cid}",
         )
         if aid:
             created.append({"alert_id": aid, "customer_id": cid})

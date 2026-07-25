@@ -10,11 +10,11 @@ import {
   getAccessToken,
   getRefreshToken,
   getStoredUser,
-  hasCap,
   updateAccessToken,
   updateStoredUser,
   type StoredStaffUser,
 } from '@/lib/auth';
+import { canViewSeoHub } from '@/lib/seo/caps';
 
 export default function SeoClientsPage() {
   const router = useRouter();
@@ -35,7 +35,7 @@ export default function SeoClientsPage() {
       const me = await staffMe(access);
       setUser(me);
       updateStoredUser(me);
-      if (!hasCap(me, 'crm_seo', 'view') && !hasCap(me, 'crm_agency', 'view')) {
+      if (!canViewSeoHub(me)) {
         setError('Không có quyền SEO/AEO');
         return null;
       }
@@ -91,7 +91,7 @@ export default function SeoClientsPage() {
       <OpsNav user={user} onLogout={logout} />
       <div className="card" style={{ marginBottom: '1rem' }}>
         <p className="muted" style={{ marginTop: 0 }}>
-          Phase 4 B1 — SEO clients list · Nest <code>/api/v1/seo/clients</code>
+          SEO clients · workspace B1
         </p>
         <Link href="/seo/hub" className="btn btn-secondary btn-sm">
           ← SEO Hub
@@ -110,18 +110,32 @@ export default function SeoClientsPage() {
                 <th>Domains</th>
                 <th>Tier</th>
                 <th>Settings</th>
-                <th>Projects</th>
+                <th>Health</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {clients.map((c) => (
                 <tr key={c.customer_id} id={`c${c.customer_id}`}>
                   <td>{c.customer_id}</td>
-                  <td>{c.customer_name}</td>
+                  <td>
+                    <Link href={`/seo/clients/${c.customer_id}`} className="nav-link">
+                      {c.customer_name}
+                    </Link>
+                  </td>
                   <td>{c.domains.join(', ') || '—'}</td>
                   <td>{c.contract_tier}</td>
                   <td>{c.settings_ok ? 'OK' : 'Missing'}</td>
-                  <td>{c.active_projects}</td>
+                  <td>
+                    <span className={c.health_tier === 'bad' ? 'error' : 'muted'}>
+                      {c.health_score} · {c.health_tier}
+                    </span>
+                  </td>
+                  <td>
+                    <Link href={`/seo/clients/${c.customer_id}?tab=settings`} className="btn btn-secondary btn-sm">
+                      Settings
+                    </Link>
+                  </td>
                 </tr>
               ))}
             </tbody>

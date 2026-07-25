@@ -83,7 +83,7 @@ def run_alert_checks(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             alert_type="critical_issues",
             severity="danger",
             message=f"Có {crit} issue kỹ thuật nghiêm trọng cần xử lý.",
-            link="/crm/seo/technical",
+            link="/seo/technical",
         )
         if aid:
             created.append({"id": aid, "type": "critical_issues"})
@@ -104,7 +104,7 @@ def run_alert_checks(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             alert_type="sync_failed",
             severity="warn",
             message=msg,
-            link="/crm/seo/automations",
+            link="/seo/automations",
         )
         if aid:
             created.append({"id": aid, "type": "sync_failed"})
@@ -125,7 +125,7 @@ def run_alert_checks(conn: sqlite3.Connection) -> list[dict[str, Any]]:
                         alert_type="aeo_coverage_low",
                         severity="warn",
                         message=f"AEO coverage thấp ({pct:.0f}%) — {visible}/{len(qs)} queries.",
-                        link=f"/crm/seo/clients/{cid}",
+                        link=f"/seo/clients/{cid}",
                     )
                     if aid:
                         created.append({"id": aid, "type": "aeo_coverage_low"})
@@ -149,7 +149,7 @@ def run_alert_checks(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             alert_type="content_overdue",
             severity="warn",
             message=f"{r['c']} nội dung quá hạn due date.",
-            link=f"/crm/seo/content?customer_id={cid}",
+            link=f"/seo/content?customer_id={cid}",
         )
         if aid:
             created.append({"id": aid, "type": "content_overdue"})
@@ -169,7 +169,7 @@ def run_alert_checks(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             alert_type="freshness_urgent",
             severity="warn",
             message=f"{r['c']} nội dung freshness urgent — cần refresh.",
-            link=f"/crm/seo/content?customer_id={cid}",
+            link=f"/seo/content?customer_id={cid}",
         )
         if aid:
             created.append({"id": aid, "type": "freshness_urgent"})

@@ -49,11 +49,11 @@ def list_client_tasks(crm_conn: Any, seo_conn: Any, customer_id: int) -> dict[st
     for issue in list_issues(seo_conn, customer_id):
         task_id = issue.get("crm_task_id")
         lifecycle_id = issue.get("lifecycle_id")
-        url = "/crm/seo/technical"
+        url = "/seo/technical"
         if task_id and lifecycle_id:
             url = f"/crm/service-delivery/{lifecycle_id}#task-card-{task_id}"
         elif issue.get("id"):
-            url = f"/crm/seo/technical?customer_id={customer_id}"
+            url = f"/seo/technical?customer_id={customer_id}"
         technical.append(
             {
                 "kind": "technical",

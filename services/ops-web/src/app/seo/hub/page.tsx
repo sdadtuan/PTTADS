@@ -4,18 +4,17 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { OpsNav } from '@/components/OpsNav';
-import { fetchSeoHub, type SeoHubResponse } from '@/lib/api';
+import { fetchSeoHub, staffMe, staffRefresh, type SeoHubResponse } from '@/lib/api';
 import {
   clearSession,
   getAccessToken,
   getRefreshToken,
   getStoredUser,
-  hasCap,
   updateAccessToken,
   updateStoredUser,
   type StoredStaffUser,
 } from '@/lib/auth';
-import { staffMe, staffRefresh } from '@/lib/api';
+import { canViewSeoHub } from '@/lib/seo/caps';
 
 function tierClass(tier: string): string {
   if (tier === 'good') return 'badge';
@@ -45,7 +44,7 @@ export default function SeoHubPage() {
       const me = await staffMe(access);
       setUser(me);
       updateStoredUser(me);
-      if (!hasCap(me, 'crm_seo', 'view') && !hasCap(me, 'crm_agency', 'view')) {
+      if (!canViewSeoHub(me)) {
         setError('Không có quyền SEO/AEO');
         return null;
       }
@@ -115,15 +114,12 @@ export default function SeoHubPage() {
       <OpsNav user={user} onLogout={logout} />
       <div className="card" style={{ marginBottom: '1rem' }}>
         <p className="muted" style={{ marginTop: 0 }}>
-          Phase 4 kickoff — SEO/AEO Ops hub · Nest PG native · batch B1
+          SEO/AEO Ops hub · Nest PG · Phase 1 B1
         </p>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
           <Link href="/seo/clients" className="btn btn-sm">
             Danh sách client
           </Link>
-          <span className="muted" style={{ alignSelf: 'center' }}>
-            Legacy Flask: /crm/seo (readonly fallback)
-          </span>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <label className="muted">
@@ -169,6 +165,27 @@ export default function SeoHubPage() {
       </div>
 
       {error ? <p className="error">{error}</p> : null}
+
+      {summary && summary.failed_sync_runs > 0 ? (
+        <div className="card" style={{ marginBottom: '1rem', borderLeft: '4px solid #c0392b' }}>
+          <strong>Sync banner:</strong> {summary.failed_sync_runs} sync run thất bại trong 7 ngày qua.{' '}
+          <Link href="/seo/clients" className="nav-link">
+            Kiểm tra client settings
+          </Link>
+        </div>
+      ) : null}
+
+      {hub?.executive?.content_delivery ? (
+        <div className="card" style={{ marginBottom: '1rem' }}>
+          <h2 style={{ marginTop: 0, fontSize: '1.1rem' }}>Content delivery</h2>
+          <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
+            <span>In writing: {hub.executive.content_delivery.in_writing ?? 0}</span>
+            <span>In review: {hub.executive.content_delivery.in_review ?? 0}</span>
+            <span>Overdue: {hub.executive.content_delivery.overdue ?? 0}</span>
+            <span>Published: {hub.executive.content_delivery.published ?? 0}</span>
+          </div>
+        </div>
+      ) : null}
 
       {summary ? (
         <div
@@ -247,7 +264,7 @@ export default function SeoHubPage() {
                 <tr key={c.customer_id}>
                   <td>{c.customer_id}</td>
                   <td>
-                    <Link href={`/seo/clients#c${c.customer_id}`} className="nav-link">
+                    <Link href={`/seo/clients/${c.customer_id}`} className="nav-link">
                       {c.customer_name}
                     </Link>
                   </td>

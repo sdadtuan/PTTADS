@@ -3283,6 +3283,109 @@ export async function fetchSeoClients(
   return agencyFetch(token, `/api/v1/seo/clients${suffix}`);
 }
 
+export interface SeoClientSettings {
+  customer_id: number;
+  domains: string[];
+  markets: string[];
+  languages: string[];
+  industry: string;
+  brand_guidelines: Record<string, unknown>;
+  seo_guidelines: Record<string, unknown>;
+  aeo_guidelines: Record<string, unknown>;
+  contract_tier: string;
+  notes: string;
+  integrations: Record<string, unknown>;
+  updated_at: string | null;
+}
+
+export interface SeoClientWorkspaceResponse {
+  ok: boolean;
+  client: SeoHubClientRow;
+  settings: SeoClientSettings;
+  integrations: {
+    gsc: { connected: boolean; site_url?: string; status: string; last_sync_at?: string | null };
+    ga4: { connected: boolean; property_id?: string; status: string; last_sync_at?: string | null };
+  };
+  sync_runs: Array<{
+    id: number;
+    source: string;
+    status: string;
+    started_at: string | null;
+    finished_at: string | null;
+    rows_imported: number;
+    error_message: string;
+  }>;
+  gsc_totals: Record<string, unknown>;
+  content_delivery: Record<string, number>;
+}
+
+export interface SeoClientTasksResponse {
+  ok: boolean;
+  customer_id: number;
+  service_tasks: Array<{
+    kind: 'service';
+    task_id: number;
+    lifecycle_id: number;
+    service_slug: string;
+    stage: string;
+    title: string;
+    due_on: string;
+    url: string;
+  }>;
+  technical_issues: Array<{
+    kind: 'technical';
+    issue_id: number;
+    title: string;
+    severity: string;
+    status: string;
+    url: string;
+  }>;
+  open_count: number;
+}
+
+export async function fetchSeoClientWorkspace(
+  token: string,
+  customerId: number,
+): Promise<SeoClientWorkspaceResponse> {
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}`);
+}
+
+export async function fetchSeoClientTasks(
+  token: string,
+  customerId: number,
+): Promise<SeoClientTasksResponse> {
+  return agencyFetch(token, `/api/v1/seo/clients/${customerId}/tasks`);
+}
+
+export async function updateSeoClientSettings(
+  token: string,
+  customerId: number,
+  body: {
+    domains?: string[];
+    markets?: string[];
+    languages?: string[];
+    industry?: string;
+    contract_tier?: string;
+    notes?: string;
+  },
+): Promise<{ ok: boolean; settings: SeoClientSettings }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/settings`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function triggerSeoClientSync(
+  token: string,
+  customerId: number,
+  source: 'gsc' | 'ga4',
+): Promise<{ ok: boolean; mode: string; job_id?: string | null; error?: string }> {
+  return agencyMutate(token, `/api/v1/seo/clients/${customerId}/sync/${source}`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
 export interface EmailHubSummary {
   workspaces: number;
   contacts: number;
