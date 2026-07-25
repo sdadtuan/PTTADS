@@ -9,6 +9,7 @@
 > **Nguồn gốc:** `Sơ đồ kiến trúc enterprise Cho Hệ thống Email Marketing.docx` (PTTCOM)  
 > **Loại tài liệu:** Business + Technical master spec  
 > **Tài liệu liên quan:**  
+> - [`EMAIL_MARKETING_COMPLETION_ROADMAP.md`](EMAIL_MARKETING_COMPLETION_ROADMAP.md) — **Roadmap hoàn thiện & Gate A** (2026-07-25)  
 > - [`specs/2026-07-19-email-marketing-architecture.md`](specs/2026-07-19-email-marketing-architecture.md) — Kiến trúc hệ thống (C4, data model, API, deployment)  
 > - [`SPEC_UI_UX_EMAIL_MARKETING.md`](SPEC_UI_UX_EMAIL_MARKETING.md) — UI/UX specification  
 > - [`SPEC_MIGRATION_FLASK_TO_NEXT.md`](SPEC_MIGRATION_FLASK_TO_NEXT.md) — Lộ trình platform Flask → Next/Nest (Track E)  

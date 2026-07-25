@@ -6,6 +6,7 @@
 > **Nguồn gốc:** `SEO:AEO Enterprise Operating System.docx` (PTTCOM)  
 > **Loại tài liệu:** Business + Technical master spec  
 > **Tài liệu liên quan:**  
+> - [`huong-dan-seo-aeo-ops.md`](huong-dan-seo-aeo-ops.md) — **Hướng dẫn setup & sử dụng** (ops-web + portal)  
 > - [`specs/2026-07-19-seo-aeo-architecture.md`](specs/2026-07-19-seo-aeo-architecture.md) — Kiến trúc hệ thống (C4, data model, API, deployment) **v1.4**  
 > - [`specs/2026-07-19-seo-aeo-pg-cutover-policy.md`](specs/2026-07-19-seo-aeo-pg-cutover-policy.md) — **Chính sách PostgreSQL-only (active 2026-07-19)**  
 > - [`SPEC_UI_UX_SEO_AEO.md`](SPEC_UI_UX_SEO_AEO.md) — UI/UX specification  

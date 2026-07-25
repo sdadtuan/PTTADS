@@ -3,6 +3,7 @@
 > **Phiên bản:** 1.4 · **Ngày:** 2026-07-19  
 > **Phạm vi:** SEO/AEO Ops UI — Flask admin (Phase 1–4) **+** Next.js Client Portal SEO (Phase 5C, flag `PTT_PORTAL_SEO_ENABLED`)  
 > **Master spec:** [`SPEC_SEO_AEO_OPERATING_SYSTEM.md`](SPEC_SEO_AEO_OPERATING_SYSTEM.md) v1.4  
+> **Hướng dẫn vận hành:** [`huong-dan-seo-aeo-ops.md`](huong-dan-seo-aeo-ops.md) v2.0  
 > **Kiến trúc:** [`specs/2026-07-19-seo-aeo-architecture.md`](specs/2026-07-19-seo-aeo-architecture.md)  
 > **Storage policy:** [`specs/2026-07-19-seo-aeo-pg-cutover-policy.md`](specs/2026-07-19-seo-aeo-pg-cutover-policy.md) — feature mới backend PG-only  
 > **Design system gốc:** [`SPEC_UI_UX_PTT.md`](SPEC_UI_UX_PTT.md) — **kế thừa tokens, không redesign**  

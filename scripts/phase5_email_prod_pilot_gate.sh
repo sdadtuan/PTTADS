@@ -51,8 +51,8 @@ if [[ "$REFRESH" == "--refresh-prior" ]] || [[ "${EM5_REFRESH_PRIOR_GATES:-0}" =
   fi
 fi
 
-echo ""
 echo "==> EM-5 prod pilot gate pack"
+bash "$ROOT/scripts/email_handoff_gate.sh"
 "$PYTHON" -m ptt_crm.phase5_email_gates $REFRESH
 RC=$?
 

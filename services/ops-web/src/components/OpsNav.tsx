@@ -6,7 +6,8 @@ import { useEffect, useState } from 'react';
 import type { StoredStaffUser } from '@/lib/auth';
 import { getAccessToken, hasCap } from '@/lib/auth';
 import { fetchReviewQueueCount } from '@/lib/api';
-import { emailJourneysEnabled, emailModuleEnabled } from '@/lib/email-flags';
+import { emailGateAEnabled, emailJourneysEnabled, emailModuleEnabled } from '@/lib/email-flags';
+import { canViewEmailGateA } from '@/lib/email/caps';
 import { canViewMetaAdsOps, canViewMetaIntelligence, canViewMetaTracking } from '@/lib/meta/caps';
 import {
   canViewSeoAeo,
@@ -121,6 +122,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/email/journeys': 'Journeys',
   '/email/deliverability': 'Deliverability',
   '/email/reports': 'Reports',
+  '/email/gate-a': 'Email Gate A',
 };
 
 function pageTitleFor(pathname: string): string {
@@ -349,6 +351,9 @@ function buildSections(
     }
     if (emailReports) {
       email.push({ href: '/email/reports', label: 'Reports' });
+    }
+    if (emailGateAEnabled() && canViewEmailGateA(user)) {
+      email.push({ href: '/email/gate-a', label: 'Gate A Prod pilot' });
     }
     sections.push({ label: 'Email Marketing', links: email });
   }

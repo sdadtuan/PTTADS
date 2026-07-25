@@ -50,7 +50,7 @@ def _run_pytest_email() -> dict[str, Any]:
     py_proc = subprocess.run(py_cmd, cwd=str(ROOT), env=env, capture_output=True, text=True, timeout=120)
     nest_cwd = ROOT / "services" / "ptt-crm-api"
     nest_proc = subprocess.run(
-        ["npm", "test", "--", "email-marketing", "portal-email"],
+        ["npm", "test", "--", "email-marketing", "portal-email", "email-gate-a"],
         cwd=str(nest_cwd),
         env=env,
         capture_output=True,
@@ -260,6 +260,34 @@ def _check_soak() -> dict[str, Any]:
     return result
 
 
+def _check_handoff_gate() -> dict[str, Any]:
+    skip = os.environ.get("EM5_SKIP_HANDOFF", "0") == "1"
+    if skip:
+        return {"id": "EM5-G09", "ok": True, "label": "Email §13 handoff gate", "skipped": True}
+    artifacts = _artifacts_dir() / "wave-gates" / "email_handoff_gate_report.json"
+    if not artifacts.is_file():
+        return {
+            "id": "EM5-G09",
+            "ok": False,
+            "label": "Email §13 handoff gate",
+            "error": "missing_report",
+            "path": str(artifacts),
+        }
+    try:
+        data = json.loads(artifacts.read_text(encoding="utf-8"))
+        ok = data.get("ok") is True
+    except json.JSONDecodeError:
+        ok = False
+        data = {}
+    return {
+        "id": "EM5-G09",
+        "ok": ok,
+        "label": "Email §13 handoff gate",
+        "path": str(artifacts),
+        "report_ok": data.get("ok"),
+    }
+
+
 def _check_signoff_template() -> dict[str, Any]:
     template = ROOT / "docs" / "evidence" / "em5-email-pilot-signoff.template.json"
     signoff = _artifacts_dir() / "em5-email-pilot-signoff.json"
@@ -309,6 +337,7 @@ def run_gates(*, refresh_prior: bool = False) -> dict[str, Any]:
         _nest_email_smoke(),
         _build_frontends(),
         _check_soak(),
+        _check_handoff_gate(),
         _check_signoff_template(),
     ]
     ok = all(c.get("ok") for c in checks)

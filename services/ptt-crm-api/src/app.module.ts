@@ -40,6 +40,7 @@ import { OwnerWeeklyModule } from './owner-weekly/owner-weekly.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { ProposalsModule } from './proposals/proposals.module';
 import { ReProjectsModule } from './re-projects/re-projects.module';
+import { EmailGateAModule } from './email-gate-a/email-gate-a.module';
 import { EmailMarketingModule } from './email-marketing/email-marketing.module';
 import { SeoAdminModule } from './seo-admin/seo-admin.module';
 import { SeoGateAModule } from './seo-gate-a/seo-gate-a.module';
@@ -114,6 +115,7 @@ import { WorkflowsModule } from './workflows/workflows.module';
     SeoCmsModule,
     SeoGateAModule,
     EmailMarketingModule,
+    EmailGateAModule,
     PerformanceModule,
     MetaTrackingModule,
     MetaAlertsModule,

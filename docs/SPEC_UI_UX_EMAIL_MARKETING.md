@@ -4,6 +4,7 @@
 > **Phạm vi:** **Next.js ops-web** (`ops.pttads.vn/email/*`) **+** client portal (`portal.pttads.vn/email/*`) **+** public preference pages  
 > **Quyết định:** Admin **không dùng Flask** — ops-web + Nest `email-marketing/` (pattern SEO hub Phase 4; ADR-EM-10 v1.3)  
 > **Master spec:** [`SPEC_EMAIL_MARKETING_OPERATING_SYSTEM.md`](SPEC_EMAIL_MARKETING_OPERATING_SYSTEM.md) v1.3  
+> **Roadmap hoàn thiện:** [`EMAIL_MARKETING_COMPLETION_ROADMAP.md`](EMAIL_MARKETING_COMPLETION_ROADMAP.md) v1.0  
 > **Kiến trúc:** [`specs/2026-07-19-email-marketing-architecture.md`](specs/2026-07-19-email-marketing-architecture.md)  
 > **Design system gốc:** [`SPEC_UI_UX_PTT.md`](SPEC_UI_UX_PTT.md) — tokens kế thừa · shell = **ops-web** (target Internal Ops)  
 > **Pattern tham chiếu:** [`SPEC_UI_UX_SEO_AEO.md`](SPEC_UI_UX_SEO_AEO.md) — wireframes, flows (routes đổi sang `/email/*` trên ops-web)  

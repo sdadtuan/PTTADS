@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checklist vận hành SEO/AEO Ops — A4 — PTTADS</title>
+<style>
+:root {
+  --navy:#0F172A; --green:#398b43; --green-light:#ecf3ee;
+  --gray:#64748B; --light:#F1F5F9; --border:#CBD5E1; --warn:#B45309;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:"Segoe UI",system-ui,-apple-system,sans-serif; color:var(--navy); background:#fff; line-height:1.45; font-size:12px; }
+.page { max-width:920px; margin:0 auto; padding:1rem 1.1rem 2rem; }
+header.doc-header {
+  background:var(--navy); color:#fff; padding:1rem 1.25rem; border-radius:8px;
+  margin-bottom:1rem; page-break-inside:avoid;
+}
+header.doc-header .header-top { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; }
+header.doc-header .header-brand img { height:48px; width:auto; display:block; }
+header.doc-header h1 { font-size:1.25rem; margin-bottom:.2rem; }
+header.doc-header .meta { font-size:.82rem; opacity:.88; }
+header.doc-header .slug { color:#86efac; font-size:.78rem; }
+.meta-grid {
+  display:grid; grid-template-columns:1fr 1fr 1fr; gap:.5rem 1rem; margin-top:.85rem;
+  background:rgba(255,255,255,.08); padding:.85rem; border-radius:6px;
+}
+.form-section { margin-bottom:1.25rem; page-break-inside:avoid; }
+.section-head {
+  display:flex; align-items:center; gap:.6rem; border-bottom:3px solid var(--green);
+  padding-bottom:.35rem; margin-bottom:.65rem;
+}
+.section-head h2 { font-size:1rem; color:var(--navy); }
+.part-badge {
+  background:var(--green); color:#fff; font-size:.68rem; font-weight:600;
+  padding:.18rem .5rem; border-radius:4px; white-space:nowrap;
+}
+.field { margin-bottom:.5rem; }
+.field label { display:block; font-weight:600; font-size:.75rem; margin-bottom:.15rem; color:var(--gray); }
+.line { border-bottom:1px solid var(--border); height:1.35rem; }
+.hint { color:var(--gray); font-size:.75rem; font-style:italic; margin-bottom:.4rem; }
+.check-table { width:100%; border-collapse:collapse; margin:.5rem 0; font-size:.78rem; }
+.check-table th {
+  background:var(--green); color:#fff; padding:.4rem .55rem; text-align:left; font-weight:600;
+}
+.check-table td { border:1px solid var(--border); padding:.35rem .55rem; vertical-align:top; }
+.check-table tr:nth-child(even) td { background:var(--light); }
+.cb { display:inline-block; width:1.1rem; height:1.1rem; border:1.5px solid var(--border); border-radius:3px; vertical-align:middle; }
+.cb-col { width:2rem; text-align:center; }
+.step-num { font-weight:700; color:var(--green); text-align:center; width:2rem; }
+.two-col { display:grid; grid-template-columns:1fr 1fr; gap:.85rem; }
+.sign-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1rem; margin-top:1rem; }
+.sign-box { border:1px solid var(--border); border-radius:6px; padding:.65rem; min-height:4.5rem; }
+.sign-box label { font-size:.72rem; color:var(--gray); font-weight:600; }
+.sign-line { border-bottom:1px solid var(--border); margin-top:2.2rem; }
+.footer-note {
+  margin-top:1.25rem; padding:.75rem; background:var(--green-light); border-radius:6px;
+  font-size:.75rem; color:var(--gray); border-left:4px solid var(--green);
+}
+@media print {
+  @page { size:A4; margin:12mm; }
+  body { font-size:10.5px; }
+  .page { padding:0; max-width:100%; }
+  header.doc-header, .check-table th, .part-badge {
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .form-section { page-break-inside:avoid; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="doc-header">
+  <div class="header-top">
+    <div>
+      <div class="slug">PTTADS · SEO/AEO Ops · Checklist A4 v2.0</div>
+      <h1>Checklist vận hành SEO/AEO Enterprise Ops</h1>
+      <div class="meta">In A4 · Dùng hàng ngày / onboard / publish gate · ops-web /seo/*</div>
+    </div>
+    <div class="header-brand"><img src="/static/images/ptt-logo.png" alt="PTT Advertising Solutions"></div>
+  </div>
+  <div class="meta-grid">
+    <div class="field"><label>Người vận hành</label><div class="line"></div></div>
+    <div class="field"><label>Ngày / Ca</label><div class="line"></div></div>
+    <div class="field"><label>Vai trò (Head SEO / Strategist / Writer / Tech)</label><div class="line"></div></div>
+    <div class="field"><label>Client / customer_id</label><div class="line"></div></div>
+    <div class="field"><label>Domain chính</label><div class="line"></div></div>
+    <div class="field"><label>URL ops-web</label><div class="line">https://rs.pttads.vn/seo/hub</div></div>
+  </div>
+</header>
+
+<!-- A. Daily -->
+<section class="form-section">
+  <div class="section-head">
+    <h2>A. Checklist hàng ngày (sau cron GSC/GA4 ~06:xx)</h2>
+    <span class="part-badge">HÀNG NGÀY</span>
+  </div>
+  <p class="hint">Head SEO / Strategist — 15–20 phút · Route: /seo/hub → drill-down client</p>
+  <table class="check-table">
+    <thead><tr><th class="cb-col">☐</th><th>Hạng mục</th><th>Màn hình / hành động</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Sync GSC/GA4 OK</td><td>/seo/hub — không banner sync failed</td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Client health review</td><td>Hub → click client đỏ/vàng</td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Critical issues</td><td>/seo/technical?customer_id=</td><td>Số issue: _____</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Content overdue</td><td>/seo/content — filter client</td><td>Số card: _____</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Pipeline review queue</td><td>SEO Review / AEO Review kanban</td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>AEO coverage thấp</td><td>/seo/aeo — client &lt;50%</td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Alerts mở</td><td>/seo/automations — ack/resolve</td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Assign task writer/tech</td><td>CRM tasks hoặc pipeline owner</td><td></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- B. Weekly -->
+<section class="form-section">
+  <div class="section-head">
+    <h2>B. Checklist hàng tuần (Chủ nhật / đầu tuần)</h2>
+    <span class="part-badge">HÀNG TUẦN</span>
+  </div>
+  <table class="check-table">
+    <thead><tr><th class="cb-col">☐</th><th>Hạng mục</th><th>Màn hình</th><th>Ghi chú</th></tr></thead>
+    <tbody>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Freshness queue</td><td>/seo/freshness</td><td>Ưu tiên top 5</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Rank capture / SOV</td><td>/seo/ranks — Capture SERP</td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Research SERP/Pages</td><td>/seo/research tabs SERP · Pages</td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>OKR KPI refresh</td><td>/seo/strategy — Refresh KPI</td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Báo cáo client</td><td>/seo/reports — Export PDF</td><td>Đã gửi: ☐</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>AEO batch scan</td><td>/seo/aeo</td><td></td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>CWV panel review</td><td>/seo/technical</td><td>Pass rate: _____%</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="two-col">
+<!-- C. Onboard -->
+<section class="form-section">
+  <div class="section-head">
+    <h2>C. Onboard client SEO mới</h2>
+    <span class="part-badge">ONBOARD</span>
+  </div>
+  <table class="check-table">
+    <thead><tr><th class="cb-col">☐</th><th>Bước</th></tr></thead>
+    <tbody>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>1. CRM: tạo/chọn customer</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>2. /seo/clients/:id Settings — domain, tier, approvers</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>3. /seo/technical — OAuth GSC</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>4. /seo/technical — OAuth GA4 + Property ID</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>5. Sync — verify GSC clicks &gt; 0</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>6. /seo/research — import keywords CSV</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>7. /seo/strategy — OKR (nếu bật Gate E)</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>8. Hub KPI hiển thị T+1</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>9. Portal map (tuỳ chọn)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- D. Publish gate -->
+<section class="form-section">
+  <div class="section-head">
+    <h2>D. Publish gate (trước Published)</h2>
+    <span class="part-badge">GOVERNANCE</span>
+  </div>
+  <p class="hint">Content detail /seo/content/:id · PTT_SEO_GOVERNANCE_ENABLED=1</p>
+  <table class="check-table">
+    <thead><tr><th class="cb-col">☐</th><th>Điều kiện</th></tr></thead>
+    <tbody>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>SEO Review — pass</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>AEO Review + checklist — pass</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Technical Review (nếu yêu cầu)</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Client Review (nếu tier yêu cầu)</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Meta title + description đủ</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Schema / governance — không vi phạm</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>CMS webhook test OK (nếu auto-publish)</td></tr>
+      <tr><td class="cb-col"><span class="cb"></span></td><td>Approver cuối — Approved stage</td></tr>
+    </tbody>
+  </table>
+  <div class="field" style="margin-top:.5rem"><label>Content ID / URL slug</label><div class="line"></div></div>
+</section>
+</div>
+
+<!-- E. Research → Content -->
+<section class="form-section">
+  <div class="section-head">
+    <h2>E. Luồng Research → Brief → Content (Flow F1)</h2>
+    <span class="part-badge">STRATEGIST</span>
+  </div>
+  <table class="check-table">
+    <thead><tr><th class="step-num">#</th><th class="cb-col">☐</th><th>Bước</th><th>Route / API</th></tr></thead>
+    <tbody>
+      <tr><td class="step-num">1</td><td class="cb-col"><span class="cb"></span></td><td>Import / chọn keyword</td><td>/seo/research · Keywords</td></tr>
+      <tr><td class="step-num">2</td><td class="cb-col"><span class="cb"></span></td><td>Gom cluster</td><td>Tab Clusters</td></tr>
+      <tr><td class="step-num">3</td><td class="cb-col"><span class="cb"></span></td><td>Capture SERP (tuỳ chọn)</td><td>Tab SERP · Capture SERP</td></tr>
+      <tr><td class="step-num">4</td><td class="cb-col"><span class="cb"></span></td><td>Sync GSC pages</td><td>Tab Pages</td></tr>
+      <tr><td class="step-num">5</td><td class="cb-col"><span class="cb"></span></td><td>Chọn keyword → Tạo brief</td><td>Modal preview</td></tr>
+      <tr><td class="step-num">6</td><td class="cb-col"><span class="cb"></span></td><td>Tạo content → Brief Ready</td><td>/seo/content pipeline</td></tr>
+      <tr><td class="step-num">7</td><td class="cb-col"><span class="cb"></span></td><td>Assign writer + due date</td><td>Content detail</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- F. RBAC quick ref -->
+<section class="form-section">
+  <div class="section-head">
+    <h2>F. Phân quyền nhanh (section keys)</h2>
+    <span class="part-badge">RBAC</span>
+  </div>
+  <table class="check-table">
+    <thead><tr><th>Key</th><th>Quyền</th><th>Vai trò gợi ý</th></tr></thead>
+    <tbody>
+      <tr><td>crm_seo_aeo</td><td>Xem toàn phân hệ</td><td>Tất cả</td></tr>
+      <tr><td>crm_seo_aeo_write</td><td>Research · content</td><td>Strategist · Writer</td></tr>
+      <tr><td>crm_seo_aeo_approve</td><td>Duyệt workflow</td><td>Head SEO</td></tr>
+      <tr><td>crm_seo_aeo_technical</td><td>Crawl · issues</td><td>Tech SEO</td></tr>
+      <tr><td>crm_seo_aeo_settings</td><td>OAuth · CMS</td><td>AM · Head SEO</td></tr>
+      <tr><td>crm_seo_aeo_reports</td><td>PDF · BI export</td><td>AM · Analyst</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- G. Troubleshooting -->
+<section class="form-section">
+  <div class="section-head">
+    <h2>G. Xử lý sự cố — ghi chú ca trực</h2>
+    <span class="part-badge">OPS</span>
+  </div>
+  <div class="field"><label>Triệu chứng / ticket</label><div class="line"></div></div>
+  <div class="field"><label>Nguyên nhân / log</label><div class="lines-tall" style="min-height:2.5rem;border:1px solid var(--border);border-radius:4px;background:#FAFAFA"></div></div>
+  <div class="field"><label>Hành động đã làm</label><div class="lines-tall" style="min-height:2.5rem;border:1px solid var(--border);border-radius:4px;background:#FAFAFA"></div></div>
+  <div class="field"><label>Resolved ☐ · Escalate ☐ · Follow-up date</label><div class="line"></div></div>
+</section>
+
+<div class="sign-row">
+  <div class="sign-box"><label>Người vận hành</label><div class="sign-line"></div></div>
+  <div class="sign-box"><label>Head SEO / Review</label><div class="sign-line"></div></div>
+  <div class="sign-box"><label>Ngày hoàn thành</label><div class="sign-line"></div></div>
+</div>
+
+<div class="footer-note">
+  <strong>Tài liệu liên quan:</strong>
+  docs/huong-dan-seo-aeo-ops.md · docs/SEO_AEO_Ops_Training.pptx ·
+  SPEC_SEO_AEO_OPERATING_SYSTEM.md · SPEC_UI_UX_SEO_AEO.md ·
+  In: Cmd+P / Ctrl+P → A4 · Tạo lại PPT: <code>python3 scripts/generate_seo_aeo_training_pptx.py</code>
+</div>
+
+</div>
+</body>
+</html>

@@ -9,6 +9,8 @@
 > - [`../PTT/docs/SPEC_META_OPERATING_SYSTEM.md`](../PTT/docs/SPEC_META_OPERATING_SYSTEM.md) — Meta-OS P1–P4 domain backlog  
 > - [`../PTT/docs/facebook_ads_agency_architecture.md`](../PTT/docs/facebook_ads_agency_architecture.md) — Agency 7-layer reference  
 > **Tài liệu PTTADS liên quan:**  
+> - [`huong-dan-meta-enterprise-ops.md`](huong-dan-meta-enterprise-ops.md) — **Hướng dẫn setup & sử dụng** (ops-web + portal)  
+> - [`specs/2026-07-24-meta-enterprise-ui-ux-architecture-design.md`](specs/2026-07-24-meta-enterprise-ui-ux-architecture-design.md) — UI/UX architecture  
 > - [`SPEC_AGENCY_OPERATING_PLATFORM.md`](SPEC_AGENCY_OPERATING_PLATFORM.md) — Master agency platform  
 > - [`SPEC_MIGRATION_FLASK_EXECUTION_PLAN.md`](SPEC_MIGRATION_FLASK_EXECUTION_PLAN.md) — Strangler migration (EXECUTING)  
 > - [`runbooks/horizon1-meta-ads-migration-checklist.md`](runbooks/horizon1-meta-ads-migration-checklist.md) — Hub canonical ops-web  

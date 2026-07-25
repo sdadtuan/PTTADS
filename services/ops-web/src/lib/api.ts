@@ -4173,6 +4173,24 @@ export async function fetchSeoGateASignoffTemplate(
   return agencyFetch(token, '/api/v1/seo/gate-a/signoff-template');
 }
 
+export async function fetchEmailGateAStatus(
+  token: string,
+): Promise<Record<string, unknown>> {
+  return agencyFetch(token, '/api/v1/email/gate-a/status');
+}
+
+export async function fetchEmailGateAReadiness(
+  token: string,
+): Promise<Record<string, unknown>> {
+  return agencyFetch(token, '/api/v1/email/gate-a/readiness');
+}
+
+export async function fetchEmailGateASignoffTemplate(
+  token: string,
+): Promise<{ ok: boolean; template: Record<string, unknown> }> {
+  return agencyFetch(token, '/api/v1/email/gate-a/signoff-template');
+}
+
 export async function fetchSeoAlerts(
   token: string,
   status = 'open',

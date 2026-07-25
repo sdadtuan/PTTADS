@@ -49,8 +49,17 @@ chmod +x scripts/phase9_email_wave4_gate.sh
 
 - [ ] `.local-dev/phase9-email-wave4-report.json` → `"ok": true`
 - [ ] `.local-dev/phase5-email-pilot-gate-report.json` → `"ok": true`
+- [ ] `.local-dev/wave-gates/email_handoff_gate_report.json` → `"ok": true`
 - [ ] EM-0..EM-4 + EM-6..EM-8b reports trong `.local-dev/` đều `"ok": true`
 - [ ] Pytest email (Nest + phase5 + wave4) pass
+
+**Handoff §13 (P0 Gate A):**
+
+```bash
+./scripts/email_handoff_gate.sh
+EMAIL_HANDOFF_SKIP_E2E=0 ./scripts/playwright_ops_email_handoff_e2e.sh   # cần Nest + ops-web up
+./scripts/email_gate_a_cutover_gate.sh
+```
 
 **Full regression (optional CI):**
 

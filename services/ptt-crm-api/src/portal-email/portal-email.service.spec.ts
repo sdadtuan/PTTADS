@@ -3,6 +3,18 @@ import { PortalEmailRepository } from './portal-email.repository';
 import { PortalEmailService } from './portal-email.service';
 
 describe('PortalEmailService', () => {
+  const prevPortal = process.env.PTT_EMAIL_PORTAL_ENABLED;
+
+  beforeEach(() => {
+    process.env.PTT_EMAIL_PORTAL_ENABLED = '1';
+  });
+
+  afterEach(() => {
+    if (prevPortal === undefined) delete process.env.PTT_EMAIL_PORTAL_ENABLED;
+    else process.env.PTT_EMAIL_PORTAL_ENABLED = prevPortal;
+    jest.clearAllMocks();
+  });
+
   const repo = {
     schemaReady: jest.fn(),
     hasWorkspace: jest.fn(),
@@ -31,8 +43,6 @@ describe('PortalEmailService', () => {
   };
 
   const approver = { ...viewer, email: 'approver@test.local', role: 'approver' as const };
-
-  afterEach(() => jest.clearAllMocks());
 
   it('returns disabled dashboard when schema not ready', async () => {
     repo.schemaReady.mockResolvedValue(false);

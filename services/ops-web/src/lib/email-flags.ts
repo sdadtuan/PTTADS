@@ -11,3 +11,8 @@ export function emailSendEnabled(): boolean {
 export function emailJourneysEnabled(): boolean {
   return emailModuleEnabled() && process.env.NEXT_PUBLIC_PTT_EMAIL_JOURNEYS_ENABLED !== '0';
 }
+
+export function emailGateAEnabled(): boolean {
+  const raw = process.env.NEXT_PUBLIC_PTT_EMAIL_GATE_A_ENABLED ?? '1';
+  return raw.trim().toLowerCase() !== '0';
+}

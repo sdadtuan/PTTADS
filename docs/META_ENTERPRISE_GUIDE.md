@@ -1,5 +1,6 @@
 # Hướng dẫn Setup & Sử dụng — Meta Enterprise trên PTTADS
 
+> **Canonical (đầy đủ):** [`huong-dan-meta-enterprise-ops.md`](huong-dan-meta-enterprise-ops.md) — bản vận hành chính thức, cùng cấu trúc với [`huong-dan-seo-aeo-ops.md`](huong-dan-seo-aeo-ops.md).  
 > **Phiên bản tài liệu:** 1.0 · **Ngày:** 2026-07-25  
 > **Canonical spec:** [`SPEC_META_ENTERPRISE_PTTADS.md`](SPEC_META_ENTERPRISE_PTTADS.md)  
 > **Đối tượng:** Super Admin, GDKD, Account Manager, Media Buyer, Tracking/Tech, Data/BI  

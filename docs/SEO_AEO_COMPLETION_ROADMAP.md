@@ -346,7 +346,9 @@ Theo spec §9.2–§9.3 (P2 hardening đã ship một phần 2026-07-25):
 | [`runbooks/seo-aeo-pg-oauth-uat-cutover.md`](runbooks/seo-aeo-pg-oauth-uat-cutover.md) | OAuth + staged prod |
 | [`runbooks/seo-aeo-gate-d.md`](runbooks/seo-aeo-gate-d.md) | ClickHouse BI |
 | [`runbooks/seo-aeo-gate-e.md`](runbooks/seo-aeo-gate-e.md) | Enterprise depth |
-| [`huong-dan-seo-aeo-ops.md`](huong-dan-seo-aeo-ops.md) | Hướng dẫn vận hành (cần cập nhật post-Flask) |
+| [`huong-dan-seo-aeo-ops.md`](huong-dan-seo-aeo-ops.md) | Hướng dẫn setup & sử dụng v2.0 (ops-web canonical) |
+| [`SEO_AEO_Ops_Training.pptx`](SEO_AEO_Ops_Training.pptx) | Slide đào tạo team SEO (~45 phút) |
+| [`forms/seo-aeo-ops-checklist-a4.html`](forms/seo-aeo-ops-checklist-a4.html) | Checklist in A4 vận hành |
 
 ---
 
