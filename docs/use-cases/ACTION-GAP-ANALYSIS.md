@@ -1,7 +1,7 @@
 # Phân tích Gap — Use Case vs Hành động người dùng thực tế
 
-> **Phiên bản:** 1.1 · **Ngày:** 2026-07-25  
-> **Cập nhật:** Phase A — Zalo actions 21/21, SYS-002/003/004/005 multi-channel, Portal Zalo  
+> **Phiên bản:** 1.2 · **Ngày:** 2026-07-25  
+> **Cập nhật:** Phase A — Zalo 21/21, SYS multi-channel, Portal Zalo · **Phase B** — CRM 15/15 + SVC 12/12 actions expanded  
 > **Mục đích:** Đối chiếu ~122 UC với ops-web / portal-web thực tế; xác định bước nghiệp vụ khách hàng chưa được hệ thống dẫn đủ.
 
 ---
@@ -23,6 +23,15 @@
 | PORTAL Zalo | Không có | **PORTAL-UC-013/014** ✅ |
 | Gap doc Zalo | Stale (nhiều ❌ đã ship Z1–Z3) | **Refreshed** |
 
+**Thay đổi post Phase B (doc):**
+
+| Module | Trước Phase B | Sau Phase B |
+|--------|---------------|-------------|
+| CRM actions | 15 skeleton (~4–6 bước) | **15/15 expanded** — 8 P0 ≥8 bước, 7 P1 ≥5 bước |
+| SVC actions | 12 skeleton | **12/12 expanded** — 8 P0 ≥8 bước, 4 P1 ≥5 bước |
+| GAP-P1-01 finance gate | 1 dòng workaround | **8 bước chi tiết** + target UI spec trong SVC-UC-004 |
+| CRM closed-loop Won | Không document | **CRM-UC-002 E2** → SYS-002 + ZALO-UC-015 |
+
 **Nguyên nhân hệ thống "chưa ổn" khi đọc UC cũ:** UC mô tả luồng logic (Main flow 5–7 bước) nhưng **không liệt kê từng click, form field, điều kiện chuyển màn** — AM/CSKH không biết "làm gì tiếp theo" khi onboard đa module.
 
 **Giải pháp tài liệu:** Bộ [`actions/`](actions/README.md) — mỗi UC có bảng hành động `# | Actor | Màn hình | Thao tác | Input | Output | Gate`.
@@ -34,19 +43,19 @@
 | Mong muốn khách hàng / agency | UC liên quan | Trạng thái đáp ứng |
 |------------------------------|--------------|-------------------|
 | Ký HĐ xong → client chạy ads trong 2 tuần | SYS-001, SVC-001/002, META-001, **ZALO-001/021** | ⚠️ Orchestrator ✅; AM vẫn deep-link nhiều URL — **doc Phase A** đã map đủ bước |
-| Lead Meta vào CRM < 1 phút, CSKH gọi ngay | META-004, CRM-001, PLAT-004 | ✅ Webhook + lead list + review queue |
-| **Lead Zalo vào CRM (webhook + poll)** | **ZALO-011/012/013/014** | ✅ Shipped Z0–Z2; **actions doc Phase A** |
+| Lead Meta vào CRM < 1 phút, CSKH gọi ngay | META-004, **CRM-001**, PLAT-004 | ✅ **Phase B** — CRM-001 9 bước + nhánh Meta/Zalo |
+| **Lead Zalo vào CRM (webhook + poll)** | **ZALO-011/012/013/014, CRM-001** | ✅ Shipped + **CRM-001 nhánh Z** |
 | Biết CPL/ROAS đúng theo client | SYS-002, META-002/003, **ZALO-004/015** | ✅ Hub + map; Zalo CPA refresh Z2-B7 |
 | **So sánh Meta/Google/Zalo một màn** | **SYS-002, ZALO-018** | ✅ `/meta/ads-combined` Z3-7 |
-| Launch ads chỉ khi QA + client duyệt | SYS-003, SVC-005/006/007, PORTAL-006, **ZALO-008/019** | ✅ Launch QA Zalo checklist Z3-2; go-live manual v1 |
-| Khách tự xem báo cáo T-1 | SYS-005, PORTAL-002/003, **PORTAL-UC-013** | ✅ Dashboard + export CSV/PDF; **Zalo PDF Z3-6** |
+| Launch ads chỉ khi QA + client duyệt | SYS-003, **SVC-005/006/007**, PORTAL-006, ZALO-008/019 | ✅ **SVC-005** Zalo auto-checklist + creative channel tag |
+| Khách tự xem báo cáo T-1 | SYS-005, PORTAL-002/003, **PORTAL-UC-013** | ✅ Dashboard + export CSV/PDF; Zalo PDF Z3-6 |
 | Khách duyệt email trước gửi | EM-007, PORTAL-008 | ✅ Portal approvals |
 | **Khách duyệt creative Zalo** | **ZALO-019, PORTAL-014** | ✅ Shared `/creatives` + channel=zalo tag |
 | SEO content duyệt trước publish | SEO-005/006, PORTAL-007 | ✅ Content pipeline + portal review |
 | Tạo tài khoản portal cho khách | PORTAL-001, SYS-001 bước 13 | ✅ Tab **Portal users** |
 | Reset mật khẩu portal | PORTAL-001 | ✅ `/forgot-password`, `/reset-password` |
-| Offboard → thu hồi hết quyền | SYS-006, SVC-012 | ✅ Nút Offboard |
-| Finance chặn handover khi nợ | SVC-004 | ⚠️ **GAP-P1-01** — Gate logic spec; UI cảnh báo hạn chế |
+| Offboard → thu hồi hết quyền | SYS-006, **SVC-012** | ✅ **SVC-UC-012** 6 bước + Offboard client |
+| Finance chặn handover khi nợ | **SVC-004**, CRM-011 | ⚠️ **GAP-P1-01** — **8 bước workaround doc**; UI auto-block pending |
 | **Cảnh báo Zalo CPL/zero leads** | **ZALO-017** | ✅ Alerts Z3 + Slack + hub banner |
 | **Thông báo tiến độ campaign Zalo** | **ZALO-020** | ⚠️ Staff inbox ✅; portal client ⚠ GAP-P1-02 |
 | Onboard email domain tự phục vụ | EM-001 | ✅ Wizard E-11 |
@@ -72,7 +81,7 @@
 
 | ID | Mô tả | UC | Workaround |
 |----|-------|-----|------------|
-| **GAP-P1-01** | Finance gate handover | SVC-004 | AM check `/crm/financials` thủ công trước advance stage |
+| **GAP-P1-01** | Finance gate handover | SVC-004 | **Doc Phase B:** 8 bước manual `/crm/financials` + block policy; target UI on lifecycle advance |
 | **GAP-P1-02** | Notification client khi có approval pending / milestone | PORTAL-006/008, **ZALO-020** | Email manual từ AM; staff inbox có; portal widget partial |
 | **GAP-P1-03** | Grafana BI trên portal khách | EM-013, SEO-014 | Khách xem PDF export; staff xem Grafana |
 | **GAP-P1-04** | Campaign map bulk AI suggest | META-002 | Hub có suggest; buyer confirm từng dòng |
@@ -107,14 +116,16 @@ Một UC được coi **"đủ bước nghiệp vụ"** khi file actions tương
 - [ ] **Nhánh E*** — hành động khi lỗi / từ chối / timeout
 - [ ] **Gap tag** — nếu bước thiếu UI
 
-**Coverage sau Phase A:**
+**Coverage sau Phase B:**
 
 | Module | UC catalog | Action file | Đạt checklist §4 |
 |--------|------------|-------------|------------------|
 | ZALO | 21 | 21 ✅ | **21/21** (Phase A) |
 | SYS | 12 | 12 | **5/12** (001–005 expanded) |
-| PORTAL | 10 + extras | 14 | **+2 Zalo** (013/014) |
-| CRM/SVC/META/SEO/EM/PLAT | ~79 | ~79 | **~4/79** full standard — **Phase B target** |
+| PORTAL | 10 + extras | 14 | **4/14** full + rest partial |
+| **CRM** | 15 | 15 ✅ | **15/15** (Phase B) — 8 P0 full, 7 P1 ≥5 steps |
+| **SVC** | 12 | 12 ✅ | **12/12** (Phase B) — 8 P0 full, 4 P1 ≥5 steps |
+| META/SEO/EM/PLAT | ~56 | ~56 | **Phase C target** |
 
 ---
 
@@ -122,10 +133,10 @@ Một UC được coi **"đủ bước nghiệp vụ"** khi file actions tương
 
 | Phase | Hạng mục | Trạng thái |
 |-------|----------|------------|
-| **A** | Zalo 21 UC actions; SYS-002/003/004/005 multi-channel; Portal Zalo; refresh gap doc | ✅ **Done** (2026-07-25) |
-| **B** (1–2 sprint doc) | CRM + SVC P0 actions expand; GAP-P1-01 finance gate UI | Pending |
-| **C** (1 sprint doc) | META/SEO/EM P0 actions expand | Pending |
-| **D** (product) | GAP-P1-02 portal notify; GAP-Z4-01 Zalo API write | Pending |
+| **A** | Zalo 21 UC; SYS multi-channel; Portal Zalo; gap refresh | ✅ **Done** (2026-07-25) |
+| **B** | CRM 15 + SVC 12 actions expand; GAP-P1-01 finance gate doc | ✅ **Done** (2026-07-25) |
+| **C** (1–2 sprint doc) | META/SEO/EM/PLAT P0 actions expand | Pending |
+| **D** (product) | GAP-P1-01 finance gate UI, GAP-P1-02 portal notify, GAP-Z4-01 | Pending |
 | **E** (product) | GAP-P1-03 Grafana portal | Pending |
 
 ---
@@ -135,7 +146,9 @@ Một UC được coi **"đủ bước nghiệp vụ"** khi file actions tương
 | Tài liệu | Nội dung |
 |----------|----------|
 | [`actions/README.md`](actions/README.md) | Quy ước bảng hành động |
-| [`actions/00-SYSTEM-ACTIONS.md`](actions/00-SYSTEM-ACTIONS.md) | 12 SYS UC — SYS-002/003/004/005 multi-channel |
-| [`actions/08-ZALO-ACTIONS.md`](actions/08-ZALO-ACTIONS.md) | **21/21 ZALO UC** chi tiết |
+| [`actions/00-SYSTEM-ACTIONS.md`](actions/00-SYSTEM-ACTIONS.md) | 12 SYS UC — multi-channel |
+| [`actions/01-CRM-ACTIONS.md`](actions/01-CRM-ACTIONS.md) | **15/15 CRM UC** chi tiết (Phase B) |
+| [`actions/02-SVC-ACTIONS.md`](actions/02-SVC-ACTIONS.md) | **12/12 SVC UC** chi tiết (Phase B) |
+| [`actions/08-ZALO-ACTIONS.md`](actions/08-ZALO-ACTIONS.md) | **21/21 ZALO UC** (Phase A) |
 | [`actions/06-PORTAL-ACTIONS.md`](actions/06-PORTAL-ACTIONS.md) | PORTAL + UC-013/014 Zalo |
 | [`huong-dan-zalo-ads-ops.md`](../huong-dan-zalo-ads-ops.md) | Ops handover Z1–Z3 |
