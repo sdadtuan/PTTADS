@@ -36,7 +36,17 @@ class ZaloAdapter(ChannelAdapter):
         )
 
     def validate_credentials(self, ctx: AdapterContext) -> CredentialValidationResult:
-        return CredentialValidationResult(valid=bool(ctx.credential_ref), message="Stub — wire Zalo Business API")
+        import os
+
+        has_ref = bool(str(ctx.credential_ref or "").strip())
+        has_env = bool((os.environ.get("PTT_ZALO_ACCESS_TOKEN") or "").strip())
+        stub = (os.environ.get("PTT_ZALO_ADS_STUB") or "").strip().lower() in {"1", "true", "yes", "on"}
+        if has_ref or has_env or stub:
+            return CredentialValidationResult(valid=True, message="Zalo credentials configured")
+        return CredentialValidationResult(
+            valid=False,
+            message="Thiếu credential_ref hoặc PTT_ZALO_ACCESS_TOKEN",
+        )
 
     def parse_webhook(
         self,

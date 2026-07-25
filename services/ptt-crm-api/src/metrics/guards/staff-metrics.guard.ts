@@ -22,8 +22,9 @@ export class StaffMetricsViewGuard implements CanActivate {
     const me = await this.staffAuth.me(req.staffUser);
     const meta = this.staffAuth.hasCap(me.caps, 'crm_facebook_ads', 'view');
     const google = this.staffAuth.hasCap(me.caps, 'crm_google_ads', 'view');
+    const zalo = this.staffAuth.hasCap(me.caps, 'crm_zalo_ads', 'view');
     const agency = this.staffAuth.hasCap(me.caps, 'crm_agency', 'view');
-    if (!meta && !google && !agency) {
+    if (!meta && !google && !zalo && !agency) {
       throw new ForbiddenException({ error: 'missing_cap', section: 'crm_agency' });
     }
     return true;

@@ -112,4 +112,22 @@ export class AgencySideEffectsService {
     });
     return job ? [job] : [];
   }
+
+  async enqueueZaloInsightsSync(
+    clientId: string,
+    targetDate?: string,
+  ): Promise<EnqueuedJob[]> {
+    const dateKey = targetDate?.trim() || new Date().toISOString().slice(0, 10);
+    const job = await this.jobQueue.enqueueAgencyJob({
+      jobType: 'zalo_insights_sync',
+      payload: {
+        client_id: clientId,
+        compute_metrics: true,
+        target_date: dateKey,
+      },
+      idempotencyKey: `zalo_insights_sync:${clientId}:${dateKey}`,
+      clientId,
+    });
+    return job ? [job] : [];
+  }
 }

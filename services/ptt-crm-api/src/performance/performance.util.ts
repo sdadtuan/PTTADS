@@ -1,4 +1,4 @@
-export type PerformanceChannelFilter = 'meta' | 'google';
+export type PerformanceChannelFilter = 'meta' | 'google' | 'zalo';
 
 export function normalizePerformanceChannel(value: string | undefined): PerformanceChannelFilter | null {
   const channel = (value ?? '').trim().toLowerCase();
@@ -11,6 +11,9 @@ export function normalizePerformanceChannel(value: string | undefined): Performa
   if (channel === 'google') {
     return 'google';
   }
+  if (channel === 'zalo') {
+    return 'zalo';
+  }
   return null;
 }
 
@@ -21,7 +24,10 @@ export function performanceChannelSql(channel: PerformanceChannelFilter | null):
   if (channel === 'google') {
     return ['google'];
   }
-  return ['meta', 'google'];
+  if (channel === 'zalo') {
+    return ['zalo'];
+  }
+  return ['meta', 'google', 'zalo'];
 }
 
 export function computeCpl(spend: number, leads: number): number | null {

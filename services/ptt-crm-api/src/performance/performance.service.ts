@@ -38,7 +38,7 @@ export class PerformanceService {
     const { start, end } = resolveDateWindow(query);
     const groupBy = this.normalizeGroupBy(query.group_by);
     const channel = normalizePerformanceChannel(query.channel);
-    const channels = performanceChannelSql(channel) as Array<'meta' | 'google'>;
+    const channels = performanceChannelSql(channel) as Array<'meta' | 'google' | 'zalo'>;
     const dateFrom = formatDateOnly(start);
     const dateTo = formatDateOnly(end);
 

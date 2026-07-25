@@ -12,6 +12,7 @@ describe('performance.util', () => {
     expect(normalizePerformanceChannel('meta')).toBe('meta');
     expect(normalizePerformanceChannel('facebook')).toBe('meta');
     expect(normalizePerformanceChannel('google')).toBe('google');
+    expect(normalizePerformanceChannel('zalo')).toBe('zalo');
     expect(normalizePerformanceChannel('')).toBeNull();
     expect(normalizePerformanceChannel('tiktok')).toBeNull();
   });
@@ -19,7 +20,8 @@ describe('performance.util', () => {
   it('performanceChannelSql filters channels', () => {
     expect(performanceChannelSql('meta')).toEqual(['meta']);
     expect(performanceChannelSql('google')).toEqual(['google']);
-    expect(performanceChannelSql(null)).toEqual(['meta', 'google']);
+    expect(performanceChannelSql('zalo')).toEqual(['zalo']);
+    expect(performanceChannelSql(null)).toEqual(['meta', 'google', 'zalo']);
   });
 
   it('computeCpl returns null when no leads or spend', () => {

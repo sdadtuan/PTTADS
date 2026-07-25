@@ -13,6 +13,7 @@ import {
   AgencyClientRow,
   FacebookHubClientRow,
   GoogleHubClientRow,
+  ZaloHubClientRow,
   HubCampaignGlobalRow,
   HubCampaignMapRow,
   JobRow,
@@ -1471,6 +1472,308 @@ export class AgencyRepository implements OnModuleDestroy {
         hub_mapped: Boolean(row.hub_mapped),
       };
     });
+  }
+
+  async zaloHubSummary(params: {
+    windowDays?: number;
+    dateTo?: string;
+    dateFrom?: string;
+    status?: string;
+    clientId?: string;
+    q?: string;
+  }): Promise<{ clients: ZaloHubClientRow[]; summary: Record<string, unknown>; dateFrom: string; dateTo: string; windowDays: number }> {
+    const { dateFrom, dateTo, windowDays } = resolveFacebookHubDateWindow({
+      days: params.windowDays,
+      dateTo: params.dateTo,
+      dateFrom: params.dateFrom,
+    });
+
+    const clientClauses = ['1=1'];
+    const sqlParams: unknown[] = [dateFrom, dateTo];
+    let idx = 3;
+    if (params.status) {
+      clientClauses.push(`c.status = $${idx++}`);
+      sqlParams.push(params.status);
+    }
+    if (params.clientId) {
+      clientClauses.push(`c.id = $${idx++}::uuid`);
+      sqlParams.push(params.clientId);
+    }
+    if (params.q) {
+      clientClauses.push(`(c.code ILIKE $${idx} OR c.name ILIKE $${idx})`);
+      sqlParams.push(`%${params.q}%`);
+      idx++;
+    }
+
+    const result = await this.db.query(
+      `WITH perf AS (
+         SELECT dp.client_id,
+                SUM(dp.spend) AS spend,
+                SUM(dp.leads_crm) AS leads_crm,
+                COUNT(DISTINCT dp.external_campaign_id) AS campaigns,
+                COUNT(DISTINCT dp.external_campaign_id)
+                  FILTER (WHERE dp.hub_campaign_map_id IS NULL) AS unmapped_campaigns,
+                COUNT(*) FILTER (
+                  WHERE hcm.target_cpl_vnd IS NOT NULL
+                    AND dp.leads_crm > 0
+                    AND (dp.spend / dp.leads_crm) > hcm.target_cpl_vnd
+                ) AS over_target_rows
+         FROM daily_performance dp
+         LEFT JOIN hub_campaign_map hcm ON hcm.id = dp.hub_campaign_map_id
+         WHERE dp.channel = 'zalo'
+           AND dp.performance_date BETWEEN $1::date AND $2::date
+         GROUP BY dp.client_id
+       ),
+       zalo_acct AS (
+         SELECT cca.client_id,
+                COUNT(*) FILTER (WHERE cca.channel = 'zalo') AS zalo_account_count,
+                BOOL_OR(cca.channel = 'zalo' AND cca.access_token_encrypted IS NOT NULL) AS zalo_has_token
+         FROM client_channel_accounts cca
+         GROUP BY cca.client_id
+       )
+       SELECT c.id::text, c.code, c.name, c.status, c.owner_am_id,
+              COALESCE(za.zalo_account_count, 0) AS zalo_account_count,
+              COALESCE(za.zalo_has_token, FALSE) AS zalo_has_token,
+              COALESCE(p.spend, 0) AS spend,
+              COALESCE(p.leads_crm, 0) AS leads_crm,
+              COALESCE(p.campaigns, 0) AS campaigns,
+              COALESCE(p.unmapped_campaigns, 0) AS unmapped_campaigns,
+              COALESCE(p.over_target_rows, 0) AS over_target_rows
+       FROM clients c
+       LEFT JOIN zalo_acct za ON za.client_id = c.id
+       LEFT JOIN perf p ON p.client_id = c.id
+       WHERE ${clientClauses.join(' AND ')}
+         AND (
+           COALESCE(za.zalo_account_count, 0) > 0
+           OR COALESCE(p.spend, 0) > 0
+           OR COALESCE(p.leads_crm, 0) > 0
+           OR c.status IN ('active', 'onboarding')
+         )
+       ORDER BY COALESCE(p.spend, 0) DESC, c.code ASC
+       LIMIT 200`,
+      sqlParams,
+    );
+
+    const clients: ZaloHubClientRow[] = [];
+    let totalSpend = 0;
+    let totalLeads = 0;
+    let overTarget = 0;
+    let unmapped = 0;
+
+    for (const row of result.rows) {
+      const spend = Number(row.spend ?? 0);
+      const leads = Math.trunc(Number(row.leads_crm ?? 0));
+      totalSpend += spend;
+      totalLeads += leads;
+      overTarget += Math.trunc(Number(row.over_target_rows ?? 0));
+      unmapped += Math.trunc(Number(row.unmapped_campaigns ?? 0));
+      clients.push({
+        id: String(row.id),
+        code: row.code ?? null,
+        name: row.name ?? null,
+        status: row.status ?? null,
+        owner_am_id: row.owner_am_id ?? null,
+        zalo_account_count: Math.trunc(Number(row.zalo_account_count ?? 0)),
+        spend: Math.round(spend * 100) / 100,
+        leads_crm: leads,
+        cpl: computeCpl(spend, leads),
+        campaigns: Math.trunc(Number(row.campaigns ?? 0)),
+        unmapped_campaigns: Math.trunc(Number(row.unmapped_campaigns ?? 0)),
+        over_target_rows: Math.trunc(Number(row.over_target_rows ?? 0)),
+        zalo_has_token: Boolean(row.zalo_has_token),
+        token_status: Boolean(row.zalo_has_token) ? 'ok' : 'missing',
+      });
+    }
+
+    const summary = {
+      zalo_clients: clients.length,
+      total_spend: Math.round(totalSpend * 100) / 100,
+      total_leads: totalLeads,
+      avg_cpl: computeCpl(totalSpend, totalLeads),
+      over_target_rows: overTarget,
+      unmapped_campaigns: unmapped,
+    };
+
+    return { clients, summary, dateFrom, dateTo, windowDays };
+  }
+
+  async zaloHubCampaignExport(params: {
+    dateFrom: string;
+    dateTo: string;
+    clientId?: string;
+    status?: string;
+    q?: string;
+  }): Promise<FacebookHubCampaignExportRow[]> {
+    const clauses = [`dp.channel = 'zalo'`, `dp.performance_date BETWEEN $1::date AND $2::date`];
+    const sqlParams: unknown[] = [params.dateFrom, params.dateTo];
+    let idx = 3;
+
+    if (params.clientId) {
+      clauses.push(`dp.client_id = $${idx++}::uuid`);
+      sqlParams.push(params.clientId);
+    }
+    if (params.status) {
+      clauses.push(`c.status = $${idx++}`);
+      sqlParams.push(params.status);
+    }
+    if (params.q) {
+      clauses.push(`(c.code ILIKE $${idx} OR c.name ILIKE $${idx})`);
+      sqlParams.push(`%${params.q}%`);
+      idx++;
+    }
+
+    const result = await this.db.query(
+      `SELECT c.id::text AS client_id,
+              c.code AS client_code,
+              c.name AS client_name,
+              dp.external_campaign_id,
+              MAX(hcm.external_campaign_name) AS external_campaign_name,
+              SUM(dp.spend) AS spend,
+              SUM(dp.leads_crm) AS leads_crm,
+              MAX(hcm.target_cpl_vnd) AS target_cpl_vnd,
+              BOOL_OR(dp.hub_campaign_map_id IS NOT NULL) AS hub_mapped
+       FROM daily_performance dp
+       JOIN clients c ON c.id = dp.client_id
+       LEFT JOIN hub_campaign_map hcm ON hcm.id = dp.hub_campaign_map_id
+       WHERE ${clauses.join(' AND ')}
+       GROUP BY c.id, c.code, c.name, dp.external_campaign_id
+       ORDER BY SUM(dp.spend) DESC, c.code ASC, dp.external_campaign_id ASC
+       LIMIT 5000`,
+      sqlParams,
+    );
+
+    return result.rows.map((row) => {
+      const spend = Number(row.spend ?? 0);
+      const leads = Math.trunc(Number(row.leads_crm ?? 0));
+      return {
+        client_id: String(row.client_id),
+        client_code: row.client_code ?? null,
+        client_name: row.client_name ?? null,
+        external_campaign_id: row.external_campaign_id ?? null,
+        external_campaign_name: row.external_campaign_name ?? null,
+        spend: Math.round(spend * 100) / 100,
+        leads_crm: leads,
+        cpl: computeCpl(spend, leads),
+        target_cpl_vnd:
+          row.target_cpl_vnd != null ? Math.trunc(Number(row.target_cpl_vnd)) : null,
+        hub_mapped: Boolean(row.hub_mapped),
+      };
+    });
+  }
+
+  async fetchZaloSyncStatus(clientId?: string): Promise<{
+    global: {
+      last_sync_at: string | null;
+      last_success_at: string | null;
+      last_error: string | null;
+      accounts_total: number;
+      accounts_failed: number;
+      status: 'ok' | 'warn' | 'error';
+    };
+    clients: Array<{
+      client_id: string;
+      client_code: string | null;
+      client_name: string | null;
+      last_job_id: string | null;
+      last_job_status: string | null;
+      last_job_finished_at: string | null;
+      last_job_error: string | null;
+      token_status: string | null;
+      sync_status: 'ok' | 'warn' | 'error';
+    }>;
+  }> {
+    let globalRow: Record<string, unknown> = {};
+    try {
+      const globalResult = await this.db.query(
+        `SELECT last_sync_at, last_success_at, last_error, accounts_total, accounts_failed
+         FROM zalo_insights_sync_state
+         WHERE id = 1`,
+      );
+      globalRow = globalResult.rows[0] ?? {};
+    } catch {
+      globalRow = {};
+    }
+
+    const accountsFailed = Number(globalRow.accounts_failed ?? 0);
+    const lastError = globalRow.last_error ? String(globalRow.last_error) : null;
+    let globalStatus: 'ok' | 'warn' | 'error' = 'ok';
+    if (lastError || accountsFailed > 0) {
+      globalStatus = accountsFailed > 0 ? 'error' : 'warn';
+    }
+
+    const clientClauses = [`cca.channel = 'zalo'`, `cca.status = 'active'`];
+    const clientParams: unknown[] = [];
+    let clientIdx = 1;
+    if (clientId) {
+      clientClauses.push(`cca.client_id = $${clientIdx++}::uuid`);
+      clientParams.push(clientId);
+    }
+
+    const clientResult = await this.db.query(
+      `SELECT c.id::text AS client_id,
+              c.code AS client_code,
+              c.name AS client_name,
+              cca.token_status,
+              lj.id::text AS last_job_id,
+              lj.status AS last_job_status,
+              lj.finished_at AS last_job_finished_at,
+              lj.last_error AS last_job_error
+       FROM client_channel_accounts cca
+       JOIN clients c ON c.id = cca.client_id
+       LEFT JOIN LATERAL (
+         SELECT j.id, j.status, j.finished_at, j.last_error
+         FROM job_queue j
+         WHERE j.client_id = cca.client_id
+           AND j.job_type = 'zalo_insights_sync'
+         ORDER BY j.created_at DESC
+         LIMIT 1
+       ) lj ON TRUE
+       WHERE ${clientClauses.join(' AND ')}
+       ORDER BY c.code ASC
+       LIMIT 200`,
+      clientParams,
+    );
+
+    const clients = clientResult.rows.map((row) => {
+      const tokenStatus = row.token_status ? String(row.token_status) : null;
+      const jobStatus = row.last_job_status ? String(row.last_job_status) : null;
+      const jobError = row.last_job_error ? String(row.last_job_error) : null;
+      let syncStatus: 'ok' | 'warn' | 'error' = 'ok';
+      if (
+        tokenStatus === 'expired' ||
+        tokenStatus === 'revoked' ||
+        tokenStatus === 'error' ||
+        jobStatus === 'failed' ||
+        jobStatus === 'dead'
+      ) {
+        syncStatus = 'error';
+      } else if (jobStatus === 'pending' || jobStatus === 'running' || jobError) {
+        syncStatus = 'warn';
+      }
+      return {
+        client_id: String(row.client_id),
+        client_code: row.client_code ?? null,
+        client_name: row.client_name ?? null,
+        last_job_id: row.last_job_id ? String(row.last_job_id) : null,
+        last_job_status: jobStatus,
+        last_job_finished_at: iso(row.last_job_finished_at),
+        last_job_error: jobError,
+        token_status: tokenStatus,
+        sync_status: syncStatus,
+      };
+    });
+
+    return {
+      global: {
+        last_sync_at: iso(globalRow.last_sync_at),
+        last_success_at: iso(globalRow.last_success_at),
+        last_error: lastError,
+        accounts_total: Number(globalRow.accounts_total ?? 0),
+        accounts_failed: accountsFailed,
+        status: globalStatus,
+      },
+      clients,
+    };
   }
 
   async fetchHubAttributionStats(params: {

@@ -116,6 +116,10 @@ def run_worker(*, poll_interval: float = 1.0, once: bool = False) -> int:
                 from ptt_jobs.handlers.google_insights_sync import run_google_insights_sync_job
 
                 run_google_insights_sync_job(job)
+            elif job_type == "zalo_insights_sync":
+                from ptt_jobs.handlers.zalo_insights_sync import run_zalo_insights_sync_job
+
+                run_zalo_insights_sync_job(job)
             elif job_type == "meta_token_refresh":
                 from ptt_jobs.handlers.meta_token_refresh import run_meta_token_refresh_job
 

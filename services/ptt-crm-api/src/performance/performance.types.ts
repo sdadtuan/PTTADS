@@ -3,7 +3,7 @@ import type { MetaAttributionMeta } from '../meta-attribution.util';
 export type { MetaAttributionMeta };
 
 export type PerformanceGroupBy = 'day' | 'campaign';
-export type PerformanceChannel = 'meta' | 'google';
+export type PerformanceChannel = 'meta' | 'google' | 'zalo';
 
 export interface PerformanceQuery {
   client_id?: string;

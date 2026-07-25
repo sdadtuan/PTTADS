@@ -78,3 +78,27 @@ export class StaffGoogleAdsViewGuard implements CanActivate {
     return true;
   }
 }
+
+@Injectable()
+export class StaffZaloAdsViewGuard implements CanActivate {
+  constructor(private readonly staffAuth: StaffAuthService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const req = context.switchToHttp().getRequest<
+      Request & { staffUser?: StaffJwtPayload; staffAuthVia?: 'internal' | 'jwt' }
+    >();
+    if (req.staffAuthVia === 'internal') {
+      return true;
+    }
+    if (!req.staffUser) {
+      throw new UnauthorizedException({ error: 'Unauthorized' });
+    }
+    const me = await this.staffAuth.me(req.staffUser);
+    const zalo = this.staffAuth.hasCap(me.caps, 'crm_zalo_ads', 'view');
+    const agency = this.staffAuth.hasCap(me.caps, 'crm_agency', 'view');
+    if (!zalo && !agency) {
+      throw new ForbiddenException({ error: 'missing_cap', section: 'crm_zalo_ads' });
+    }
+    return true;
+  }
+}

@@ -288,6 +288,18 @@ export class ClientsController {
     return this.agency.syncGoogleClientInsights(id);
   }
 
+  @Post(':id/sync/zalo-insights')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(StaffAgencyWriteGuard)
+  async syncZaloInsights(@Param('id') id: string) {
+    return this.agency.syncZaloClientInsights(id);
+  }
+
+  @Get(':id/zalo/sync-status')
+  async zaloSyncStatus(@Param('id') id: string) {
+    return this.agency.zaloSyncStatus(id);
+  }
+
   @Post(':id/offboard')
   @HttpCode(HttpStatus.OK)
   @UseGuards(StaffAgencyConfigureGuard)

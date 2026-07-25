@@ -20,6 +20,8 @@ import { ClientsController } from './clients.controller';
 import {
   StaffAgencyViewGuard,
   StaffFacebookAdsViewGuard,
+  StaffGoogleAdsViewGuard,
+  StaffZaloAdsViewGuard,
 } from './guards/staff-agency-view.guard';
 import { StaffAgencyConfigureGuard } from './guards/staff-agency-configure.guard';
 import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
@@ -40,6 +42,8 @@ import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
     OnboardingOrchestratorService,
     StaffAgencyViewGuard,
     StaffFacebookAdsViewGuard,
+    StaffGoogleAdsViewGuard,
+    StaffZaloAdsViewGuard,
     StaffAgencyWriteGuard,
     StaffAgencyConfigureGuard,
   ],

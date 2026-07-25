@@ -13,9 +13,11 @@ import {
   FacebookHubCampaignsResponse,
   FacebookHubCampaignRow,
   GoogleHubResponse,
+  ZaloHubResponse,
   MetaHubMapSuggestBody,
   MetaHubMapSuggestResponse,
   MetaSyncStatusResponse,
+  ZaloSyncStatusResponse,
   ChannelAlertConfigBody,
   ChannelAlertConfigResponse,
   HubCampaignMapsResponse,
@@ -44,6 +46,7 @@ import {
   buildFacebookHubClientsCsv,
   facebookHubExportFilename,
   googleAdsHubExportFilename,
+  zaloAdsHubExportFilename,
   normalizeHubClientUuid,
 } from './facebook-hub.util';
 import {
@@ -52,12 +55,19 @@ import {
   computeUnmappedSpendPct,
 } from '../meta-attribution.util';
 import { googleAdsPilotStatus, checkGoogleAdsPilot } from './google-ads-pilot.util';
+import { zaloAdsPilotStatus, checkZaloAdsPilot } from './zalo-ads-pilot.util';
 import {
   exchangeGoogleAuthorizationCode,
   googleOAuthAuthorizationUrl,
   googleOAuthConfigured,
   parseGoogleOAuthState,
 } from './google-oauth.util';
+import {
+  exchangeZaloAuthorizationCode,
+  zaloOAuthAuthorizationUrl,
+  zaloOAuthConfigured,
+  parseZaloOAuthState,
+} from './zalo-oauth.util';
 import {
   checkAutosyncStandalone,
   evaluateSoakGate,
@@ -623,6 +633,105 @@ export class AgencyService {
     };
   }
 
+  async zaloHub(query: {
+    days?: string;
+    to?: string;
+    date_to?: string;
+    from?: string;
+    date_from?: string;
+    status?: string;
+    client_id?: string;
+    q?: string;
+  }): Promise<ZaloHubResponse> {
+    await this.ensurePg();
+    const windowDays = Math.min(Math.max(Number(query.days ?? 7) || 7, 1), 90);
+    const dateTo = (query.to ?? query.date_to ?? '').trim() || undefined;
+    const dateFrom = (query.from ?? query.date_from ?? '').trim() || undefined;
+    const clientId = normalizeHubClientUuid(query.client_id);
+    const q = query.q?.trim() || undefined;
+    const status = query.status?.trim() || undefined;
+
+    const { clients, summary, dateFrom: df, dateTo: dt, windowDays: wd } =
+      await this.repo.zaloHubSummary({
+        windowDays,
+        dateTo,
+        dateFrom,
+        status,
+        clientId: clientId ?? undefined,
+        q,
+      });
+
+    return {
+      ok: true,
+      pg_ready: true,
+      date_from: df,
+      date_to: dt,
+      window_days: wd,
+      summary,
+      clients,
+      alerts: this.buildZaloHubAlerts(summary),
+      pilot: zaloAdsPilotStatus(clientId ?? undefined) as unknown as Record<string, unknown>,
+      filters: {
+        client_id: clientId,
+        status: status ?? null,
+        q: q ?? null,
+      },
+    };
+  }
+
+  async zaloHubExportCsv(query: {
+    days?: string;
+    to?: string;
+    date_to?: string;
+    from?: string;
+    date_from?: string;
+    status?: string;
+    client_id?: string;
+    q?: string;
+    scope?: string;
+  }): Promise<{ csv: string; filename: string }> {
+    await this.ensurePg();
+    const hub = await this.zaloHub(query);
+    const scope = (query.scope ?? 'clients').trim().toLowerCase();
+    const meta = { dateFrom: hub.date_from, dateTo: hub.date_to };
+
+    if (scope === 'campaigns') {
+      const rows = await this.repo.zaloHubCampaignExport({
+        dateFrom: hub.date_from,
+        dateTo: hub.date_to,
+        clientId: hub.filters?.client_id ?? undefined,
+        status: hub.filters?.status ?? undefined,
+        q: hub.filters?.q ?? undefined,
+      });
+      return {
+        csv: buildFacebookHubCampaignsCsv(rows, meta),
+        filename: zaloAdsHubExportFilename('campaigns', meta.dateFrom, meta.dateTo),
+      };
+    }
+
+    const exportClients = hub.clients.map((c) => ({
+      id: c.id,
+      code: c.code,
+      name: c.name,
+      status: c.status,
+      owner_am_id: c.owner_am_id,
+      meta_account_count: c.zalo_account_count,
+      spend: c.spend,
+      leads_crm: c.leads_crm,
+      cpl: c.cpl,
+      campaigns: c.campaigns,
+      unmapped_campaigns: c.unmapped_campaigns,
+      over_target_rows: c.over_target_rows,
+      meta_has_token: c.zalo_has_token,
+      token_status: c.token_status,
+    }));
+
+    return {
+      csv: buildFacebookHubClientsCsv(exportClients, meta),
+      filename: zaloAdsHubExportFilename('clients', meta.dateFrom, meta.dateTo),
+    };
+  }
+
   googleAdsPilotStatus(clientId?: string) {
     return { ok: true, pilot: googleAdsPilotStatus(clientId) };
   }
@@ -669,6 +778,67 @@ export class AgencyService {
     const opsWeb = (process.env.PTT_OPS_WEB_URL ?? 'https://ops.pttads.vn').replace(/\/$/, '');
     return {
       redirect_url: `${opsWeb}/agency/clients/${encodeURIComponent(agencyClientId)}?tab=channels&google_oauth=ok`,
+    };
+  }
+
+  zaloAdsPilotStatus(clientId?: string) {
+    return { ok: true, pilot: zaloAdsPilotStatus(clientId) };
+  }
+
+  async zaloOAuthStart(agencyClientId: string, accountId?: string) {
+    await this.ensurePg();
+    await this.assertClientWritable(agencyClientId.trim());
+    if (!zaloOAuthConfigured()) {
+      throw new ServiceUnavailableException({
+        error: 'missing_zalo_oauth_env',
+        hint: 'Cấu hình PTT_ZALO_APP_ID/SECRET và PTT_ZALO_OAUTH_REDIRECT_URI',
+      });
+    }
+    const pilot = checkZaloAdsPilot(agencyClientId);
+    const url = zaloOAuthAuthorizationUrl(agencyClientId.trim(), accountId?.trim() || undefined);
+    return { ok: true, authorization_url: url, pilot };
+  }
+
+  async zaloOAuthCallback(code: string, state: string): Promise<{ redirect_url: string }> {
+    const parsed = parseZaloOAuthState(state);
+    const agencyClientId = parsed.client_id.trim();
+    const accountId = parsed.account_id.trim();
+    if (!agencyClientId) {
+      throw new BadRequestException({ error: 'invalid_oauth_state' });
+    }
+    await this.ensurePg();
+    await this.assertClientWritable(agencyClientId);
+    const tokens = await exchangeZaloAuthorizationCode(code);
+    let targetAccountId = accountId;
+    if (!targetAccountId) {
+      const client = await this.getClient(agencyClientId);
+      const zaloAcc = (client.channel_accounts ?? []).find((a) => a.channel === 'zalo');
+      targetAccountId = zaloAcc?.id ?? '';
+    }
+    if (!targetAccountId) {
+      throw new BadRequestException({
+        error: 'zalo_account_required',
+        message: 'Tạo channel account Zalo trước khi connect OAuth',
+      });
+    }
+    await this.setChannelAccountToken(agencyClientId, targetAccountId, {
+      access_token: tokens.access_token,
+    });
+    const opsWeb = (process.env.PTT_OPS_WEB_URL ?? 'https://ops.pttads.vn').replace(/\/$/, '');
+    return {
+      redirect_url: `${opsWeb}/agency/clients/${encodeURIComponent(agencyClientId)}?tab=channels&zalo_oauth=ok`,
+    };
+  }
+
+  async zaloSyncStatus(clientId?: string): Promise<ZaloSyncStatusResponse> {
+    await this.ensurePg();
+    const normalized = normalizeHubClientUuid(clientId);
+    const out = await this.repo.fetchZaloSyncStatus(normalized ?? undefined);
+    return {
+      ok: true,
+      global: out.global,
+      clients: out.clients,
+      count: out.clients.length,
     };
   }
 
@@ -925,6 +1095,29 @@ export class AgencyService {
         severity: 'warn',
         message: `${overTarget} dòng CPL vượt target trong kỳ đã chọn`,
         link: '/google/google-ads',
+        link_label: 'Xem bảng client',
+      });
+    }
+    return alerts;
+  }
+
+  private buildZaloHubAlerts(summary: Record<string, unknown>): FacebookHubAlert[] {
+    const alerts: FacebookHubAlert[] = [];
+    const unmapped = Number(summary.unmapped_campaigns ?? 0);
+    const overTarget = Number(summary.over_target_rows ?? 0);
+    if (unmapped > 0) {
+      alerts.push({
+        severity: 'warn',
+        message: `${unmapped} campaign Zalo chưa map Hub`,
+        link: '/crm/hub',
+        link_label: 'Mở Hub map',
+      });
+    }
+    if (overTarget > 0) {
+      alerts.push({
+        severity: 'warn',
+        message: `${overTarget} dòng CPL vượt target trong kỳ đã chọn`,
+        link: '/zalo/zalo-ads',
         link_label: 'Xem bảng client',
       });
     }
@@ -1232,6 +1425,17 @@ export class AgencyService {
         })),
       );
     }
+    if (account?.channel === 'zalo' && account.has_token && !body.revoke) {
+      const enqueued = await this.sideEffects.enqueueZaloInsightsSync(clientId);
+      jobs = (jobs ?? []).concat(
+        enqueued.map((j) => ({
+          id: j.id,
+          job_type: j.job_type,
+          status: j.status,
+          created: j.created,
+        })),
+      );
+    }
     const detail = await this.getClient(clientId);
     return jobs?.length ? { ...detail, side_effects: { jobs_enqueued: jobs } } : detail;
   }
@@ -1270,6 +1474,33 @@ export class AgencyService {
     }
     const pilot = checkGoogleAdsPilot(clientId);
     const jobs = await this.sideEffects.enqueueGoogleInsightsSync(clientId);
+    if (!jobs.length) {
+      throw new ServiceUnavailableException({
+        error: 'jobs_disabled',
+        hint: 'Bật PTT_JOBS_ENABLED=1 và chạy ptt-worker',
+      });
+    }
+    return {
+      ok: true,
+      pilot,
+      jobs_enqueued: jobs.map((j) => ({
+        id: j.id,
+        job_type: j.job_type,
+        status: j.status,
+        created: j.created,
+      })),
+    };
+  }
+
+  async syncZaloClientInsights(clientId: string): Promise<{ ok: boolean; jobs_enqueued: AgencySideEffectsSummary['jobs_enqueued']; pilot?: ReturnType<typeof checkZaloAdsPilot> }> {
+    await this.ensurePg();
+    await this.assertClientWritable(clientId);
+    const client = await this.repo.fetchClient(clientId);
+    if (!client) {
+      throw new NotFoundException({ error: 'Not found' });
+    }
+    const pilot = checkZaloAdsPilot(clientId);
+    const jobs = await this.sideEffects.enqueueZaloInsightsSync(clientId);
     if (!jobs.length) {
       throw new ServiceUnavailableException({
         error: 'jobs_disabled',

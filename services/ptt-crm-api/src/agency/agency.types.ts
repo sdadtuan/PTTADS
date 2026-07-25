@@ -437,3 +437,39 @@ export interface GoogleHubResponse {
     q?: string | null;
   };
 }
+
+export interface ZaloHubClientRow {
+  id: string;
+  code: string | null;
+  name: string | null;
+  status: string | null;
+  owner_am_id: string | null;
+  zalo_account_count: number;
+  spend: number;
+  leads_crm: number;
+  cpl: number | null;
+  campaigns: number;
+  unmapped_campaigns: number;
+  over_target_rows: number;
+  zalo_has_token: boolean;
+  token_status: string;
+}
+
+export interface ZaloHubResponse {
+  ok: boolean;
+  pg_ready: boolean;
+  date_from: string;
+  date_to: string;
+  window_days: number;
+  summary: Record<string, unknown>;
+  clients: ZaloHubClientRow[];
+  alerts: FacebookHubAlert[];
+  pilot?: Record<string, unknown>;
+  filters?: {
+    client_id?: string | null;
+    status?: string | null;
+    q?: string | null;
+  };
+}
+
+export type ZaloSyncStatusResponse = MetaSyncStatusResponse;

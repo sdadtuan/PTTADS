@@ -20,6 +20,8 @@ import {
   AgencyStatsResponse,
   FacebookHubResponse,
   GoogleHubResponse,
+  ZaloHubResponse,
+  ZaloSyncStatusResponse,
   JobsListResponse,
   NotificationsListResponse,
   PatchHubCampaignMapBody,
@@ -36,6 +38,7 @@ import {
   StaffAgencyViewGuard,
   StaffFacebookAdsViewGuard,
   StaffGoogleAdsViewGuard,
+  StaffZaloAdsViewGuard,
 } from './guards/staff-agency-view.guard';
 import { StaffAgencyWriteGuard } from './guards/staff-agency-write.guard';
 
@@ -312,6 +315,85 @@ export class AgencyOpsController {
     @Res() res: Response,
   ) {
     const out = await this.agency.googleOAuthCallback(code, state);
+    res.redirect(302, out.redirect_url);
+  }
+
+  @Get('zalo-ads/pilot-status')
+  @UseGuards(StaffOrInternalKeyGuard, StaffZaloAdsViewGuard)
+  zaloAdsPilotStatus(@Query('client_id') clientId?: string) {
+    return this.agency.zaloAdsPilotStatus(clientId);
+  }
+
+  @Get('zalo-ads/hub')
+  @UseGuards(StaffOrInternalKeyGuard, StaffZaloAdsViewGuard)
+  async zaloHub(
+    @Query('days') days?: string,
+    @Query('to') to?: string,
+    @Query('date_to') dateTo?: string,
+    @Query('from') from?: string,
+    @Query('date_from') dateFrom?: string,
+    @Query('status') status?: string,
+    @Query('client_id') clientId?: string,
+    @Query('q') q?: string,
+  ): Promise<ZaloHubResponse> {
+    return this.agency.zaloHub({
+      days,
+      to,
+      date_to: dateTo,
+      from,
+      date_from: dateFrom,
+      status,
+      client_id: clientId,
+      q,
+    });
+  }
+
+  @Get('zalo-ads/hub/export')
+  @UseGuards(StaffOrInternalKeyGuard, StaffZaloAdsViewGuard)
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  async zaloHubExport(
+    @Res({ passthrough: true }) res: Response,
+    @Query('days') days?: string,
+    @Query('to') to?: string,
+    @Query('date_to') dateTo?: string,
+    @Query('from') from?: string,
+    @Query('date_from') dateFrom?: string,
+    @Query('status') status?: string,
+    @Query('client_id') clientId?: string,
+    @Query('q') q?: string,
+    @Query('scope') scope?: string,
+  ): Promise<string> {
+    const out = await this.agency.zaloHubExportCsv({
+      days,
+      to,
+      date_to: dateTo,
+      from,
+      date_from: dateFrom,
+      status,
+      client_id: clientId,
+      q,
+      scope,
+    });
+    res.setHeader('Content-Disposition', `attachment; filename="${out.filename}"`);
+    return out.csv;
+  }
+
+  @Get('zalo-ads/oauth/start')
+  @UseGuards(StaffOrInternalKeyGuard, StaffAgencyWriteGuard)
+  zaloOAuthStart(
+    @Query('client_id') clientId: string,
+    @Query('account_id') accountId?: string,
+  ) {
+    return this.agency.zaloOAuthStart(clientId, accountId);
+  }
+
+  @Get('zalo-ads/oauth/callback')
+  async zaloOAuthCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Res() res: Response,
+  ) {
+    const out = await this.agency.zaloOAuthCallback(code, state);
     res.redirect(302, out.redirect_url);
   }
 
